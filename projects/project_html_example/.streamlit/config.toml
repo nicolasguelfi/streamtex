@@ -1,0 +1,16 @@
+[theme]
+base="dark"
+font = "sans serif"
+
+[browser]
+gatherUsageStats = false
+
+[server]
+port = 8501
+address = "0.0.0.0"
+enableStaticServing = true
+headless = false
+runOnSave = true
+
+[client]
+showSidebarNavigation = true

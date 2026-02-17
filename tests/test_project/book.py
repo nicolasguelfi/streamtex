@@ -1,0 +1,48 @@
+import streamlit as st
+import setup
+from streamtex import st_book, TOCConfig
+import blocks
+from custom.styles import Styles as s
+from custom.themes import dark
+import streamtex.styles as sts
+
+
+st.set_page_config(
+    page_title="StreamTeX Training Course",
+    page_icon=None,
+    layout="wide",
+    initial_sidebar_state="collapsed",
+    menu_items=None
+)
+
+toc = TOCConfig(
+    numerate_titles=False,
+    toc_position=0,
+    title_style=s.project.titles.course_title + s.center_txt + s.text.wrap.nowrap,
+    content_style=s.large + s.text.colors.reset
+)
+
+sts.theme = dark
+
+st_book([
+    blocks.bck_00_welcome,
+    blocks.bck_01_architecture,
+    blocks.bck_02_style_system,
+    blocks.bck_03_custom_styles,
+    blocks.bck_04_spacing,
+    blocks.bck_05_text_basics,
+    blocks.bck_06_containers,
+    blocks.bck_07_text_styles,
+    blocks.bck_08_container_styles,
+    blocks.bck_09_text_inline,
+    blocks.bck_10_grid_basics,
+    blocks.bck_11_grid_cell_styles,
+    blocks.bck_12_lists,
+    blocks.bck_13_images,
+    blocks.bck_14_overlays,
+    blocks.bck_15_toc,
+    blocks.bck_16_visibility,
+    blocks.bck_17_themes,
+    blocks.bck_18_best_practices,
+    blocks.bck_19_static_assets,
+], toc_config=toc, separator=blocks.separator)

@@ -1,0 +1,15 @@
+{
+    "project": "StreamTeX",
+    "version": "1.0",
+    "features": [
+        {"name": "st_write", "category": "text"},
+        {"name": "st_grid", "category": "layout"},
+        {"name": "st_image", "category": "media"},
+        {"name": "st_list", "category": "text"},
+        {"name": "st_block", "category": "layout"}
+    ],
+    "metadata": {
+        "author": "StreamTeX Team",
+        "license": "MIT"
+    }
+}

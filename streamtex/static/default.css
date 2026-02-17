@@ -1,0 +1,48 @@
+/* default.css */
+
+
+/* Make the header transparent and let mouse clicks pass through it */
+header[data-testid="stHeader"] {
+    background-color: transparent !important;
+    pointer-events: none; /* Allows to click "through" the header background */
+}
+/* Re-enable clicks on interactive children (deploy button, hamburger menu) */
+header[data-testid="stHeader"] > * {
+    pointer-events: auto;
+}
+
+/* Changes the default font of the web page to Arial */
+.stApp {
+    font-family: Arial, Helvetica, sans-serif !important;
+}
+
+/* Removes the default streamlit padding at the top of the page */
+.stMainBlockContainer {
+    padding-top: 0;
+    padding-bottom: 0;
+}
+ 
+/* Makes st_br invisible as it should be*/
+.stElementContainer {
+    min-width: 0;
+}
+
+/* Removes margins of st_* function calls */
+div[data-testid="stBidiComponentRegular"] > * {
+    margin: 0 auto;
+}
+.stHtml > * {
+    margin: 0 auto;
+}
+
+/* Removes gaps between blocks in a st_book */
+.stVerticalBlock {
+    gap: 0;
+}
+
+/* Changes the default link underlining color*/
+a {
+    color: #1155cc;
+}
+
+

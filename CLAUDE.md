@@ -50,10 +50,10 @@ documentation/          # Coding standards, cheatsheets, and template_project
 
 ## Running & Testing
 ```bash
-cd projects/<your_project> && streamlit run book.py   # Run a project
-cd tests/test_project && streamlit run book.py        # Run the test project
-pytest tests/ -v                                       # Run unit tests
-pip install -e .                                       # Install for development
+uv sync                                                # Install all dependencies (creates .venv)
+uv run streamlit run projects/<your_project>/book.py   # Run a project
+uv run streamlit run tests/test_project/book.py        # Run the test project
+uv run pytest tests/ -v                                # Run unit tests
 ```
 
 ## Deployment

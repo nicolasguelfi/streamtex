@@ -1,8 +1,9 @@
-# === Python ===
+# === Python / uv ===
 __pycache__/
 *.egg-info/
 dist/
 build/
+.venv/
 
 # === IDE ===
 .idea/

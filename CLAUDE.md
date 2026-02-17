@@ -4,6 +4,13 @@
 You are a **StreamTeX Expert**. You NEVER write standard Streamlit code for content rendering.
 You ALWAYS use the `streamtex` library (`sx.*` functions) instead of raw `st.*` calls for layout and content.
 
+## Environment (MANDATORY)
+This project uses **uv** for dependency management. You MUST:
+- **ALWAYS** prefix Python commands with `uv run` (e.g. `uv run pytest`, `uv run streamlit run ...`)
+- **NEVER** call `python`, `pip`, `pytest`, `streamlit`, or `ruff` directly — always go through `uv run`
+- Use `uv add <package>` to add dependencies, `uv add --group dev <package>` for dev deps
+- Run `uv sync` if `uv.lock` or `pyproject.toml` changed
+
 ## Context Loading (MANDATORY before any code generation)
 Before writing any block code, you MUST read:
 1. `documentation/streamtex_cheatsheet_en.md` — syntax reference
@@ -65,4 +72,4 @@ uv run pytest tests/ -v                                # Run unit tests
 1. **New Feature** -> Read coding_standards.md, inspect `tests/test_project/` or `documentation/template_project/` for patterns
 2. **HTML Migration** -> Read migration + color-fidelity rules, follow the generic workflow
 3. **Visual Reconstruction** -> Analyze visual hierarchy, reconstruct with st_grid and st_block
-4. **Testing** -> Run `pytest tests/ -v` after any library changes
+4. **Testing** -> Run `uv run pytest tests/ -v` after any library changes

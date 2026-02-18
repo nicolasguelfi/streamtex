@@ -1,6 +1,7 @@
 import os
 import streamlit as st
 from .styles import Style, StreamTeX_Styles
+from .export import _render
 from .utils import __is_url, __is_absolute_path, __is_relative_path, __get_mime_type, __get_base64_encoded_image, contain_link
 
 _static_image_base = "app/static/images"
@@ -61,7 +62,7 @@ def st_image(
     html_content = contain_link(html_content, link, False, hover)
 
     # 6. Render
-    st.html(html_content)
+    _render(html_content)
 
 def get_image_src(uri: str) -> str:
     """

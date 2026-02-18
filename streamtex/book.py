@@ -12,15 +12,23 @@ from .marker import reset_marker_registry, inject_marker_navigation, MarkerConfi
 from .enums import Tags
 from .utils import inject_link_preview_scaffold
 from .zoom import add_zoom_options
+from .export import ExportConfig, reset_export_buffer, generate_export_html, is_export_active
 
 
-def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConfig = None, separator=None, *args, **kwargs):
+def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConfig = None, separator=None,
+            export: bool = True, export_title: str = "StreamTeX Export",
+            *args, **kwargs):
     """Generates a web page e-book from a list of block modules.
 
     :param separator: Optional module with a build() function, rendered between each block.
+    :param export: If True, enables HTML export with a download button in the sidebar.
+    :param export_title: Title used for the exported HTML document.
     """
     start_time = time.time()
     print("Starting st_book function...")
+
+    # Initialise the export buffer (no-op if export=False)
+    reset_export_buffer(ExportConfig(enabled=export, page_title=export_title))
 
     # Load default CSS styles
     load_css("default.css")
@@ -84,6 +92,19 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
     # Inject marker navigation JS (only if markers were registered)
     if marker_config is not None:
         inject_marker_navigation()
+
+    # Offer HTML download when export is active
+    if is_export_active():
+        full_html = generate_export_html()
+        if full_html:
+            file_name = f"{export_title.replace(' ', '_').lower()}.html"
+            with st.sidebar:
+                st.download_button(
+                    label="\U0001F4E5 Download HTML",
+                    data=full_html,
+                    file_name=file_name,
+                    mime="text/html",
+                )
 
     end_time = time.time()
     duration = end_time - start_time

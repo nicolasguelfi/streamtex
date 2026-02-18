@@ -30,5 +30,8 @@ from .enums import Tags
 # Zoom
 from .zoom import add_zoom_options, inject_zoom_logic
 
+# Export
+from .export import ExportConfig
+
 # Utilities
 from .utils import inject_link_preview_scaffold

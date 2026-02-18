@@ -4,6 +4,7 @@ from contextlib import contextmanager
 from .styles import Style, StyleGrid, StreamTeX_Styles
 from .container import st_block
 from .utils import generate_key
+from .export import export_push_wrapper, export_pop_wrapper, is_export_active
 
 # Helper type definition
 CELL_STYLES_TYPE = Union[List[List[Style]], List[Style], Style, StyleGrid]
@@ -162,11 +163,19 @@ def st_grid(
     </style>
     """
     st.html(css)
-    
-    # 4. Render
+
+    # 4. Export wrapper (no-op when export is inactive)
+    if is_export_active():
+        export_push_wrapper(
+            f'<div style="display:grid;grid-template-columns:{template};gap:0;align-items:stretch;{grid_style}">')
+
+    # 5. Render
     with st.container():
         # Marker
         st.html(f'<span class="{grid_id}" style="display:none"></span>')
-        
+
         controller = GridController(cols, cell_styles)
         yield controller
+
+    if is_export_active():
+        export_pop_wrapper("</div>")

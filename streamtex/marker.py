@@ -6,6 +6,7 @@ import streamlit.components.v1 as components
 from dataclasses import dataclass, field
 from typing import Optional
 from .utils import generate_key
+from .export import _render
 
 
 @dataclass
@@ -124,7 +125,7 @@ def st_marker(label: str = "", visible: bool = False) -> None:
         style = "height: 0; overflow: hidden; scroll-margin-top: 80px;"
         html = f'<div id="{anchor}" class="streamtex-marker" data-marker-index="{idx}" style="{style}"></div>'
 
-    st.html(html)
+    _render(html)
 
 
 # ---------------------------------------------------------------------------

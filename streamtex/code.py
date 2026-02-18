@@ -1,5 +1,6 @@
 import streamlit as st
 from .styles import Style, StreamTeX_Styles
+from .export import _render
 
 
 def st_code(
@@ -70,4 +71,4 @@ def st_code(
         f"color: #F8F8F2; font-size: {font_size};"
     )
     final_html = f'{line_no_css}<div style="{container_style}">{highlighted}</div>'
-    st.html(final_html)
+    _render(final_html)

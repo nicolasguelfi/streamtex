@@ -6,6 +6,7 @@ from .styles import Style, StreamTeX_Styles as s, ListStyle
 from .container import st_block
 from .enums import ListType, ListTypes
 from .utils import generate_key
+from .export import export_push_wrapper, export_pop_wrapper, is_export_active
 
 _current_list_level = ContextVar("list_level", default=0)
 
@@ -80,16 +81,23 @@ class ListController:
         #    -> ::before (Bullet)
         #    -> [ st.container (Inner) ]
         #          -> User Content (Stacked)
-        
-        with st_block(style=final_style):
+
+        # Export wrapper: <li> (suppresses st_block's own <div>)
+        if is_export_active():
+            export_push_wrapper(f'<li style="{final_style}">')
+
+        with st_block(style=final_style, _export_wrapper=False):
             st.html(f'<span class="{item_id}" style="display:none"></span>')
-            
+
             # THIS IS THE FIX:
             # We open a new container to wrap all user content.
             # This container becomes the second item in the Flex Row,
             # and it naturally stacks its children (st_write, st_list) vertically.
             with st.container():
                 yield
+
+        if is_export_active():
+            export_pop_wrapper("</li>")
 
 
 @contextmanager
@@ -149,7 +157,8 @@ def st_list(
             elif next_level >= 3: bullet_content = "'■'"
 
         list_id = generate_key("ul")
-        
+        tag = "ol" if is_ordered else "ul"
+
         css = f"""
         <style>
             div[data-testid="stVerticalBlock"]:has(> .element-container .stHtml span.{list_id}) {{
@@ -161,9 +170,16 @@ def st_list(
         """
         st.html(css)
 
-        with st_block(style=l_style):
+        # Export wrapper: semantic <ul>/<ol> (suppresses st_block's own <div>)
+        if is_export_active():
+            export_push_wrapper(f'<{tag} style="{l_style}">')
+
+        with st_block(style=l_style, _export_wrapper=False):
             st.html(f'<span class="{list_id}" style="display:none"></span>')
             yield ListController(li_style=li_style, bullet_content=bullet_content, is_ordered=is_ordered)
+
+        if is_export_active():
+            export_pop_wrapper(f"</{tag}>")
             
     finally:
         _current_list_level.reset(token)

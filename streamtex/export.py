@@ -1,0 +1,175 @@
+"""HTML Export — self-contained HTML export for StreamTeX books.
+
+Provides a dual-rendering pipeline: each content call goes to both
+Streamlit (st.html) and an optional export buffer.  Context managers
+(st_block, st_grid, st_list) push/pop wrapper tags so the exported
+HTML reproduces the nesting structure with inline styles.
+"""
+
+import importlib.resources as resources
+import os
+import streamlit as st
+from dataclasses import dataclass, field
+from typing import Optional
+
+
+# ---------------------------------------------------------------------------
+# Configuration
+# ---------------------------------------------------------------------------
+
+@dataclass
+class ExportConfig:
+    """Settings for the HTML export feature."""
+    enabled: bool = False
+    page_title: str = "StreamTeX Export"
+    page_width: str = "1224pt"
+    page_padding: str = "36pt"
+
+
+# ---------------------------------------------------------------------------
+# Buffer with nesting stack
+# ---------------------------------------------------------------------------
+
+class HtmlExportBuffer:
+    """Accumulates HTML fragments with push/pop support for nested wrappers.
+
+    ``_stack`` is a list of levels.  Each level is a list of HTML strings.
+    ``push_wrapper`` opens a new level; ``pop_wrapper`` collapses it back
+    into the parent level wrapped in the given close tag.
+    """
+
+    def __init__(self, config: ExportConfig):
+        self.config = config
+        self._stack: list[list[str]] = [[]]  # root level
+
+    def append(self, html_fragment: str) -> None:
+        """Add a fragment to the current (innermost) level."""
+        self._stack[-1].append(html_fragment)
+
+    def push_wrapper(self, open_tag: str) -> None:
+        """Open a new nesting level starting with *open_tag*."""
+        self._stack.append([open_tag])
+
+    def pop_wrapper(self, close_tag: str) -> None:
+        """Close the current level and collapse it into its parent."""
+        if len(self._stack) <= 1:
+            return  # safety: never pop the root
+        level = self._stack.pop()
+        level.append(close_tag)
+        self._stack[-1].append("\n".join(level))
+
+    def get_body_html(self) -> str:
+        """Return all accumulated HTML from the root level."""
+        return "\n".join(self._stack[0])
+
+    def reset(self) -> None:
+        self._stack = [[]]
+
+    def generate_full_html(self) -> str:
+        """Produce a complete, self-contained HTML document."""
+        body = self.get_body_html()
+        css = _load_default_css()
+        c = self.config
+        return (
+            "<!DOCTYPE html>\n"
+            f"<html lang=\"en\">\n<head>\n"
+            f"<meta charset=\"UTF-8\">\n"
+            f"<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n"
+            f"<title>{c.page_title}</title>\n"
+            f"<style>\n"
+            f"*, *::before, *::after {{ box-sizing: border-box; margin: 0; padding: 0; }}\n"
+            f"body {{ font-family: Arial, Helvetica, sans-serif; background: #fff; }}\n"
+            f"a {{ color: #1155cc; }}\n"
+            f"{css}\n"
+            f".streamtex-page {{\n"
+            f"  max-width: {c.page_width};\n"
+            f"  margin: 0 auto;\n"
+            f"  padding: {c.page_padding};\n"
+            f"}}\n"
+            f"</style>\n"
+            f"</head>\n<body>\n"
+            f"<div class=\"streamtex-page\">\n"
+            f"{body}\n"
+            f"</div>\n"
+            f"</body>\n</html>\n"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Internal helper
+# ---------------------------------------------------------------------------
+
+def _load_default_css() -> str:
+    """Load the default.css bundled with StreamTeX."""
+    try:
+        with resources.open_text("streamtex.static", "default.css") as f:
+            return f.read()
+    except (FileNotFoundError, ModuleNotFoundError, TypeError):
+        current_dir = os.path.dirname(__file__)
+        css_path = os.path.join(current_dir, "static", "default.css")
+        try:
+            with open(css_path) as f:
+                return f.read()
+        except FileNotFoundError:
+            return ""
+
+
+# ---------------------------------------------------------------------------
+# Global singleton (same pattern as toc.py / marker.py)
+# ---------------------------------------------------------------------------
+
+_buffer: Optional[HtmlExportBuffer] = None
+
+
+def reset_export_buffer(config: ExportConfig = None) -> None:
+    """Initialise or reset the global export buffer."""
+    global _buffer
+    if config is None or not config.enabled:
+        _buffer = None
+        return
+    if _buffer is not None:
+        _buffer.config = config
+        _buffer.reset()
+    else:
+        _buffer = HtmlExportBuffer(config)
+
+
+def is_export_active() -> bool:
+    """Return True when the export buffer is collecting fragments."""
+    return _buffer is not None
+
+
+def export_append(html: str) -> None:
+    """Append *html* to the buffer (no-op when export is inactive)."""
+    if _buffer is not None:
+        _buffer.append(html)
+
+
+def export_push_wrapper(open_tag: str) -> None:
+    """Push a wrapper open-tag onto the nesting stack (no-op when inactive)."""
+    if _buffer is not None:
+        _buffer.push_wrapper(open_tag)
+
+
+def export_pop_wrapper(close_tag: str) -> None:
+    """Pop and close the current nesting level (no-op when inactive)."""
+    if _buffer is not None:
+        _buffer.pop_wrapper(close_tag)
+
+
+def generate_export_html() -> Optional[str]:
+    """Return the full HTML document, or None when export is inactive."""
+    if _buffer is None:
+        return None
+    return _buffer.generate_full_html()
+
+
+# ---------------------------------------------------------------------------
+# Dual render — the single bridge from content modules to st.html()
+# ---------------------------------------------------------------------------
+
+def _render(html: str) -> None:
+    """Send *html* to Streamlit **and** to the export buffer (if active)."""
+    st.html(html)
+    if _buffer is not None:
+        _buffer.append(html)

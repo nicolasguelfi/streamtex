@@ -1,6 +1,7 @@
 from typing import Optional
 import streamlit as st
 from .styles import Style, StreamTeX_Styles
+from .export import _render
 from .enums import Tag, Tags
 from .utils import contain_link, generate_key, strip_html
 from .toc import register_toc_entry
@@ -51,7 +52,7 @@ def st_write(
     # Thus, this could be a future source of bugs.
     txt_tag = contain_link(txt_tag, link, no_link_decor, hover)
 
-    st.html(txt_tag)
+    _render(txt_tag)
 
 def _parse_args(*args, style: Style = StreamTeX_Styles.none, no_link_decor:bool=False, hover:bool=False):
     """

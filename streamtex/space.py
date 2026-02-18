@@ -1,5 +1,6 @@
 import streamlit as st
 from typing import Literal
+from .export import _render
 
 def st_space(direction: Literal["v", "h"] = "v", size="1em") -> str:
     """
@@ -24,7 +25,7 @@ def st_space(direction: Literal["v", "h"] = "v", size="1em") -> str:
         # Horizontal space with padding-left
         space_tag = f"""<span style="padding-left: {size};"></span>"""
     
-    st.html(space_tag)
+    _render(space_tag)
 
 def st_br():
    

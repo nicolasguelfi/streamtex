@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 
 _ZOOM_STATE_KEY = "streamtex_zoom"
 
@@ -103,64 +104,86 @@ def inject_zoom_logic(zoom_setting):
     </style>
     """
 
-    # 3. JS via parent.document (accesses main page from sandboxed iframe)
+    # 3. JS via components.html() — st.html() strips <script> in Streamlit 1.54+
+    # Uses parent.document to access the main page from the iframe.
     js_logic = f"""
     <script>
-        function updateLayout() {{
-            try {{
-                // Access the main Streamlit page from the st.html() iframe
-                const doc = parent.document;
-                const win = doc.defaultView || parent;
-                const page = doc.querySelector('.block-container');
-                if (!page) return;
+        (function() {{
+            var doc = parent.document;
+            var win = doc.defaultView || parent;
 
-                // Refine sidebar offset with exact pixel width
-                const sidebar = doc.querySelector(
-                    '[data-testid="stSidebar"]');
-                const app = doc.querySelector('.stApp');
-                if (app) {{
-                    if (sidebar && sidebar.offsetWidth > 50) {{
-                        app.style.setProperty(
-                            '--streamtex-sidebar-offset',
-                            sidebar.offsetWidth + 'px');
-                    }} else {{
-                        app.style.setProperty(
-                            '--streamtex-sidebar-offset', '0px');
-                    }}
-                }}
-
-                // Fit scale logic
-                {fit_logic_js}
-
-                // Ghost space fix: collapse gap between layout and visual height
-                const rootStyle = win.getComputedStyle(doc.documentElement);
-                const scale =
-                    parseFloat(rootStyle.getPropertyValue('--streamtex-scale'))
-                    || parseFloat(rootStyle.getPropertyValue(
-                           '--streamtex-fit-scale'))
-                    || 1;
-                const origHeight = page.offsetHeight;
-                const visualHeight = origHeight * scale;
-                const ghostSpace = origHeight - visualHeight;
-                if (ghostSpace > 50) {{
-                    page.style.marginBottom = `-${{ghostSpace - 50}}px`;
-                }}
-            }} catch(e) {{
-                // Cross-origin: CSS :has() fallback handles sidebar offset
+            // Cleanup previous run
+            if (win._stxZoomCleanup) {{
+                try {{ win._stxZoomCleanup(); }} catch(e) {{}}
             }}
-        }}
 
-        // Set up triggers on the PARENT window/document
-        try {{
-            parent.addEventListener('resize', updateLayout);
-            new MutationObserver(updateLayout).observe(
-                parent.document.body,
+            function updateLayout() {{
+                try {{
+                    var page = doc.querySelector('.block-container');
+                    if (!page) return;
+
+                    // Refine sidebar offset with exact pixel width
+                    var sidebar = doc.querySelector(
+                        '[data-testid="stSidebar"]');
+                    var app = doc.querySelector('.stApp');
+                    if (app) {{
+                        if (sidebar && sidebar.offsetWidth > 50) {{
+                            app.style.setProperty(
+                                '--streamtex-sidebar-offset',
+                                sidebar.offsetWidth + 'px');
+                        }} else {{
+                            app.style.setProperty(
+                                '--streamtex-sidebar-offset', '0px');
+                        }}
+                    }}
+
+                    // Fit scale logic
+                    {fit_logic_js}
+
+                    // Ghost space fix: collapse gap between layout and visual height
+                    var rootStyle = win.getComputedStyle(doc.documentElement);
+                    var scale =
+                        parseFloat(rootStyle.getPropertyValue('--streamtex-scale'))
+                        || parseFloat(rootStyle.getPropertyValue(
+                               '--streamtex-fit-scale'))
+                        || 1;
+                    var origHeight = page.offsetHeight;
+                    var visualHeight = origHeight * scale;
+                    var ghostSpace = origHeight - visualHeight;
+                    if (ghostSpace > 50) {{
+                        page.style.marginBottom = '-' + (ghostSpace - 50) + 'px';
+                    }}
+                }} catch(e) {{}}
+            }}
+
+            // Window resize
+            win.addEventListener('resize', updateLayout);
+
+            // DOM mutations (sidebar open/close, content changes)
+            var obs = new MutationObserver(updateLayout);
+            obs.observe(doc.body,
                 {{ childList: true, subtree: true, attributes: true }});
-        }} catch(e) {{}}
 
-        setTimeout(updateLayout, 200);
+            // ResizeObserver on sidebar for drag-resize
+            var resObs = null;
+            var sidebar = doc.querySelector('[data-testid="stSidebar"]');
+            if (sidebar && typeof ResizeObserver !== 'undefined') {{
+                resObs = new ResizeObserver(updateLayout);
+                resObs.observe(sidebar);
+            }}
+
+            // Cleanup for next Streamlit rerun
+            win._stxZoomCleanup = function() {{
+                win.removeEventListener('resize', updateLayout);
+                obs.disconnect();
+                if (resObs) resObs.disconnect();
+            }};
+
+            setTimeout(updateLayout, 200);
+        }})();
     </script>
     """
 
     st.html(css)
-    st.html(js_logic)
+    # components.html() creates a real iframe where scripts execute
+    components.html(js_logic, height=0)

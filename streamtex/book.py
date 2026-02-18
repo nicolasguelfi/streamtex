@@ -41,8 +41,11 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
     # Extract ToC config and create ToC placeholders
     use_toc_sidebar = toc_config is not None
     use_toc_block = use_toc_sidebar and toc_config.toc_position is not None
+    markers_sidebar = None
     if use_toc_sidebar:
-        toc_sidebar = build_ToC_sidebar_placeholder()
+        toc_sidebar, markers_sidebar = build_ToC_sidebar_placeholder(
+            has_markers=marker_config is not None
+        )
         toc_block = None
         toc_content_style = None
     if use_toc_block:
@@ -75,6 +78,8 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
     # Fill the ToC placeholder
     if use_toc_sidebar:
         populate_toc(toc_sidebar, toc_block, toc_content_style)
+        if markers_sidebar is not None:
+            populate_markers_sidebar(markers_sidebar)
 
     # Inject marker navigation JS (only if markers were registered)
     if marker_config is not None:
@@ -100,12 +105,17 @@ def load_css(file_name: str):
             st.html(f'<style>{f.read()}</style>')
 
 
-def build_ToC_sidebar_placeholder():
+def build_ToC_sidebar_placeholder(has_markers=False):
     with st.sidebar:
-        st.header("Table of Contents")
-        toc_sidebar = st.empty()
-
-    return toc_sidebar
+        if has_markers:
+            tab_toc, tab_markers = st.tabs(["Contents", "Markers"])
+            toc_sidebar = tab_toc.empty()
+            markers_sidebar = tab_markers.empty()
+            return toc_sidebar, markers_sidebar
+        else:
+            st.header("Table of Contents")
+            toc_sidebar = st.empty()
+            return toc_sidebar, None
 
 
 def populate_toc(toc_sidebar: Delta, toc_block: Delta = None, toc_content_style: Style = None):
@@ -135,6 +145,19 @@ def populate_toc(toc_sidebar: Delta, toc_block: Delta = None, toc_content_style:
                 st_write(toc_content_style, f"{indent}{entry['title']}",
                                 link=f"#{entry['key_anchor']}", hover=False, no_link_decor=True)
                 st_br()
+
+
+def populate_markers_sidebar(markers_placeholder: Delta):
+    entries = marker_entries()
+    if not entries:
+        return
+    with markers_placeholder.container():
+        for entry in entries:
+            idx = entry['index'] + 1
+            st.html(
+                f'<span style="overflow:hidden;text-overflow:ellipsis;text-wrap:nowrap;word-wrap:normal;">'
+                f'<a href="#{entry["anchor"]}">{idx}. {entry["label"]}</a></span>'
+            )
 
 
 def st_toc(toc_title_style):

@@ -4,12 +4,14 @@ from .styles import Style, StreamTeX_Styles
 from .enums import Tag, Tags
 from .utils import contain_link, generate_key, strip_html
 from .toc import register_toc_entry
+from .marker import register_marker, get_marker_config
 
 
 def st_write(
-    *args, style: Style = StreamTeX_Styles.none, tag: Tag = Tags.span, 
-    link:str="", no_link_decor:bool=False, hover:bool=True, 
-    toc_lvl: Optional[str] = None, label: str = "" ):
+    *args, style: Style = StreamTeX_Styles.none, tag: Tag = Tags.span,
+    link:str="", no_link_decor:bool=False, hover:bool=True,
+    toc_lvl: Optional[str] = None, label: str = "",
+    marker: Optional[bool] = None ):
     """
     Function to write a styled string with optional link reference and table of content entry.
     
@@ -36,8 +38,8 @@ def st_write(
     # Parse style and txt arguments
     container_style, final_txt = _parse_args(*args, style=style, no_link_decor=no_link_decor, hover=hover)
 
-    # Handle ToC registration and element id 
-    final_txt, key_anchor = _handle_toc(final_txt, toc_lvl, label)
+    # Handle ToC registration and element id
+    final_txt, key_anchor = _handle_toc(final_txt, toc_lvl, label, marker)
     elementId = f" id='{key_anchor}'" if key_anchor else ""
     
     # Wrap the text in the specified tag with the given style. This ensures consistent styling.   
@@ -96,7 +98,7 @@ def _parse_args(*args, style: Style = StreamTeX_Styles.none, no_link_decor:bool=
     
     return container_style, final_txt
 
-def _handle_toc(final_txt: str, toc_lvl: Optional[str] = None, label: str = ""):
+def _handle_toc(final_txt: str, toc_lvl: Optional[str] = None, label: str = "", marker: Optional[bool] = None):
         # --- 3. Handle ToC Registration ---
     key_anchor = ""
     if toc_lvl:
@@ -108,7 +110,19 @@ def _handle_toc(final_txt: str, toc_lvl: Optional[str] = None, label: str = ""):
             label = (clean_label[:label_length] + '..') if len(clean_label) > label_length else clean_label
 
         # Generate the opening and closing TOC tags for the specified level and label.
-        key_anchor, section_number = register_toc_entry(label, toc_lvl)
+        key_anchor, section_number, resolved_lvl = register_toc_entry(label, toc_lvl)
         final_txt = section_number + final_txt # Prepend the numbering of the ToC title
+
+        # Bridge TOC → Marker (opt-in)
+        marker_cfg = get_marker_config()
+        if marker_cfg is not None and marker is not False:
+            auto = marker_cfg.auto_marker_on_toc
+            should_mark = (
+                marker is True
+                or (auto is True)
+                or (isinstance(auto, int) and resolved_lvl <= auto)
+            )
+            if should_mark:
+                register_marker(label, key_anchor)
 
     return final_txt, key_anchor

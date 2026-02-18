@@ -1,6 +1,6 @@
 import streamlit as st
 import setup
-from streamtex import st_book, TOCConfig
+from streamtex import st_book, TOCConfig, MarkerConfig
 import blocks
 from custom.styles import Styles as s
 from custom.themes import dark
@@ -24,6 +24,13 @@ toc = TOCConfig(
 
 sts.theme = dark
 
+marker = MarkerConfig(
+    auto_marker_on_toc=1,
+    show_nav_ui=True,
+    next_keys=["PageDown", "n", "m"],
+    prev_keys=["PageUp", "p", "l"],
+)
+
 st_book([
     blocks.bck_00_welcome,
     blocks.bck_01_architecture,
@@ -45,4 +52,4 @@ st_book([
     blocks.bck_17_themes,
     blocks.bck_18_best_practices,
     blocks.bck_19_static_assets,
-], toc_config=toc, separator=blocks.separator)
+], toc_config=toc, marker_config=marker, separator=blocks.separator)

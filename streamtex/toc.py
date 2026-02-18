@@ -87,7 +87,7 @@ class TOCRegistry:
         if not self.config.numerate_titles:
             section_number = ""
 
-        return key_anchor, section_number
+        return key_anchor, section_number, lvl
         
     @staticmethod
     def get_key_anchor(title: str):

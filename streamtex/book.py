@@ -8,12 +8,13 @@ from .styles import Style
 from .write import st_write
 from .space import st_space, st_br
 from .toc import reset_toc_registry, toc_entries, TOCConfig
+from .marker import reset_marker_registry, inject_marker_navigation, MarkerConfig, marker_entries
 from .enums import Tags
 from .utils import inject_link_preview_scaffold
 from .zoom import add_zoom_options
 
 
-def st_book(module_list, toc_config: TOCConfig = None, separator=None, *args, **kwargs):
+def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConfig = None, separator=None, *args, **kwargs):
     """Generates a web page e-book from a list of block modules.
 
     :param separator: Optional module with a build() function, rendered between each block.
@@ -32,6 +33,10 @@ def st_book(module_list, toc_config: TOCConfig = None, separator=None, *args, **
 
     # Clear previous run's headers
     reset_toc_registry(toc_config)
+
+    # Initialize marker navigation (opt-in)
+    if marker_config is not None:
+        reset_marker_registry(marker_config)
 
     # Extract ToC config and create ToC placeholders
     use_toc_sidebar = toc_config is not None
@@ -71,6 +76,10 @@ def st_book(module_list, toc_config: TOCConfig = None, separator=None, *args, **
     if use_toc_sidebar:
         populate_toc(toc_sidebar, toc_block, toc_content_style)
 
+    # Inject marker navigation JS (only if markers were registered)
+    if marker_config is not None:
+        inject_marker_navigation()
+
     end_time = time.time()
     duration = end_time - start_time
     print(f"st_book function completed in {duration:.2f} seconds.")
@@ -101,6 +110,7 @@ def build_ToC_sidebar_placeholder():
 
 def populate_toc(toc_sidebar: Delta, toc_block: Delta = None, toc_content_style: Style = None):
     toc_entry_list = toc_entries()
+    marker_anchors = {m['anchor'] for m in marker_entries()}
     indent_char = "&nbsp;"
 
     with toc_sidebar.container():
@@ -108,10 +118,15 @@ def populate_toc(toc_sidebar: Delta, toc_block: Delta = None, toc_content_style:
             # Indentation based on level
             indent = indent_char * (entry['level'] - 1) * 4
 
+            # Marker indicator dot for TOC entries that are also navigation markers
+            dot = ('<span style="opacity:.5;font-size:6px;vertical-align:middle;'
+                   'margin-right:4px;">&#9679;</span>'
+                   if entry['key_anchor'] in marker_anchors else '')
+
             # Native Streamlit Link to ID
             st.html(
                 f"<span style=\"overflow: hidden; text-overflow: ellipsis; text-wrap: nowrap; word-wrap: normal;\">"
-                f"{indent}<a href=\"#{entry['key_anchor']}\">{entry['title']}</a></span>"
+                f"{indent}{dot}<a href=\"#{entry['key_anchor']}\">{entry['title']}</a></span>"
             )
     if toc_block is not None:
         with toc_block.container():

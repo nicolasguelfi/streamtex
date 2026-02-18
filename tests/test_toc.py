@@ -22,11 +22,12 @@ class TestTOCRegistry:
 
     def test_register_entry(self):
         reg = TOCRegistry()
-        key_anchor, section_number = reg.register_entry("Introduction", "1")
+        key_anchor, section_number, lvl = reg.register_entry("Introduction", "1")
         entries = reg.get_entries()
         assert len(entries) == 1
         assert entries[0]["title"] == "1 Introduction"
         assert entries[0]["level"] == 1
+        assert lvl == 1
 
     def test_register_multiple_entries(self):
         reg = TOCRegistry()

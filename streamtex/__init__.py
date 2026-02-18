@@ -21,6 +21,9 @@ from .book import st_book, st_include, st_toc, load_css
 # Table of Contents
 from .toc import reset_toc_registry, toc_entries, TOCConfig
 
+# Marker Navigation
+from .marker import st_marker, MarkerConfig
+
 # Enums
 from .enums import Tags
 

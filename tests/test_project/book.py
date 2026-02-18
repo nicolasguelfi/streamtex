@@ -52,5 +52,9 @@ st_book([
     blocks.bck_17_themes,
     blocks.bck_18_best_practices,
     blocks.bck_19_static_assets,
+    blocks.bck_21_export_html,
+    blocks.bck_22_deploy_docker,
+    blocks.bck_23_deploy_huggingface,
+    blocks.bck_24_deploy_cloud,
 ], toc_config=toc, marker_config=marker, separator=blocks.separator,
     export_title="StreamTeX Training Course")

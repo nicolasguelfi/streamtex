@@ -25,6 +25,9 @@ class BackgroundsCustom:
     bad_example_bg = Style("background-color: rgba(231, 76, 60, 0.15);", "bad_example_bg")
     tip_bg = Style("background-color: rgba(74, 144, 217, 0.12);", "tip_bg")
     note_bg = Style("background-color: rgba(243, 156, 18, 0.12);", "note_bg")
+    interactive_result_bg = Style(
+        "background-color: rgba(46, 196, 182, 0.12);", "interactive_result_bg"
+    )
 
 
 class TextStylesCustom:
@@ -121,6 +124,14 @@ class ContainerStylesCustom:
             "separator_line"
         ),
         "separator"
+    )
+    result_box = Style.create(
+        BackgroundsCustom.interactive_result_bg
+        + Container.borders.solid_border
+        + Style("border-color: #2EC4B6; border-width: 0 0 0 4px;", "result_border")
+        + Style("border-radius: 4px;", "result_radius")
+        + Container.paddings.medium_padding,
+        "result_box"
     )
 
 

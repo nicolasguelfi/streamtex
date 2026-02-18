@@ -27,6 +27,7 @@ sts.theme = dark
 marker = MarkerConfig(
     auto_marker_on_toc=1,
     show_nav_ui=True,
+    popup_open=True,
     next_keys=["PageDown", "n", "m"],
     prev_keys=["PageUp", "p", "l"],
 )
@@ -56,5 +57,12 @@ st_book([
     blocks.bck_22_deploy_docker,
     blocks.bck_23_deploy_huggingface,
     blocks.bck_24_deploy_cloud,
+    blocks.bck_25_interactive_widgets,
+    blocks.bck_26_forms_and_state,
+    blocks.bck_27_charts_builtin,
+    blocks.bck_28_dataframes_and_tables,
+    blocks.bck_29_tabs_expanders_popover,
+    blocks.bck_30_dynamic_content,
+    blocks.bck_31_graphviz_diagrams,
 ], toc_config=toc, marker_config=marker, separator=blocks.separator,
     export_title="StreamTeX Training Course")

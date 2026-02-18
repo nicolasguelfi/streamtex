@@ -17,6 +17,7 @@ class MarkerConfig:
     auto_marker_on_toc: int | bool = False
     nav_position: str = "bottom-right"
     nav_label_chars: int = 40
+    popup_open: bool = False
     next_keys: list[str] = field(default_factory=lambda: ["PageDown"])
     prev_keys: list[str] = field(default_factory=lambda: ["PageUp"])
 
@@ -165,7 +166,7 @@ def inject_marker_navigation() -> None:
     var prevKeys = __PREV_KEYS__;
     var OFFSET = __OFFSET__;
     var currentIdx = 0;
-    var popupOpen = false;
+    var popupOpen = __POPUP_OPEN__;
 
     if (!markers.length) return;
 
@@ -417,7 +418,10 @@ def inject_marker_navigation() -> None:
     };
 
     /* --- Init --- */
-    setTimeout(function() { updateUI(); scanIframes(); }, 500);
+    setTimeout(function() {
+        updateUI(); scanIframes();
+        if (popupOpen) { popup.style.display = 'block'; highlightPopup(); }
+    }, 500);
 })();
 """
 
@@ -428,6 +432,7 @@ def inject_marker_navigation() -> None:
         .replace('__PREV_KEYS__', json.dumps(config.prev_keys))
         .replace('__OFFSET__', str(scroll_offset))
         .replace('__LABEL_CHARS__', str(config.nav_label_chars))
+        .replace('__POPUP_OPEN__', 'true' if config.popup_open else 'false')
         .replace('__POS_CSS__', pos_css)
         .replace('__SHOW_UI__', show_ui))
 

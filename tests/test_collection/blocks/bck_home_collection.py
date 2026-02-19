@@ -42,10 +42,10 @@ class BlockStyles:
         "subtitle"
     )
 
-    # Button wrapper
-    button_row = Style(
-        "display:flex;gap:16px;margin-top:24px;",
-        "button_row"
+    # Grid gap style
+    grid_with_gap = Style(
+        "gap:24px;",
+        "grid_with_gap"
     )
 
 
@@ -78,7 +78,7 @@ def build():
     # ========================================================================
     st_space("v", 2)
 
-    with st_grid(cols=2, gap="24px"):
+    with st_grid(cols=2, grid_style=bs.grid_with_gap):
 
         # ====================================================================
         # PROJECT 1: Introduction

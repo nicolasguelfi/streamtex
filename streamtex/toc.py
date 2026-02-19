@@ -81,7 +81,9 @@ class TOCRegistry:
         self.get_entries().append({
             "level": lvl,
             "title": section_number + label if has_num else label,
-            "key_anchor": key_anchor
+            "key_anchor": key_anchor,
+            "_reg_label": label,
+            "_reg_level": level,
         })
         
         if not self.config.numerate_titles:

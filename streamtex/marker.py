@@ -209,9 +209,7 @@ def inject_marker_navigation() -> None:
     }
 
     /* --- Scroll --- */
-    function scrollToMarker(anchor) {
-        var target = findMarkerElement(anchor);
-        if (!target) return;
+    function scrollToTarget(target) {
         var sc = hostDoc.querySelector('.stMain');
         if (sc && sc.scrollHeight > sc.clientHeight) {
             var cRect = sc.getBoundingClientRect();
@@ -227,11 +225,29 @@ def inject_marker_navigation() -> None:
         }
     }
 
+    function scrollToMarker(anchor) {
+        var target = findMarkerElement(anchor);
+        if (target) scrollToTarget(target);
+    }
+
     function navigateTo(idx) {
-        if (idx < 0) idx = 0;
-        if (idx >= markers.length) idx = markers.length - 1;
+        if (idx < 0) {
+            if (hostWin._stxMarkerBoundary) { hostWin._stxMarkerBoundary('prev'); return; }
+            idx = 0;
+        }
+        if (idx >= markers.length) {
+            if (hostWin._stxMarkerBoundary) { hostWin._stxMarkerBoundary('next'); return; }
+            idx = markers.length - 1;
+        }
         currentIdx = idx;
-        scrollToMarker(markers[idx].anchor);
+        var m = markers[idx];
+        var target = findMarkerElement(m.anchor);
+        if (target) {
+            scrollToTarget(target);
+        } else if (m.page !== undefined && hostWin._stxMarkerGoToPage) {
+            hostWin._stxMarkerStartIdx = idx;
+            hostWin._stxMarkerGoToPage(m.page);
+        }
         updateUI();
     }
 
@@ -419,6 +435,11 @@ def inject_marker_navigation() -> None:
 
     /* --- Init --- */
     setTimeout(function() {
+        var startIdx = hostWin._stxMarkerStartIdx || 0;
+        if (startIdx < 0) startIdx = markers.length + startIdx;
+        startIdx = Math.max(0, Math.min(startIdx, markers.length - 1));
+        currentIdx = startIdx;
+        hostWin._stxMarkerStartIdx = 0;
         updateUI(); scanIframes();
         if (popupOpen) { popup.style.display = 'block'; highlightPopup(); }
     }, 500);

@@ -1,5 +1,9 @@
 import streamlit as st
 from streamlit.delta_generator import DeltaGenerator as Delta
+import streamlit.components.v1 as components
+import copy
+import hashlib
+import json
 import time
 import os
 import importlib.resources as resources
@@ -7,6 +11,7 @@ import importlib.resources as resources
 from .styles import Style
 from .write import st_write
 from .space import st_space, st_br
+from . import toc as _toc_mod
 from .toc import reset_toc_registry, toc_entries, TOCConfig
 from .marker import reset_marker_registry, inject_marker_navigation, MarkerConfig, marker_entries
 from .enums import Tags
@@ -17,13 +22,20 @@ from .export import ExportConfig, reset_export_buffer, generate_export_html, is_
 
 def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConfig = None, separator=None,
             export: bool = True, export_title: str = "StreamTeX Export",
+            paginate: bool = False,
             *args, **kwargs):
     """Generates a web page e-book from a list of block modules.
 
     :param separator: Optional module with a build() function, rendered between each block.
     :param export: If True, enables HTML export with a download button in the sidebar.
     :param export_title: Title used for the exported HTML document.
+    :param paginate: If True, renders one block at a time for faster widget interactions.
     """
+    if paginate:
+        _paginated_book(module_list, toc_config, marker_config, separator,
+                        export, export_title, *args, **kwargs)
+        return
+
     start_time = time.time()
     print("Starting st_book function...")
 
@@ -204,3 +216,418 @@ def st_include(block_file_module, *args, **kwargs):
     except Exception as e:
         st.markdown(f":red-background[Error in block '{module_name}': {e}]")
         raise
+
+
+# ---------------------------------------------------------------------------
+# Paginated mode
+# ---------------------------------------------------------------------------
+
+_STX_CACHE_KEY = "_stx_page_cache"
+_STX_PAGE_KEY = "_stx_current_page"
+
+
+def _compute_cache_hash(module_list):
+    """Return a hash that changes when the module list changes."""
+    names = "|".join(getattr(m, '__name__', str(m)) for m in module_list)
+    return hashlib.md5(names.encode()).hexdigest()
+
+
+def _get_page_titles(cache, total):
+    """Extract the first TOC title for each page (fallback to 'Section N')."""
+    titles = [f"Section {i + 1}" for i in range(total)]
+    for entry in cache.get("toc", []):
+        idx = entry.get("page_idx", 0)
+        if idx < total and titles[idx].startswith("Section "):
+            titles[idx] = entry["title"]
+    return titles
+
+
+def _preseed_toc_registry(cached_toc, current_page):
+    """Replay TOC registrations for pages before *current_page*.
+
+    This ensures that section numbering and anchors are identical to the
+    full-render pass, so cached sidebar links match the live anchors.
+    """
+    registry = _toc_mod.toc
+    if registry is None:
+        return
+    for entry in cached_toc:
+        if entry.get("page_idx", 0) >= current_page:
+            break
+        # Replay the original registration (advances numbering state)
+        registry.register_entry(entry["_reg_label"], entry["_reg_level"])
+
+
+def _build_page_cache(module_list, toc_config, marker_config, separator,
+                      cache_hash, *args, **kwargs):
+    """Execute all blocks inside st.empty() to collect TOC/markers, then cache."""
+    reset_toc_registry(toc_config)
+    if marker_config is not None:
+        reset_marker_registry(marker_config)
+
+    hidden = st.empty()
+    with hidden.container():
+        for i, module in enumerate(module_list):
+            toc_before = len(toc_entries()) if toc_config else 0
+            markers_before = len(marker_entries()) if marker_config else 0
+
+            st_include(module, *args, **kwargs)
+
+            # Tag new TOC entries with their page index
+            if toc_config:
+                for entry in toc_entries()[toc_before:]:
+                    if "page_idx" not in entry:
+                        entry["page_idx"] = i
+            # Tag new marker entries with their page index
+            if marker_config:
+                for entry in marker_entries()[markers_before:]:
+                    if "page_idx" not in entry:
+                        entry["page_idx"] = i
+
+            if separator and i < len(module_list) - 1:
+                st_include(separator, *args, **kwargs)
+
+    hidden.empty()
+
+    st.session_state[_STX_CACHE_KEY] = {
+        "hash": cache_hash,
+        "toc": copy.deepcopy(toc_entries()) if toc_config else [],
+        "markers": copy.deepcopy(marker_entries()) if marker_config else [],
+        "total": len(module_list),
+    }
+
+
+def _build_paginated_sidebar(cache, current_page, total, toc_config, marker_config):
+    """Populate the sidebar from cached data (st.markdown for direct DOM access)."""
+    with st.sidebar:
+        has_markers = marker_config is not None and cache.get("markers")
+
+        if has_markers:
+            tab_toc, tab_markers = st.tabs(["Contents", "Markers"])
+        else:
+            tab_toc = st.container()
+            tab_markers = None
+
+        # --- TOC ---
+        cached_toc = cache.get("toc", [])
+        marker_anchors = {m["anchor"] for m in cache.get("markers", [])}
+        indent_char = "&nbsp;"
+
+        toc_parts = []
+        for entry in cached_toc:
+            indent = indent_char * (entry["level"] - 1) * 4
+            dot = (
+                '<span style="opacity:.5;font-size:6px;vertical-align:middle;'
+                'margin-right:4px;">&#9679;</span>'
+                if entry.get("key_anchor") in marker_anchors else ""
+            )
+            page_idx = entry.get("page_idx", 0)
+            title_esc = entry["title"]
+            if page_idx == current_page:
+                link = f'<a href="#{entry["key_anchor"]}">{title_esc}</a>'
+            else:
+                link = (
+                    f'<a href="#stx-goto-{page_idx}" class="stx-page-link" '
+                    f'style="opacity:.6;">{title_esc}</a>'
+                )
+            toc_parts.append(
+                f'<div style="overflow:hidden;text-overflow:ellipsis;'
+                f'white-space:nowrap;padding:1px 0;font-size:14px;">'
+                f'{indent}{dot}{link}</div>'
+            )
+
+        with tab_toc:
+            if toc_parts:
+                st.markdown("\n".join(toc_parts), unsafe_allow_html=True)
+
+        # --- Markers ---
+        if tab_markers is not None:
+            marker_parts = []
+            for entry in cache.get("markers", []):
+                idx = entry["index"] + 1
+                page_idx = entry.get("page_idx", 0)
+                if page_idx == current_page:
+                    link = f'<a href="#{entry["anchor"]}">{idx}. {entry["label"]}</a>'
+                else:
+                    link = (
+                        f'<a href="#stx-goto-{page_idx}" class="stx-page-link" '
+                        f'style="opacity:.6;">{idx}. {entry["label"]}</a>'
+                    )
+                marker_parts.append(
+                    f'<div style="overflow:hidden;text-overflow:ellipsis;'
+                    f'white-space:nowrap;font-size:14px;">{link}</div>'
+                )
+            with tab_markers:
+                if marker_parts:
+                    st.markdown("\n".join(marker_parts), unsafe_allow_html=True)
+
+
+def _inject_paginated_nav_js(current_page, total, marker_config):
+    """Inject JS for cross-page navigation via hidden buttons.
+
+    Navigation mechanisms:
+    - Overscroll: scrolling past bottom/top triggers prev/next page
+    - Marker callbacks: cross-page marker navigation from marker.py widget
+    - Sidebar links: click .stx-page-link (rendered via st.markdown) to change page
+    - Hidden buttons: JS finds stx_nav_* buttons and clicks them programmatically
+    """
+    js_body = """
+<script>
+(function() {
+    var hostDoc = parent.document;
+    var hostWin = hostDoc.defaultView || parent;
+    var currentPage = __CURRENT_PAGE__;
+    var totalPages = __TOTAL_PAGES__;
+
+    if (hostWin._stxPaginatedCleanup) {
+        try { hostWin._stxPaginatedCleanup(); } catch(e) {}
+    }
+
+    /* --- Find and hide navigation buttons --- */
+    var navButtons = {};
+    function findNavButtons() {
+        var allBtns = hostDoc.querySelectorAll(
+            '[data-testid="stBaseButton-secondary"]');
+        for (var i = 0; i < allBtns.length; i++) {
+            var txt = (allBtns[i].textContent || '').trim();
+            if (txt.indexOf('stx_nav_') === 0) {
+                var page = parseInt(txt.substring(8), 10);
+                if (!isNaN(page)) {
+                    navButtons[page] = allBtns[i];
+                    var wrapper = allBtns[i].closest('[data-testid="stButton"]');
+                    if (wrapper) wrapper.style.cssText =
+                        'position:absolute;left:-9999px;height:0;overflow:hidden;';
+                }
+            }
+        }
+    }
+    findNavButtons();
+    setTimeout(findNavButtons, 300);
+    setTimeout(findNavButtons, 1000);
+
+    /* --- Navigate to a specific page by clicking the hidden button --- */
+    function navigateToPage(targetPage) {
+        if (targetPage < 0 || targetPage >= totalPages
+            || targetPage === currentPage) return;
+        findNavButtons();
+        var btn = navButtons[targetPage];
+        if (btn) btn.click();
+    }
+
+    /* --- Overscroll detection --- */
+    var scrollEl = hostDoc.querySelector('[data-testid="stMain"]')
+                || hostDoc.querySelector('.stMain')
+                || hostDoc.documentElement;
+    var overscrollCount = 0;
+    var overscrollDir = null;
+    var overscrollTimer = null;
+    var overscrollCooldown = false;
+    var THRESHOLD = 8;
+    var TIMEOUT = 2000;
+    var COOLDOWN = 2000;
+
+    function wheelHandler(e) {
+        if (overscrollCooldown) return;
+        var atBot = scrollEl.scrollHeight - scrollEl.scrollTop
+                    - scrollEl.clientHeight < 10;
+        var atTop = scrollEl.scrollTop < 10;
+        var down = e.deltaY > 0;
+        var up = e.deltaY < 0;
+
+        if (down && atBot && currentPage < totalPages - 1) {
+            if (overscrollDir !== 'down') {
+                overscrollCount = 0; overscrollDir = 'down';
+            }
+            overscrollCount++;
+            clearTimeout(overscrollTimer);
+            overscrollTimer = setTimeout(function() {
+                overscrollCount = 0; overscrollDir = null;
+            }, TIMEOUT);
+            if (overscrollCount >= THRESHOLD) {
+                overscrollCount = 0; overscrollDir = null;
+                overscrollCooldown = true;
+                setTimeout(function() { overscrollCooldown = false; }, COOLDOWN);
+                hostWin._stxMarkerStartIdx = 0;
+                navigateToPage(currentPage + 1);
+            }
+        } else if (up && atTop && currentPage > 0) {
+            if (overscrollDir !== 'up') {
+                overscrollCount = 0; overscrollDir = 'up';
+            }
+            overscrollCount++;
+            clearTimeout(overscrollTimer);
+            overscrollTimer = setTimeout(function() {
+                overscrollCount = 0; overscrollDir = null;
+            }, TIMEOUT);
+            if (overscrollCount >= THRESHOLD) {
+                overscrollCount = 0; overscrollDir = null;
+                overscrollCooldown = true;
+                setTimeout(function() { overscrollCooldown = false; }, COOLDOWN);
+                hostWin._stxMarkerStartIdx = -1;
+                navigateToPage(currentPage - 1);
+            }
+        } else {
+            overscrollCount = 0;
+            overscrollDir = null;
+        }
+    }
+    scrollEl.addEventListener('wheel', wheelHandler, { passive: true });
+
+    /* --- Cross-page marker callbacks (used by marker.py widget) --- */
+    hostWin._stxMarkerGoToPage = function(page) {
+        navigateToPage(page);
+    };
+
+    hostWin._stxMarkerBoundary = function(direction) {
+        if (direction === 'next' && currentPage < totalPages - 1) {
+            hostWin._stxMarkerStartIdx = 0;
+            navigateToPage(currentPage + 1);
+        } else if (direction === 'prev' && currentPage > 0) {
+            hostWin._stxMarkerStartIdx = -1;
+            navigateToPage(currentPage - 1);
+        }
+    };
+
+    /* --- Sidebar link interception (st.markdown = direct DOM) --- */
+    function linkClick(e) {
+        var a = e.target.closest('a[href^="#stx-goto-"]');
+        if (!a) return;
+        e.preventDefault();
+        e.stopPropagation();
+        var href = a.getAttribute('href') || '';
+        var match = href.match(/^#stx-goto-(\\d+)/);
+        if (!match) return;
+        var p = parseInt(match[1], 10);
+        if (isNaN(p) || p === currentPage) return;
+        navigateToPage(p);
+    }
+    hostDoc.addEventListener('click', linkClick, true);
+
+    /* --- Cleanup --- */
+    hostWin._stxPaginatedCleanup = function() {
+        scrollEl.removeEventListener('wheel', wheelHandler);
+        hostDoc.removeEventListener('click', linkClick, true);
+        clearTimeout(overscrollTimer);
+        hostWin._stxMarkerBoundary = null;
+        hostWin._stxMarkerGoToPage = null;
+    };
+})();
+</script>
+"""
+    js_body = (js_body
+               .replace("__CURRENT_PAGE__", str(current_page))
+               .replace("__TOTAL_PAGES__", str(total)))
+    components.html(js_body, height=0)
+
+
+def _paginated_book(module_list, toc_config, marker_config, separator,
+                    export, export_title, *args, **kwargs):
+    """Paginated rendering — only renders one block per rerun."""
+    start_time = time.time()
+    print("Starting st_book (paginated)...")
+
+    total = len(module_list)
+    if total == 0:
+        return
+
+    # --- Common setup ---
+    load_css("default.css")
+    inject_link_preview_scaffold()
+    add_zoom_options()
+
+    # --- Cache management ---
+    cache_hash = _compute_cache_hash(module_list)
+    cache = st.session_state.get(_STX_CACHE_KEY)
+    has_valid_cache = (
+        cache is not None
+        and cache.get("hash") == cache_hash
+        and cache.get("total") == total
+    )
+
+    if not has_valid_cache:
+        reset_export_buffer(ExportConfig(enabled=False))
+        _build_page_cache(module_list, toc_config, marker_config,
+                          separator, cache_hash, *args, **kwargs)
+        cache = st.session_state[_STX_CACHE_KEY]
+
+    # --- Current page ---
+    if _STX_PAGE_KEY not in st.session_state:
+        st.session_state[_STX_PAGE_KEY] = 0
+    current_page = max(0, min(st.session_state[_STX_PAGE_KEY], total - 1))
+    st.session_state[_STX_PAGE_KEY] = current_page
+
+    # --- Sidebar (from cache) ---
+    _build_paginated_sidebar(cache, current_page, total, toc_config, marker_config)
+
+    # --- Prepare registries for current page ---
+    reset_export_buffer(ExportConfig(enabled=export, page_title=export_title))
+    reset_toc_registry(toc_config)
+    if marker_config is not None:
+        reset_marker_registry(marker_config)
+
+    # Pre-seed TOC so numbering/anchors match cache
+    if toc_config and cache.get("toc"):
+        _preseed_toc_registry(cache["toc"], current_page)
+
+    # Pre-seed markers for pages BEFORE current (for global navigation)
+    if marker_config and cache.get("markers"):
+        from . import marker as _marker_mod
+        registry = _marker_mod._registry
+        if registry is not None:
+            for entry in cache["markers"]:
+                if entry.get("page_idx", 0) >= current_page:
+                    break
+                registry._entries.append({
+                    "index": entry["index"],
+                    "label": entry["label"],
+                    "anchor": entry["anchor"],
+                    "page": entry.get("page_idx", 0),
+                })
+
+    # --- Render current block ---
+    st_include(module_list[current_page], *args, **kwargs)
+
+    # Post-seed markers for pages AFTER current (for global navigation)
+    if marker_config and cache.get("markers"):
+        from . import marker as _marker_mod
+        registry = _marker_mod._registry
+        if registry is not None:
+            for entry in cache["markers"]:
+                if entry.get("page_idx", 0) <= current_page:
+                    continue
+                registry._entries.append({
+                    "index": entry["index"],
+                    "label": entry["label"],
+                    "anchor": entry["anchor"],
+                    "page": entry.get("page_idx", 0),
+                })
+
+    # --- Marker navigation widget (ALL markers, cross-page aware) ---
+    if marker_config is not None:
+        inject_marker_navigation()
+
+    # --- Hidden navigation buttons (one per page, clickable by JS) ---
+    for i in range(total):
+        def _goto_page(page=i):
+            st.session_state[_STX_PAGE_KEY] = page
+        st.button(f"stx_nav_{i}", key=f"_stx_goto_{i}", on_click=_goto_page)
+
+    # --- Paginated navigation JS (finds & hides buttons, overscroll, callbacks) ---
+    _inject_paginated_nav_js(current_page, total, marker_config)
+
+    # --- Export download button ---
+    if is_export_active():
+        full_html = generate_export_html()
+        if full_html:
+            file_name = f"{export_title.replace(' ', '_').lower()}.html"
+            with st.sidebar:
+                st.download_button(
+                    label="\U0001F4E5 Download HTML",
+                    data=full_html,
+                    file_name=file_name,
+                    mime="text/html",
+                )
+
+    end_time = time.time()
+    print(f"st_book (paginated) completed in {end_time - start_time:.2f}s "
+          f"[page {current_page + 1}/{total}]")

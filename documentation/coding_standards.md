@@ -90,6 +90,25 @@ Interactive widgets (`st.button`, `st.slider`, etc.) have no meaningful static r
 3. **Dark mode**: Never hardcode black/white — let Streamlit handle Light/Dark mode.
 4. **No raw HTML/CSS**: Never write inline CSS strings or HTML in Python code. Use Style composition.
 
+### Grid Layout (`st_grid`)
+```python
+# st_grid(cols, grid_style, cell_styles) signature
+# - cols: int (number of columns) or CSS string ("1fr 1fr 1fr")
+# - grid_style: Style object for the entire grid (includes gap via CSS)
+# - cell_styles: Style(s) for individual cells
+
+# Gap between cells goes in grid_style, NOT as a parameter
+gap_style = Style("gap:24px;", "grid_gap")
+with st_grid(cols=2, grid_style=gap_style):
+    # 2-column layout with 24px gap
+
+# Common column patterns:
+st_grid(cols=2)                                    # 2 equal columns
+st_grid(cols="1fr 1fr 1fr")                       # 3 equal columns (CSS syntax)
+st_grid(cols="auto 1fr")                          # First col: fit content, second: rest
+st_grid(cols="repeat(auto-fill, minmax(200px, 1fr))")  # Responsive cards
+```
+
 ## 7. Block Architecture
 Every block file MUST contain:
 ```python
@@ -111,13 +130,34 @@ def build():
 - **Variables**: `snake_case` | **Classes**: `PascalCase`
 
 ## 9. Style System
-- **Compose**: `s.bold + s.Large + s.center_txt`
-- **Remove**: `style - s.bold`
-- **Factory**: `Style.create(existing_style, "new_id")`
-- **Grid styles**: `sg.create("A1:B3", style)`
-- **Custom colors**: Define in `custom/styles.py`
-- **Theme overrides**: Define in `custom/themes.py`
+
+### Style Creation & Composition
+- **New from CSS**: `Style("color:red;", "my_style")` — create style from CSS string
+- **Copy existing**: `Style.create(existing_style, "new_id")` — copy with new ID
+- **Compose**: `s.bold + s.Large + s.center_txt` — combine styles (returns Style)
+- **Remove**: `style - s.bold` — subtract CSS properties
+- **Grid styles**: `sg.create("A1:B3", style)` — apply styles to grid cells
+- **Custom colors**: Define in `custom/styles.py`, inherit `StreamTeX_Styles`
+- **Theme overrides**: Define in `custom/themes.py` (dict of style_id → CSS)
 - **Reuse**: Never duplicate identical style definitions. One generic style, reused everywhere.
+
+### Common Patterns
+```python
+# Create container style with gradient
+container = Style(
+    "background:linear-gradient(135deg, rgba(40,44,52,0.9) 0%, rgba(30,33,40,0.9) 100%);"
+    + "border-radius:12px;padding:24px;",
+    "container_modern"
+)
+
+# Copy and modify text style
+my_title = Style.create(s.Large + s.text.weights.bold_weight, "my_title")
+
+# Grid with gap
+grid_gap = Style("gap:24px;", "grid_with_gap")
+with st_grid(cols=2, grid_style=grid_gap):
+    # cells here
+```
 
 ### Style Hierarchy
 - `s.text.*` — text colors, sizes, weights, decorations, fonts, alignments
@@ -132,21 +172,33 @@ def build():
 
 ## 10. Running the App
 ```bash
+# Single project
 uv run streamlit run projects/<project_name>/book.py
-```
 
-To run multiple projects simultaneously, specify a different port (default is 8501):
-```bash
-uv run streamlit run projects/<project_name>/book.py --server.port 8502
+# Test projects
+uv run streamlit run tests/test_project_intro/book.py
+uv run streamlit run tests/test_project_advanced/book.py
+uv run streamlit run tests/test_collection/book.py
+
+# Multiple projects simultaneously (different ports)
+./run-test-projects.sh --intro --advanced --collection
+./run-test-projects.sh --all                  # Launch all 3 projects
 ```
 
 ## 11. Deployment
-- **Docker**: `docker build -t streamtex-app . && docker run -p 8501:8501 streamtex-app`
-- **Configurable**: `docker build --build-arg FOLDER=project_name -t streamtex-app .`
+- **Docker**: `docker build --build-arg FOLDER=projects/<project_name> -t streamtex-app .`
+- **Multiple on VM**: Run each on different port, load-balance with nginx/caddy
+- **Hugging Face Spaces**: Push Docker image to HF Space via git remote
 - **pip install**: `pip install -e .` for development (eliminates setup.py PATH hack)
 
 ## 12. Testing
 ```bash
-pytest tests/          # Run all tests
-pytest tests/ -v       # Verbose output
+# Unit tests (all)
+uv run pytest tests/ -v
+
+# Specific test file
+uv run pytest tests/test_export.py -v
+
+# Watch mode (requires pytest-watch)
+uv run pytest-watch tests/
 ```

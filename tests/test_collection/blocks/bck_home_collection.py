@@ -43,7 +43,7 @@ class BlockStyles:
     )
 
     # Button wrapper
-    button_row = Style.create(
+    button_row = Style(
         "display:flex;gap:16px;margin-top:24px;",
         "button_row"
     )

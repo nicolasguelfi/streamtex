@@ -1,6 +1,6 @@
 """Styles for the collection home page."""
 
-from streamtex.styles import StreamTeX_Styles, Style, Text, Container
+from streamtex.styles import StreamTeX_Styles, Style, Text
 
 
 class Styles(StreamTeX_Styles):
@@ -21,7 +21,7 @@ class Styles(StreamTeX_Styles):
 
         class bg_colors:
             """Background colors for dark mode"""
-            dark_bg_secondary = Style.create(
+            dark_bg_secondary = Style(
                 "background:linear-gradient(135deg, rgba(40, 44, 52, 0.9) 0%, rgba(30, 33, 40, 0.9) 100%);"
                 + "box-shadow:inset 0 1px 0 rgba(255,255,255,0.05);",
                 "dark_bg_secondary"

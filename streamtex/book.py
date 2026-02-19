@@ -23,6 +23,7 @@ from .export import ExportConfig, reset_export_buffer, generate_export_html, is_
 def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConfig = None, separator=None,
             export: bool = True, export_title: str = "StreamTeX Export",
             paginate: bool = False,
+            monties_color: str = "rgba(211, 47, 47, 0.8)",
             *args, **kwargs):
     """Generates a web page e-book from a list of block modules.
 
@@ -30,10 +31,11 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
     :param export: If True, enables HTML export with a download button in the sidebar.
     :param export_title: Title used for the exported HTML document.
     :param paginate: If True, renders one block at a time for faster widget interactions.
+    :param monties_color: Background color for paginated navigation banners (CSS value).
     """
     if paginate:
         _paginated_book(module_list, toc_config, marker_config, separator,
-                        export, export_title, *args, **kwargs)
+                        export, export_title, monties_color, *args, **kwargs)
         return
 
     start_time = time.time()
@@ -476,9 +478,9 @@ def _inject_paginated_nav_js(current_page, total, marker_config,
      * Top:    isAtTop() + wheel deltaY < 0  (800ms startup delay)
      * Banners: click on red banners → navigateToPage
      * ================================================================= */
-    var sentinel = hostDoc.getElementById('stx-monties-sentinel');
-    var prevBanner = hostDoc.getElementById('stx-monties-prev');
-    var nextBanner = hostDoc.getElementById('stx-monties-next');
+    var sentinel = null;
+    var prevBanner = null;
+    var nextBanner = null;
     var montiesNextActive = false;
     var montiesNextTimer = null;
     var montiesPrevTimer = null;
@@ -491,6 +493,50 @@ def _inject_paginated_nav_js(current_page, total, marker_config,
     var montiesReadyTimer = setTimeout(function() {
         montiesPrevReady = true;
     }, 800);
+
+    /* --- Deferred element lookup (DOM may not be ready on cold start) --- */
+    function prevClick() {
+        if (navigating || currentPage <= 0) return;
+        var pp = currentPage - 1;
+        hostWin._stxMarkerStartIdx =
+            pageFirstMarker[pp] !== undefined ? pageFirstMarker[pp] : 0;
+        navigateToPage(pp);
+    }
+    function nextClick() {
+        if (navigating || currentPage >= totalPages - 1) return;
+        var np = currentPage + 1;
+        hostWin._stxMarkerStartIdx =
+            pageFirstMarker[np] !== undefined ? pageFirstMarker[np] : 0;
+        navigateToPage(np);
+    }
+
+    function findElements() {
+        /* Sentinel — attach IntersectionObserver on first find */
+        if (!sentinel && currentPage < totalPages - 1) {
+            sentinel = hostDoc.getElementById('stx-monties-sentinel');
+            if (sentinel && !montiesObs) {
+                montiesObs = new hostWin.IntersectionObserver(function(entries) {
+                    montiesNextActive = entries[0].isIntersecting;
+                    if (!montiesNextActive) {
+                        clearTimeout(montiesNextTimer); montiesNextTimer = null;
+                    }
+                }, { threshold: 0.1 });
+                montiesObs.observe(sentinel);
+            }
+        }
+        /* Banners — attach click handlers on first find */
+        if (!prevBanner) {
+            prevBanner = hostDoc.getElementById('stx-monties-prev');
+            if (prevBanner) prevBanner.addEventListener('click', prevClick);
+        }
+        if (!nextBanner) {
+            nextBanner = hostDoc.getElementById('stx-monties-next');
+            if (nextBanner) nextBanner.addEventListener('click', nextClick);
+        }
+    }
+    findElements();
+    setTimeout(findElements, 300);
+    setTimeout(findElements, 1000);
 
     function montiesWheel(e) {
         if (navigating) return;
@@ -531,37 +577,8 @@ def _inject_paginated_nav_js(current_page, total, marker_config,
         clearTimeout(montiesPrevTimer); montiesPrevTimer = null;
     }
 
-    /* Bottom sentinel: IntersectionObserver */
-    if (sentinel && currentPage < totalPages - 1) {
-        montiesObs = new hostWin.IntersectionObserver(function(entries) {
-            montiesNextActive = entries[0].isIntersecting;
-            if (!montiesNextActive) {
-                clearTimeout(montiesNextTimer); montiesNextTimer = null;
-            }
-        }, { threshold: 0.1 });
-        montiesObs.observe(sentinel);
-    }
-
     /* Wheel listener — handles both top and bottom auto-trigger */
     hostDoc.addEventListener('wheel', montiesWheel, { passive: true });
-
-    /* Banner click handlers */
-    function prevClick() {
-        if (navigating || currentPage <= 0) return;
-        var pp = currentPage - 1;
-        hostWin._stxMarkerStartIdx =
-            pageFirstMarker[pp] !== undefined ? pageFirstMarker[pp] : 0;
-        navigateToPage(pp);
-    }
-    function nextClick() {
-        if (navigating || currentPage >= totalPages - 1) return;
-        var np = currentPage + 1;
-        hostWin._stxMarkerStartIdx =
-            pageFirstMarker[np] !== undefined ? pageFirstMarker[np] : 0;
-        navigateToPage(np);
-    }
-    if (prevBanner) prevBanner.addEventListener('click', prevClick);
-    if (nextBanner) nextBanner.addEventListener('click', nextClick);
 
     /* --- Cross-page marker callbacks (used by marker.py widget) --- */
     hostWin._stxMarkerGoToPage = function(page) {
@@ -637,7 +654,7 @@ def _inject_paginated_nav_js(current_page, total, marker_config,
 
 
 def _paginated_book(module_list, toc_config, marker_config, separator,
-                    export, export_title, *args, **kwargs):
+                    export, export_title, monties_color, *args, **kwargs):
     """Paginated rendering — only renders one block per rerun."""
     start_time = time.time()
     print("Starting st_book (paginated)...")
@@ -707,7 +724,7 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
     if current_page > 0:
         _prev = page_titles[current_page - 1]
         st.markdown(
-            f'<div id="stx-monties-prev" style="background:#d32f2f;color:white;'
+            f'<div id="stx-monties-prev" style="background:{monties_color};color:white;'
             f'font-weight:bold;font-size:1.3rem;padding:18px 24px;text-align:center;'
             f'cursor:pointer;border-radius:8px;user-select:none;">'
             f'◂&ensp;{_prev}</div>',
@@ -723,7 +740,7 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
         _next = page_titles[current_page + 1]
         st.divider()
         st.markdown(
-            f'<div id="stx-monties-next" style="background:#d32f2f;color:white;'
+            f'<div id="stx-monties-next" style="background:{monties_color};color:white;'
             f'font-weight:bold;font-size:1.3rem;padding:18px 24px;text-align:center;'
             f'cursor:pointer;border-radius:8px;user-select:none;">'
             f'{_next}&ensp;▸</div>',

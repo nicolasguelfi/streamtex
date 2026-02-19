@@ -333,6 +333,7 @@ def inject_marker_navigation() -> None:
     function togglePopup(show) {
         popupOpen = typeof show === 'boolean' ? show : !popupOpen;
         popup.style.display = popupOpen ? 'block' : 'none';
+        hostWin._stxMarkerPopupState = popupOpen;
         if (popupOpen) highlightPopup();
     }
 
@@ -440,6 +441,10 @@ def inject_marker_navigation() -> None:
         startIdx = Math.max(0, Math.min(startIdx, markers.length - 1));
         currentIdx = startIdx;
         hostWin._stxMarkerStartIdx = 0;
+        /* Restore popup state from previous run if available */
+        if (hostWin._stxMarkerPopupState !== undefined) {
+            popupOpen = hostWin._stxMarkerPopupState;
+        }
         updateUI(); scanIframes();
         if (popupOpen) { popup.style.display = 'block'; highlightPopup(); }
     }, 500);

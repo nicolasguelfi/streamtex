@@ -362,7 +362,8 @@ def _build_paginated_sidebar(cache, current_page, total, toc_config, marker_conf
                     st.markdown("\n".join(marker_parts), unsafe_allow_html=True)
 
 
-def _inject_paginated_nav_js(current_page, total, marker_config):
+def _inject_paginated_nav_js(current_page, total, marker_config,
+                             page_marker_info=None):
     """Inject JS for cross-page navigation via hidden buttons.
 
     Navigation mechanisms:
@@ -378,6 +379,8 @@ def _inject_paginated_nav_js(current_page, total, marker_config):
     var hostWin = hostDoc.defaultView || parent;
     var currentPage = __CURRENT_PAGE__;
     var totalPages = __TOTAL_PAGES__;
+    var pageFirstMarker = __PAGE_FIRST_MARKER__;
+    var pageLastMarker  = __PAGE_LAST_MARKER__;
 
     if (hostWin._stxPaginatedCleanup) {
         try { hostWin._stxPaginatedCleanup(); } catch(e) {}
@@ -406,72 +409,232 @@ def _inject_paginated_nav_js(current_page, total, marker_config):
     setTimeout(findNavButtons, 1000);
 
     /* --- Navigate to a specific page by clicking the hidden button --- */
+    var navigating = false;
     function navigateToPage(targetPage) {
+        if (navigating) return;
         if (targetPage < 0 || targetPage >= totalPages
             || targetPage === currentPage) return;
+        navigating = true;          /* block further signals */
+        hostWin._stxScrollReset = true;
+        reenablePE();               /* restore iframe interactions */
         findNavButtons();
         var btn = navButtons[targetPage];
         if (btn) btn.click();
     }
 
-    /* --- Overscroll detection --- */
-    var scrollEl = hostDoc.querySelector('[data-testid="stMain"]')
-                || hostDoc.querySelector('.stMain')
-                || hostDoc.documentElement;
-    var overscrollCount = 0;
-    var overscrollDir = null;
-    var overscrollTimer = null;
-    var overscrollCooldown = false;
-    var THRESHOLD = 8;
-    var TIMEOUT = 2000;
-    var COOLDOWN = 2000;
+    /* =================================================================
+     * OVERSCROLL DETECTION  (scroll → pause → re-scroll → navigate)
+     *
+     * Three independent event sources feed one shared state machine:
+     *  1. wheel events on hostDoc          (cursor over non-iframe areas)
+     *  2. wheel events on iframe docs      (cursor over st.html content)
+     *  3. scroll events on the container   (elastic bounce on macOS)
+     *
+     * State machine:
+     *  idle     → boundary signal         → phase1
+     *  phase1   → signals keep coming     → stay  (restart gap timer)
+     *  phase1   → GAP_MS silence          → waiting
+     *  waiting  → boundary signal         → TRIGGER → cooldown
+     *  waiting  → WAIT_MS expires         → idle
+     *  cooldown → ignore COOLDOWN_MS      → idle
+     * ================================================================= */
 
-    function wheelHandler(e) {
-        if (overscrollCooldown) return;
-        var atBot = scrollEl.scrollHeight - scrollEl.scrollTop
-                    - scrollEl.clientHeight < 10;
-        var atTop = scrollEl.scrollTop < 10;
-        var down = e.deltaY > 0;
-        var up = e.deltaY < 0;
+    /* -- Find the real scroll container (walk up from content) --
+       We look for the FIRST ancestor with overflow-y auto/scroll.
+       The scrollHeight check is intentionally omitted because the
+       content may not be fully rendered yet when this JS executes
+       (iframes load asynchronously).  Without the check, we find
+       the CSS-designated scroll container even if it is not yet
+       overflowing.                                                  */
+    var scrollEl = (function() {
+        var start = hostDoc.querySelector('[data-testid="stVerticalBlock"]')
+                 || hostDoc.querySelector('[data-testid="stMain"]')
+                 || hostDoc.body;
+        var el = start;
+        while (el && el !== hostDoc.documentElement) {
+            var ov = hostWin.getComputedStyle(el).overflowY;
+            if (ov === 'auto' || ov === 'scroll' || ov === 'overlay')
+                return el;
+            el = el.parentElement;
+        }
+        /* Last resort — try well-known Streamlit containers */
+        var main = hostDoc.querySelector('.stMain')
+                || hostDoc.querySelector('[data-testid="stMain"]');
+        if (main) return main;
+        return hostDoc.scrollingElement || hostDoc.documentElement;
+    })();
 
-        if (down && atBot && currentPage < totalPages - 1) {
-            if (overscrollDir !== 'down') {
-                overscrollCount = 0; overscrollDir = 'down';
-            }
-            overscrollCount++;
-            clearTimeout(overscrollTimer);
-            overscrollTimer = setTimeout(function() {
-                overscrollCount = 0; overscrollDir = null;
-            }, TIMEOUT);
-            if (overscrollCount >= THRESHOLD) {
-                overscrollCount = 0; overscrollDir = null;
-                overscrollCooldown = true;
-                setTimeout(function() { overscrollCooldown = false; }, COOLDOWN);
-                hostWin._stxMarkerStartIdx = 0;
-                navigateToPage(currentPage + 1);
-            }
-        } else if (up && atTop && currentPage > 0) {
-            if (overscrollDir !== 'up') {
-                overscrollCount = 0; overscrollDir = 'up';
-            }
-            overscrollCount++;
-            clearTimeout(overscrollTimer);
-            overscrollTimer = setTimeout(function() {
-                overscrollCount = 0; overscrollDir = null;
-            }, TIMEOUT);
-            if (overscrollCount >= THRESHOLD) {
-                overscrollCount = 0; overscrollDir = null;
-                overscrollCooldown = true;
-                setTimeout(function() { overscrollCooldown = false; }, COOLDOWN);
-                hostWin._stxMarkerStartIdx = -1;
-                navigateToPage(currentPage - 1);
+    /* -- Scroll reset after page navigation --
+       Multiple delayed attempts override browser / Streamlit scroll
+       restoration which can fire asynchronously after our initial reset.
+       We target scrollEl, .stMain, and the window to cover all cases. */
+    if (hostWin._stxScrollReset) {
+        hostWin._stxScrollReset = false;
+        function doScrollReset() {
+            scrollEl.scrollTop = 0;
+            /* Also target well-known Streamlit containers directly */
+            var mains = hostDoc.querySelectorAll('.stMain, [data-testid="stMain"]');
+            for (var m = 0; m < mains.length; m++) mains[m].scrollTop = 0;
+            try { hostWin.scrollTo({top: 0, behavior: 'instant'}); }
+            catch(e) { hostWin.scrollTo(0, 0); }
+        }
+        doScrollReset();
+        [0, 50, 100, 200, 400].forEach(function(ms) {
+            setTimeout(doScrollReset, ms);
+        });
+    }
+
+    var overState = 'idle';
+    var overDir = null;
+    var gapTimer = null;
+    var waitTimer = null;
+    var GAP_MS = 500;
+    var WAIT_MS = 3000;
+    var COOLDOWN_MS = 2000;
+
+    function isAtBot() {
+        return scrollEl.scrollHeight - scrollEl.scrollTop
+               - scrollEl.clientHeight < 15;
+    }
+    function isAtTop() { return scrollEl.scrollTop < 15; }
+
+    /* -- Pointer-events management for overscroll at boundaries --
+       Wheel events inside iframes do NOT propagate to the parent doc.
+       When the scroll container reaches a boundary we temporarily disable
+       pointer-events on all iframes so that subsequent wheel events fall
+       through to the parent document and reach our wheelHandler.
+       The marker widget buttons live in the parent DOM (not in iframes)
+       so they remain clickable at all times.                           -- */
+    var peDisabled = false;
+    var peTimer = null;
+    var PE_TIMEOUT_MS = 5000;
+
+    function setIframePE(enabled) {
+        var iframes = hostDoc.querySelectorAll('iframe');
+        for (var k = 0; k < iframes.length; k++)
+            iframes[k].style.pointerEvents = enabled ? '' : 'none';
+        peDisabled = !enabled;
+    }
+    function reenablePE() {
+        clearTimeout(peTimer);
+        if (peDisabled) setIframePE(true);
+    }
+    function checkBoundaryPE() {
+        if (navigating) return;
+        /* Content fits without scrolling — no overscroll needed */
+        if (scrollEl.scrollHeight <= scrollEl.clientHeight + 30) return;
+        var atBot = isAtBot() && currentPage < totalPages - 1;
+        var atTop = isAtTop() && currentPage > 0;
+        if (atBot || atTop) {
+            if (!peDisabled) {
+                setIframePE(false);
+                peTimer = setTimeout(reenablePE, PE_TIMEOUT_MS);
             }
         } else {
-            overscrollCount = 0;
-            overscrollDir = null;
+            reenablePE();
         }
     }
-    scrollEl.addEventListener('wheel', wheelHandler, { passive: true });
+    scrollEl.addEventListener('scroll', checkBoundaryPE);
+
+    /* Periodic boundary check — catches cases where the scroll event
+       misses the exact boundary moment (e.g. momentum scroll ending
+       exactly at bottom, or content height changing after load).
+       Does NOT re-enable PE — only the scroll listener does that
+       when the user scrolls away from the boundary.                  */
+    var peCheckInterval = setInterval(function() {
+        if (navigating) return;
+        if (scrollEl.scrollHeight <= scrollEl.clientHeight + 30) return;
+        var atBot = isAtBot() && currentPage < totalPages - 1;
+        var atTop = isAtTop() && currentPage > 0;
+        if (atBot || atTop) {
+            if (!peDisabled) {
+                setIframePE(false);
+                clearTimeout(peTimer);
+                peTimer = setTimeout(reenablePE, PE_TIMEOUT_MS);
+            }
+        }
+    }, 300);
+
+    function resetOver() {
+        overState = 'idle'; overDir = null;
+        clearTimeout(gapTimer); clearTimeout(waitTimer);
+    }
+
+    /* -- Shared state machine entry point -- */
+    function boundarySignal(dir) {
+        if (overDir && dir !== overDir) { resetOver(); return; }
+        overDir = dir;
+        if (overState === 'cooldown') return;
+
+        if (overState === 'idle' || overState === 'phase1') {
+            overState = 'phase1';
+            clearTimeout(gapTimer);
+            gapTimer = setTimeout(function() {
+                overState = 'waiting';
+                waitTimer = setTimeout(resetOver, WAIT_MS);
+            }, GAP_MS);
+        } else if (overState === 'waiting') {
+            overState = 'cooldown'; overDir = null;
+            clearTimeout(gapTimer); clearTimeout(waitTimer);
+            setTimeout(function() { overState = 'idle'; }, COOLDOWN_MS);
+            if (dir === 'down') {
+                var np = currentPage + 1;
+                hostWin._stxMarkerStartIdx =
+                    pageFirstMarker[np] !== undefined ? pageFirstMarker[np] : 0;
+                navigateToPage(np);
+            } else {
+                var pp = currentPage - 1;
+                hostWin._stxMarkerStartIdx =
+                    pageFirstMarker[pp] !== undefined ? pageFirstMarker[pp] : 0;
+                navigateToPage(pp);
+            }
+        }
+    }
+
+    /* -- Source 1 & 2: wheel events (parent doc + iframes) -- */
+    function wheelHandler(e) {
+        var dir = null;
+        if (e.deltaY > 0 && isAtBot() && currentPage < totalPages - 1)
+            dir = 'down';
+        else if (e.deltaY < 0 && isAtTop() && currentPage > 0)
+            dir = 'up';
+        if (!dir) {
+            if ((overDir === 'down' && !isAtBot())
+             || (overDir === 'up'   && !isAtTop())) resetOver();
+            return;
+        }
+        /* Keep PE disabled while boundary wheel events keep coming */
+        if (peDisabled) {
+            clearTimeout(peTimer);
+            peTimer = setTimeout(reenablePE, PE_TIMEOUT_MS);
+        }
+        boundarySignal(dir);
+    }
+
+    /* Listen on the parent document itself (captures wheel on
+       non-iframe elements: Streamlit wrappers, gaps, buttons…) */
+    hostDoc.addEventListener('wheel', wheelHandler, { passive: true });
+
+    /* Also attach to each iframe's contentDocument */
+    var attachedWF = new WeakSet();
+    function attachWheelIframe(iframe) {
+        if (attachedWF.has(iframe)) return;
+        attachedWF.add(iframe);
+        function tryA() {
+            try { var d = iframe.contentDocument;
+                  if (d) d.addEventListener('wheel', wheelHandler,
+                                            { passive: true });
+            } catch(x) {}
+        }
+        tryA(); iframe.addEventListener('load', tryA);
+    }
+    function scanWF() {
+        hostDoc.querySelectorAll('iframe').forEach(attachWheelIframe);
+    }
+    scanWF();
+    var wheelObs = new MutationObserver(scanWF);
+    wheelObs.observe(hostDoc.body, { childList: true, subtree: true });
+    var wheelScan = setInterval(scanWF, 2000);
 
     /* --- Cross-page marker callbacks (used by marker.py widget) --- */
     hostWin._stxMarkerGoToPage = function(page) {
@@ -480,11 +643,15 @@ def _inject_paginated_nav_js(current_page, total, marker_config):
 
     hostWin._stxMarkerBoundary = function(direction) {
         if (direction === 'next' && currentPage < totalPages - 1) {
-            hostWin._stxMarkerStartIdx = 0;
-            navigateToPage(currentPage + 1);
+            var np = currentPage + 1;
+            hostWin._stxMarkerStartIdx =
+                pageFirstMarker[np] !== undefined ? pageFirstMarker[np] : 0;
+            navigateToPage(np);
         } else if (direction === 'prev' && currentPage > 0) {
-            hostWin._stxMarkerStartIdx = -1;
-            navigateToPage(currentPage - 1);
+            var pp = currentPage - 1;
+            hostWin._stxMarkerStartIdx =
+                pageLastMarker[pp] !== undefined ? pageLastMarker[pp] : -1;
+            navigateToPage(pp);
         }
     };
 
@@ -505,18 +672,26 @@ def _inject_paginated_nav_js(current_page, total, marker_config):
 
     /* --- Cleanup --- */
     hostWin._stxPaginatedCleanup = function() {
-        scrollEl.removeEventListener('wheel', wheelHandler);
+        hostDoc.removeEventListener('wheel', wheelHandler);
+        wheelObs.disconnect(); clearInterval(wheelScan);
         hostDoc.removeEventListener('click', linkClick, true);
-        clearTimeout(overscrollTimer);
+        clearTimeout(gapTimer); clearTimeout(waitTimer);
+        reenablePE();
+        clearInterval(peCheckInterval);
+        scrollEl.removeEventListener('scroll', checkBoundaryPE);
         hostWin._stxMarkerBoundary = null;
         hostWin._stxMarkerGoToPage = null;
     };
 })();
 </script>
 """
+    pmi_first = json.dumps(page_marker_info["first"]) if page_marker_info else "{}"
+    pmi_last = json.dumps(page_marker_info["last"]) if page_marker_info else "{}"
     js_body = (js_body
                .replace("__CURRENT_PAGE__", str(current_page))
-               .replace("__TOTAL_PAGES__", str(total)))
+               .replace("__TOTAL_PAGES__", str(total))
+               .replace("__PAGE_FIRST_MARKER__", pmi_first)
+               .replace("__PAGE_LAST_MARKER__", pmi_last))
     components.html(js_body, height=0)
 
 
@@ -612,8 +787,20 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
             st.session_state[_STX_PAGE_KEY] = page
         st.button(f"stx_nav_{i}", key=f"_stx_goto_{i}", on_click=_goto_page)
 
+    # --- Compute page↔marker mapping for synchronized navigation ---
+    page_marker_info = None
+    if marker_config and cache.get("markers"):
+        page_first = {}
+        page_last = {}
+        for entry in cache["markers"]:
+            pg = entry.get("page_idx", 0)
+            if pg not in page_first:
+                page_first[pg] = entry["index"]
+            page_last[pg] = entry["index"]
+        page_marker_info = {"first": page_first, "last": page_last}
+
     # --- Paginated navigation JS (finds & hides buttons, overscroll, callbacks) ---
-    _inject_paginated_nav_js(current_page, total, marker_config)
+    _inject_paginated_nav_js(current_page, total, marker_config, page_marker_info)
 
     # --- Export download button ---
     if is_export_active():

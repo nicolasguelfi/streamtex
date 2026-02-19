@@ -1,0 +1,173 @@
+"""Modern collection home page with project cards."""
+
+import streamlit as st
+from streamtex import *
+from streamtex.styles import Style
+from streamtex.enums import Tags as t
+from custom.styles import Styles as s
+
+
+class BlockStyles:
+    """Styles for the collection home page."""
+
+    # Card container with modern dark mode styling
+    card_container = Style.create(
+        s.container.bg_colors.dark_bg_secondary
+        + "border-radius:12px;padding:24px;transition:all 0.3s ease;"
+        + "box-shadow:0 4px 16px rgba(0,0,0,0.3);",
+        "card_container"
+    )
+
+    # Card header with icon space
+    card_header = Style.create(
+        s.large + s.text.weights.bold_weight + s.text.colors.reset,
+        "card_header"
+    )
+
+    # Card description text
+    card_description = Style.create(
+        s.medium + s.text.colors.reset + "opacity:0.85;",
+        "card_description"
+    )
+
+    # Project title in card
+    project_title = Style.create(
+        s.Large + s.text.weights.bold_weight + s.text.colors.reset,
+        "project_title"
+    )
+
+    # Subtitle / tagline
+    subtitle = Style.create(
+        s.large + s.text.colors.reset + "opacity:0.7;",
+        "subtitle"
+    )
+
+    # Button wrapper
+    button_row = Style.create(
+        "display:flex;gap:16px;margin-top:24px;",
+        "button_row"
+    )
+
+
+bs = BlockStyles
+
+
+def build():
+    """Render the modern collection home page."""
+
+    # ========================================================================
+    # HEADER: Title in 1-column grid
+    # ========================================================================
+    with st_grid(cols=1):
+        st_space("v", 2)
+        st_write(
+            s.project.titles.main_title,
+            "StreamTeX Training Collection",
+            tag=t.h1
+        )
+        st_write(
+            bs.subtitle,
+            "Discover and explore our curated learning paths"
+        )
+        st_space("v", 2)
+
+    st.divider()
+
+    # ========================================================================
+    # PROJECTS: 2-column grid with modern cards
+    # ========================================================================
+    st_space("v", 2)
+
+    with st_grid(cols=2, gap="24px"):
+
+        # ====================================================================
+        # PROJECT 1: Introduction
+        # ====================================================================
+        with st_block(bs.card_container):
+            st_space("v", 1)
+
+            # Icon + title area
+            st_write(
+                s.huge + "text-align:center;",
+                "📚"
+            )
+            st_space("v", 1)
+
+            # Project title
+            st_write(
+                bs.project_title + "text-align:center;",
+                "Introduction to StreamTeX"
+            )
+            st_space("v", 1)
+
+            # Description
+            st_write(
+                bs.card_description + "text-align:center;",
+                "Learn the basics: text styling, containers, grids, layouts, and more"
+            )
+            st_space("v", 2)
+
+            # Button
+            col1, col2, col3 = st.columns([1, 2, 1])
+            with col2:
+                st.link_button(
+                    "🚀 Open Course",
+                    "http://localhost:8502",
+                    use_container_width=True
+                )
+
+            st_space("v", 1)
+
+        # ====================================================================
+        # PROJECT 2: Advanced
+        # ====================================================================
+        with st_block(bs.card_container):
+            st_space("v", 1)
+
+            # Icon + title area
+            st_write(
+                s.huge + "text-align:center;",
+                "⚡"
+            )
+            st_space("v", 1)
+
+            # Project title
+            st_write(
+                bs.project_title + "text-align:center;",
+                "Advanced Features & Architecture"
+            )
+            st_space("v", 1)
+
+            # Description
+            st_write(
+                bs.card_description + "text-align:center;",
+                "Master advanced concepts: shared blocks, multi-source resolution, and deployment"
+            )
+            st_space("v", 2)
+
+            # Button
+            col1, col2, col3 = st.columns([1, 2, 1])
+            with col2:
+                st.link_button(
+                    "🚀 Open Course",
+                    "http://localhost:8503",
+                    use_container_width=True
+                )
+
+            st_space("v", 1)
+
+    st_space("v", 3)
+
+    # ========================================================================
+    # FOOTER: About / Info
+    # ========================================================================
+    st.divider()
+    st_space("v", 2)
+
+    st_write(
+        s.medium + s.text.colors.reset + "opacity:0.6;text-align:center;",
+        "StreamTeX Training Collection © 2026 | "
+        "Interactive documentation for modern web education"
+    )
+
+    st_space("v", 2)

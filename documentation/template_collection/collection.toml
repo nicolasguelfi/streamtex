@@ -1,0 +1,33 @@
+# StreamTeX Collection Configuration
+# This file defines the projects available in the collection and their metadata
+
+[collection]
+title = "My Course Library"
+description = "A collection of StreamTeX courses"
+cards_per_row = 3
+
+# Example Project 1
+# Replace 'example-course-1' with your actual project directory name
+# and update project_url to where the project runs
+[projects.example-course-1]
+title = "Example Course 1"
+description = "Description of your first course"
+cover = "static/images/covers/course1.png"
+project_url = "http://localhost:8502"
+order = 1
+
+# Example Project 2
+# Add more projects as needed
+[projects.example-course-2]
+title = "Example Course 2"
+description = "Description of your second course"
+cover = "static/images/covers/course2.png"
+project_url = "http://localhost:8503"
+order = 2
+
+# To add more projects:
+# 1. Copy one of the [projects.xxx] sections
+# 2. Change the key (e.g., 'example-course-3')
+# 3. Update title, description, cover, project_url
+# 4. Make sure the project is running on the specified port
+# 5. Update the order field to control display order

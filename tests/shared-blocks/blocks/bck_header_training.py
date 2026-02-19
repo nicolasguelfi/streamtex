@@ -1,0 +1,37 @@
+"""Shared header block for training courses."""
+
+import streamlit as st
+from streamtex import *
+import streamtex as sx
+from streamtex.styles import Style
+from streamtex.enums import Tags as t
+
+
+class BlockStyles:
+    """Shared header styles."""
+    pass
+
+
+def build():
+    """Render a standard training course header."""
+    st_space("v", 1)
+    
+    # Header style with gradient background
+    header_style = Style(
+        "background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); "
+        "padding: 40px 20px; border-radius: 8px;",
+        "training_header"
+    )
+    
+    with st_block(header_style):
+        st_write(
+            sx.StreamTeX_Styles.huge + sx.StreamTeX_Styles.text.colors.white,
+            "StreamTeX Training Course",
+            tag=t.div
+        )
+        st_write(
+            sx.StreamTeX_Styles.large + sx.StreamTeX_Styles.text.colors.white,
+            "Learn styling, layouts, and advanced features",
+            tag=t.div
+        )
+    st_space("v", 1)

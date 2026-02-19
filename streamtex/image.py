@@ -3,6 +3,7 @@ import streamlit as st
 from .styles import Style, StreamTeX_Styles
 from .export import _render
 from .utils import __is_url, __is_absolute_path, __is_relative_path, __get_mime_type, __get_base64_encoded_image, contain_link
+from .blocks import get_static_sources
 
 _static_image_base = "app/static/images"
 
@@ -88,9 +89,26 @@ def get_image_src(uri: str) -> str:
         else:
             img_src = "" # File not found
     else:
-        # If no specific relative or absolute indicator, assume it's a static path (Legacy behavior)
-        # Note: You might want to update this logic if your static handling changes
+        # If no specific relative or absolute indicator, try configured static sources first
+        static_sources = get_static_sources()
+
+        for base in static_sources:
+            # Try multiple common subdirectories in static sources
+            for subdir in ["images", ""]:
+                if subdir:
+                    full_path = os.path.join(base, subdir, uri)
+                else:
+                    full_path = os.path.join(base, uri)
+
+                if os.path.isfile(full_path):
+                    mime_type = __get_mime_type(full_path)
+                    encoded_image = __get_base64_encoded_image(full_path)
+                    if mime_type and encoded_image:
+                        img_src = f"data:{mime_type};base64,{encoded_image}"
+                        return img_src
+
+        # Fallback: use legacy static path (for Streamlit's built-in static serving)
         img_src = f"{_static_image_base}/{uri}"
-        
+
     return img_src
 

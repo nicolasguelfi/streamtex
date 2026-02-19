@@ -1,0 +1,21 @@
+# StreamTeX Test Collection
+# Demonstrates Phase 2: Collections feature
+
+[collection]
+title = "StreamTeX Training Collection"
+description = "Introduction and Advanced courses for learning StreamTeX"
+cards_per_row = 2
+
+[projects.test-intro]
+title = "Introduction to StreamTeX"
+description = "Learn the basics: text styling, containers, grids, layouts, and more"
+cover = "static/images/covers/test-intro.png"
+project_url = "http://localhost:8502"
+order = 1
+
+[projects.test-advanced]
+title = "Advanced Features & Multi-Repo Architecture"
+description = "Master advanced concepts: shared blocks, multi-source resolution, and deployment strategies"
+cover = "static/images/covers/test-advanced.png"
+project_url = "http://localhost:8503"
+order = 2

@@ -1,0 +1,15 @@
+{
+  "name": "StreamTeX Project",
+  "version": "0.2.0",
+  "features": [
+    "Modular styling system",
+    "Lazy-loading blocks",
+    "Static asset resolution",
+    "HTML export"
+  ],
+  "stats": {
+    "blocks": 32,
+    "tests": 203,
+    "components": 15
+  }
+}

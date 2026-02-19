@@ -36,163 +36,103 @@ def add_zoom_options():
 
 def inject_zoom_logic(zoom_setting):
     """
-    Applies page layout and calculates negative margins to remove whitespace.
+    Applies page layout with CSS zoom for proper scaling.
 
-    Since Streamlit 1.41+, st.html() renders <script> inside a sandboxed iframe
-    while <style> tags are extracted to the host page (since 1.43+).
-    Therefore:
-      - CSS uses :has() for sidebar detection (no JS needed).
-      - JS uses parent.document to access the main page DOM from the iframe.
+    Uses CSS ``zoom`` property (Baseline 2024 — all modern browsers since
+    Firefox 126, May 2024) instead of ``transform: scale()``.
+
+    CSS zoom modifies the actual box model so:
+    - No ghost-space compensation needed (layout matches visual size)
+    - No sidebar offset tracking needed (Streamlit sizes .stMain itself)
+    - Scroll and measurement APIs stay in a single coordinate system
+
+    CSS is injected via st.html() (extracted to host page since Streamlit 1.43+).
+    JS is injected via components.html() (runs in an iframe, accesses host via
+    parent.document).
     """
 
-    # Constants
-    # 17 inches * 72 pt/inch = 1224 pt
+    # Constants — 17 in × 72 pt/in = 1224 pt ; 0.5 in × 72 = 36 pt
     PAGE_WIDTH = "1224pt"
-    # 0.5 inches * 72 pt/inch = 36 pt
     PAGE_PADDING = "36pt"
 
-    # 1. Determine Scale Strategy
-    if zoom_setting == "Fit":
-        # Calculate scale based on viewport
-        scale_val = "var(--streamtex-fit-scale, 1)"
-
-        # JS logic for Fit mode (uses doc/win/page from parent scope)
-        fit_logic_js = """
-                // Calculate fit scale accounting for sidebar offset
-                const pageWidthPx = page.scrollWidth;
-                const computedMargin = parseFloat(
-                    win.getComputedStyle(page).marginLeft) || 0;
-                const availableWidth = win.innerWidth - computedMargin - 40;
-                const fitScale = Math.min(1, availableWidth / pageWidthPx);
-                doc.documentElement.style.setProperty(
-                    '--streamtex-fit-scale', fitScale);
-        """
-    else:
-        # Fixed mode
-        scale_val = zoom_setting / 100.0
-        fit_logic_js = ""  # No calculation needed
-
-    # 2. CSS with :has() for sidebar-aware layout
-    # <style> tags are extracted from st.html() to the host page (Streamlit 1.43+)
+    # --- CSS ---------------------------------------------------------------
     css = f"""
     <style>
-        :root {{
-            --streamtex-scale: {scale_val};
-            --streamtex-sidebar-offset: 0px;
-        }}
-
-        /* Pure-CSS sidebar detection (works even if JS fails) */
-        .stApp:has([data-testid="stSidebar"][aria-expanded="true"]) {{
-            --streamtex-sidebar-offset: 17.5rem;
+        .stMainBlockContainer {{
+            padding-left: 0 !important;
+            padding-right: 0 !important;
         }}
 
         .stMain .block-container {{
-            /* Dimensions */
+            /* Fixed document dimensions */
             width: {PAGE_WIDTH} !important;
-            min-width: {PAGE_WIDTH} !important;
             max-width: {PAGE_WIDTH} !important;
 
-            /* Padding */
+            /* Internal padding */
             padding-left: {PAGE_PADDING} !important;
             padding-right: {PAGE_PADDING} !important;
 
-            /* Scaling */
-            transform: scale(var(--streamtex-scale));
-            transform-origin: top left;
-            margin-left: var(--streamtex-sidebar-offset, 0px);
+            /* Natural centering (works for zoom < 1 and zoom > 1) */
+            margin-left: auto !important;
+            margin-right: auto !important;
+
+            /* CSS zoom — replaces transform: scale() */
+            zoom: var(--streamtex-zoom, 1);
         }}
     </style>
     """
 
-    # 3. JS via components.html() — st.html() strips <script> in Streamlit 1.54+
-    # Uses parent.document to access the main page from the iframe.
+    st.html(css)
+
+    # --- JS: cleanup previous run + set zoom value -------------------------
+    if zoom_setting == "Fit":
+        zoom_js = """
+            var stMain = doc.querySelector('.stMain')
+                      || doc.querySelector('[data-testid="stMain"]');
+            var page = doc.querySelector('.block-container');
+            if (stMain && page) {
+                function updateFitZoom() {
+                    try {
+                        var available = stMain.clientWidth;
+                        /* offsetWidth returns the UN-zoomed width (CSS zoom spec) */
+                        var pageWidth = page.offsetWidth;
+                        if (pageWidth <= 0) return;
+                        var fitZoom = Math.min(1, available / pageWidth);
+                        doc.documentElement.style.setProperty(
+                            '--streamtex-zoom', fitZoom);
+                    } catch(e) {}
+                }
+                /* ResizeObserver on stMain fires when:
+                   - browser window resizes
+                   - sidebar opens / closes (Streamlit resizes stMain) */
+                var ro = new ResizeObserver(updateFitZoom);
+                ro.observe(stMain);
+                updateFitZoom();
+                win._stxZoomCleanup = function() { ro.disconnect(); };
+            }"""
+    else:
+        zoom_js = (
+            "doc.documentElement.style.setProperty("
+            "'--streamtex-zoom', __ZOOM_VAL__);"
+            .replace("__ZOOM_VAL__", str(zoom_setting / 100.0))
+        )
+
     js_logic = f"""
     <script>
         (function() {{
             var doc = parent.document;
             var win = doc.defaultView || parent;
 
-            // Cleanup previous run
+            /* Cleanup previous run (disconnect old ResizeObserver etc.) */
             if (win._stxZoomCleanup) {{
                 try {{ win._stxZoomCleanup(); }} catch(e) {{}}
             }}
+            win._stxZoomCleanup = null;
 
-            function updateLayout() {{
-                try {{
-                    var page = doc.querySelector('.block-container');
-                    if (!page) return;
-
-                    // Refine sidebar offset with exact pixel width
-                    var sidebar = doc.querySelector(
-                        '[data-testid="stSidebar"]');
-                    var app = doc.querySelector('.stApp');
-                    if (app) {{
-                        if (sidebar && sidebar.offsetWidth > 50) {{
-                            app.style.setProperty(
-                                '--streamtex-sidebar-offset',
-                                sidebar.offsetWidth + 'px');
-                        }} else {{
-                            app.style.setProperty(
-                                '--streamtex-sidebar-offset', '0px');
-                        }}
-                    }}
-
-                    // Fit scale logic
-                    {fit_logic_js}
-
-                    // Ghost space fix: collapse gap between layout and visual size
-                    var rootStyle = win.getComputedStyle(doc.documentElement);
-                    var scale =
-                        parseFloat(rootStyle.getPropertyValue('--streamtex-scale'))
-                        || parseFloat(rootStyle.getPropertyValue(
-                               '--streamtex-fit-scale'))
-                        || 1;
-                    // Vertical ghost space
-                    var origHeight = page.offsetHeight;
-                    var visualHeight = origHeight * scale;
-                    var ghostSpace = origHeight - visualHeight;
-                    if (ghostSpace > 50) {{
-                        page.style.marginBottom = '-' + (ghostSpace - 50) + 'px';
-                    }}
-                    // Horizontal ghost space (prevents horizontal scrollbar)
-                    var origWidth = page.offsetWidth;
-                    var hGhostSpace = Math.round(origWidth * (1 - scale));
-                    if (hGhostSpace > 5) {{
-                        page.style.marginRight = '-' + hGhostSpace + 'px';
-                    }} else {{
-                        page.style.marginRight = '';
-                    }}
-                }} catch(e) {{}}
-            }}
-
-            // Window resize
-            win.addEventListener('resize', updateLayout);
-
-            // DOM mutations (sidebar open/close, content changes)
-            var obs = new MutationObserver(updateLayout);
-            obs.observe(doc.body,
-                {{ childList: true, subtree: true, attributes: true }});
-
-            // ResizeObserver on sidebar for drag-resize
-            var resObs = null;
-            var sidebar = doc.querySelector('[data-testid="stSidebar"]');
-            if (sidebar && typeof ResizeObserver !== 'undefined') {{
-                resObs = new ResizeObserver(updateLayout);
-                resObs.observe(sidebar);
-            }}
-
-            // Cleanup for next Streamlit rerun
-            win._stxZoomCleanup = function() {{
-                win.removeEventListener('resize', updateLayout);
-                obs.disconnect();
-                if (resObs) resObs.disconnect();
-            }};
-
-            setTimeout(updateLayout, 200);
+            {zoom_js}
         }})();
     </script>
     """
 
-    st.html(css)
     # components.html() creates a real iframe where scripts execute
     components.html(js_logic, height=0)

@@ -15,6 +15,7 @@ dependencies = [
     "requests>=2.28.0",
     "watchdog",
     "graphviz>=0.21",
+    "matplotlib>=3.10.8",
 ]
 
 [dependency-groups]

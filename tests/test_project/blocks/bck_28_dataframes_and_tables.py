@@ -59,7 +59,7 @@ def build():
         """))
         st_space("v", 1)
 
-        st.dataframe(SAMPLE_DATA, use_container_width=True)
+        sx.st_dataframe(SAMPLE_DATA, use_container_width=True)
         st_space("v", 2)
 
         # --- Section 2: st.table ---
@@ -71,7 +71,7 @@ def build():
         """))
         st_space("v", 1)
 
-        st.table(SAMPLE_DATA)
+        sx.st_table(SAMPLE_DATA)
         st_space("v", 2)
 
         # --- Section 3: st.json ---
@@ -83,7 +83,7 @@ def build():
         """))
         st_space("v", 1)
 
-        st.json(SAMPLE_JSON)
+        sx.st_json(SAMPLE_JSON)
         st_space("v", 2)
 
         # --- Section 4: StreamTeX styled grid ---
@@ -129,7 +129,7 @@ def build():
             with g.cell():
                 st_write(s.large + s.bold + s.project.colors.primary_blue,
                          "st.dataframe")
-                st.dataframe(SAMPLE_DATA, use_container_width=True)
+                sx.st_dataframe(SAMPLE_DATA, use_container_width=True)
             with g.cell():
                 st_write(s.large + s.bold + s.project.colors.accent_teal,
                          "st_grid")

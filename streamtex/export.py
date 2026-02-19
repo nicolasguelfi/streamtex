@@ -8,10 +8,11 @@ HTML reproduces the nesting structure with inline styles.
 
 import importlib.resources as resources
 import os
-import streamlit as st
-from dataclasses import dataclass, field
+from contextlib import contextmanager
+from dataclasses import dataclass
 from typing import Optional
 
+import streamlit as st
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -162,6 +163,17 @@ def generate_export_html() -> Optional[str]:
     if _buffer is None:
         return None
     return _buffer.generate_full_html()
+
+
+# ---------------------------------------------------------------------------
+# Export-aware widget wrapper
+# ---------------------------------------------------------------------------
+
+@contextmanager
+def st_export(fallback_html: str):
+    """Wrap any st.* widget to include a static HTML fallback in the export."""
+    yield
+    export_append(fallback_html)  # no-op when buffer is None
 
 
 # ---------------------------------------------------------------------------

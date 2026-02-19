@@ -31,7 +31,14 @@ from .enums import Tags
 from .zoom import add_zoom_options, inject_zoom_logic
 
 # Export
-from .export import ExportConfig
+from .export import ExportConfig, st_export
+
+# Export-aware widget wrappers
+from .export_widgets import (
+    st_dataframe, st_table, st_metric, st_json, st_graphviz,
+    st_line_chart, st_bar_chart, st_area_chart, st_scatter_chart,
+    st_audio, st_video,
+)
 
 # Utilities
 from .utils import inject_link_preview_scaffold

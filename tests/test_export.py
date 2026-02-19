@@ -13,6 +13,7 @@ from streamtex.export import (
     export_pop_wrapper,
     generate_export_html,
     _render,
+    st_export,
 )
 import streamtex.export as export_mod
 
@@ -186,3 +187,44 @@ class TestRender:
         _render("<p>hi</p>")
         mock_st.html.assert_called_once()
         assert generate_export_html() is None
+
+
+# ---------------------------------------------------------------------------
+# st_export — context manager
+# ---------------------------------------------------------------------------
+
+class TestStExport:
+    def setup_method(self):
+        export_mod._buffer = None
+
+    def teardown_method(self):
+        export_mod._buffer = None
+
+    def test_noop_when_inactive(self):
+        with st_export("<p>fallback</p>"):
+            pass
+        assert generate_export_html() is None
+
+    def test_appends_when_active(self):
+        reset_export_buffer(ExportConfig(enabled=True))
+        with st_export("<p>fallback</p>"):
+            pass
+        html = generate_export_html()
+        assert "<p>fallback</p>" in html
+
+    def test_multiple_exports(self):
+        reset_export_buffer(ExportConfig(enabled=True))
+        with st_export("<p>first</p>"):
+            pass
+        with st_export("<p>second</p>"):
+            pass
+        html = generate_export_html()
+        assert "<p>first</p>" in html
+        assert "<p>second</p>" in html
+
+    def test_yield_executes_body(self):
+        reset_export_buffer(ExportConfig(enabled=True))
+        executed = False
+        with st_export("<p>fb</p>"):
+            executed = True
+        assert executed is True

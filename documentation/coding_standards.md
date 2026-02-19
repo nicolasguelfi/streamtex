@@ -48,7 +48,33 @@ import blocks
 
 ## 5. sx vs st — When to Use What
 - **ALL layout and content** -> `sx.*`: st_write, st_image, st_grid, st_list, st_block, st_span, st_space, st_br, st_overlay
-- **ONLY interactivity** -> `st.*`: buttons, inputs, sliders, media players, dataframes
+- **Data visualization (export-aware)** -> `sx.*`: st_dataframe, st_table, st_metric, st_json, st_graphviz, st_line_chart, st_bar_chart, st_area_chart, st_scatter_chart, st_audio, st_video
+- **ONLY interactivity** -> `st.*`: buttons, inputs, sliders, forms, selectbox, checkbox
+
+### Export-Aware Widgets
+When HTML export is enabled, native `st.*` widgets (charts, tables, etc.) are **invisible** in the exported HTML because they use Streamlit's protobuf/React pipeline.
+
+Use the `sx.st_*` wrappers instead — they call the native widget AND inject a static HTML fallback (SVG chart, HTML table, etc.) into the export buffer:
+
+```python
+# BAD — invisible in export
+st.line_chart(data)
+st.dataframe(df)
+st.graphviz_chart(dot)
+
+# GOOD — visible in both live app AND export
+sx.st_line_chart(data)
+sx.st_dataframe(df)
+sx.st_graphviz(dot)
+```
+
+For any widget not covered by the helpers, use `sx.st_export()`:
+```python
+with sx.st_export('<p>Static fallback for export</p>'):
+    st.plotly_chart(fig)
+```
+
+Interactive widgets (`st.button`, `st.slider`, etc.) have no meaningful static representation and are expected to be absent from the export.
 
 ## 6. Critical Layout Rules
 1. **Inline text**: Multiple `st_write()` calls STACK VERTICALLY. For inline mixed-style text, use ONE `st_write()` with tuple arguments:

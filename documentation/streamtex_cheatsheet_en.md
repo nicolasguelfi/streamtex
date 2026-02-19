@@ -167,6 +167,60 @@ s.italic
 s.text.decors.underline_text
 ```
 
+## 📊 Export-Aware Widgets
+
+Use `sx.st_*` wrappers instead of raw `st.*` calls for data visualization — they appear in both the live app AND the HTML export.
+
+### Charts
+
+```python
+# Line / Bar / Area / Scatter charts
+sx.st_line_chart(data, x="col_x", y="col_y")
+sx.st_bar_chart(data, x="Category", y="Value")
+sx.st_area_chart(data)
+sx.st_scatter_chart(data, x="x", y="y")
+```
+
+### Tables & Data
+
+```python
+# Interactive table (sortable)
+sx.st_dataframe(df, use_container_width=True)
+
+# Static table
+sx.st_table(data)
+
+# JSON viewer
+sx.st_json({"key": "value"})
+
+# Metric
+sx.st_metric("Revenue", "$1M", delta="+5%")
+```
+
+### Diagrams & Media
+
+```python
+# Graphviz (DOT language)
+sx.st_graphviz('digraph { A -> B -> C }')
+
+# Audio
+sx.st_audio("path/to/audio.wav", format="audio/wav")
+
+# Video (local or YouTube)
+sx.st_video("path/to/video.mp4")
+sx.st_video("https://www.youtube.com/watch?v=...")
+```
+
+### Generic Fallback
+
+```python
+# For any widget not covered above
+with sx.st_export('<p>Fallback HTML for export</p>'):
+    st.plotly_chart(fig)
+```
+
+> **Note:** Interactive widgets (`st.button`, `st.slider`, `st.selectbox`) have no static representation and are absent from the export. This is expected.
+
 ## 🔧 Utilities
 
 ### Spacing

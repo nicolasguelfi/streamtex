@@ -98,7 +98,7 @@ def build():
         st_space("v", 2)
 
         show_explanation(textwrap.dedent("""\
-            st.graphviz_chart() renders DOT language diagrams.
+            sx.st_graphviz() renders DOT language diagrams.
             DOT is concise for describing directed graphs.
             Charts are interactive (pan/zoom).
         """))
@@ -109,7 +109,7 @@ def build():
         st_space("v", 1)
 
         show_code(textwrap.dedent("""\
-            st.graphviz_chart('''
+            sx.st_graphviz('''
                 digraph {
                     A -> B -> C -> D -> A
                     A -> C
@@ -118,7 +118,7 @@ def build():
         """))
         st_space("v", 1)
 
-        st.graphviz_chart(SIMPLE_GRAPH)
+        sx.st_graphviz(SIMPLE_GRAPH)
         st_space("v", 2)
 
         # --- Section 2: Styled flowchart ---
@@ -126,7 +126,7 @@ def build():
         st_space("v", 1)
 
         show_code(textwrap.dedent("""\
-            st.graphviz_chart('''
+            sx.st_graphviz('''
                 digraph {
                     node [shape=box, style="rounded,filled"]
                     book [label="book.py", fillcolor="#4A90D9"]
@@ -137,7 +137,7 @@ def build():
         """))
         st_space("v", 1)
 
-        st.graphviz_chart(FLOWCHART)
+        sx.st_graphviz(FLOWCHART)
         st_space("v", 2)
 
         # --- Section 3: Interactive selection ---
@@ -147,7 +147,7 @@ def build():
         show_code(textwrap.dedent("""\
             diagrams = {"Simple Graph": dot1, "Flowchart": dot2, ...}
             choice = st.selectbox("Choose a diagram", list(diagrams.keys()))
-            st.graphviz_chart(diagrams[choice])
+            sx.st_graphviz(diagrams[choice])
         """))
         st_space("v", 1)
 
@@ -155,7 +155,7 @@ def build():
                               [*DIAGRAMS],
                               key="bck31_diagram_select")
         with st_block(s.project.containers.result_box):
-            st.graphviz_chart(DIAGRAMS[choice])
+            sx.st_graphviz(DIAGRAMS[choice])
         st_space("v", 2)
 
         # --- Section 4: Self-referential architecture ---
@@ -168,12 +168,12 @@ def build():
         """))
         st_space("v", 1)
 
-        st.graphviz_chart(ARCHITECTURE)
+        sx.st_graphviz(ARCHITECTURE)
         st_space("v", 2)
 
         show_details(textwrap.dedent("""\
             DOT language: concise graph description (nodes, edges, attributes).
-            st.graphviz_chart() supports pan and zoom interaction.
+            sx.st_graphviz() supports pan and zoom interaction.
             Combine with st.selectbox() to switch between diagrams.
             Requires: uv add graphviz (Python bindings).
         """))

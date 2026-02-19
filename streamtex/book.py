@@ -439,16 +439,18 @@ def _inject_paginated_nav_js(current_page, total, marker_config,
      *  cooldown → ignore COOLDOWN_MS      → idle
      * ================================================================= */
 
-    /* -- Find the real scroll container (walk up from content) --
-       We look for the FIRST ancestor with overflow-y auto/scroll.
-       The scrollHeight check is intentionally omitted because the
-       content may not be fully rendered yet when this JS executes
-       (iframes load asynchronously).  Without the check, we find
-       the CSS-designated scroll container even if it is not yet
-       overflowing.                                                  */
+    /* -- Find the real scroll container --
+       Use .stMain directly — it is Streamlit's designated scroll
+       container (<section> with overflow:auto).  Walking up from
+       content risks landing on an intermediate wrapper that has
+       overflow:auto but doesn't actually scroll (e.g. when the
+       sidebar is collapsed and the content is shorter).             */
     var scrollEl = (function() {
+        var main = hostDoc.querySelector('.stMain')
+                || hostDoc.querySelector('[data-testid="stMain"]');
+        if (main) return main;
+        /* Fallback: walk up from content */
         var start = hostDoc.querySelector('[data-testid="stVerticalBlock"]')
-                 || hostDoc.querySelector('[data-testid="stMain"]')
                  || hostDoc.body;
         var el = start;
         while (el && el !== hostDoc.documentElement) {
@@ -457,10 +459,6 @@ def _inject_paginated_nav_js(current_page, total, marker_config,
                 return el;
             el = el.parentElement;
         }
-        /* Last resort — try well-known Streamlit containers */
-        var main = hostDoc.querySelector('.stMain')
-                || hostDoc.querySelector('[data-testid="stMain"]');
-        if (main) return main;
         return hostDoc.scrollingElement || hostDoc.documentElement;
     })();
 

@@ -27,8 +27,12 @@ Le fichier `.python-version` à la racine du projet fixe la version de Python (3
 ### 2. Lancer un projet StreamTeX
 (adapté à votre dossier projet)
 ```bash
-# uv run streamlit run projects
 uv run streamlit run projects/<votre_projet>/book.py
+```
+
+Pour lancer plusieurs projets en parallèle, spécifiez un port différent (le port par défaut est 8501) :
+```bash
+uv run streamlit run projects/<autre_projet>/book.py --server.port 8502
 ```
 
 ### 3. Lancer le projet de test/démonstration

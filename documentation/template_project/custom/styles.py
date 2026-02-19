@@ -1,36 +1,69 @@
-"""Project-specific styles. Extend StreamTeX_Styles with your custom colors and compositions.
+"""Project-specific styles. Extends StreamTeX_Styles with a minimal working palette.
 
 Usage in blocks:
     from custom.styles import Styles as s
-    st_write(s.project.colors.my_color, "Hello")
-    st_write(s.project.titles.my_title, "Title")
+    st_write(s.project.colors.primary, "Hello")
+    st_write(s.project.titles.main_title, "Title")
 """
 
 from streamtex.styles import Style, Text, Container, StreamTeX_Styles
 
 
 class ColorsCustom:
-    """Define project-specific colors here."""
-    # example = Style("color: #FF6B35;", "example")
-    pass
+    """Project text colors."""
+    primary = Style("color: #4A90D9;", "primary")
+    accent = Style("color: #2EC4B6;", "accent")
+    muted = Style("color: #95A5A6;", "muted")
+
+
+class BackgroundsCustom:
+    """Project background colors for callout containers."""
+    callout_bg = Style("background-color: rgba(74, 144, 217, 0.12);", "callout_bg")
+    code_box_bg = Style("background-color: rgba(74, 144, 217, 0.08);", "code_box_bg")
 
 
 class TextStylesCustom:
-    """Define project-specific title/subtitle compositions here.
+    """Project title compositions."""
+    main_title = Style.create(
+        ColorsCustom.primary + Text.weights.bold_weight + Text.sizes.Giant_size,
+        "main_title"
+    )
+    section_title = Style.create(
+        ColorsCustom.primary + Text.weights.bold_weight + Text.sizes.huge_size,
+        "section_title"
+    )
+    section_subtitle = Style.create(
+        ColorsCustom.accent + Text.weights.bold_weight + Text.sizes.Large_size,
+        "section_subtitle"
+    )
 
-    Example:
-        my_title = Style.create(
-            ColorsCustom.example + Text.weights.bold_weight + Text.sizes.Giant_size,
-            "my_title"
-        )
-    """
-    pass
+
+class ContainerStylesCustom:
+    """Project container styles."""
+    callout = Style.create(
+        BackgroundsCustom.callout_bg
+        + Container.borders.solid_border
+        + Style("border-color: #4A90D9; border-width: 0 0 0 4px;", "callout_border")
+        + Container.paddings.medium_padding,
+        "callout"
+    )
+    code_box = Style.create(
+        BackgroundsCustom.code_box_bg
+        + Container.borders.solid_border
+        + Style("border-color: #4A90D9; border-width: 1px;", "code_box_border")
+        + Style("border-radius: 6px;", "code_box_radius")
+        + Container.paddings.medium_padding
+        + Container.layouts.center,
+        "code_box"
+    )
 
 
 class Custom:
     """Aggregation class for all project-specific styles."""
     colors = ColorsCustom
+    backgrounds = BackgroundsCustom
     titles = TextStylesCustom
+    containers = ContainerStylesCustom
 
 
 class Styles(StreamTeX_Styles):

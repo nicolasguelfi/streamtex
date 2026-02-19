@@ -106,7 +106,12 @@ def build():
 
 ## 10. Running the App
 ```bash
-cd project_name && streamlit run book.py
+uv run streamlit run projects/<project_name>/book.py
+```
+
+To run multiple projects simultaneously, specify a different port (default is 8501):
+```bash
+uv run streamlit run projects/<project_name>/book.py --server.port 8502
 ```
 
 ## 11. Deployment

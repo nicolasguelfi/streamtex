@@ -67,6 +67,11 @@ uv run streamlit run tests/test_project/book.py        # Run the test project
 uv run pytest tests/ -v                                # Run unit tests
 ```
 
+To run multiple projects simultaneously, use `--server.port` to avoid conflicts:
+```bash
+uv run streamlit run projects/<other_project>/book.py --server.port 8502
+```
+
 ## Deployment
 - **Docker**: `docker build --build-arg FOLDER=projects/<your_project> -t streamtex-app .`
 - **Hugging Face Spaces**: Push Docker image to HF Space via git remote

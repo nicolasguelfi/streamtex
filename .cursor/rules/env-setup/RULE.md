@@ -4,19 +4,29 @@ alwaysApply: true
 # Environment & Execution
 
 ## Shell Configuration
-If asked to run code, verify the environment first:
+This project uses **uv** for dependency management. Never call `python`, `pip`, `pytest`, `streamlit`, or `ruff` directly.
 
-1. **Activate Environment:**
+1. **Install dependencies:**
 ```bash
-conda activate streamtex
+uv sync
 ```
 
-2.  **Run the Book:**
-Navigate to the project folder and run:
+2. **Run a project:**
 ```bash
-streamlit run book.py
+uv run streamlit run projects/<your_project>/book.py
+```
+
+3. **Run the test project:**
+```bash
+uv run streamlit run tests/test_project/book.py
+```
+
+4. **Run unit tests:**
+```bash
+uv run pytest tests/ -v
 ```
 
 ## Dependencies
-- If import errors occur, check `requirements.txt`.
-- Ensure the `streamtex` folder is located in the parent directory of your project folder.
+- If import errors occur, run `uv sync` to install from `pyproject.toml` / `uv.lock`.
+- Use `uv add <package>` to add dependencies, `uv add --group dev <package>` for dev deps.
+- The `streamtex` package is installed in editable mode via `uv sync`.

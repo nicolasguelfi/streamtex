@@ -33,15 +33,19 @@ See `documentation/coding_standards.md` for the full reference. Key rules:
 ## Key Files to Know
 - `streamtex/styles/` — Core style system (modular package)
 - `streamtex/__init__.py` — Public API surface (re-exports)
-- `streamtex/book.py` — Book orchestration (st_book, st_include, st_toc)
-- `streamtex/zoom.py` — Zoom controls and page scaling
+- `streamtex/book.py` — Book orchestration (st_book, st_include, st_toc, paginated mode)
+- `streamtex/zoom.py` — Zoom controls via CSS `zoom` property (Baseline 2024)
 - `streamtex/write.py` — Text rendering (st_write)
 - `streamtex/grid.py` — CSS Grid layout (st_grid)
 - `streamtex/container.py` — st_block, st_span context managers
 - `streamtex/list.py` — List rendering (st_list)
 - `streamtex/toc.py` — Table of Contents registry
+- `streamtex/marker.py` — Navigation markers (st_marker, MarkerConfig)
 - `streamtex/image.py` — Image handling with base64
-- `streamtex/overlay.py` — Absolute positioning layers
+- `streamtex/code.py` — Code block rendering with Pygments (st_code)
+- `streamtex/space.py` — Vertical/horizontal spacing (st_space, st_br)
+- `streamtex/overlay.py` — Absolute positioning layers (st_overlay)
+- `streamtex/export.py` — HTML export system (ExportConfig)
 - `streamtex/image_utils.py` — Base64, MIME, URL detection
 - `streamtex/link_preview.py` — Hover link preview scaffold
 

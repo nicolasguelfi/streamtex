@@ -53,6 +53,7 @@ st_book([
     blocks.bck_17_themes,
     blocks.bck_18_best_practices,
     blocks.bck_19_static_assets,
+    blocks.bck_20_markers,
     blocks.bck_21_export_html,
     blocks.bck_22_deploy_docker,
     blocks.bck_23_deploy_huggingface,

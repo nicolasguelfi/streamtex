@@ -1,14 +1,20 @@
 /* default.css */
 
 
-/* Make the header transparent and let mouse clicks pass through it */
-header[data-testid="stHeader"] {
+/* Make the header transparent and let mouse clicks pass through it.
+   We must force pointer-events:none on ALL descendants with !important
+   because Streamlit's own CSS sets pointer-events:auto on internal
+   elements (stToolbar, etc.), overriding simple inheritance. */
+header[data-testid="stHeader"],
+header[data-testid="stHeader"] * {
     background-color: transparent !important;
-    pointer-events: none; /* Allows to click "through" the header background */
+    pointer-events: none !important;
 }
-/* Re-enable clicks on interactive children (deploy button, hamburger menu) */
-header[data-testid="stHeader"] > * {
-    pointer-events: auto;
+/* Re-enable clicks only on actual interactive elements (deploy button, hamburger menu) */
+header[data-testid="stHeader"] button,
+header[data-testid="stHeader"] a,
+header[data-testid="stHeader"] [role="button"] {
+    pointer-events: auto !important;
 }
 
 /* Changes the default font of the web page to Arial */

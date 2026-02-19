@@ -367,7 +367,7 @@ def _inject_paginated_nav_js(current_page, total, marker_config,
     """Inject JS for cross-page navigation via hidden buttons.
 
     Navigation mechanisms:
-    - Overscroll: scrolling past bottom/top triggers prev/next page
+    - Monties: IntersectionObserver on sentinel auto-triggers next page on wheel
     - Marker callbacks: cross-page marker navigation from marker.py widget
     - Sidebar links: click .stx-page-link (rendered via st.markdown) to change page
     - Hidden buttons: JS finds stx_nav_* buttons and clicks them programmatically
@@ -416,35 +416,14 @@ def _inject_paginated_nav_js(current_page, total, marker_config,
             || targetPage === currentPage) return;
         navigating = true;          /* block further signals */
         hostWin._stxScrollReset = true;
-        reenablePE();               /* restore iframe interactions */
         findNavButtons();
         var btn = navButtons[targetPage];
         if (btn) btn.click();
     }
 
-    /* =================================================================
-     * OVERSCROLL DETECTION  (scroll → pause → re-scroll → navigate)
-     *
-     * Three independent event sources feed one shared state machine:
-     *  1. wheel events on hostDoc          (cursor over non-iframe areas)
-     *  2. wheel events on iframe docs      (cursor over st.html content)
-     *  3. scroll events on the container   (elastic bounce on macOS)
-     *
-     * State machine:
-     *  idle     → boundary signal         → phase1
-     *  phase1   → signals keep coming     → stay  (restart gap timer)
-     *  phase1   → GAP_MS silence          → waiting
-     *  waiting  → boundary signal         → TRIGGER → cooldown
-     *  waiting  → WAIT_MS expires         → idle
-     *  cooldown → ignore COOLDOWN_MS      → idle
-     * ================================================================= */
-
     /* -- Find the real scroll container --
        Use .stMain directly — it is Streamlit's designated scroll
-       container (<section> with overflow:auto).  Walking up from
-       content risks landing on an intermediate wrapper that has
-       overflow:auto but doesn't actually scroll (e.g. when the
-       sidebar is collapsed and the content is shorter).             */
+       container (<section> with overflow:auto).                     */
     var scrollEl = (function() {
         var main = hostDoc.querySelector('.stMain')
                 || hostDoc.querySelector('[data-testid="stMain"]');
@@ -463,14 +442,22 @@ def _inject_paginated_nav_js(current_page, total, marker_config,
     })();
 
     /* -- Scroll reset after page navigation --
-       Multiple delayed attempts override browser / Streamlit scroll
-       restoration which can fire asynchronously after our initial reset.
-       We target scrollEl, .stMain, and the window to cover all cases. */
+       Dual mechanism: explicit _stxScrollReset flag (set by navigateToPage)
+       + page-change detection (_stxPrevPage) which covers Monties button
+       clicks that go through on_click Python callbacks directly.         */
+    var needsReset = false;
     if (hostWin._stxScrollReset) {
         hostWin._stxScrollReset = false;
+        needsReset = true;
+    }
+    var prevPage = hostWin._stxPrevPage;
+    hostWin._stxPrevPage = currentPage;
+    if (prevPage !== undefined && prevPage !== currentPage) {
+        needsReset = true;
+    }
+    if (needsReset) {
         function doScrollReset() {
             scrollEl.scrollTop = 0;
-            /* Also target well-known Streamlit containers directly */
             var mains = hostDoc.querySelectorAll('.stMain, [data-testid="stMain"]');
             for (var m = 0; m < mains.length; m++) mains[m].scrollTop = 0;
             try { hostWin.scrollTo({top: 0, behavior: 'instant'}); }
@@ -482,157 +469,99 @@ def _inject_paginated_nav_js(current_page, total, marker_config,
         });
     }
 
-    var overState = 'idle';
-    var overDir = null;
-    var gapTimer = null;
-    var waitTimer = null;
-    var GAP_MS = 500;
-    var WAIT_MS = 3000;
-    var COOLDOWN_MS = 2000;
+    /* =================================================================
+     * MONTIES — banner clicks + auto-trigger zones
+     *
+     * Bottom: IntersectionObserver on sentinel + wheel deltaY > 0
+     * Top:    isAtTop() + wheel deltaY < 0  (800ms startup delay)
+     * Banners: click on red banners → navigateToPage
+     * ================================================================= */
+    var sentinel = hostDoc.getElementById('stx-monties-sentinel');
+    var prevBanner = hostDoc.getElementById('stx-monties-prev');
+    var nextBanner = hostDoc.getElementById('stx-monties-next');
+    var montiesNextActive = false;
+    var montiesNextTimer = null;
+    var montiesPrevTimer = null;
+    var montiesObs = null;
+    var montiesPrevReady = false;
 
-    function isAtBot() {
-        return scrollEl.scrollHeight - scrollEl.scrollTop
-               - scrollEl.clientHeight < 15;
-    }
     function isAtTop() { return scrollEl.scrollTop < 15; }
 
-    /* -- Pointer-events management for overscroll at boundaries --
-       Wheel events inside iframes do NOT propagate to the parent doc.
-       When the scroll container reaches a boundary we temporarily disable
-       pointer-events on all iframes so that subsequent wheel events fall
-       through to the parent document and reach our wheelHandler.
-       The marker widget buttons live in the parent DOM (not in iframes)
-       so they remain clickable at all times.                           -- */
-    var peDisabled = false;
-    var peTimer = null;
-    var PE_TIMEOUT_MS = 5000;
+    /* Delay top auto-trigger to avoid residual momentum after scroll reset */
+    var montiesReadyTimer = setTimeout(function() {
+        montiesPrevReady = true;
+    }, 800);
 
-    function setIframePE(enabled) {
-        var iframes = hostDoc.querySelectorAll('iframe');
-        for (var k = 0; k < iframes.length; k++)
-            iframes[k].style.pointerEvents = enabled ? '' : 'none';
-        peDisabled = !enabled;
-    }
-    function reenablePE() {
-        clearTimeout(peTimer);
-        if (peDisabled) setIframePE(true);
-    }
-    function checkBoundaryPE() {
+    function montiesWheel(e) {
         if (navigating) return;
-        /* Content fits without scrolling — no overscroll needed */
-        if (scrollEl.scrollHeight <= scrollEl.clientHeight + 30) return;
-        var atBot = isAtBot() && currentPage < totalPages - 1;
-        var atTop = isAtTop() && currentPage > 0;
-        if (atBot || atTop) {
-            if (!peDisabled) {
-                setIframePE(false);
-                peTimer = setTimeout(reenablePE, PE_TIMEOUT_MS);
+
+        /* Bottom: scroll down while sentinel visible → next page */
+        if (e.deltaY > 0 && montiesNextActive) {
+            clearTimeout(montiesPrevTimer); montiesPrevTimer = null;
+            if (!montiesNextTimer) {
+                montiesNextTimer = setTimeout(function() {
+                    if (!montiesNextActive || navigating) return;
+                    var np = currentPage + 1;
+                    hostWin._stxMarkerStartIdx =
+                        pageFirstMarker[np] !== undefined ? pageFirstMarker[np] : 0;
+                    navigateToPage(np);
+                }, 400);
             }
-        } else {
-            reenablePE();
-        }
-    }
-    scrollEl.addEventListener('scroll', checkBoundaryPE);
-
-    /* Periodic boundary check — catches cases where the scroll event
-       misses the exact boundary moment (e.g. momentum scroll ending
-       exactly at bottom, or content height changing after load).
-       Does NOT re-enable PE — only the scroll listener does that
-       when the user scrolls away from the boundary.                  */
-    var peCheckInterval = setInterval(function() {
-        if (navigating) return;
-        if (scrollEl.scrollHeight <= scrollEl.clientHeight + 30) return;
-        var atBot = isAtBot() && currentPage < totalPages - 1;
-        var atTop = isAtTop() && currentPage > 0;
-        if (atBot || atTop) {
-            if (!peDisabled) {
-                setIframePE(false);
-                clearTimeout(peTimer);
-                peTimer = setTimeout(reenablePE, PE_TIMEOUT_MS);
-            }
-        }
-    }, 300);
-
-    function resetOver() {
-        overState = 'idle'; overDir = null;
-        clearTimeout(gapTimer); clearTimeout(waitTimer);
-    }
-
-    /* -- Shared state machine entry point -- */
-    function boundarySignal(dir) {
-        if (overDir && dir !== overDir) { resetOver(); return; }
-        overDir = dir;
-        if (overState === 'cooldown') return;
-
-        if (overState === 'idle' || overState === 'phase1') {
-            overState = 'phase1';
-            clearTimeout(gapTimer);
-            gapTimer = setTimeout(function() {
-                overState = 'waiting';
-                waitTimer = setTimeout(resetOver, WAIT_MS);
-            }, GAP_MS);
-        } else if (overState === 'waiting') {
-            overState = 'cooldown'; overDir = null;
-            clearTimeout(gapTimer); clearTimeout(waitTimer);
-            setTimeout(function() { overState = 'idle'; }, COOLDOWN_MS);
-            if (dir === 'down') {
-                var np = currentPage + 1;
-                hostWin._stxMarkerStartIdx =
-                    pageFirstMarker[np] !== undefined ? pageFirstMarker[np] : 0;
-                navigateToPage(np);
-            } else {
-                var pp = currentPage - 1;
-                hostWin._stxMarkerStartIdx =
-                    pageFirstMarker[pp] !== undefined ? pageFirstMarker[pp] : 0;
-                navigateToPage(pp);
-            }
-        }
-    }
-
-    /* -- Source 1 & 2: wheel events (parent doc + iframes) -- */
-    function wheelHandler(e) {
-        var dir = null;
-        if (e.deltaY > 0 && isAtBot() && currentPage < totalPages - 1)
-            dir = 'down';
-        else if (e.deltaY < 0 && isAtTop() && currentPage > 0)
-            dir = 'up';
-        if (!dir) {
-            if ((overDir === 'down' && !isAtBot())
-             || (overDir === 'up'   && !isAtTop())) resetOver();
             return;
         }
-        /* Keep PE disabled while boundary wheel events keep coming */
-        if (peDisabled) {
-            clearTimeout(peTimer);
-            peTimer = setTimeout(reenablePE, PE_TIMEOUT_MS);
+
+        /* Top: scroll up while at top of page → prev page */
+        if (e.deltaY < 0 && montiesPrevReady
+                && currentPage > 0 && isAtTop()) {
+            clearTimeout(montiesNextTimer); montiesNextTimer = null;
+            if (!montiesPrevTimer) {
+                montiesPrevTimer = setTimeout(function() {
+                    if (navigating || !isAtTop()) return;
+                    var pp = currentPage - 1;
+                    hostWin._stxMarkerStartIdx =
+                        pageFirstMarker[pp] !== undefined ? pageFirstMarker[pp] : 0;
+                    navigateToPage(pp);
+                }, 400);
+            }
+            return;
         }
-        boundarySignal(dir);
+
+        /* Not at a boundary: cancel timers */
+        clearTimeout(montiesNextTimer); montiesNextTimer = null;
+        clearTimeout(montiesPrevTimer); montiesPrevTimer = null;
     }
 
-    /* Listen on the parent document itself (captures wheel on
-       non-iframe elements: Streamlit wrappers, gaps, buttons…) */
-    hostDoc.addEventListener('wheel', wheelHandler, { passive: true });
+    /* Bottom sentinel: IntersectionObserver */
+    if (sentinel && currentPage < totalPages - 1) {
+        montiesObs = new hostWin.IntersectionObserver(function(entries) {
+            montiesNextActive = entries[0].isIntersecting;
+            if (!montiesNextActive) {
+                clearTimeout(montiesNextTimer); montiesNextTimer = null;
+            }
+        }, { threshold: 0.1 });
+        montiesObs.observe(sentinel);
+    }
 
-    /* Also attach to each iframe's contentDocument */
-    var attachedWF = new WeakSet();
-    function attachWheelIframe(iframe) {
-        if (attachedWF.has(iframe)) return;
-        attachedWF.add(iframe);
-        function tryA() {
-            try { var d = iframe.contentDocument;
-                  if (d) d.addEventListener('wheel', wheelHandler,
-                                            { passive: true });
-            } catch(x) {}
-        }
-        tryA(); iframe.addEventListener('load', tryA);
+    /* Wheel listener — handles both top and bottom auto-trigger */
+    hostDoc.addEventListener('wheel', montiesWheel, { passive: true });
+
+    /* Banner click handlers */
+    function prevClick() {
+        if (navigating || currentPage <= 0) return;
+        var pp = currentPage - 1;
+        hostWin._stxMarkerStartIdx =
+            pageFirstMarker[pp] !== undefined ? pageFirstMarker[pp] : 0;
+        navigateToPage(pp);
     }
-    function scanWF() {
-        hostDoc.querySelectorAll('iframe').forEach(attachWheelIframe);
+    function nextClick() {
+        if (navigating || currentPage >= totalPages - 1) return;
+        var np = currentPage + 1;
+        hostWin._stxMarkerStartIdx =
+            pageFirstMarker[np] !== undefined ? pageFirstMarker[np] : 0;
+        navigateToPage(np);
     }
-    scanWF();
-    var wheelObs = new MutationObserver(scanWF);
-    wheelObs.observe(hostDoc.body, { childList: true, subtree: true });
-    var wheelScan = setInterval(scanWF, 2000);
+    if (prevBanner) prevBanner.addEventListener('click', prevClick);
+    if (nextBanner) nextBanner.addEventListener('click', nextClick);
 
     /* --- Cross-page marker callbacks (used by marker.py widget) --- */
     hostWin._stxMarkerGoToPage = function(page) {
@@ -683,13 +612,14 @@ def _inject_paginated_nav_js(current_page, total, marker_config,
 
     /* --- Cleanup --- */
     hostWin._stxPaginatedCleanup = function() {
-        hostDoc.removeEventListener('wheel', wheelHandler);
-        wheelObs.disconnect(); clearInterval(wheelScan);
+        if (montiesObs) montiesObs.disconnect();
+        hostDoc.removeEventListener('wheel', montiesWheel);
+        clearTimeout(montiesNextTimer);
+        clearTimeout(montiesPrevTimer);
+        clearTimeout(montiesReadyTimer);
+        if (prevBanner) prevBanner.removeEventListener('click', prevClick);
+        if (nextBanner) nextBanner.removeEventListener('click', nextClick);
         hostDoc.removeEventListener('click', linkClick, true);
-        clearTimeout(gapTimer); clearTimeout(waitTimer);
-        reenablePE();
-        clearInterval(peCheckInterval);
-        scrollEl.removeEventListener('scroll', checkBoundaryPE);
         hostWin._stxMarkerBoundary = null;
         hostWin._stxMarkerGoToPage = null;
     };
@@ -770,8 +700,42 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
                     "page": entry.get("page_idx", 0),
                 })
 
+    # --- Monties — page titles for navigation labels ---
+    page_titles = _get_page_titles(cache, total)
+
+    # Monties — top banner (previous section, clickable via JS)
+    if current_page > 0:
+        _prev = page_titles[current_page - 1]
+        st.markdown(
+            f'<div id="stx-monties-prev" style="background:#d32f2f;color:white;'
+            f'font-weight:bold;font-size:1.3rem;padding:18px 24px;text-align:center;'
+            f'cursor:pointer;border-radius:8px;user-select:none;">'
+            f'◂&ensp;{_prev}</div>',
+            unsafe_allow_html=True,
+        )
+        st.divider()
+
     # --- Render current block ---
     st_include(module_list[current_page], *args, **kwargs)
+
+    # Monties — bottom banner (next section, clickable via JS)
+    if current_page < total - 1:
+        _next = page_titles[current_page + 1]
+        st.divider()
+        st.markdown(
+            f'<div id="stx-monties-next" style="background:#d32f2f;color:white;'
+            f'font-weight:bold;font-size:1.3rem;padding:18px 24px;text-align:center;'
+            f'cursor:pointer;border-radius:8px;user-select:none;">'
+            f'{_next}&ensp;▸</div>',
+            unsafe_allow_html=True,
+        )
+        # Buffer zone before auto-trigger sentinel (800px)
+        st_space("v", "800px")
+        # Sentinel watched by IntersectionObserver in paginated nav JS
+        st.markdown(
+            '<div id="stx-monties-sentinel" style="height:1px;"></div>',
+            unsafe_allow_html=True,
+        )
 
     # Post-seed markers for pages AFTER current (for global navigation)
     if marker_config and cache.get("markers"):

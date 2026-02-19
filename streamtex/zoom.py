@@ -140,18 +140,27 @@ def inject_zoom_logic(zoom_setting):
                     // Fit scale logic
                     {fit_logic_js}
 
-                    // Ghost space fix: collapse gap between layout and visual height
+                    // Ghost space fix: collapse gap between layout and visual size
                     var rootStyle = win.getComputedStyle(doc.documentElement);
                     var scale =
                         parseFloat(rootStyle.getPropertyValue('--streamtex-scale'))
                         || parseFloat(rootStyle.getPropertyValue(
                                '--streamtex-fit-scale'))
                         || 1;
+                    // Vertical ghost space
                     var origHeight = page.offsetHeight;
                     var visualHeight = origHeight * scale;
                     var ghostSpace = origHeight - visualHeight;
                     if (ghostSpace > 50) {{
                         page.style.marginBottom = '-' + (ghostSpace - 50) + 'px';
+                    }}
+                    // Horizontal ghost space (prevents horizontal scrollbar)
+                    var origWidth = page.offsetWidth;
+                    var hGhostSpace = Math.round(origWidth * (1 - scale));
+                    if (hGhostSpace > 5) {{
+                        page.style.marginRight = '-' + hGhostSpace + 'px';
+                    }} else {{
+                        page.style.marginRight = '';
                     }}
                 }} catch(e) {{}}
             }}

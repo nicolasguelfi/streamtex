@@ -141,7 +141,7 @@ def load_css(file_name: str):
 def build_ToC_sidebar_placeholder(has_markers=False):
     with st.sidebar:
         if has_markers:
-            tab_toc, tab_markers = st.tabs(["Contents", "Markers"])
+            tab_markers, tab_toc = st.tabs(["Markers", "Contents"])
             toc_sidebar = tab_toc.empty()
             markers_sidebar = tab_markers.empty()
             return toc_sidebar, markers_sidebar
@@ -303,7 +303,7 @@ def _build_paginated_sidebar(cache, current_page, total, toc_config, marker_conf
         has_markers = marker_config is not None and cache.get("markers")
 
         if has_markers:
-            tab_toc, tab_markers = st.tabs(["Contents", "Markers"])
+            tab_markers, tab_toc = st.tabs(["Markers", "Contents"])
         else:
             tab_toc = st.container()
             tab_markers = None

@@ -27,7 +27,7 @@ sts.theme = dark
 marker = MarkerConfig(
     auto_marker_on_toc=1,
     show_nav_ui=True,
-    popup_open=True,
+    popup_open=False,
     next_keys=["PageDown", "n", "m"],
     prev_keys=["PageUp", "p", "l"],
 )

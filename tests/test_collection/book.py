@@ -14,7 +14,8 @@ st.set_page_config(
 )
 sts.theme = dark
 
-# Display the collection home with modern design
+# Display the collection home with modern design and management guide
 st_book([
     blocks.bck_home_collection,
+    blocks.bck_collection_management,
 ], paginate=False)

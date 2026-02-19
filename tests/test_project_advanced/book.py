@@ -71,6 +71,8 @@ st_book([
     blocks.bck_visibility_control,
     blocks.bck_custom_themes,
     blocks.bck_static_assets_loading,
+    blocks.bck_export_aware_widgets,
+    blocks.bck_hover_and_preview,
     blocks.bck_deployment_strategies,
     blocks.bck_interactive_and_state,
     blocks.bck_data_and_charts,

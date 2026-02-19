@@ -10,6 +10,40 @@ tags:
 pinned: false
 short_description: StreamTeX test space
 ---
+## 🤖 Commandes d'installation et d'exécution StreamTeX
+
+Pour installer les dépendances du projet et exécuter StreamTeX, voici les commandes de base à connaître :
+
+### 1. Installation des dépendances (création d'un virtualenv et installation de tout)
+Le fichier `.python-version` à la racine du projet fixe la version de Python (ex. 3.13.7). Sur toute machine, **uv** lit ce fichier et utilise cette version ; si elle n’est pas installée, **uv** la télécharge et l’installe automatiquement sans modifier l’environnement système.
+
+```bash
+uv sync
+```
+
+### 2. Lancer un projet StreamTeX
+(adapté à votre dossier projet)
+```bash
+uv run streamlit run projects/<votre_projet>/book.py
+```
+
+### 3. Lancer le projet de test/démonstration
+```bash
+uv run streamlit run tests/test_project/book.py
+```
+
+### 4. Lancer les tests unitaires
+```bash
+uv run pytest tests/ -v
+```
+
+> **Note importante :**
+> - Toujours utiliser `uv run ...` au lieu des commandes `python`, `streamlit` ou `pytest` directement.
+> - Si vous ajoutez une nouvelle dépendance :
+>   - Pour une dépendance standard : `uv add <package>`
+>   - Pour une dépendance de développement : `uv add --group dev <package>`
+>   - Ensuite relancez `uv sync` pour mettre à jour l'environnement.
+>
 
 # StreamTeX
 

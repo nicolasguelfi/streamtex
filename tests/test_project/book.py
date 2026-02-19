@@ -66,4 +66,4 @@ st_book([
     blocks.bck_31_graphviz_diagrams,
 ], toc_config=toc, marker_config=marker, separator=blocks.separator,
     export_title="StreamTeX Training Course", paginate=True,
-    monties_color="rgba(211, 47, 47, 0.4)")
+    monties_color="rgba(211, 47, 47, 0.6)")

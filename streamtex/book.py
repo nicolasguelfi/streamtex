@@ -33,7 +33,19 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
     :param paginate: If True, renders one block at a time for faster widget interactions.
     :param monties_color: Background color for paginated navigation banners (CSS value).
     """
-    if paginate:
+    # --- View mode toggle (sidebar) ---
+    if _STX_VIEW_MODE_KEY not in st.session_state:
+        st.session_state[_STX_VIEW_MODE_KEY] = "Paginated" if paginate else "Continuous"
+
+    with st.sidebar:
+        st.radio(
+            "**View**",
+            options=["Paginated", "Continuous"],
+            horizontal=True,
+            key=_STX_VIEW_MODE_KEY,
+        )
+
+    if st.session_state[_STX_VIEW_MODE_KEY] == "Paginated":
         _paginated_book(module_list, toc_config, marker_config, separator,
                         export, export_title, monties_color, *args, **kwargs)
         return
@@ -226,6 +238,7 @@ def st_include(block_file_module, *args, **kwargs):
 
 _STX_CACHE_KEY = "_stx_page_cache"
 _STX_PAGE_KEY = "_stx_current_page"
+_STX_VIEW_MODE_KEY = "_stx_view_mode"
 
 
 def _compute_cache_hash(module_list):

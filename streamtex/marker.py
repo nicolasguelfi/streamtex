@@ -410,14 +410,20 @@ def inject_marker_navigation() -> None:
     function scrollHandler() {
         clearTimeout(scrollTimer);
         scrollTimer = setTimeout(function() {
-            var best = 0, bestDist = Infinity;
+            var best = -1, bestDist = Infinity;
             for (var i = 0; i < markers.length; i++) {
                 var t = findMarkerElement(markers[i].anchor);
                 if (!t) continue;
                 var d = Math.abs(t.getBoundingClientRect().top - OFFSET);
                 if (d < bestDist) { bestDist = d; best = i; }
             }
-            if (best !== currentIdx) { currentIdx = best; updateUI(); }
+            /* Only update if at least one marker was found in the DOM.
+               When no markers are found (iframes still loading after a
+               page navigation), keep the current index unchanged to
+               avoid resetting to a wrong default.                     */
+            if (best >= 0 && best !== currentIdx) {
+                currentIdx = best; updateUI();
+            }
         }, 150);
     }
     var scrollTarget = hostDoc.querySelector('.stMain') || hostWin;
@@ -429,13 +435,15 @@ def inject_marker_navigation() -> None:
         hostDoc.removeEventListener('click', outsideClick);
         obs.disconnect();
         clearInterval(scanInterval);
+        clearTimeout(scrollTimer);
+        clearTimeout(initTimer);
         scrollTarget.removeEventListener('scroll', scrollHandler);
         var el = hostDoc.getElementById('streamtex-marker-nav');
         if (el) el.remove();
     };
 
     /* --- Init --- */
-    setTimeout(function() {
+    var initTimer = setTimeout(function() {
         var startIdx = hostWin._stxMarkerStartIdx || 0;
         if (startIdx < 0) startIdx = markers.length + startIdx;
         startIdx = Math.max(0, Math.min(startIdx, markers.length - 1));

@@ -653,6 +653,15 @@ def _inject_paginated_nav_js(current_page, total, marker_config,
         }
     };
 
+    /* --- Ensure marker start index matches current page ---
+       Covers cases where no explicit navigation handler set it
+       (e.g. sidebar link click, initial page load, browser refresh).
+       Runs synchronously BEFORE marker.py's 500ms init reads it. */
+    if (!hostWin._stxMarkerStartIdx) {
+        var fm = pageFirstMarker[currentPage];
+        if (fm !== undefined) hostWin._stxMarkerStartIdx = fm;
+    }
+
     /* --- Sidebar link interception (st.markdown = direct DOM) --- */
     function linkClick(e) {
         var a = e.target.closest('a[href^="#stx-goto-"]');
@@ -664,6 +673,10 @@ def _inject_paginated_nav_js(current_page, total, marker_config,
         if (!match) return;
         var p = parseInt(match[1], 10);
         if (isNaN(p) || p === currentPage) return;
+        /* Set marker start index for the target page so the
+           floating marker widget initialises on the right marker */
+        hostWin._stxMarkerStartIdx =
+            pageFirstMarker[p] !== undefined ? pageFirstMarker[p] : 0;
         navigateToPage(p);
     }
     hostDoc.addEventListener('click', linkClick, true);

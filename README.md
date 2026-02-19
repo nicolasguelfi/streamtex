@@ -14,16 +14,20 @@ short_description: StreamTeX test space
 
 Pour installer les dépendances du projet et exécuter StreamTeX, voici les commandes de base à connaître :
 
-### 1. Installation des dépendances (création d'un virtualenv et installation de tout)
-Le fichier `.python-version` à la racine du projet fixe la version de Python (ex. 3.13.7). Sur toute machine, **uv** lit ce fichier et utilise cette version ; si elle n’est pas installée, **uv** la télécharge et l’installe automatiquement sans modifier l’environnement système.
+### 1. Installation des dépendances (création d’un virtualenv et installation de tout)
+Le fichier `.python-version` à la racine du projet fixe la version de Python (3.13.7). Le script `uvsync.sh` garantit un environnement reproductible sur **toutes les machines** : il met à jour **uv**, installe la bonne version de Python si nécessaire, puis synchronise les dépendances.
 
 ```bash
-uv sync
+./uvsync.sh
 ```
+
+> **Pourquoi `./uvsync.sh` plutôt que `uv sync` ?**
+> Un simple `uv sync` peut échouer si la version de Python requise n’est pas disponible localement ou si **uv** est trop ancien pour la connaître. Le script s’en charge automatiquement.
 
 ### 2. Lancer un projet StreamTeX
 (adapté à votre dossier projet)
 ```bash
+# uv run streamlit run projects
 uv run streamlit run projects/<votre_projet>/book.py
 ```
 

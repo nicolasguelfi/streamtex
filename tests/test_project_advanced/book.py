@@ -70,6 +70,10 @@ st_book([
     blocks.bck_overlays_positioning,
     blocks.bck_visibility_control,
     blocks.bck_custom_themes,
+
+    # Library patterns and best practices
+    blocks.bck_block_helpers_patterns,
+
     blocks.bck_static_assets_loading,
     blocks.bck_export_aware_widgets,
     blocks.bck_hover_and_preview,

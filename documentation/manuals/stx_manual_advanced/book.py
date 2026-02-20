@@ -2,7 +2,7 @@
 
 import streamlit as st
 import setup
-import streamtex as sx
+import streamtex as stx
 from streamtex import st_book, TOCConfig, MarkerConfig
 
 from custom.styles import Styles as s
@@ -16,13 +16,13 @@ import blocks
 
 # Configure shared blocks (Phase 1: LazyBlockRegistry)
 from pathlib import Path
-_shared_blocks_path = str(Path(__file__).parent.parent / "sx_manuals_shared-blocks" / "blocks")
-_static_shared_path = str(Path(__file__).parent.parent / "sx_manuals_shared-blocks" / "static")
+_shared_blocks_path = str(Path(__file__).parent.parent / "stx_manuals_shared-blocks" / "blocks")
+_static_shared_path = str(Path(__file__).parent.parent / "stx_manuals_shared-blocks" / "static")
 
-shared_blocks = sx.LazyBlockRegistry([_shared_blocks_path])
+shared_blocks = stx.LazyBlockRegistry([_shared_blocks_path])
 
 # Configure static sources for multi-directory resolution
-sx.set_static_sources([
+stx.set_static_sources([
     str(Path(__file__).parent / "static"),
     _static_shared_path,
 ])

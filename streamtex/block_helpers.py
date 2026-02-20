@@ -6,9 +6,9 @@ Block rendering helpers with 3 usage modes:
 """
 
 from typing import Optional, Callable
-import streamtex as sx
+import streamtex as stx
 from streamtex import st_write, st_block, st_space, st_br
-from streamtex.styles import StreamTeX_Styles
+from streamtex.styles import StxStyles
 
 
 class BlockHelperConfig:
@@ -103,7 +103,7 @@ def show_code(
         show_code("print('hello')")  # Uses MyConfig.get_code_style()
     """
     resolved_style = style or _block_helper_config.get_code_style()
-    sx.st_code(resolved_style, code=code_string, language=language, line_numbers=line_numbers)
+    stx.st_code(resolved_style, code=code_string, language=language, line_numbers=line_numbers)
 
 
 def show_code_inline(
@@ -126,7 +126,7 @@ def show_code_inline(
         style: Optional style override
     """
     resolved_style = style or _block_helper_config.get_code_inline_style()
-    sx.st_code(resolved_style, code=code_string, language=language, line_numbers=line_numbers)
+    stx.st_code(resolved_style, code=code_string, language=language, line_numbers=line_numbers)
 
 
 def show_explanation(text: str, style: Optional[object] = None) -> None:
@@ -153,10 +153,10 @@ def show_explanation(text: str, style: Optional[object] = None) -> None:
     resolved_style = style or _block_helper_config.get_explanation_style()
     lines = [line.strip() for line in text.strip().split("\n") if line.strip()]
     with st_block(resolved_style):
-        st_write(StreamTeX_Styles.none, "Purpose")  # Label
+        st_write(StxStyles.big + StxStyles.bold, "Purpose")  # Label
         st_space("v", 1)
         for i, line in enumerate(lines):
-            st_write(StreamTeX_Styles.none, line)
+            st_write(StxStyles.big, line)
             if i < len(lines) - 1:
                 st_br()
 
@@ -186,14 +186,14 @@ def show_details(text: str, style: Optional[object] = None) -> None:
     resolved_style = style or _block_helper_config.get_details_style()
     lines = [line.strip() for line in text.strip().split("\n") if line.strip()]
     with st_block(resolved_style):
-        st_write(StreamTeX_Styles.none, "Details:")  # Label
+        st_write(StxStyles.big + StxStyles.bold, "Details:")  # Label
         st_space("v", 1)
         if lines:
-            st_write(StreamTeX_Styles.none, lines[0])  # Summary (bold could be applied here)
+            st_write(StxStyles.big, lines[0])  # Summary
             if len(lines) > 1:
                 st_space("v", 1)
                 for i, line in enumerate(lines[1:]):
-                    st_write(StreamTeX_Styles.none, line)
+                    st_write(StxStyles.big, line)
                     if i < len(lines) - 2:
                         st_br()
 

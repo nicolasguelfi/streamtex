@@ -2,7 +2,7 @@
 
 import pytest
 from streamtex.styles import (
-    Style, ListStyle, StyleGrid, StreamTeX_Styles,
+    Style, ListStyle, StyleGrid, StxStyles,
     theme, add_css, remove_css,
     Colors, Sizes, Weights, Alignments, Decors, Fonts,
     BackgroundColors, Paddings, Margins, Borders, ContainerSizes,
@@ -134,7 +134,7 @@ class TestStyleGrid:
     def test_create_fills_none_for_unspecified_cells(self):
         s = Style("color: red;", "red")
         grid = StyleGrid.create("B2", s, num_rows=3, num_cols=3)
-        assert grid.css_grid[0][0] is StreamTeX_Styles.none
+        assert grid.css_grid[0][0] is StxStyles.none
         assert grid.css_grid[1][1] is s
 
     def test_add_grids(self):
@@ -229,9 +229,9 @@ class TestPredefinedStyles:
         assert "border-color: Red;" in str(bc)
 
     def test_streamtex_styles_aggregation(self):
-        assert StreamTeX_Styles.bold is Weights.bold_weight
-        assert StreamTeX_Styles.LARGE is Sizes.LARGE_size
-        assert str(StreamTeX_Styles.none) == ""
+        assert StxStyles.bold is Weights.bold_weight
+        assert StxStyles.LARGE is Sizes.LARGE_size
+        assert str(StxStyles.none) == ""
 
     def test_visibility_styles(self):
         assert "display: none;" in str(Visibility.hidden)

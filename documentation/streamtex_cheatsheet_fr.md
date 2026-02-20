@@ -282,6 +282,27 @@ def build():
 
 ```
 
+## 🧩 Blocs Composites (Sous-blocs atomiques)
+
+```python
+# Bloc composite : charge des sous-blocs depuis le dossier _atomic/
+import streamtex as stx
+from streamtex import st_include
+
+bck_text_basics = stx.load_atomic_block("bck_text_basics", __file__)
+bck_text_styles = stx.load_atomic_block("bck_text_styles", __file__)
+
+class BlockStyles:
+    pass
+
+def build():
+    st_include(bck_text_basics)
+    st_include(bck_text_styles)
+```
+
+- `load_atomic_block(name, __file__)` charge `_atomic/{name}.py` relatif à l'appelant
+- Lève `BlockNotFoundError` / `BlockImportError` en cas d'erreur
+
 ## 📌 Notes Importantes
 
 1. Utilisez des classes de style pour organiser le code.

@@ -15,7 +15,7 @@ from custom.styles import Styles as s
 # Load the shared header block (kept as a separate, reusable file)
 _header_path = (
     Path(__file__).resolve().parent.parent.parent
-    / "sx_manuals_shared-blocks" / "blocks" / "bck_header_training.py"
+    / "stx_manuals_shared-blocks" / "blocks" / "bck_header_training.py"
 )
 _spec = importlib.util.spec_from_file_location("bck_header_training", _header_path)
 _header = importlib.util.module_from_spec(_spec)

@@ -2,7 +2,7 @@
 
 import streamlit as st
 from streamtex import *
-import streamtex as sx
+import streamtex as stx
 
 
 class BlockStyles:
@@ -15,10 +15,10 @@ def build():
     st_space("v", 2)
     st.divider()
     st_write(
-        sx.StreamTeX_Styles.small + sx.StreamTeX_Styles.text.colors.reset + "center",
+        stx.StxStyles.small + stx.StxStyles.text.colors.reset + stx.StxStyles.center_txt,
         "StreamTeX Training Course © 2026 | All rights reserved"
     )
     st_write(
-        sx.StreamTeX_Styles.small,
+        stx.StxStyles.small,
         "For more information, visit: https://github.com/streamtex"
     )

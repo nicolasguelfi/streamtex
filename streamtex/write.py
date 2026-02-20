@@ -1,6 +1,6 @@
 from typing import Optional
 import streamlit as st
-from .styles import Style, StreamTeX_Styles
+from .styles import Style, StxStyles
 from .export import _render
 from .enums import Tag, Tags
 from .utils import contain_link, generate_key, strip_html
@@ -9,7 +9,7 @@ from .marker import register_marker, get_marker_config
 
 
 def st_write(
-    *args, style: Style = StreamTeX_Styles.none, tag: Tag = Tags.span,
+    *args, style: Style = StxStyles.none, tag: Tag = Tags.span,
     link:str="", no_link_decor:bool=False, hover:bool=True,
     toc_lvl: Optional[str] = None, label: str = "",
     marker: Optional[bool] = None ):
@@ -17,7 +17,7 @@ def st_write(
     Function to write a styled string with optional link reference and table of content entry.
     
     :param args: The text or HTML content to wrap in the specified tag. See `Syntax` for example of usage.
-    :param style: A Style object representing the CSS to apply to the text. Defaults to `StreamTeX_Styles.none`.
+    :param style: A Style object representing the CSS to apply to the text. Defaults to `StxStyles.none`.
     :param tag: The HTML tag to use for wrapping the content (e.g., <span>, <div>). Defaults to `Tags.span`.
     :param link: An optional hyperlink to wrap around the content. If provided, the text will be clickable.
     :param no_link_decor: If True, removes text decoration (like underline) for links. Defaults to False.
@@ -54,11 +54,11 @@ def st_write(
 
     _render(txt_tag)
 
-def _parse_args(*args, style: Style = StreamTeX_Styles.none, no_link_decor:bool=False, hover:bool=False):
+def _parse_args(*args, style: Style = StxStyles.none, no_link_decor:bool=False, hover:bool=False):
     """
     Parses arguments to distinguish between Wrapper Styles, Text, and Tuples.
     """
-    container_style = StreamTeX_Styles.none
+    container_style = StxStyles.none
     content_args = args
 
     # Check if the first arg is a Wrapper Style
@@ -74,7 +74,7 @@ def _parse_args(*args, style: Style = StreamTeX_Styles.none, no_link_decor:bool=
     
     for item in content_args:
         if isinstance(item, tuple):
-            sub_style = StreamTeX_Styles.none
+            sub_style = StxStyles.none
             sub_txt = ""
             sub_link = ""
             

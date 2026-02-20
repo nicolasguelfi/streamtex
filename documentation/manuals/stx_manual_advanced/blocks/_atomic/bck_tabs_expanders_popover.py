@@ -1,6 +1,6 @@
 import streamlit as st
 from streamtex import *
-import streamtex as sx
+import streamtex as stx
 from streamtex.styles import Style as ns, StyleGrid as sg
 from streamtex.enums import Tags as t, ListTypes as lt
 from custom.styles import Styles as s
@@ -56,7 +56,7 @@ def build():
                 st_write(s.project.titles.tip_label, "Tip")
                 st_space("v", 1)
                 st_write(s.large, "Rich StreamTeX content inside a tab. "
-                         "All sx.* functions work here.")
+                         "All stx.* functions work here.")
         with tab2:
             with st_grid(cols=2, cell_styles=bs.cell) as g:
                 with g.cell():
@@ -174,6 +174,6 @@ def build():
 
         show_details(textwrap.dedent("""\
             st.tabs, st.expander, st.popover are context managers like st_block().
-            All sx.* functions work inside Streamlit containers.
+            All stx.* functions work inside Streamlit containers.
             Nesting is supported: tabs > expander > grid/list.
         """))

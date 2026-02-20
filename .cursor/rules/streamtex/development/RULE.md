@@ -7,11 +7,11 @@ alwaysApply: true
 ## 1. The StreamTeX Philosophy
 StreamTeX is a wrapper around Streamlit with a block-based architecture. You are strictly forbidden from manually writing HTML or CSS strings within the Python code.
 - **BAD:** `st.markdown("<div style='color:red'>Text</div>", unsafe_allow_html=True)`
-- **GOOD:** `sx.st_write(s.text.colors.red, "Text")`
+- **GOOD:** `stx.st_write(s.text.colors.red, "Text")`
 
 ## 2. Source of Truth
 - **Syntax Reference:** Read `documentation/streamtex_cheatsheet_en.md` before writing any block code.
-- **Architecture Reference:** Inspect any project's `book.py` to understand how it orchestrates `blocks/`, and how to build a web book with modular blocks that may be nested and reusable. For illustration, see `documentation/manuals/sx_manual_intro/book.py` or `documentation/template_project/book.py`.
+- **Architecture Reference:** Inspect any project's `book.py` to understand how it orchestrates `blocks/`, and how to build a web book with modular blocks that may be nested and reusable. For illustration, see `documentation/manuals/stx_manual_intro/book.py` or `documentation/template_project/book.py`.
 
 ### Directory Structure
 - Follow the standard StreamTeX project structure:
@@ -33,7 +33,7 @@ import streamlit as st
 
 # StreamTeX Imports
 from streamtex import *
-import streamtex as sx
+import streamtex as stx
 from streamtex.styles import Style as ns, StyleGrid as sg
 from streamtex.enums import Tags as t, ListTypes as lt
 
@@ -60,12 +60,12 @@ blocks.bck_name
 
 Use `sx` functions for **ALL** layout and static content.
 
-- **Text:** Use `sx.st_write(style, ...)` instead of `st.write` or `st.markdown`.
-- **Images:** Use `sx.st_image(style, uri=...)` instead of `st.image`.
-- **Lists:** Use `sx.st_list()` instead of manual markdown lists.
-- **Layouts:** Use `sx.st_grid(cols, ...)` instead of `st.columns`.
+- **Text:** Use `stx.st_write(style, ...)` instead of `st.write` or `st.markdown`.
+- **Images:** Use `stx.st_image(style, uri=...)` instead of `st.image`.
+- **Lists:** Use `stx.st_list()` instead of manual markdown lists.
+- **Layouts:** Use `stx.st_grid(cols, ...)` instead of `st.columns`.
 - **Content Encapsulation:** Use `st_block()`, sometimes `st_span()`.
-- **Spacing:** Use `sx.st_space()` or `sx.st_br()`.
+- **Spacing:** Use `stx.st_space()` or `stx.st_br()`.
 
 #### Common Parameters
 - Always specify `style=` for `st_write()`
@@ -74,9 +74,9 @@ Use `sx` functions for **ALL** layout and static content.
 - Use `tag=` to specify HTML tag
 
 #### Layout & Encapsulation Rules (`st_block`)
-- **Vertical Stacking (Default):** Use `with sx.st_block(...):` when you want elements to stack on top of each other. This is the default behavior.
+- **Vertical Stacking (Default):** Use `with stx.st_block(...):` when you want elements to stack on top of each other. This is the default behavior.
 - **Inline Flow (Mixed-Style Text):** For multiple styled segments on *one line* (e.g. link + text, or spans side-by-side), use **one** `st_write` with tuple arguments: `st_write(base_style, (style_a, "text"), (style_b, "more"))`. **Do NOT** use multiple `st_write` calls — they stack vertically and break the inline layout.
-- **Horizontal Flow:** Use `with sx.st_span(...):` when you want elements to flow inline (side-by-side), similar to text spans. Only use this if the content isn't wide enough to wrap around. For mixed-style *text* on one line, prefer `st_write` with tuples over `st_span`.
+- **Horizontal Flow:** Use `with stx.st_span(...):` when you want elements to flow inline (side-by-side), similar to text spans. Only use this if the content isn't wide enough to wrap around. For mixed-style *text* on one line, prefer `st_write` with tuples over `st_span`.
 
 ### When to use Streamlit (`st`)
 
@@ -95,7 +95,7 @@ It must contain a ```build()``` function.
 ```python
 import streamlit as st
 from streamtex import *
-import streamtex as sx
+import streamtex as stx
 from streamtex.styles import Style as ns, StyleGrid as sg
 from streamtex.enums import Tags as t, ListTypes as lt
 from custom.styles import Styles as s
@@ -107,8 +107,8 @@ class BlockStyles:
 bs = BlockStyles
 
 def build():
-    with sx.st_block(s.center_txt):
-        sx.st_write(s.title, "Hello World")
+    with stx.st_block(s.center_txt):
+        stx.st_write(s.title, "Hello World")
 ```
 
 
@@ -142,7 +142,7 @@ def build():
   - **Explicit Colors:** Only define `color` or `background-color` if it is a branding color (Red, Blue, specialized Gray) that must remain constant regardless of the theme.
 
 ### Custom Style Creation
-- Inherit from `StreamTeX_Styles` in `custom/styles.py`
+- Inherit from `StxStyles` in `custom/styles.py`
 - Organize by categories: colors, titles, etc.
 - Use `Style.create()` to combine existing styles
 

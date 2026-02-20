@@ -6,7 +6,7 @@ classDiagram
         +__sub__(other) Style
         +create(base, name) Style
     }
-    class StreamTeX_Styles {
+    class StxStyles {
         +Text text
         +Container container
     }
@@ -20,6 +20,6 @@ classDiagram
         +show_details(text)
     }
 
-    StreamTeX_Styles --> Style : composes
+    StxStyles --> Style : composes
     BlockStyles --> Style : uses
     BlockHelper --> Style : renders with

@@ -1,8 +1,8 @@
+import os
 import streamlit as st
 from streamtex import *
-import streamtex as sx
-from streamtex.styles import Style as ns, StyleGrid as sg
-from streamtex.enums import Tags as t, ListTypes as lt
+import streamtex as stx
+from streamtex.enums import Tags as t
 from custom.styles import Styles as s
 from blocks.helpers import show_code, show_explanation, show_details
 import textwrap
@@ -12,86 +12,29 @@ class BlockStyles:
     """Mermaid diagrams demo styles."""
     heading = s.project.titles.section_title + s.center_txt
     sub = s.project.titles.section_subtitle
-    content = s.large
 bs = BlockStyles
 
 
 # ---------------------------------------------------------------------------
-# Inline diagram definitions
+# Load all diagrams from static files (single source of truth)
 # ---------------------------------------------------------------------------
 
-SIMPLE_FLOWCHART = """\
-graph TD
-    A[Start] --> B{Is it working?}
-    B -->|Yes| C[Great!]
-    B -->|No| D[Debug]
-    D --> E[Read logs]
-    E --> F[Fix code]
-    F --> B
-    C --> G[Deploy]\
-"""
-
-SEQUENCE = """\
-sequenceDiagram
-    participant U as User
-    participant B as Browser
-    participant S as Streamlit
-    participant SX as StreamTeX
-
-    U->>B: Open app
-    B->>S: HTTP request
-    S->>SX: st_book(blocks)
-    SX->>SX: Load TOC + Markers
-    SX->>S: Render HTML
-    S->>B: Response
-    B->>U: Display page
-    U->>B: Navigate (PageDown)
-    B->>S: Rerun
-    S->>SX: Render next block
-    SX->>S: HTML fragment
-    S->>B: Updated page\
-"""
-
-CLASS_DIAGRAM = """\
-classDiagram
-    class Style {
-        +str css
-        +str name
-        +__add__(other) Style
-        +__sub__(other) Style
-        +create(base, name) Style
-    }
-    class StreamTeX_Styles {
-        +Text text
-        +Container container
-    }
-    class BlockStyles {
-        +Style heading
-        +Style sub
-    }
-    class BlockHelper {
-        +show_code(code)
-        +show_explanation(text)
-        +show_details(text)
-    }
-
-    StreamTeX_Styles --> Style : composes
-    BlockStyles --> Style : uses
-    BlockHelper --> Style : renders with\
-"""
-
-DIAGRAMS = {
-    "Flowchart": SIMPLE_FLOWCHART,
-    "Sequence Diagram": SEQUENCE,
-    "Class Diagram": CLASS_DIAGRAM,
-}
+# _atomic/ → blocks/ → project root (where static/ lives)
+_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+_STATIC_DIR = os.path.join(_PROJECT_ROOT, "static")
 
 
-def _load_static_diagram(filename: str) -> str:
-    """Load a .mmd file from the static/diagrams/ folder."""
-    path = sx.resolve_static(f"diagrams/{filename}")
+def _load(filename: str) -> str:
+    path = os.path.join(_STATIC_DIR, "diagrams", filename)
     with open(path, encoding="utf-8") as f:
         return f.read().strip()
+
+
+DIAGRAMS = {
+    "Flowchart": _load("flowchart.mmd"),
+    "Sequence Diagram": _load("sequence.mmd"),
+    "Class Diagram": _load("class_diagram.mmd"),
+}
 
 
 def build():
@@ -100,18 +43,18 @@ def build():
         st_space("v", 2)
 
         show_explanation(textwrap.dedent("""\
-            sx.st_mermaid() renders Mermaid diagrams: flowcharts, sequence
+            stx.st_mermaid() renders Mermaid diagrams: flowcharts, sequence
             diagrams, class diagrams, and more. Live rendering uses the
             streamlit-mermaid component. HTML export generates SVG via mermaid-py.
         """))
         st_space("v", 2)
 
-        # --- Section 1: Simple flowchart (inline) ---
+        # --- Section 1: Flowchart ---
         st_write(bs.sub, "Flowchart", toc_lvl="+1")
         st_space("v", 1)
 
         show_code(textwrap.dedent("""\
-            sx.st_mermaid('''
+            stx.st_mermaid('''
                 graph TD
                     A[Start] --> B{Is it working?}
                     B -->|Yes| C[Great!]
@@ -123,7 +66,7 @@ def build():
         st_space("v", 1)
 
         with st_block(s.project.containers.result_box):
-            sx.st_mermaid(SIMPLE_FLOWCHART)
+            stx.st_mermaid(DIAGRAMS["Flowchart"], key="mermaid_flowchart")
         st_space("v", 2)
 
         # --- Section 2: Sequence diagram ---
@@ -137,7 +80,7 @@ def build():
         st_space("v", 1)
 
         show_code(textwrap.dedent("""\
-            sx.st_mermaid('''
+            stx.st_mermaid('''
                 sequenceDiagram
                     participant U as User
                     participant S as Server
@@ -148,7 +91,7 @@ def build():
         st_space("v", 1)
 
         with st_block(s.project.containers.result_box):
-            sx.st_mermaid(SEQUENCE)
+            stx.st_mermaid(DIAGRAMS["Sequence Diagram"], key="mermaid_sequence")
         st_space("v", 2)
 
         # --- Section 3: Class diagram ---
@@ -162,35 +105,17 @@ def build():
         st_space("v", 1)
 
         with st_block(s.project.containers.result_box):
-            sx.st_mermaid(CLASS_DIAGRAM)
+            stx.st_mermaid(DIAGRAMS["Class Diagram"], key="mermaid_class")
         st_space("v", 2)
 
-        # --- Section 4: Loading from static file ---
-        st_write(bs.sub, "Loading from Static Files", toc_lvl="+1")
-        st_space("v", 1)
-
-        show_code(textwrap.dedent("""\
-            # Load a .mmd file from static/diagrams/
-            path = sx.resolve_static("diagrams/flowchart.mmd")
-            with open(path) as f:
-                code = f.read()
-            sx.st_mermaid(code)
-        """))
-        st_space("v", 1)
-
-        static_code = _load_static_diagram("flowchart.mmd")
-        with st_block(s.project.containers.result_box):
-            sx.st_mermaid(static_code)
-        st_space("v", 2)
-
-        # --- Section 5: Interactive selection ---
+        # --- Section 4: Interactive selection ---
         st_write(bs.sub, "Interactive Diagram Selection", toc_lvl="+1")
         st_space("v", 1)
 
         show_code(textwrap.dedent("""\
             diagrams = {"Flowchart": code1, "Sequence": code2, ...}
             choice = st.selectbox("Choose a diagram", list(diagrams.keys()))
-            sx.st_mermaid(diagrams[choice])
+            stx.st_mermaid(diagrams[choice], key="my_mermaid")
         """))
         st_space("v", 1)
 
@@ -198,12 +123,12 @@ def build():
                               [*DIAGRAMS],
                               key="bck_mermaid_select")
         with st_block(s.project.containers.result_box):
-            sx.st_mermaid(DIAGRAMS[choice])
+            stx.st_mermaid(DIAGRAMS[choice], key="mermaid_interactive")
         st_space("v", 2)
 
         show_details(textwrap.dedent("""\
             Mermaid supports: flowcharts, sequence, class, state, ER, Gantt, pie, and more.
-            sx.st_mermaid() uses streamlit-mermaid for live rendering.
+            stx.st_mermaid() uses streamlit-mermaid for live rendering.
             HTML export generates SVG via mermaid-py (mermaid.ink service).
-            Static .mmd files can be loaded with sx.resolve_static().
+            Static .mmd files can be loaded from the static/diagrams/ folder.
         """))

@@ -164,8 +164,8 @@ complète de la fonctionnalité correspondante, en suivant le pattern standard
 - Pattern d'organisation multi-projet
 
 **bck_static_resolution_demo.py** doit montrer :
-- `sx.set_static_sources([local_path, shared_path])`
-- `sx.resolve_static("image.png")` — résolution par priorité
+- `stx.set_static_sources([local_path, shared_path])`
+- `stx.resolve_static("image.png")` — résolution par priorité
 - Pattern de fallback entre sources statiques
 
 **Import pattern attendu** :
@@ -854,7 +854,7 @@ __all__ = [
     "st_book", "st_include", "st_toc", "load_css",
     "TOCConfig", "MarkerConfig", "st_marker",
     # Styles
-    "Style", "ListStyle", "StyleGrid", "StreamTeX_Styles",
+    "Style", "ListStyle", "StyleGrid", "StxStyles",
     # Enums
     "Tags",
     # Export

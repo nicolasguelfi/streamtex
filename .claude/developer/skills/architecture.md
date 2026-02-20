@@ -9,7 +9,7 @@ __init__.py (public API re-exports)
   |
   +-- styles/ (independent, no deps on other streamtex modules)
   |     base.py -> core.py -> text.py, container.py, visibility.py
-  |     __init__.py re-exports: Style, ListStyle, StyleGrid, StreamTeX_Styles, theme
+  |     __init__.py re-exports: Style, ListStyle, StyleGrid, StxStyles, theme
   |
   +-- enums.py (Tags, ListTypes — independent)
   +-- constants.py (PAGE_WIDTH, PAGE_PADDING — independent)

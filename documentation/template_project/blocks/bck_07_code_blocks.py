@@ -1,6 +1,6 @@
 import streamlit as st
 from streamtex import *
-import streamtex as sx
+import streamtex as stx
 from streamtex.styles import Style as ns, StyleGrid as sg
 from streamtex.enums import Tags as t, ListTypes as lt
 from custom.styles import Styles as s
@@ -23,14 +23,14 @@ def build():
     st_space("v", 1)
 
     show_code(textwrap.dedent("""\
-        sx.st_code(code=\"\"\"
+        stx.st_code(code=\"\"\"
         def greet(name):
             return f"Hello, {name}!"
         \"\"\", language="python", line_numbers=True)
     """))
     st_space("v", 1)
 
-    sx.st_code(code=textwrap.dedent("""\
+    stx.st_code(code=textwrap.dedent("""\
         def greet(name):
             return f"Hello, {name}!"
     """), language="python", line_numbers=True)
@@ -41,13 +41,13 @@ def build():
     st_space("v", 1)
 
     show_code(textwrap.dedent("""\
-        sx.st_code(s.project.containers.code_box,
+        stx.st_code(s.project.containers.code_box,
                    code="SELECT * FROM users WHERE active = true;",
                    language="sql", line_numbers=False)
     """))
     st_space("v", 1)
 
-    sx.st_code(s.project.containers.code_box,
+    stx.st_code(s.project.containers.code_box,
                code="SELECT * FROM users WHERE active = true;",
                language="sql", line_numbers=False)
     st_space("v", 2)
@@ -59,7 +59,7 @@ def build():
     show_code(textwrap.dedent("""\
         # In blocks/helpers.py:
         def show_code(code_string, language="python", line_numbers=True):
-            sx.st_code(s.project.containers.code_box, code=code_string,
+            stx.st_code(s.project.containers.code_box, code=code_string,
                        language=language, line_numbers=line_numbers)
 
         # In any block:
@@ -69,7 +69,7 @@ def build():
     st_space("v", 2)
 
     show_tip(
-        "sx.st_code() uses Pygments for syntax highlighting. "
+        "stx.st_code() uses Pygments for syntax highlighting. "
         "Wrap it in a styled container for consistent presentation. "
         "The helpers.show_code() pattern keeps blocks DRY."
     )

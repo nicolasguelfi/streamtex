@@ -15,11 +15,11 @@ This repository contains reusable blocks and assets for StreamTeX training cours
 ### Option 1: LazyBlockRegistry (Recommended for Phase 1+)
 
 ```python
-import streamtex as sx
+import streamtex as stx
 from streamtex import st_book
 
 # Load shared blocks
-shared = sx.LazyBlockRegistry(["../sx_manuals_shared-blocks/blocks"])
+shared = stx.LazyBlockRegistry(["../stx_manuals_shared-blocks/blocks"])
 
 # Use in st_book()
 st_book([
@@ -38,7 +38,7 @@ import sys
 import importlib.util
 
 # Load shared blocks module
-shared_path = Path(__file__).parent.parent / "sx_manuals_shared-blocks" / "blocks"
+shared_path = Path(__file__).parent.parent / "stx_manuals_shared-blocks" / "blocks"
 sys.path.insert(0, str(shared_path))
 
 import bck_header_training
@@ -60,13 +60,13 @@ Place your shared images, videos, and other assets in:
 Access them via `resolve_static()`:
 
 ```python
-import streamtex as sx
+import streamtex as stx
 
 # Configure static sources
-sx.set_static_sources(["static", "../sx_manuals_shared-blocks/static"])
+stx.set_static_sources(["static", "../stx_manuals_shared-blocks/static"])
 
 # Resolve a file
-logo_path = sx.resolve_static("images/logo.png")
+logo_path = stx.resolve_static("images/logo.png")
 ```
 
 ## Styles
@@ -74,7 +74,7 @@ logo_path = sx.resolve_static("images/logo.png")
 Reuse shared style palette:
 
 ```python
-from shared_blocks.custom.styles import SharedStyles
+from custom.styles import SharedStyles
 
 # Use shared colors
 st_write(SharedStyles.colors.primary_blue, "Blue text")

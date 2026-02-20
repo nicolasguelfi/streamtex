@@ -1,6 +1,6 @@
 import streamlit as st
 from streamtex import *
-import streamtex as sx
+import streamtex as stx
 from streamtex.styles import Style as ns, StyleGrid as sg
 from streamtex.enums import Tags as t, ListTypes as lt
 from custom.styles import Styles as s
@@ -16,8 +16,8 @@ class BlockStyles:
     sub = s.project.titles.section_subtitle
 bs = BlockStyles
 
-# Resolve paths relative to the project root (where book.py lives)
-_project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# _atomic/ → blocks/ → project root (where book.py and static/ live)
+_project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 _static_dir = os.path.join(_project_root, "static")
 
 
@@ -91,14 +91,14 @@ def build():
             text_path = os.path.join("static", "texts", "sample_lorem.txt")
             with open(text_path) as f:
                 content = f.read()
-            sx.st_code(code=content, language="text")
+            stx.st_code(code=content, language="text")
         """))
         st_space("v", 1)
 
         text_path = os.path.join(_static_dir, "texts", "sample_lorem.txt")
         with open(text_path) as f:
             content = f.read()
-        sx.st_code(s.project.containers.code_box, code=content, language="text")
+        stx.st_code(s.project.containers.code_box, code=content, language="text")
         st_space("v", 2)
 
         # --- 4. PDF Documents ---
@@ -134,19 +134,19 @@ def build():
         st_space("v", 1)
 
         show_explanation(textwrap.dedent("""\
-            Play audio with sx.st_audio() (Streamlit native).
+            Play audio with stx.st_audio() (Streamlit native).
             This is an interactive widget, so st.* is correct.
         """))
         st_space("v", 1)
 
         show_code(textwrap.dedent("""\
             audio_path = os.path.join("static", "sounds", "sample_tone.wav")
-            sx.st_audio(audio_path, format="audio/wav")
+            stx.st_audio(audio_path, format="audio/wav")
         """))
         st_space("v", 1)
 
         audio_path = os.path.join(_static_dir, "sounds", "sample_tone.wav")
-        sx.st_audio(audio_path, format="audio/wav")
+        stx.st_audio(audio_path, format="audio/wav")
         st_space("v", 2)
 
         # --- 6. Local Video Files ---
@@ -154,19 +154,19 @@ def build():
         st_space("v", 1)
 
         show_explanation(textwrap.dedent("""\
-            Play local video with sx.st_video() (Streamlit native).
+            Play local video with stx.st_video() (Streamlit native).
             Place .mp4, .webm, .ogg files in static/videos/.
         """))
         st_space("v", 1)
 
         show_code(textwrap.dedent("""\
             video_path = os.path.join("static", "videos", "chameleon.mp4")
-            sx.st_video(video_path)
+            stx.st_video(video_path)
         """))
         st_space("v", 1)
 
         video_path = os.path.join(_static_dir, "videos", "chameleon.mp4")
-        sx.st_video(video_path)
+        stx.st_video(video_path)
         st_space("v", 2)
 
         # --- 7. YouTube Videos ---
@@ -175,7 +175,7 @@ def build():
 
         show_explanation(textwrap.dedent("""\
             Embed YouTube videos by reading URLs from a file
-            and using sx.st_video() with the URL directly.
+            and using stx.st_video() with the URL directly.
         """))
         st_space("v", 1)
 
@@ -184,14 +184,14 @@ def build():
             url_file = os.path.join("static", "videos", "youtube_urls.txt")
             with open(url_file) as f:
                 youtube_url = f.readline().strip()
-            sx.st_video(youtube_url)
+            stx.st_video(youtube_url)
         """))
         st_space("v", 1)
 
         url_file = os.path.join(_static_dir, "videos", "youtube_urls.txt")
         with open(url_file) as f:
             youtube_url = f.readline().strip()
-        sx.st_video(youtube_url)
+        stx.st_video(youtube_url)
         st_space("v", 2)
 
         # --- 8. Various Data Files ---
@@ -209,14 +209,14 @@ def build():
             json_path = os.path.join("static", "various", "sample_data.json")
             with open(json_path) as f:
                 data = json.load(f)
-            sx.st_code(code=json.dumps(data, indent=2), language="json")
+            stx.st_code(code=json.dumps(data, indent=2), language="json")
         """))
         st_space("v", 1)
 
         json_path = os.path.join(_static_dir, "various", "sample_data.json")
         with open(json_path) as f:
             data = json.load(f)
-        sx.st_code(s.project.containers.code_box,
+        stx.st_code(s.project.containers.code_box,
                    code=json.dumps(data, indent=2), language="json")
         st_space("v", 2)
 
@@ -224,5 +224,5 @@ def build():
             Static serving requires enableStaticServing = true in config.toml.
             Files under static/ are served at the app/static/ URL prefix.
             Use st_image() for images (StreamTeX native).
-            Use sx.st_audio(), sx.st_video() for media (Streamlit interactive widgets).
+            Use stx.st_audio(), stx.st_video() for media (Streamlit interactive widgets).
         """))

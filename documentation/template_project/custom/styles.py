@@ -1,4 +1,4 @@
-"""Project-specific styles. Extends StreamTeX_Styles with a minimal working palette.
+"""Project-specific styles. Extends StxStyles with a minimal working palette.
 
 Usage in blocks:
     from custom.styles import Styles as s
@@ -6,7 +6,7 @@ Usage in blocks:
     st_write(s.project.titles.main_title, "Title")
 """
 
-from streamtex.styles import Style, Text, Container, StreamTeX_Styles
+from streamtex.styles import Style, Text, Container, StxStyles
 
 
 class ColorsCustom:
@@ -66,6 +66,6 @@ class Custom:
     containers = ContainerStylesCustom
 
 
-class Styles(StreamTeX_Styles):
+class Styles(StxStyles):
     """Main Styles class — inherits all StreamTeX styles + project-specific ones."""
     project = Custom

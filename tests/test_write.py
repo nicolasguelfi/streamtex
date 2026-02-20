@@ -2,7 +2,7 @@
 
 import pytest
 from unittest.mock import patch, call
-from streamtex.styles import Style, StreamTeX_Styles
+from streamtex.styles import Style, StxStyles
 from streamtex.enums import Tags
 from streamtex.write import st_write, _parse_args
 
@@ -16,7 +16,7 @@ class TestParseArgs:
 
     def test_no_style_uses_default(self):
         container_style, txt = _parse_args("hello")
-        assert container_style is StreamTeX_Styles.none
+        assert container_style is StxStyles.none
         assert txt == "hello"
 
     def test_tuple_style_text(self):

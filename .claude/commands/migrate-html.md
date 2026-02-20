@@ -21,7 +21,7 @@ Before starting, read ALL of these:
    - List all hex/rgb values found
    - For each: map to StreamTeX style OR classify as "default/theme — not migrated" with justification
 4. **Detect Formatting**: Bold (`font-weight: 700`) -> `s.bold`, Italic -> `s.italic`
-5. **Identify Containers**: Tables -> `sx.st_grid()`, bullet lists -> `sx.st_list()`
+5. **Identify Containers**: Tables -> `stx.st_grid()`, bullet lists -> `stx.st_list()`
 6. **Style Consolidation**: Group identical computed styles under ONE generic `BlockStyles` name (English)
 
 ## Phase 2: Implementation
@@ -32,12 +32,12 @@ Before starting, read ALL of these:
    - Dropped-colors log (which colors were intentionally not migrated and why)
    - All consolidated styles
 3. Implement `build()`:
-   - `sx.st_block()` for stacked sections
+   - `stx.st_block()` for stacked sections
    - ONE `st_write()` with tuples for inline mixed-style text (NEVER multiple st_write calls)
    - Include font size in link styles when HTML shows links larger than 12pt
-   - `sx.st_grid()` with `cell_styles` for tables
-   - `sx.st_list()` for lists
-   - `sx.st_br()` for line breaks
+   - `stx.st_grid()` with `cell_styles` for tables
+   - `stx.st_list()` for lists
+   - `stx.st_br()` for line breaks
 4. Rename images: `[block_name]_image_[00index].[ext]` -> copy to `static/images/`
 
 ## Phase 3: Second-Pass Verification (MANDATORY)
@@ -50,10 +50,10 @@ After the first complete implementation:
    - [ ] No raw HTML strings
    - [ ] Semantic style names (not c1/c2)
    - [ ] Images renamed per convention
-   - [ ] Lists use sx.st_list
+   - [ ] Lists use stx.st_list
    - [ ] Inline content uses ONE st_write with tuples
    - [ ] Font sizes included on link styles where needed
-   - [ ] sx.st_br() for line breaks
+   - [ ] stx.st_br() for line breaks
    - [ ] st_grid with cell_styles for tables
    - [ ] No hardcoded black/white
    - [ ] Bold and italic correctly applied

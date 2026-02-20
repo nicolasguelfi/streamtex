@@ -7,7 +7,7 @@ Condensed API reference. For full details, see `documentation/streamtex_cheatshe
 ```python
 import streamlit as st
 from streamtex import *
-import streamtex as sx
+import streamtex as stx
 from streamtex.styles import Style as ns, StyleGrid as sg
 from streamtex.enums import Tags as t, ListTypes as lt
 from custom.styles import Styles as s
@@ -110,7 +110,7 @@ st_image(uri="static/images/logo.png", link="https://...", hover=True)
 ## Code Blocks — `st_code()`
 
 ```python
-sx.st_code(style, code="print('hello')", language="python", line_numbers=True)
+stx.st_code(style, code="print('hello')", language="python", line_numbers=True)
 ```
 
 ## Spacing
@@ -181,21 +181,21 @@ st_book([blocks.bck_01, blocks.bck_02, ...],
 
 ## Export-Aware Widgets
 
-Always use `sx.*` instead of `st.*` for widgets that should survive HTML export:
+Always use `stx.*` instead of `st.*` for widgets that should survive HTML export:
 
 | Streamlit | StreamTeX (export-aware) |
 |-----------|------------------------|
-| `st.dataframe()` | `sx.st_dataframe()` |
-| `st.table()` | `sx.st_table()` |
-| `st.metric()` | `sx.st_metric()` |
-| `st.json()` | `sx.st_json()` |
-| `st.line_chart()` | `sx.st_line_chart()` |
-| `st.bar_chart()` | `sx.st_bar_chart()` |
-| `st.area_chart()` | `sx.st_area_chart()` |
-| `st.scatter_chart()` | `sx.st_scatter_chart()` |
-| `st.graphviz_chart()` | `sx.st_graphviz()` |
-| `st.audio()` | `sx.st_audio()` |
-| `st.video()` | `sx.st_video()` |
+| `st.dataframe()` | `stx.st_dataframe()` |
+| `st.table()` | `stx.st_table()` |
+| `st.metric()` | `stx.st_metric()` |
+| `st.json()` | `stx.st_json()` |
+| `st.line_chart()` | `stx.st_line_chart()` |
+| `st.bar_chart()` | `stx.st_bar_chart()` |
+| `st.area_chart()` | `stx.st_area_chart()` |
+| `st.scatter_chart()` | `stx.st_scatter_chart()` |
+| `st.graphviz_chart()` | `stx.st_graphviz()` |
+| `st.audio()` | `stx.st_audio()` |
+| `st.video()` | `stx.st_video()` |
 
 ## Collections (`book.py` for a hub)
 
@@ -213,6 +213,6 @@ st_collection(config=config, home_styles=s)
 
 ```python
 # In book.py for shared blocks:
-shared = sx.LazyBlockRegistry([Path("../shared-blocks/blocks")])
+shared = stx.LazyBlockRegistry([Path("../shared-blocks/blocks")])
 st_book([blocks.bck_01, shared.bck_footer], ...)
 ```

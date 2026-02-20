@@ -1,6 +1,6 @@
 import streamlit as st
 from dataclasses import dataclass
-from .styles import Style, StreamTeX_Styles as s
+from .styles import Style, StxStyles as s
 from .enums import Tag
 from typing import Optional
 

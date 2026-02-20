@@ -18,6 +18,7 @@ sts.theme = dark
 toc = TOCConfig(numerate_titles=False, search=True)
 
 st_book([
+    blocks.bck_level_badge,
     blocks.bck_home_collection,
     blocks.bck_collection_management,
 ], toc_config=toc, paginate=False)

@@ -37,10 +37,10 @@ def build():
     show_code(textwrap.dedent("""\
         # blocks/bck_hello.py
         from streamtex import *
-        import streamtex as sx
+        import streamtex as stx
         from streamtex.enums import Tags as t
 
-        _sts = sx.StreamTeX_Styles
+        _sts = stx.StxStyles
 
 
         class BlockStyles:

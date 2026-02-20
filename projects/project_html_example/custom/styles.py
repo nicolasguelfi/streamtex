@@ -1,4 +1,4 @@
-from streamtex.styles import Style, Text, Container, StreamTeX_Styles
+from streamtex.styles import Style, Text, Container, StxStyles
 
 class ColorsCustom:
     """Custom colors defined multiple times."""
@@ -27,6 +27,6 @@ class ProjectStyles:
     titles = TitleStyles
 
 
-class Styles(StreamTeX_Styles):
+class Styles(StxStyles):
     project = ProjectStyles
 

@@ -1,11 +1,10 @@
 """Unit tests for streamtex.tikz — TikZ diagram rendering."""
 
-from unittest.mock import patch, MagicMock, mock_open
+from unittest.mock import MagicMock, patch
 
 import streamtex.export as export_mod
-from streamtex.export import ExportConfig, reset_export_buffer, generate_export_html
-from streamtex.tikz import st_tikz, _compile_tikz
-
+from streamtex.export import ExportConfig, generate_export_html, reset_export_buffer
+from streamtex.tikz import _compile_tikz, _extract_svg_height, st_tikz
 
 SAMPLE_CODE = r"""
 \begin{tikzpicture}
@@ -13,7 +12,7 @@ SAMPLE_CODE = r"""
 \end{tikzpicture}
 """
 
-FAKE_SVG = '<svg xmlns="http://www.w3.org/2000/svg"><line x1="0" y1="0" x2="1" y2="1"/></svg>'
+FAKE_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="150"><line x1="0" y1="0" x2="1" y2="1"/></svg>'
 
 
 # ---------------------------------------------------------------------------
@@ -31,7 +30,7 @@ class TestCompileTikz:
     @patch("builtins.open", create=True)
     @patch("streamtex.tikz.tempfile.TemporaryDirectory")
     def test_full_pipeline(self, mock_tmpdir, mock_file_open, mock_run):
-        """The pipeline calls pdflatex then dvisvgm and returns SVG."""
+        """The pipeline calls latex then dvisvgm and returns SVG."""
         # Set up temp directory
         mock_tmpdir.return_value.__enter__ = lambda s: "/tmp/stx_tikz_test"
         mock_tmpdir.return_value.__exit__ = MagicMock(return_value=False)
@@ -57,18 +56,18 @@ class TestCompileTikz:
         assert "<svg" in result
         assert mock_run.call_count == 2
 
-        # First call should be pdflatex
+        # First call should be latex
         first_call_args = mock_run.call_args_list[0][0][0]
-        assert first_call_args[0] == "pdflatex"
+        assert first_call_args[0] == "latex"
 
         # Second call should be dvisvgm
         second_call_args = mock_run.call_args_list[1][0][0]
         assert second_call_args[0] == "dvisvgm"
 
-    @patch("streamtex.tikz.subprocess.run", side_effect=FileNotFoundError("pdflatex not found"))
+    @patch("streamtex.tikz.subprocess.run", side_effect=FileNotFoundError("latex not found"))
     @patch("streamtex.tikz.tempfile.TemporaryDirectory")
     def test_raises_when_latex_missing(self, mock_tmpdir, mock_run):
-        """FileNotFoundError is raised when pdflatex is not installed."""
+        """FileNotFoundError is raised when latex is not installed."""
         mock_tmpdir.return_value.__enter__ = lambda s: "/tmp/stx_tikz_test"
         mock_tmpdir.return_value.__exit__ = MagicMock(return_value=False)
 
@@ -79,6 +78,26 @@ class TestCompileTikz:
                 assert False, "Should have raised FileNotFoundError"
             except FileNotFoundError:
                 pass
+
+
+# ---------------------------------------------------------------------------
+# _extract_svg_height
+# ---------------------------------------------------------------------------
+
+class TestExtractSvgHeight:
+    """Tests for SVG height extraction."""
+
+    def test_extracts_integer_height(self):
+        svg = '<svg width="200" height="150"><rect/></svg>'
+        assert _extract_svg_height(svg) == 170  # 150 + 20 padding
+
+    def test_extracts_float_height(self):
+        svg = "<svg width='300.5' height='250.7'><rect/></svg>"
+        assert _extract_svg_height(svg) == 270  # int(250.7) + 20
+
+    def test_fallback_when_no_height(self):
+        svg = "<svg><rect/></svg>"
+        assert _extract_svg_height(svg) == 400
 
 
 # ---------------------------------------------------------------------------
@@ -97,12 +116,14 @@ class TestLiveRendering:
     @patch("streamtex.tikz.st")
     @patch("streamtex.tikz._compile_tikz", return_value=FAKE_SVG)
     def test_renders_svg_via_render(self, mock_compile, mock_st, mock_render):
-        """Successful compilation displays SVG via _render()."""
+        """Successful compilation displays SVG via _render() with height."""
         st_tikz(SAMPLE_CODE)
         mock_render.assert_called_once()
         call_arg = mock_render.call_args[0][0]
         assert "stx-tikz" in call_arg
         assert "<svg" in call_arg
+        # height is extracted from the SVG (150px + 20px padding)
+        assert mock_render.call_args[1]["height"] == 170
 
     @patch("streamtex.tikz._render")
     @patch("streamtex.tikz.st")

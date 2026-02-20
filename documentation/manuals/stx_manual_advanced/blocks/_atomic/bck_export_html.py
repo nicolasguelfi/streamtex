@@ -1,6 +1,6 @@
 import streamlit as st
 from streamtex import *
-import streamtex as sx
+import streamtex as stx
 from streamtex.styles import Style as ns, StyleGrid as sg
 from streamtex.enums import Tags as t, ListTypes as lt
 from custom.styles import Styles as s
@@ -48,7 +48,7 @@ def build():
         st_space("v", 1)
 
         show_explanation(textwrap.dedent("""\
-            Every sx.* content call goes through _render(),
+            Every stx.* content call goes through _render(),
             which sends HTML to both Streamlit and an export buffer.
             Context managers (st_block, st_grid, st_list) push/pop
             wrapper tags so the exported HTML keeps the nesting structure.
@@ -58,7 +58,7 @@ def build():
         show_code(textwrap.dedent("""\
             # Dual rendering pipeline (simplified)
             #
-            #   sx.st_write(...)
+            #   stx.st_write(...)
             #        |
             #   _render(html)
             #        |

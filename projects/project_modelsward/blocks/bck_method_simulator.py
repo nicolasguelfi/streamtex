@@ -1,6 +1,6 @@
 import streamlit as st
 from streamtex import *
-import streamtex as sx
+import streamtex as stx
 from custom.styles import Styles as s
 from streamtex.styles import Style as ns, StyleGrid as sg
 from streamtex.enums import Tags as t, ListTypes as lt
@@ -20,7 +20,7 @@ def build():
         toc_lvl="2",
     )
     st_space(size=2)
-    sx.st_graphviz(
+    stx.st_graphviz(
         """
         digraph simulator {
             rankdir=LR;

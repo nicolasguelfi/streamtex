@@ -356,8 +356,8 @@ Choose what works for your project.
   4. Expert pattern for edge cases
 
 📚 Learn more:
-  - See sx_manual_intro/blocks/helpers.py for minimal example
-  - See sx_manual_advanced/blocks/helpers.py for complete showcase
+  - See stx_manual_intro/blocks/helpers.py for minimal example
+  - See stx_manual_advanced/blocks/helpers.py for complete showcase
   - See documentation/template_project/blocks/helpers.py for annotated template
 
 🚀 Next steps:

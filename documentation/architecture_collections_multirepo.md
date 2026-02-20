@@ -152,9 +152,9 @@ The `blocks` namespace becomes a unified view across all declared directories.
 ### API
 
 ```python
-import streamtex as sx
+import streamtex as stx
 
-sx.configure_sources(
+stx.configure_sources(
     blocks=[
         "blocks",                                # Local blocks (relative to book.py)
         "../../shared-course-blocks/blocks",     # Shared blocks
@@ -239,7 +239,7 @@ __all__ = list(_loaded.keys())
 
 **Backward compatibility:** If `configure_sources()` was never called, `get_block_sources()` returns `[]`, and `__init__.py` falls back to globbing its own directory — identical to the current behavior.
 
-### `sx.resolve_static()` — Static File Resolution
+### `stx.resolve_static()` — Static File Resolution
 
 A new utility function to find static files across all configured sources:
 
@@ -260,11 +260,11 @@ def resolve_static(relative_path):
 **Usage in blocks:**
 
 ```python
-import streamtex as sx
+import streamtex as stx
 
 def build():
     # Instead of hardcoded path:
-    data_path = sx.resolve_static("various/sample_data.json")
+    data_path = stx.resolve_static("various/sample_data.json")
     with open(data_path) as f:
         data = json.load(f)
 ```
@@ -306,10 +306,10 @@ def get_image_src(uri: str) -> str:
 ```python
 import streamlit as st
 import setup
-import streamtex as sx
+import streamtex as stx
 
 # --- Multi-source configuration (BEFORE import blocks) ---
-sx.configure_sources(
+stx.configure_sources(
     blocks=[
         "blocks",                                  # Local blocks (priority 1)
         "../../shared-course-blocks/blocks",       # Shared blocks (priority 2)
@@ -365,9 +365,9 @@ project-minimal/
 # book.py — project-minimal
 import streamlit as st
 import setup
-import streamtex as sx
+import streamtex as stx
 
-sx.configure_sources(
+stx.configure_sources(
     blocks=["blocks", "../../shared-course-blocks/blocks"],
     static=["../../shared-course-blocks/static"],  # No local static/
 )

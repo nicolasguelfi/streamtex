@@ -19,9 +19,9 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-COLLECTION_PROJECT="$SCRIPT_DIR/documentation/manuals/sx_manuals_collection"
-INTRO_PROJECT="$SCRIPT_DIR/documentation/manuals/sx_manual_intro"
-ADVANCED_PROJECT="$SCRIPT_DIR/documentation/manuals/sx_manual_advanced"
+COLLECTION_PROJECT="$SCRIPT_DIR/documentation/manuals/stx_manuals_collection"
+INTRO_PROJECT="$SCRIPT_DIR/documentation/manuals/stx_manual_intro"
+ADVANCED_PROJECT="$SCRIPT_DIR/documentation/manuals/stx_manual_advanced"
 
 # Ports par défaut
 COLLECTION_PORT=8501
@@ -234,7 +234,7 @@ cleanup() {
     echo ""
     echo "🛑 Arrêt des projets..."
     pkill -f "streamtex_collection\|streamtex_intro\|streamtex_advanced" || true
-    pkill -f "streamlit run.*sx_manuals_collection\|streamlit run.*sx_manual_intro\|streamlit run.*sx_manual_advanced" || true
+    pkill -f "streamlit run.*stx_manuals_collection\|streamlit run.*stx_manual_intro\|streamlit run.*stx_manual_advanced" || true
     sleep 1
     echo "✓ Tous les projets ont été arrêtés"
 }
@@ -269,15 +269,15 @@ if [ "$WATCH_MODE" = true ]; then
     while true; do
         sleep 5
         # Vérifier que les processus tournent toujours
-        if [ "$LAUNCH_COLLECTION" = true ] && ! pgrep -f "streamlit run.*sx_manuals_collection" > /dev/null 2>&1; then
+        if [ "$LAUNCH_COLLECTION" = true ] && ! pgrep -f "streamlit run.*stx_manuals_collection" > /dev/null 2>&1; then
             echo "⚠️  Collection est arrêté. Redémarrage..."
             launch_project "$COLLECTION_PROJECT" "Collection" "$COLLECTION_PORT" "$COLLECTION_LOG"
         fi
-        if [ "$LAUNCH_INTRO" = true ] && ! pgrep -f "streamlit run.*sx_manual_intro" > /dev/null 2>&1; then
+        if [ "$LAUNCH_INTRO" = true ] && ! pgrep -f "streamlit run.*stx_manual_intro" > /dev/null 2>&1; then
             echo "⚠️  Intro est arrêté. Redémarrage..."
             launch_project "$INTRO_PROJECT" "Intro" "$INTRO_PORT" "$INTRO_LOG"
         fi
-        if [ "$LAUNCH_ADVANCED" = true ] && ! pgrep -f "streamlit run.*sx_manual_advanced" > /dev/null 2>&1; then
+        if [ "$LAUNCH_ADVANCED" = true ] && ! pgrep -f "streamlit run.*stx_manual_advanced" > /dev/null 2>&1; then
             echo "⚠️  Advanced est arrêté. Redémarrage..."
             launch_project "$ADVANCED_PROJECT" "Advanced" "$ADVANCED_PORT" "$ADVANCED_LOG"
         fi

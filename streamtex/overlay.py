@@ -1,7 +1,7 @@
 import streamlit as st
 from contextlib import contextmanager
 from typing import Union
-from .styles import Style, StreamTeX_Styles
+from .styles import Style, StxStyles
 from .container import st_block
 
 class OverlayController:
@@ -14,7 +14,7 @@ class OverlayController:
     @contextmanager
     def layer(
         self, 
-        style: Style = StreamTeX_Styles.none, 
+        style: Style = StxStyles.none, 
         top: Union[str, int] = None, 
         left: Union[str, int] = None, 
         right: Union[str, int] = None, 
@@ -53,7 +53,7 @@ class OverlayController:
 
 
 @contextmanager
-def st_overlay(style: Style = StreamTeX_Styles.none):
+def st_overlay(style: Style = StxStyles.none):
     """
     Creates a relative container for overlaying elements.
     

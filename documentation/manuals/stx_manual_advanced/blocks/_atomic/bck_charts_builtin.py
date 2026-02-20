@@ -1,6 +1,6 @@
 import streamlit as st
 from streamtex import *
-import streamtex as sx
+import streamtex as stx
 from streamtex.styles import Style as ns, StyleGrid as sg
 from streamtex.enums import Tags as t, ListTypes as lt
 from custom.styles import Styles as s
@@ -56,7 +56,7 @@ def build():
         st_space("v", 1)
 
         with st_block(s.project.containers.result_box):
-            sx.st_line_chart(_make_line_data())
+            stx.st_line_chart(_make_line_data())
         st_space("v", 2)
 
         # --- Section 2: Bar chart ---
@@ -71,7 +71,7 @@ def build():
 
         bar_data = _make_bar_data()
         with st_block(s.project.containers.result_box):
-            sx.st_bar_chart(bar_data, x="Category", y="Value")
+            stx.st_bar_chart(bar_data, x="Category", y="Value")
         st_space("v", 2)
 
         # --- Section 3: Area chart with slider ---
@@ -87,7 +87,7 @@ def build():
         n_points = st.slider("Number of data points", 5, 100, 30,
                              key="bck27_area_slider")
         with st_block(s.project.containers.result_box):
-            sx.st_area_chart(_make_line_data(n_points))
+            stx.st_area_chart(_make_line_data(n_points))
         st_space("v", 2)
 
         # --- Section 4: Scatter chart ---
@@ -108,7 +108,7 @@ def build():
             "size": [random.uniform(10, 60) for _ in range(50)],
         }
         with st_block(s.project.containers.result_box):
-            sx.st_scatter_chart(scatter_data, x="x", y="y", size="size")
+            stx.st_scatter_chart(scatter_data, x="x", y="y", size="size")
         st_space("v", 2)
 
         # --- Section 5: Metrics + chart in grid ---
@@ -127,11 +127,11 @@ def build():
 
         with st_grid(cols="1fr 2fr", cell_styles=bs.cell) as g:
             with g.cell():
-                sx.st_metric("Users", "1,234", "+12%")
-                sx.st_metric("Revenue", "$5.6K", "+8%")
-                sx.st_metric("Uptime", "99.9%", "+0.1%")
+                stx.st_metric("Users", "1,234", "+12%")
+                stx.st_metric("Revenue", "$5.6K", "+8%")
+                stx.st_metric("Uptime", "99.9%", "+0.1%")
             with g.cell():
-                sx.st_line_chart(_make_line_data())
+                stx.st_line_chart(_make_line_data())
         st_space("v", 2)
 
         show_details(textwrap.dedent("""\

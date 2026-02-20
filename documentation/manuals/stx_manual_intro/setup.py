@@ -1,4 +1,4 @@
-"""Setup module to configure Python path for sx_manual_intro."""
+"""Setup module to configure Python path for stx_manual_intro."""
 
 import os
 import sys

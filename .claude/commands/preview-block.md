@@ -1,6 +1,6 @@
 Preview and validate a StreamTeX block by checking its structure and dependencies.
 
-Arguments: $ARGUMENTS (block file path, e.g. "documentation/manuals/sx_manual_intro/blocks/bck_level_badge.py")
+Arguments: $ARGUMENTS (block file path, e.g. "documentation/manuals/stx_manual_intro/blocks/bck_level_badge.py")
 
 ## Steps
 
@@ -12,7 +12,7 @@ Arguments: $ARGUMENTS (block file path, e.g. "documentation/manuals/sx_manual_in
    - [ ] Has `build()` function
    - [ ] No raw HTML strings (`<div`, `<span`, `<style`, `unsafe_allow_html`)
    - [ ] No raw CSS strings (inline `"color:"`, `"font-size:"`, etc. outside of `Style()` or `ns()`)
-   - [ ] Uses `sx.*` functions, not raw `st.*` for content
+   - [ ] Uses `stx.*` functions, not raw `st.*` for content
 
 3. **Asset validation**:
    - Extract all `uri=` values from `st_image()` calls

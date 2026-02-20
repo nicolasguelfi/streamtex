@@ -1,4 +1,4 @@
-"""StreamTeX_Styles — the aggregation class that composes all style categories."""
+"""StxStyles — the aggregation class that composes all style categories."""
 
 from .core import Style
 from .text import Text
@@ -14,7 +14,7 @@ container = Container
 visibility = Visibility
 
 
-class StreamTeX_Styles:
+class StxStyles:
 
     ### Enums #####
     none = Style("", "none")
@@ -55,3 +55,7 @@ class StreamTeX_Styles:
     """8pt"""
     tiny = text.sizes.tiny_size
     """4pt"""
+
+
+# Backward compatibility alias (deprecated)
+StreamTeX_Styles = StxStyles

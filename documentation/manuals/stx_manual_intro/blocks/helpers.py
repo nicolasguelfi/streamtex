@@ -1,11 +1,11 @@
-"""Block helpers for sx_manual_intro — minimal hybrid approach.
+"""Block helpers for stx_manual_intro — minimal hybrid approach.
 
 This module shows the SIMPLE usage pattern:
 - ProjectBlockHelperConfig for dependency injection
 - Convenience wrappers with config injection
 - A few project-specific helpers
 
-For advanced patterns (OOP, multiple modes), see sx_manual_advanced/blocks/helpers.py
+For advanced patterns (OOP, multiple modes), see stx_manual_advanced/blocks/helpers.py
 """
 
 from streamtex import (

@@ -223,14 +223,14 @@ class StyleGrid:
 
     def _combine_with(self, other, combine_styles):
         # Import here to avoid circular import at module level
-        from .base import StreamTeX_Styles
+        from .base import StxStyles
         self_rows, self_cols = self._get_dimensions()
         other_rows, other_cols = other._get_dimensions()
 
         max_rows = max(self_rows, other_rows)
         max_cols = max(self_cols, other_cols)
 
-        new_grid = [[StreamTeX_Styles.none for _ in range(max_cols)] for _ in range(max_rows)]
+        new_grid = [[StxStyles.none for _ in range(max_cols)] for _ in range(max_rows)]
 
         for i in range(self_rows):
             for j in range(len(self.css_grid[i])):
@@ -253,7 +253,7 @@ class StyleGrid:
     @staticmethod
     def create(cells: str, style: Style, num_rows: Optional[int] = None, num_cols: Optional[int] = None):
         """Creates a StyleGrid with the specified cells filled with the given style."""
-        from .base import StreamTeX_Styles
+        from .base import StxStyles
         cells_list = StyleGrid._parse_cells(cells)
 
         max_row_index = max((row for row, _ in cells_list), default=0)
@@ -262,7 +262,7 @@ class StyleGrid:
         grid_rows = max(num_rows if num_rows is not None else 0, max_row_index + 1)
         grid_cols = max(num_cols if num_cols is not None else 0, max_col_index + 1)
 
-        grid = [[StreamTeX_Styles.none for _ in range(grid_cols)] for _ in range(grid_rows)]
+        grid = [[StxStyles.none for _ in range(grid_cols)] for _ in range(grid_rows)]
 
         for row, col in cells_list:
             if row < grid_rows and col < grid_cols:

@@ -2,7 +2,7 @@
 
 import streamlit as st
 from streamtex import *
-import streamtex as sx
+import streamtex as stx
 from streamtex.styles import Style
 from streamtex.enums import Tags as t
 from custom.styles import Styles as s
@@ -48,19 +48,19 @@ def build():
     st_space("v", 2)
 
     # Section 2: The Solution
-    st_write(bs.section, "The Solution: Use sx.st_* Wrappers", toc_lvl="+1")
+    st_write(bs.section, "The Solution: Use stx.st_* Wrappers", toc_lvl="+1")
     st_space("v", 1)
 
     with st_block(bs.good_box):
         st_write(
             s.large,
-            (s.text.weights.bold_weight, "✓ Use sx.st_* functions instead"),
+            (s.text.weights.bold_weight, "✓ Use stx.st_* functions instead"),
         )
     st_space("v", 1)
 
     st_write(
         s.medium,
-        "StreamTeX provides export-aware wrappers (sx.st_dataframe, sx.st_line_chart, etc.) "
+        "StreamTeX provides export-aware wrappers (stx.st_dataframe, stx.st_line_chart, etc.) "
         "that render BOTH in the live app AND in exported HTML with static fallbacks.",
     )
     st_space("v", 2)
@@ -70,17 +70,17 @@ def build():
     st_space("v", 1)
 
     with st_list(list_type="ul"):
-        st_write(s.medium, "sx.st_dataframe() — tables")
-        st_write(s.medium, "sx.st_line_chart() — line charts")
-        st_write(s.medium, "sx.st_bar_chart() — bar charts")
-        st_write(s.medium, "sx.st_area_chart() — area charts")
-        st_write(s.medium, "sx.st_scatter_chart() — scatter plots")
-        st_write(s.medium, "sx.st_table() — simple tables")
-        st_write(s.medium, "sx.st_metric() — metrics")
-        st_write(s.medium, "sx.st_json() — JSON display")
-        st_write(s.medium, "sx.st_graphviz() — graph diagrams")
-        st_write(s.medium, "sx.st_audio() — audio playback")
-        st_write(s.medium, "sx.st_video() — video playback")
+        st_write(s.medium, "stx.st_dataframe() — tables")
+        st_write(s.medium, "stx.st_line_chart() — line charts")
+        st_write(s.medium, "stx.st_bar_chart() — bar charts")
+        st_write(s.medium, "stx.st_area_chart() — area charts")
+        st_write(s.medium, "stx.st_scatter_chart() — scatter plots")
+        st_write(s.medium, "stx.st_table() — simple tables")
+        st_write(s.medium, "stx.st_metric() — metrics")
+        st_write(s.medium, "stx.st_json() — JSON display")
+        st_write(s.medium, "stx.st_graphviz() — graph diagrams")
+        st_write(s.medium, "stx.st_audio() — audio playback")
+        st_write(s.medium, "stx.st_video() — video playback")
 
     st_space("v", 2)
 
@@ -101,7 +101,7 @@ def build():
     )
 
     # Use export-aware dataframe (visible in both live app and export)
-    sx.st_dataframe(df, use_container_width=True)
+    stx.st_dataframe(df, use_container_width=True)
 
     st_space("v", 2)
 
@@ -122,7 +122,7 @@ def build():
     )
 
     # Use export-aware line chart
-    sx.st_line_chart(
+    stx.st_line_chart(
         chart_data.set_index("Date")[["Sales", "Growth"]],
     )
 
@@ -152,10 +152,10 @@ st.line_chart(data)  # Invisible in HTML export
     with st_block(s.project.containers.code_box):
         st_code("python", """\
 # ✓ GOOD - visible in live app AND export
-import streamtex as sx
+import streamtex as stx
 
-sx.st_dataframe(df)      # Static HTML fallback in export
-sx.st_line_chart(data)   # SVG chart in export
+stx.st_dataframe(df)      # Static HTML fallback in export
+stx.st_line_chart(data)   # SVG chart in export
 """)
 
     st_space("v", 2)
@@ -167,7 +167,7 @@ sx.st_line_chart(data)   # SVG chart in export
     with st_list(list_type="ol"):
         st_write(
             s.medium,
-            "Always use sx.st_* for widgets when export is enabled",
+            "Always use stx.st_* for widgets when export is enabled",
         )
         st_write(
             s.medium,
@@ -175,7 +175,7 @@ sx.st_line_chart(data)   # SVG chart in export
         )
         st_write(
             s.medium,
-            "For custom widgets without sx.st_* wrapper, use sx.st_export() context",
+            "For custom widgets without stx.st_* wrapper, use stx.st_export() context",
         )
         st_write(
             s.medium,

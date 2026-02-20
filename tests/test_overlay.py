@@ -159,7 +159,7 @@ class TestOverlayControllerLayer:
         user_style = Style("color: red;", "red")
         self._run_layer(styles, top=5)
         # The user style is applied via the Style object passed to layer()
-        # via the default StreamTeX_Styles.none; override with explicit style
+        # via the default StxStyles.none; override with explicit style
         captured_styles_with_user = []
 
         def _fake_st_block(style=None, **kwargs):

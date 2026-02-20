@@ -2,12 +2,17 @@
 
 import streamlit as st
 import setup
+import streamtex as stx
 from streamtex import st_book, TOCConfig, MarkerConfig
+from pathlib import Path
 
 from custom.styles import Styles as s
 from custom.themes import dark
 import streamtex.styles as sts
 import blocks
+
+# Configure static sources
+stx.set_static_sources([str(Path(__file__).parent / "static")])
 
 # Page configuration
 st.set_page_config(

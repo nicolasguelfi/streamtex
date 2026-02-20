@@ -18,7 +18,7 @@ uv run streamlit run projects/<your_project>/book.py
 
 3. **Run the test project:**
 ```bash
-uv run streamlit run documentation/manuals/sx_manual_intro/book.py
+uv run streamlit run documentation/manuals/stx_manual_intro/book.py
 ```
 
 4. **Run unit tests:**

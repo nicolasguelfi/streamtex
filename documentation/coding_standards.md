@@ -6,11 +6,11 @@
 ## 1. The StreamTeX Philosophy
 StreamTeX wraps Streamlit with a block-based architecture. Never manually write HTML or CSS strings in Python code.
 - **BAD:** `st.markdown("<div style='color:red'>Text</div>", unsafe_allow_html=True)`
-- **GOOD:** `sx.st_write(s.text.colors.red, "Text")`
+- **GOOD:** `stx.st_write(s.text.colors.red, "Text")`
 
 ## 2. Source of Truth
 - **Syntax Reference:** `documentation/streamtex_cheatsheet_en.md`
-- **Architecture Reference:** Any project's `book.py` (orchestrates blocks/). See `documentation/template_project/` or `documentation/manuals/sx_manual_intro/` for illustration.
+- **Architecture Reference:** Any project's `book.py` (orchestrates blocks/). See `documentation/template_project/` or `documentation/manuals/stx_manual_intro/` for illustration.
 
 ## 3. Project Structure
 ```
@@ -21,7 +21,7 @@ project_name/
     __init__.py            # Dynamic import via importlib
     bck_*.py               # Each block has a build() function
   custom/
-    styles.py              # Project-specific styles (inherits StreamTeX_Styles)
+    styles.py              # Project-specific styles (inherits StxStyles)
     themes.py              # Theme overrides (dict)
   static/images/           # Image assets
   .streamlit/config.toml   # MUST have enableStaticServing = true
@@ -33,7 +33,7 @@ project_name/
 ```python
 import streamlit as st
 from streamtex import *
-import streamtex as sx
+import streamtex as stx
 from streamtex.styles import Style as ns, StyleGrid as sg
 from streamtex.enums import Tags as t, ListTypes as lt
 from custom.styles import Styles as s
@@ -47,14 +47,14 @@ import blocks
 ```
 
 ## 5. sx vs st — When to Use What
-- **ALL layout and content** -> `sx.*`: st_write, st_image, st_grid, st_list, st_block, st_span, st_space, st_br, st_overlay
-- **Data visualization (export-aware)** -> `sx.*`: st_dataframe, st_table, st_metric, st_json, st_graphviz, st_line_chart, st_bar_chart, st_area_chart, st_scatter_chart, st_audio, st_video
+- **ALL layout and content** -> `stx.*`: st_write, st_image, st_grid, st_list, st_block, st_span, st_space, st_br, st_overlay
+- **Data visualization (export-aware)** -> `stx.*`: st_dataframe, st_table, st_metric, st_json, st_graphviz, st_line_chart, st_bar_chart, st_area_chart, st_scatter_chart, st_audio, st_video
 - **ONLY interactivity** -> `st.*`: buttons, inputs, sliders, forms, selectbox, checkbox
 
 ### Export-Aware Widgets
 When HTML export is enabled, native `st.*` widgets (charts, tables, etc.) are **invisible** in the exported HTML because they use Streamlit's protobuf/React pipeline.
 
-Use the `sx.st_*` wrappers instead — they call the native widget AND inject a static HTML fallback (SVG chart, HTML table, etc.) into the export buffer:
+Use the `stx.st_*` wrappers instead — they call the native widget AND inject a static HTML fallback (SVG chart, HTML table, etc.) into the export buffer:
 
 ```python
 # BAD — invisible in export
@@ -63,14 +63,14 @@ st.dataframe(df)
 st.graphviz_chart(dot)
 
 # GOOD — visible in both live app AND export
-sx.st_line_chart(data)
-sx.st_dataframe(df)
-sx.st_graphviz(dot)
+stx.st_line_chart(data)
+stx.st_dataframe(df)
+stx.st_graphviz(dot)
 ```
 
-For any widget not covered by the helpers, use `sx.st_export()`:
+For any widget not covered by the helpers, use `stx.st_export()`:
 ```python
-with sx.st_export('<p>Static fallback for export</p>'):
+with stx.st_export('<p>Static fallback for export</p>'):
     st.plotly_chart(fig)
 ```
 
@@ -137,7 +137,7 @@ def build():
 - **Compose**: `s.bold + s.Large + s.center_txt` — combine styles (returns Style)
 - **Remove**: `style - s.bold` — subtract CSS properties
 - **Grid styles**: `sg.create("A1:B3", style)` — apply styles to grid cells
-- **Custom colors**: Define in `custom/styles.py`, inherit `StreamTeX_Styles`
+- **Custom colors**: Define in `custom/styles.py`, inherit `StxStyles`
 - **Theme overrides**: Define in `custom/themes.py` (dict of style_id → CSS)
 - **Reuse**: Never duplicate identical style definitions. One generic style, reused everywhere.
 
@@ -176,9 +176,9 @@ with st_grid(cols=2, grid_style=grid_gap):
 uv run streamlit run projects/<project_name>/book.py
 
 # Manual projects (documentation/manuals/)
-uv run streamlit run documentation/manuals/sx_manual_intro/book.py
-uv run streamlit run documentation/manuals/sx_manual_advanced/book.py
-uv run streamlit run documentation/manuals/sx_manuals_collection/book.py
+uv run streamlit run documentation/manuals/stx_manual_intro/book.py
+uv run streamlit run documentation/manuals/stx_manual_advanced/book.py
+uv run streamlit run documentation/manuals/stx_manuals_collection/book.py
 
 # Multiple projects simultaneously (different ports)
 ./run-test-projects.sh --intro --advanced --collection
@@ -234,28 +234,53 @@ Used in `book.py` to load blocks from external directories:
 
 ```python
 # book.py
-import streamtex as sx
+import streamtex as stx
 from pathlib import Path
 
-shared_path = str(Path(__file__).parent.parent / "sx_manuals_shared-blocks" / "blocks")
-shared_blocks = sx.LazyBlockRegistry([shared_path])
+shared_path = str(Path(__file__).parent.parent / "stx_manuals_shared-blocks" / "blocks")
+shared_blocks = stx.LazyBlockRegistry([shared_path])
 
 st_book([
-    shared_blocks.bck_header,    # From sx_manuals_shared-blocks
+    shared_blocks.bck_header,    # From stx_manuals_shared-blocks
     blocks.bck_content,          # From local blocks/
-    shared_blocks.bck_footer,    # From sx_manuals_shared-blocks
+    shared_blocks.bck_footer,    # From stx_manuals_shared-blocks
 ])
 ```
 
 Priority: first source directory in the list wins. Once loaded, blocks are cached.
 
+### Composite Blocks — load_atomic_block()
+
+Composite blocks group multiple atomic blocks (from `_atomic/` subfolder) into a single section.
+Use `stx.load_atomic_block()` to load them:
+
+```python
+# blocks/bck_text_and_styling.py — Composite block
+import streamtex as stx
+from streamtex import st_include
+
+bck_text_basics = stx.load_atomic_block("bck_text_basics", __file__)
+bck_text_styles = stx.load_atomic_block("bck_text_styles", __file__)
+
+class BlockStyles:
+    pass
+
+def build():
+    st_include(bck_text_basics)
+    st_include(bck_text_styles)
+```
+
+`load_atomic_block(name, __file__)` loads `_atomic/{name}.py` relative to the caller's directory.
+Raises `BlockNotFoundError` if not found, `BlockImportError` on import failure.
+
 ### When to use which?
 
-| Use Case | Registry |
+| Use Case | Registry / Function |
 |----------|----------|
 | Local blocks (blocks/) | `ProjectBlockRegistry` |
 | Shared blocks from other dirs | `LazyBlockRegistry` |
-| Both in same project | One of each (see sx_manual_advanced) |
+| Atomic sub-blocks (_atomic/) | `load_atomic_block()` |
+| Both in same project | One of each (see stx_manual_advanced) |
 
 ## 14. Hybrid Helper Patterns
 
@@ -320,12 +345,12 @@ Use this for override patterns: project-specific blocks take priority over share
 ### Static asset resolution
 
 ```python
-import streamtex as sx
+import streamtex as stx
 from pathlib import Path
 
-sx.set_static_sources([
+stx.set_static_sources([
     str(Path(__file__).parent / "static"),          # Local (highest priority)
-    str(Path(__file__).parent.parent / "sx_manuals_shared-blocks" / "static"),  # Shared
+    str(Path(__file__).parent.parent / "stx_manuals_shared-blocks" / "static"),  # Shared
 ])
 
 # resolve_static("logo.png") searches each source in order

@@ -1,6 +1,6 @@
 import os
 import streamlit as st
-from .styles import Style, StreamTeX_Styles
+from .styles import Style, StxStyles
 from .export import _render
 from .utils import __is_url, __is_absolute_path, __is_relative_path, __get_mime_type, __get_base64_encoded_image, contain_link
 from .blocks import get_static_sources
@@ -14,7 +14,7 @@ def configure_image_path(base_path: str):
     _static_image_base = base_path
 
 def st_image(
-    style: Style = StreamTeX_Styles.none,
+    style: Style = StxStyles.none,
     width="100%", height="auto",
     uri: str="", alt:str="",
     link:str="", hover:bool=True
@@ -22,7 +22,7 @@ def st_image(
     """
     Generates an HTML `img` tag based on the image URI, with optional styles, link wrapping, and hover effects.
 
-    :param style: A `Style` object defining CSS styles to apply to the image. Defaults to `StreamTeX_Styles.none`.
+    :param style: A `Style` object defining CSS styles to apply to the image. Defaults to `StxStyles.none`.
     :param width: The width of the image. Can be a string (e.g., "50%") or an integer (e.g., 100). Defaults to "100%".
     :param height: The height of the image. Can be a string (e.g., "300px") or an integer (e.g., 300). Defaults to "100%".
     :param uri: The image URI. Can be:

@@ -1,7 +1,7 @@
 import streamlit as st
 import os
 from streamtex import *
-import streamtex as sx
+import streamtex as stx
 from streamtex.styles import Style as ns, StyleGrid as sg
 from streamtex.enums import Tags as t, ListTypes as lt
 from custom.styles import Styles as s
@@ -62,8 +62,9 @@ def build():
 
         # Read actual book.py
         try:
-            book_path = os.path.join(
-                os.path.dirname(__file__), "..", "book.py")
+            # _atomic/ → blocks/ → project root
+            _project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            book_path = os.path.join(_project_root, "book.py")
             with open(book_path) as f:
                 book_source = f.read()
             show_code(book_source)
@@ -150,8 +151,9 @@ def build():
 
         # Read actual __init__.py
         try:
+            # _atomic/ → blocks/ (where __init__.py lives)
             init_path = os.path.join(
-                os.path.dirname(__file__), "__init__.py")
+                os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "__init__.py")
             with open(init_path) as f:
                 init_source = f.read()
             show_code(init_source)

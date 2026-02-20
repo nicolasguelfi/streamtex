@@ -1,6 +1,6 @@
 import streamlit as st
 from streamtex import *
-import streamtex as sx
+import streamtex as stx
 from streamtex.styles import Style as ns, StyleGrid as sg
 from streamtex.enums import Tags as t, ListTypes as lt
 from custom.styles import Styles as s
@@ -39,7 +39,7 @@ digraph {
 
     book -> blocks [label="st_include"]
     book -> styles [label="imports"]
-    blocks -> streamtex [label="sx.*"]
+    blocks -> streamtex [label="stx.*"]
     blocks -> styles [label="s.*"]
     streamtex -> styles [label="inherits"]
 }
@@ -73,7 +73,7 @@ digraph {
     user [label="User Input", fillcolor="#95A5A6", fontcolor="white"]
     widget [label="st.* Widget", fillcolor="#4A90D9", fontcolor="white"]
     state [label="Session State", fillcolor="#F39C12", fontcolor="white"]
-    render [label="sx.* Render", fillcolor="#2EC4B6", fontcolor="white"]
+    render [label="stx.* Render", fillcolor="#2EC4B6", fontcolor="white"]
     html [label="HTML Output", fillcolor="#E74C3C", fontcolor="white"]
 
     user -> widget [label="interacts"]
@@ -98,7 +98,7 @@ def build():
         st_space("v", 2)
 
         show_explanation(textwrap.dedent("""\
-            sx.st_graphviz() renders DOT language diagrams.
+            stx.st_graphviz() renders DOT language diagrams.
             DOT is concise for describing directed graphs.
             Charts are interactive (pan/zoom).
         """))
@@ -109,7 +109,7 @@ def build():
         st_space("v", 1)
 
         show_code(textwrap.dedent("""\
-            sx.st_graphviz('''
+            stx.st_graphviz('''
                 digraph {
                     A -> B -> C -> D -> A
                     A -> C
@@ -118,7 +118,7 @@ def build():
         """))
         st_space("v", 1)
 
-        sx.st_graphviz(SIMPLE_GRAPH)
+        stx.st_graphviz(SIMPLE_GRAPH)
         st_space("v", 2)
 
         # --- Section 2: Styled flowchart ---
@@ -126,7 +126,7 @@ def build():
         st_space("v", 1)
 
         show_code(textwrap.dedent("""\
-            sx.st_graphviz('''
+            stx.st_graphviz('''
                 digraph {
                     node [shape=box, style="rounded,filled"]
                     book [label="book.py", fillcolor="#4A90D9"]
@@ -137,7 +137,7 @@ def build():
         """))
         st_space("v", 1)
 
-        sx.st_graphviz(FLOWCHART)
+        stx.st_graphviz(FLOWCHART)
         st_space("v", 2)
 
         # --- Section 3: Interactive selection ---
@@ -147,7 +147,7 @@ def build():
         show_code(textwrap.dedent("""\
             diagrams = {"Simple Graph": dot1, "Flowchart": dot2, ...}
             choice = st.selectbox("Choose a diagram", list(diagrams.keys()))
-            sx.st_graphviz(diagrams[choice])
+            stx.st_graphviz(diagrams[choice])
         """))
         st_space("v", 1)
 
@@ -155,7 +155,7 @@ def build():
                               [*DIAGRAMS],
                               key="bck31_diagram_select")
         with st_block(s.project.containers.result_box):
-            sx.st_graphviz(DIAGRAMS[choice])
+            stx.st_graphviz(DIAGRAMS[choice])
         st_space("v", 2)
 
         # --- Section 4: Self-referential architecture ---
@@ -168,12 +168,12 @@ def build():
         """))
         st_space("v", 1)
 
-        sx.st_graphviz(ARCHITECTURE)
+        stx.st_graphviz(ARCHITECTURE)
         st_space("v", 2)
 
         show_details(textwrap.dedent("""\
             DOT language: concise graph description (nodes, edges, attributes).
-            sx.st_graphviz() supports pan and zoom interaction.
+            stx.st_graphviz() supports pan and zoom interaction.
             Combine with st.selectbox() to switch between diagrams.
             Requires: uv add graphviz (Python bindings).
         """))

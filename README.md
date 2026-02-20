@@ -37,7 +37,7 @@ uv run streamlit run projects/<autre_projet>/book.py --server.port 8502
 
 ### 3. Lancer le projet de test/démonstration
 ```bash
-uv run streamlit run documentation/manuals/sx_manual_intro/book.py
+uv run streamlit run documentation/manuals/stx_manual_intro/book.py
 ```
 
 ### 4. Lancer les tests unitaires
@@ -105,8 +105,8 @@ import setup
 ```
 This imports streamlit and adds the parent folder to the python path. This is essential for the project to be able to access the```streamtex``` folder.
 
-After this, you can import StreamTeX (```import streamtex as sx```), your custom styles and your block files, set up your streamlit page through ```st.set_page_config()``` and other streamlit code. 
-The final line should be ```sx.st_book(module_list)```, where ```module_list``` is a list of the block modules to include in your Streamlit web book in the order of appearance.
+After this, you can import StreamTeX (```import streamtex as stx```), your custom styles and your block files, set up your streamlit page through ```st.set_page_config()``` and other streamlit code. 
+The final line should be ```stx.st_book(module_list)```, where ```module_list``` is a list of the block modules to include in your Streamlit web book in the order of appearance.
 
 ## Blocks
 
@@ -125,11 +125,11 @@ Users may create theme dictionaries which can be used to replace the look of cer
 
 
 ### Custom Styles
-In ```custom/styles.py```, you may define a new Custom class, which will hold all new styles you may want to create and not available through StreamTeX. At the end of the python file, define a new class Styles, a subclass of ```streamtex.styles.StreamTeX_Styles```, with a new property referencing your new custom styles class. For reference, see ```documentation/template_project/custom/styles.py``` or ```documentation/manuals/sx_manual_intro/custom/styles.py```
+In ```custom/styles.py```, you may define a new Custom class, which will hold all new styles you may want to create and not available through StreamTeX. At the end of the python file, define a new class Styles, a subclass of ```streamtex.styles.StxStyles```, with a new property referencing your new custom styles class. For reference, see ```documentation/template_project/custom/styles.py``` or ```documentation/manuals/stx_manual_intro/custom/styles.py```
 
 Example:
 ```python 
-class Styles(StreamTeX_Styles):
+class Styles(StxStyles):
     project = Custom
 ```
 

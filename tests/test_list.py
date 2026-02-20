@@ -5,7 +5,7 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from unittest.mock import MagicMock, patch, call
 from streamtex.list import ListController, st_list, _current_list_level
-from streamtex.styles import Style, ListStyle, StreamTeX_Styles
+from streamtex.styles import Style, ListStyle, StxStyles
 from streamtex.enums import ListType, ListTypes
 
 
@@ -34,7 +34,7 @@ class TestListController:
 
     def test_list_controller_with_empty_style(self):
         """Test ListController with empty style."""
-        li_style = StreamTeX_Styles.none
+        li_style = StxStyles.none
         controller = ListController(li_style, "'●'", is_ordered=False)
 
         assert controller.li_style is li_style
@@ -42,7 +42,7 @@ class TestListController:
 
     def test_list_controller_item_context_manager(self, mock_streamlit):
         """Test that item() method is a context manager."""
-        controller = ListController(StreamTeX_Styles.none, "'●'", is_ordered=False)
+        controller = ListController(StxStyles.none, "'●'", is_ordered=False)
 
         # Check that item() is callable and returns a context manager
         with patch("streamtex.list.st_block") as mock_st_block, \
@@ -420,7 +420,7 @@ class TestListControllerItemExport:
 
     def test_list_item_export_uses_li_tag(self, mock_streamlit):
         """Test that list item uses <li> tag in export."""
-        controller = ListController(StreamTeX_Styles.none, "'●'", is_ordered=False)
+        controller = ListController(StxStyles.none, "'●'", is_ordered=False)
 
         with patch("streamtex.list.st_block") as mock_st_block, \
              patch("streamtex.list.st.container") as mock_container, \
@@ -445,7 +445,7 @@ class TestListControllerItemExport:
 
     def test_list_item_export_inactive_does_not_call_wrappers(self, mock_streamlit):
         """Test that export wrappers are not called when export is inactive."""
-        controller = ListController(StreamTeX_Styles.none, "'●'", is_ordered=False)
+        controller = ListController(StxStyles.none, "'●'", is_ordered=False)
 
         with patch("streamtex.list.st_block") as mock_st_block, \
              patch("streamtex.list.st.container") as mock_container, \
@@ -519,7 +519,7 @@ class TestListCssGeneration:
 
     def test_list_item_generates_css(self, mock_streamlit):
         """Test that ListController.item() generates and renders CSS."""
-        controller = ListController(StreamTeX_Styles.none, "'●'", is_ordered=False)
+        controller = ListController(StxStyles.none, "'●'", is_ordered=False)
 
         with patch("streamtex.list.st_block") as mock_st_block, \
              patch("streamtex.list.st.container") as mock_container, \

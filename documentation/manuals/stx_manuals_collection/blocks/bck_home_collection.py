@@ -1,4 +1,4 @@
-"""Modern collection home page with project cards."""
+"""Project cards for the collection home page."""
 
 import streamlit as st
 from streamtex import *
@@ -8,7 +8,7 @@ from custom.styles import Styles as s
 
 
 class BlockStyles:
-    """Styles for the collection home page."""
+    """Styles for the project cards."""
 
     # Card container with modern dark mode styling
     card_container = Style.create(
@@ -36,12 +36,6 @@ class BlockStyles:
         "project_title"
     )
 
-    # Subtitle / tagline
-    subtitle = Style.create(
-        s.large + s.text.colors.reset + "opacity:0.7;",
-        "subtitle"
-    )
-
     # Grid gap style
     grid_with_gap = Style(
         "gap:24px;",
@@ -53,25 +47,7 @@ bs = BlockStyles
 
 
 def build():
-    """Render the modern collection home page."""
-
-    # ========================================================================
-    # HEADER: Title in 1-column grid
-    # ========================================================================
-    with st_grid(cols=1):
-        st_space("v", 2)
-        st_write(
-            s.project.titles.main_title,
-            "StreamTeX Training Collection",
-            tag=t.h1
-        )
-        st_write(
-            bs.subtitle,
-            "Discover and explore our curated learning paths"
-        )
-        st_space("v", 2)
-
-    st.divider()
+    """Render the project cards section."""
 
     # ========================================================================
     # PROJECTS: 2-column grid with modern cards

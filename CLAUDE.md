@@ -2,7 +2,7 @@
 
 ## Identity
 You are a **StreamTeX Expert**. You NEVER write standard Streamlit code for content rendering.
-You ALWAYS use the `streamtex` library (`sx.*` functions) instead of raw `st.*` calls for layout and content.
+You ALWAYS use the `streamtex` library (`stx.*` functions) instead of raw `st.*` calls for layout and content.
 
 ## Environment (MANDATORY)
 This project uses **uv** for dependency management. You MUST:
@@ -61,7 +61,7 @@ See `documentation/coding_standards.md` for the full reference. Key rules:
 - `streamtex/export_widgets.py` — Export-aware widget wrappers (st_dataframe, st_table, st_metric, st_json, st_graphviz, charts, st_audio, st_video)
 
 ### Block Infrastructure
-- `streamtex/blocks.py` — ProjectBlockRegistry, LazyBlockRegistry, static resolution API (set_static_sources, get_static_sources, resolve_static), BlockNotFoundError, BlockImportError
+- `streamtex/blocks.py` — ProjectBlockRegistry, LazyBlockRegistry, load_atomic_block, static resolution API (set_static_sources, get_static_sources, resolve_static), BlockNotFoundError, BlockImportError
 - `streamtex/block_helpers.py` — BlockHelper, show_code, show_code_inline, show_explanation, show_details (3 usage modes: functions, config injection via BlockHelperConfig, OOP inheritance)
 
 ### Utilities & Internal
@@ -91,10 +91,10 @@ documentation/
   ├── template_project/         # Starter template (single project)
   ├── template_collection/      # Starter template (multi-project hub)
   └── manuals/                  # StreamTeX manuals (runnable demo projects)
-      ├── sx_manual_intro/      # Phase 1 intro course (lazy-loading demo)
-      ├── sx_manual_advanced/   # Phase 1 advanced + multi-source blocks
-      ├── sx_manuals_collection/# Phase 2 collection hub (modern design)
-      └── sx_manuals_shared-blocks/ # Cross-project shared block library
+      ├── stx_manual_intro/      # Phase 1 intro course (lazy-loading demo)
+      ├── stx_manual_advanced/   # Phase 1 advanced + multi-source blocks
+      ├── stx_manuals_collection/# Phase 2 collection hub (modern design)
+      └── stx_manuals_shared-blocks/ # Cross-project shared block library
 .claude/
   ├── commands/                 # Slash commands (all discoverable)
   │   ├── Designer: new-project, new-collection, new-block, new-slide,
@@ -114,7 +114,7 @@ uv sync                                                # Install all dependencie
 
 # Run individual projects
 uv run streamlit run projects/<your_project>/book.py
-uv run streamlit run documentation/manuals/sx_manual_intro/book.py
+uv run streamlit run documentation/manuals/stx_manual_intro/book.py
 
 # Run multiple projects simultaneously (with different ports)
 ./run-test-projects.sh --intro --advanced --collection
@@ -135,7 +135,7 @@ uv run pytest tests/ -v
 - HTML export (self-contained, dual rendering pipeline)
 - Block helpers with DI pattern
 
-**Demo projects**: `documentation/manuals/sx_manual_intro`, `documentation/manuals/sx_manual_advanced`
+**Demo projects**: `documentation/manuals/stx_manual_intro`, `documentation/manuals/stx_manual_advanced`
 
 ### Phase 2: Collections & Hub
 - Multi-project collections via st_collection()
@@ -144,7 +144,7 @@ uv run pytest tests/ -v
 - Project discovery cards with navigation
 - Dark mode support with gradient styling
 
-**Demo project**: `documentation/manuals/sx_manuals_collection`
+**Demo project**: `documentation/manuals/stx_manuals_collection`
 
 ## Deployment
 - **Docker**: `docker build --build-arg FOLDER=projects/<your_project> -t streamtex-app .`

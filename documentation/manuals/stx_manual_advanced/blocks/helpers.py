@@ -1,4 +1,4 @@
-"""Block helpers for sx_manual_advanced — COMPLETE hybrid showcase.
+"""Block helpers for stx_manual_advanced — COMPLETE hybrid showcase.
 
 This module demonstrates ALL 3 usage patterns of the hybrid block helpers system:
 
@@ -19,7 +19,7 @@ This module demonstrates ALL 3 usage patterns of the hybrid block helpers system
 This project is used to DOCUMENT and SHOWCASE all patterns in detail.
 Each pattern is explained in dedicated advanced blocks (bck_*).
 
-See sx_manual_intro/blocks/helpers.py for the minimal SIMPLE pattern only.
+See stx_manual_intro/blocks/helpers.py for the minimal SIMPLE pattern only.
 """
 
 from streamtex import (

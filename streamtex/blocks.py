@@ -1,7 +1,7 @@
 """Lazy block registry for multi-source block loading."""
 
-import os
 import importlib.util
+import os
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -15,11 +15,11 @@ class LazyBlockRegistry:
 
     Example:
         ```python
-        import streamtex as sx
+        import streamtex as stx
         from streamtex import st_book
 
         # Create a registry pointing to local and shared block directories
-        shared_blocks = sx.LazyBlockRegistry([
+        shared_blocks = stx.LazyBlockRegistry([
             "../../shared-course-blocks/blocks",
         ])
         import blocks  # Local blocks
@@ -168,7 +168,7 @@ class ProjectBlockRegistry:
             try:
                 with open(path, encoding="utf-8") as f:
                     content = f.read(1000)
-                    if "_load_atomic" in content or "st_include" in content:
+                    if "_load_atomic" in content or "load_atomic_block" in content or "st_include" in content:
                         composites.add(path.stem)
             except (IOError, UnicodeDecodeError):
                 pass
@@ -229,6 +229,37 @@ class ProjectBlockRegistry:
                 f"composites={s['composites']}, atomics={s['atomics']})")
 
 
+def load_atomic_block(name: str, caller_file: str):
+    """Load an atomic block from _atomic/ subfolder relative to caller_file.
+
+    Args:
+        name: Block module name (e.g. "bck_text_basics")
+        caller_file: Pass __file__ from the calling composite block
+
+    Returns:
+        The imported module object
+
+    Raises:
+        BlockNotFoundError: If the block file does not exist
+        BlockImportError: If the block fails to import
+    """
+    caller_dir = Path(caller_file).parent
+    block_path = caller_dir / "_atomic" / f"{name}.py"
+    if not block_path.is_file():
+        raise BlockNotFoundError(f"Atomic block '{name}' not found at: {block_path}")
+    try:
+        spec = importlib.util.spec_from_file_location(f"atomic_{name}", block_path)
+        if not spec or not spec.loader:
+            raise BlockImportError(f"Cannot create spec for atomic block: {name}")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+    except (BlockNotFoundError, BlockImportError):
+        raise
+    except Exception as e:
+        raise BlockImportError(f"Failed to import atomic block '{name}': {e}") from e
+
+
 # Global state for static file resolution
 _static_sources: List[str] = []
 
@@ -266,12 +297,12 @@ def resolve_static(relative_path: str) -> str:
 
     Example:
         ```python
-        import streamtex as sx
+        import streamtex as stx
 
-        sx.set_static_sources(["static", "../../shared-course-blocks/static"])
+        stx.set_static_sources(["static", "../../shared-course-blocks/static"])
 
         # In a block:
-        data_path = sx.resolve_static("data/trainers.json")
+        data_path = stx.resolve_static("data/trainers.json")
         with open(data_path) as f:
             trainers = json.load(f)
         ```

@@ -79,9 +79,9 @@ def build():
     show_code(textwrap.dedent("""\
         # custom/styles.py
         from streamtex.styles import Style
-        import streamtex as sx
+        import streamtex as stx
 
-        _sts = sx.StreamTeX_Styles
+        _sts = stx.StxStyles
 
         class ProjectStyles:
             class titles:

@@ -3,7 +3,7 @@
 __version__ = "0.2.0"
 
 # Core style system
-from .styles import Style, ListStyle, StyleGrid, StreamTeX_Styles, theme
+from .styles import Style, ListStyle, StyleGrid, StxStyles, StreamTeX_Styles, theme
 
 # Content rendering
 from .write import st_write
@@ -51,6 +51,7 @@ from .utils import inject_link_preview_scaffold
 from .blocks import (
     LazyBlockRegistry, ProjectBlockRegistry,
     BlockNotFoundError, BlockImportError,
+    load_atomic_block,
     set_static_sources, get_static_sources, resolve_static
 )
 

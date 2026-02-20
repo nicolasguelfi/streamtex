@@ -1,4 +1,4 @@
-"""Training course styles. Extends StreamTeX_Styles with a teaching palette and callout containers.
+"""Training course styles. Extends StxStyles with a teaching palette and callout containers.
 
 Usage in blocks:
     from custom.styles import Styles as s
@@ -6,7 +6,7 @@ Usage in blocks:
     st_write(s.project.titles.course_title, "StreamTeX Training")
 """
 
-from streamtex.styles import Style, Text, Container, StreamTeX_Styles
+from streamtex.styles import Style, Text, Container, StxStyles
 
 
 class ColorsCustom:
@@ -155,6 +155,6 @@ class Custom:
     containers = ContainerStylesCustom
 
 
-class Styles(StreamTeX_Styles):
+class Styles(StxStyles):
     """Main Styles class — inherits all StreamTeX styles + project-specific ones."""
     project = Custom

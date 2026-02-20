@@ -1,6 +1,6 @@
 import streamlit as st
 from streamtex import *
-import streamtex as sx
+import streamtex as stx
 from streamtex.styles import Style as ns, StyleGrid as sg
 from streamtex.enums import Tags as t, ListTypes as lt
 from custom.styles import Styles as s
@@ -20,7 +20,7 @@ def build():
 
     show_tip(
         "Widgets are st.* (interactivity). Their return values drive "
-        "what sx.* renders. Styles can be built dynamically at runtime."
+        "what stx.* renders. Styles can be built dynamically at runtime."
     )
     st_space("v", 2)
 
@@ -85,7 +85,7 @@ def build():
     st_space("v", 2)
 
     show_tip(
-        "Always use st.* for interactivity and sx.* for content rendering. "
+        "Always use st.* for interactivity and stx.* for content rendering. "
         "Style() objects can be built dynamically with f-strings: "
         "ns(f\"font-size: {val}px;\")."
     )

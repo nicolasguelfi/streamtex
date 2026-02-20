@@ -2,7 +2,7 @@ import streamlit as st
 import re
 from contextlib import contextmanager
 from contextvars import ContextVar
-from .styles import Style, StreamTeX_Styles as s, ListStyle
+from .styles import Style, StxStyles as s, ListStyle
 from .container import st_block
 from .enums import ListType, ListTypes
 from .utils import generate_key
@@ -111,7 +111,7 @@ def st_list(
 
     :param list_type: The type of list, either ordered (`<ol>`) or unordered (`<ul>`). Defaults to unordered.
     :param l_style: A `Style` object for the entire list. Supports custom list-level styles for `ListStyle`.
-    :param li_style: A `Style` object for individual list items. Defaults to `StreamTeX_Styles.none`.
+    :param li_style: A `Style` object for individual list items. Defaults to `StxStyles.none`.
 
     Notes:
     - Supports nested lists recursively, with the nesting level affecting the style if `l_style` is a `ListStyle`.

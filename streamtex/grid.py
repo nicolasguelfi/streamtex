@@ -1,7 +1,7 @@
 import streamlit as st
 from typing import List, Union
 from contextlib import contextmanager
-from .styles import Style, StyleGrid, StreamTeX_Styles
+from .styles import Style, StyleGrid, StxStyles
 from .container import st_block
 from .utils import generate_key
 from .export import export_push_wrapper, export_pop_wrapper, is_export_active
@@ -10,7 +10,7 @@ from .export import export_push_wrapper, export_pop_wrapper, is_export_active
 CELL_STYLES_TYPE = Union[List[List[Style]], List[Style], Style, StyleGrid]
 
 class GridController:
-    def __init__(self, cols: str | int = 2, cell_styles: CELL_STYLES_TYPE = StreamTeX_Styles.none):
+    def __init__(self, cols: str | int = 2, cell_styles: CELL_STYLES_TYPE = StxStyles.none):
         self.cell_styles = cell_styles
         self.cell_counter = 0 # Tracks total cells to map styles to flat list/matrix
         
@@ -52,7 +52,7 @@ class GridController:
                 return flat_grid[idx]
 
         # Case 4: Fallback
-        return StreamTeX_Styles.none
+        return StxStyles.none
 
     @contextmanager
     def cell(self):
@@ -75,8 +75,8 @@ class GridController:
 @contextmanager
 def st_grid(
     cols: str | int = 2,
-    grid_style: Style = StreamTeX_Styles.none,
-    cell_styles: CELL_STYLES_TYPE = StreamTeX_Styles.none,
+    grid_style: Style = StxStyles.none,
+    cell_styles: CELL_STYLES_TYPE = StxStyles.none,
     gap: str = None,
 ):
     """
@@ -89,7 +89,7 @@ def st_grid(
                     - "auto 1fr" (First col fits content, second takes rest)
                     - "200px 1fr 200px" (Fixed sidebars)
                     - "repeat(auto-fill, minmax(200px, 1fr))" (Responsive card grid)
-    :param grid_style: A `Style` object applied to the entire grid. Defaults to `StreamTeX_Styles.none`.
+    :param grid_style: A `Style` object applied to the entire grid. Defaults to `StxStyles.none`.
     :param cell_styles: Styles for individual cells. Can be:
         - A `StyleGrid` object.
         - A matrix (list of lists) of `Style` objects.

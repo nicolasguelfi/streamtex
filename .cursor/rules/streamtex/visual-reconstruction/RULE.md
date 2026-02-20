@@ -16,9 +16,9 @@ This workflow applies when the user provides one or more screenshots/images to r
 Before coding, analyze the images to distinguish between structure, layout, colors, text, UI components and assets:
 
 ### A. Layout & Grid Detection
-- **Horizontal Split:** If elements are side-by-side, use `sx.st_grid()`.
-    - *Estimate Ratios:* 1/3 Image + 2/3 Text = `sx.st_grid(cols="1fr 2fr", …)`.
-- **Inline Elements:** If blocks sit side-by-side in a single line, use `sx.st_span(...)`.
+- **Horizontal Split:** If elements are side-by-side, use `stx.st_grid()`.
+    - *Estimate Ratios:* 1/3 Image + 2/3 Text = `stx.st_grid(cols="1fr 2fr", …)`.
+- **Inline Elements:** If blocks sit side-by-side in a single line, use `stx.st_span(...)`.
 - **Stacked Elements:** Default behavior `st_block()`.
 - **Vertical Rhythm:** Identify the main sections (Hero, Content, Footer).
 
@@ -30,7 +30,7 @@ Before coding, analyze the images to distinguish between structure, layout, colo
 - **Bold & Italic:** Scrutinize the image for weight (Bold) and slant (Italic). Apply `s.bold` / `s.italic` accordingly.
 
 ### C. Spacing & Alignment
-- **Vertical Spacing:** Use `sx.st_space("v", size=...)` to match the exact vertical gaps seen in the screenshot.
+- **Vertical Spacing:** Use `stx.st_space("v", size=...)` to match the exact vertical gaps seen in the screenshot.
 - **Padding:** If text isn't touching the container edge, add `s.container.paddings.*`.
 - **Centering:** If text is centered, use `s.center_txt`.
 
@@ -46,12 +46,12 @@ Before coding, analyze the images to distinguish between structure, layout, colo
 - **Consistency Check:** If you have multiple screenshots, check if the element remains identical while other text changes. This often confirms it is an image asset.
 - **Decision:**
     - If **Image/Logo**: Treat it as an asset (see Section 3.A).
-    - If **Text**: You MUST implement it using `sx.st_write`.
+    - If **Text**: You MUST implement it using `stx.st_write`.
 
 ## 3. Implementation Rules
 
 ### A. Asset Handling & Naming
-If the screenshot contains images, illustrations, or icons and logos (identified in 2.E), you MUST use `sx.st_image` with the following URI naming convention:
+If the screenshot contains images, illustrations, or icons and logos (identified in 2.E), you MUST use `stx.st_image` with the following URI naming convention:
 - **Format:** `[current_block_filename_no_ext]_image_[00index].png`
 - **Example:** If creating `bck_agent_building_workflow_summary_002.py`, the first image is:
   `uri="bck_agent_building_workflow_summary_002_image_001.png"`
@@ -63,10 +63,10 @@ If the screenshot contains images, illustrations, or icons and logos (identified
 - Do not create separate blocks unless explicitly asked. Merge the visual flow into one continuous `build()` function.
 
 ### C. Text Layout & Coloring
-- **Line Breaks:** Use `sx.st_br()` to force line breaks exactly where they appear in the image to preserve the visual shape of the text.
+- **Line Breaks:** Use `stx.st_br()` to force line breaks exactly where they appear in the image to preserve the visual shape of the text.
 - **Multi-Colored Text:** You must replicate text coloring with high precision.
     - *Example:* If "Artificial Intelligence" is Blue but "A" and "I" are Red.
-    - **Implementation:** Do NOT simplify this to a single color. Use a `sx.st_write` call with multiple `(style, txt)` tuples as its parameters (one for "A", one for "rtificial", etc.) or appropriate StreamTeX composition tools to achieve the exact visual result.
+    - **Implementation:** Do NOT simplify this to a single color. Use a `stx.st_write` call with multiple `(style, txt)` tuples as its parameters (one for "A", one for "rtificial", etc.) or appropriate StreamTeX composition tools to achieve the exact visual result.
 
 ### D. Iterative Styling
 - Define `BlockStyles` first.

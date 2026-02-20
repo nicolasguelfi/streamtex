@@ -1,4 +1,4 @@
-from streamtex.styles import Style, Text, Container, StreamTeX_Styles
+from streamtex.styles import Style, Text, Container, StxStyles
 
 
 class ColorsCustom:
@@ -109,5 +109,5 @@ class Custom:
     titles = TextStylesCustom
 
 
-class Styles(StreamTeX_Styles):
+class Styles(StxStyles):
     project = Custom

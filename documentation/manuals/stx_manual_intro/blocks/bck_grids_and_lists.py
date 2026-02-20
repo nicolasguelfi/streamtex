@@ -1,25 +1,12 @@
 """Composite block - groups multiple atomic blocks."""
 
-import streamlit as st
+import streamtex as stx
 from streamtex import st_include
-import importlib.util
-from pathlib import Path
 
 
-def _load_atomic(name):
-    """Load an atomic block from _atomic/ folder."""
-    path = Path(__file__).parent / "_atomic" / f"{name}.py"
-    spec = importlib.util.spec_from_file_location(f"atomic_{name}", path)
-    if not spec or not spec.loader:
-        raise ImportError(f"Cannot load atomic block: {name}")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-
-bck_grid_basics = _load_atomic("bck_grid_basics")
-bck_grid_cell_styles = _load_atomic("bck_grid_cell_styles")
-bck_lists = _load_atomic("bck_lists")
+bck_grid_basics = stx.load_atomic_block("bck_grid_basics", __file__)
+bck_grid_cell_styles = stx.load_atomic_block("bck_grid_cell_styles", __file__)
+bck_lists = stx.load_atomic_block("bck_lists", __file__)
 
 
 class BlockStyles:

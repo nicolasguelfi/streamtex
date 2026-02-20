@@ -1,6 +1,6 @@
 import streamlit as st
 from streamtex import *
-import streamtex as sx
+import streamtex as stx
 from streamtex.styles import Style as ns, StyleGrid as sg
 from streamtex.enums import Tags as t, ListTypes as lt
 from custom.styles import Styles as s
@@ -15,9 +15,9 @@ class BlockStyles:
     sub = s.project.titles.section_subtitle
 bs = BlockStyles
 
-# Resolve the real Dockerfile path
-_project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-_repo_root = os.path.dirname(os.path.dirname(_project_root))
+# _atomic/ → blocks/ → project root → manuals/ → documentation/ → repo root
+_project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+_repo_root = os.path.dirname(os.path.dirname(os.path.dirname(_project_root)))
 _dockerfile_path = os.path.join(_repo_root, "Dockerfile")
 
 
@@ -72,7 +72,7 @@ def build():
 
         show_explanation(textwrap.dedent("""\
             Use --build-arg FOLDER to deploy a specific project.
-            The default target is documentation/manuals/sx_manual_intro.
+            The default target is documentation/manuals/stx_manual_intro.
         """))
         st_space("v", 1)
 

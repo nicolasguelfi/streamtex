@@ -27,8 +27,8 @@ Before implementing a new migration, you SHOULD:
 3.  **Detect Formatting:**
     - Identify **Bold** (`font-weight: 700`) and *Italic* (`font-style: italic`) usage. Map these to `s.bold` and `s.italic`.
 4.  **Identify Containers:**
-    - Tables used for alignment or data (e.g. `<table>`) -> Map to `sx.st_grid()`.
-    - Manual bullet points -> Map to `sx.st_list()`.
+    - Tables used for alignment or data (e.g. `<table>`) -> Map to `stx.st_grid()`.
+    - Manual bullet points -> Map to `stx.st_list()`.
 5.  **Style Consolidation:**
     - Identify repeating patterns (e.g., "11pt Arial Black").
     - Create **ONE** generic style in `BlockStyles` (e.g., `s.text.header_standard`) instead of copying `c1`, `c2`, `c3`.
@@ -48,7 +48,7 @@ Before implementing a new migration, you SHOULD:
 If the HTML contains images (`<img>` tags), you MUST rename them using the project standard:
 - **Format:** `[current_block_filename_no_ext]_image_[00index].[extension]`
 - **Example:** `bck_session_intro_01_image_001.png`
-- **Action:** Replace the original `src` (often a Googleusercontent URL) with this local URI in `sx.st_image(uri=...)`.
+- **Action:** Replace the original `src` (often a Googleusercontent URL) with this local URI in `stx.st_image(uri=...)`.
 - **Destination:** If the images are provided (present inside the workspace), copy them into the project's `static/images` folder and rename them.
 
 ### B. Structure & Layout
@@ -56,9 +56,9 @@ If the HTML contains images (`<img>` tags), you MUST rename them using the proje
 2.  **Styles:** Define consolidated `BlockStyles` class.
     - *Constraint:* Do not use IDs for style differentiation if definitions are identical.
 3.  **Structure:** Write `build()`.
-    - Use `sx.st_block()` for stacked blocks.
-    - Use `sx.st_write(style, (sub_style, txt), txt, ...)` for inline text of different styles.
-    - Use `sx.st_span()` for other inline elements.
+    - Use `stx.st_block()` for stacked blocks.
+    - Use `stx.st_write(style, (sub_style, txt), txt, ...)` for inline text of different styles.
+    - Use `stx.st_span()` for other inline elements.
 
 ### B.1 Inline vs Block Layout (CRITICAL)
 **StreamTeX containers stack children vertically by default.** Multiple `st_write()` calls inside a list item or cell will render **on top of each other**, not side by side.
@@ -86,32 +86,32 @@ Links default to 12pt. When the HTML shows links at a larger size (e.g. 42pt, 48
 - **CORRECT:** `link_style = s.project.colors.denim_blue + s.text.decors.underline_text + s.Large` — links match 48pt context.
 
 **Key patterns to follow:**
-- Raw HTML table layout -> `sx.st_grid` with `cell_styles` (use `s.container.layouts.vertical_center_layout` for vertical centering) and `sx.st_block` for cell content.
+- Raw HTML table layout -> `stx.st_grid` with `cell_styles` (use `s.container.layouts.vertical_center_layout` for vertical centering) and `stx.st_block` for cell content.
 - Repeated inline link sequences -> abstract into a small helper function that constructs arguments for a `st_write()` call.
 - **Inline mixed-style text** -> one `st_write` with tuples: e.g. `st_write(bs.italic_bold, "(", (bs.link_style, "Link", URL), ") surrounding text...")` — link and surrounding text flow inline.
 
 ### C. Content Extraction
-1.  **Text:** Extract clean text. Replace `<br>` with `sx.st_br()`.
-2.  **Lists:** Convert `<ul>/<ol>` or manual bullets to `sx.st_list()`.
+1.  **Text:** Extract clean text. Replace `<br>` with `stx.st_br()`.
+2.  **Lists:** Convert `<ul>/<ol>` or manual bullets to `stx.st_list()`.
 
-When unsure how to represent a particular HTML construct, look for the closest equivalent in existing blocks within the project or in `documentation/manuals/sx_manual_intro/blocks/`.
+When unsure how to represent a particular HTML construct, look for the closest equivalent in existing blocks within the project or in `documentation/manuals/stx_manual_intro/blocks/`.
 
 ## 4. Migration Checklist
 - [ ] Did I remove all raw HTML strings?
 - [ ] Did I replace "c1/c2" classes with semantic names?
 - [ ] Did I rename all image assets to `..._image_001.[ext]`?
-- [ ] Did I use `sx.st_list` instead of hardcoded bullets?
+- [ ] Did I use `stx.st_list` instead of hardcoded bullets?
 - [ ] **Inline content:** For HTML with multiple sibling spans (e.g. `<span>X</span><span>Y</span>`), did I use one `st_write` with tuple args instead of multiple `st_write` calls?
 - [ ] **Font size:** Do the styles include the appropriate font size when HTML shows text at non-default (e.g. 42pt) size?
-- [ ] Did I use `sx.st_br()` for line breaks to match the layout?
-- [ ] Did I use `sx.st_grid()` with `cell_styles` containing `s.container.layouts.vertical_center_layout` to match `<table>` layouts?
+- [ ] Did I use `stx.st_br()` for line breaks to match the layout?
+- [ ] Did I use `stx.st_grid()` with `cell_styles` containing `s.container.layouts.vertical_center_layout` to match `<table>` layouts?
 - [ ] Did I remove hardcoded black/white colors to support Dark Mode?
 - [ ] Did I correctly apply `s.bold` and `s.italic` where needed?
 - [ ] Did I map all non-default **text colors** to composed styles?
 - [ ] Did I map all non-default **background/border colors** (cards, callouts, highlights)?
 - [ ] Did I add a color-mapping summary and dropped-colors log in `BlockStyles`?
 - [ ] Did I pass the color sanity check (visual parity of key elements)?
-- [ ] Did I reuse or learn from patterns found in existing project blocks or `documentation/manuals/sx_manual_intro/blocks/`?
+- [ ] Did I reuse or learn from patterns found in existing project blocks or `documentation/manuals/stx_manual_intro/blocks/`?
 
 ## 5. Second-Pass Verification & Refinement (MANDATORY)
 
@@ -129,7 +129,7 @@ After you have a complete first version of the migrated block (imports, `BlockSt
    - Check explicitly that:
      - No intentional color from the HTML was dropped during consolidation.
      - Default/theme-dependent colors (pure black/white) are not hardcoded.
-     - Tables, lists, and line breaks are mapped to `sx.st_grid`, `sx.st_list`, and `sx.st_br` where appropriate.
+     - Tables, lists, and line breaks are mapped to `stx.st_grid`, `stx.st_list`, and `stx.st_br` where appropriate.
 
 3. **Refine the Block Implementation**
    - Adjust `BlockStyles` and `build()` to fix any mismatches found during the re-read.

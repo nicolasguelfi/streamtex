@@ -4,7 +4,7 @@ import pytest
 from unittest.mock import patch, MagicMock, call
 from contextlib import contextmanager
 
-from streamtex.styles import Style, StyleGrid, StreamTeX_Styles
+from streamtex.styles import Style, StyleGrid, StxStyles
 from streamtex.grid import GridController, st_grid, CELL_STYLES_TYPE
 
 
@@ -37,9 +37,9 @@ class TestGridController:
         assert controller.cols == 3
 
     def test_init_default_cell_styles(self):
-        """Test default cell_styles is StreamTeX_Styles.none."""
+        """Test default cell_styles is StxStyles.none."""
         controller = GridController()
-        assert controller.cell_styles is StreamTeX_Styles.none
+        assert controller.cell_styles is StxStyles.none
 
     def test_init_with_single_style(self):
         """Test initialization with a single Style object."""
@@ -109,7 +109,7 @@ class TestGridController:
         controller = GridController(cols=2, cell_styles=styles)
 
         resolved = controller._resolve_style(5)
-        assert resolved is StreamTeX_Styles.none
+        assert resolved is StxStyles.none
 
     def test_resolve_style_matrix(self):
         """Test _resolve_style with a matrix (list of lists) of styles."""
@@ -139,7 +139,7 @@ class TestGridController:
         controller = GridController(cols=1, cell_styles=styles)
 
         resolved = controller._resolve_style(10)
-        assert resolved is StreamTeX_Styles.none
+        assert resolved is StxStyles.none
 
     def test_resolve_style_style_grid(self):
         """Test _resolve_style with a StyleGrid object."""
@@ -166,29 +166,29 @@ class TestGridController:
         controller = GridController(cols=1, cell_styles=grid)
 
         resolved = controller._resolve_style(10)
-        assert resolved is StreamTeX_Styles.none
+        assert resolved is StxStyles.none
 
     def test_resolve_style_fallback_none_styles(self):
         """Test _resolve_style returns fallback for None cell_styles."""
         controller = GridController(cols=2)
-        # cell_styles defaults to StreamTeX_Styles.none
+        # cell_styles defaults to StxStyles.none
 
         resolved = controller._resolve_style(0)
-        assert resolved is StreamTeX_Styles.none
+        assert resolved is StxStyles.none
 
     def test_resolve_style_empty_list(self):
         """Test _resolve_style with empty list returns fallback."""
         controller = GridController(cols=2, cell_styles=[])
 
         resolved = controller._resolve_style(0)
-        assert resolved is StreamTeX_Styles.none
+        assert resolved is StxStyles.none
 
     def test_resolve_style_empty_matrix(self):
         """Test _resolve_style with empty matrix returns fallback."""
         controller = GridController(cols=2, cell_styles=[[]])
 
         resolved = controller._resolve_style(0)
-        assert resolved is StreamTeX_Styles.none
+        assert resolved is StxStyles.none
 
     # -----------------------------------------------------------------------
     # Cell counter tests

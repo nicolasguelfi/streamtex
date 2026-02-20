@@ -1,7 +1,7 @@
 import streamlit as st
 import os
 from streamtex import *
-import streamtex as sx
+import streamtex as stx
 from streamtex.styles import Style as ns, StyleGrid as sg
 from streamtex.enums import Tags as t, ListTypes as lt
 from custom.styles import Styles as s
@@ -36,8 +36,9 @@ def build():
 
         # Read actual themes.py
         try:
-            themes_path = os.path.join(
-                os.path.dirname(__file__), "..", "custom", "themes.py")
+            # _atomic/ → blocks/ → project root → custom/
+            _project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            themes_path = os.path.join(_project_root, "custom", "themes.py")
             with open(themes_path) as f:
                 themes_source = f.read()
             show_code(themes_source)

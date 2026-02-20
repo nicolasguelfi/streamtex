@@ -1,10 +1,10 @@
 import streamlit as st
-from .styles import Style, StreamTeX_Styles
+from .styles import Style, StxStyles
 from .export import _render
 
 
 def st_code(
-    style: Style = StreamTeX_Styles.none,
+    style: Style = StxStyles.none,
     code: str = "",
     language: str = "python",
     line_numbers: bool = True,

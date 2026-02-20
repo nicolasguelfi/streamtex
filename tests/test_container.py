@@ -4,7 +4,7 @@ import pytest
 from unittest.mock import patch, call, MagicMock
 import streamtex.export as export_mod
 from streamtex.container import st_block, st_span
-from streamtex.styles import Style, StreamTeX_Styles
+from streamtex.styles import Style, StxStyles
 from streamtex.export import ExportConfig, reset_export_buffer
 
 
@@ -41,7 +41,7 @@ class TestStBlockBasic:
         assert "color: red;" in css_content
 
     def test_st_block_uses_default_style(self, mock_streamlit):
-        """st_block should use StreamTeX_Styles.none by default."""
+        """st_block should use StxStyles.none by default."""
         with st_block():
             pass
 
@@ -180,7 +180,7 @@ class TestStSpanBasic:
         assert "color: blue;" in css_content
 
     def test_st_span_uses_default_style(self, mock_streamlit):
-        """st_span should use StreamTeX_Styles.none by default."""
+        """st_span should use StxStyles.none by default."""
         with st_span():
             pass
 

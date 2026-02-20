@@ -39,7 +39,7 @@ Arguments: $ARGUMENTS (project name, e.g. "project_mycoursename")
    - `blocks/__init__.py`: ProjectBlockRegistry lazy loader (copy from template)
    - `blocks/helpers.py`: Block helper config with DI pattern (copy from template)
    - `blocks/bck_welcome.py`: Starter block with a title and placeholder content
-   - `custom/styles.py`: Custom styles class inheriting from `StreamTeX_Styles`, with example color and title styles
+   - `custom/styles.py`: Custom styles class inheriting from `StxStyles`, with example color and title styles
    - `custom/themes.py`: Empty theme dictionary ready for overrides
    - `.streamlit/config.toml`: With `enableStaticServing = true` and `layout = "wide"`
 
@@ -58,5 +58,5 @@ Arguments: $ARGUMENTS (project name, e.g. "project_mycoursename")
 
 ## Reference Projects
 - `documentation/template_project/` — canonical template (source of truth)
-- `documentation/manuals/sx_manual_intro/` — Phase 1 intro course example
-- `documentation/manuals/sx_manual_advanced/` — Phase 1 advanced + multi-source blocks example
+- `documentation/manuals/stx_manual_intro/` — Phase 1 intro course example
+- `documentation/manuals/stx_manual_advanced/` — Phase 1 advanced + multi-source blocks example

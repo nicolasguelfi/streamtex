@@ -183,9 +183,22 @@ def st_export(fallback_html: str):
 # Dual render — the single bridge from content modules to st.html()
 # ---------------------------------------------------------------------------
 
-def _render(html: str) -> None:
-    """Send *html* to Streamlit **and** to the export buffer (if active)."""
-    st.html(html)
+def _render(html: str, *, height: int = 0) -> None:
+    """Send *html* to Streamlit **and** to the export buffer (if active).
+
+    Parameters
+    ----------
+    height : int
+        When > 0, use ``components.html()`` with an explicit pixel height
+        instead of ``st.html()``.  This is required for content (e.g. SVG
+        diagrams) that cannot be auto-sized by the Shadow DOM iframe.
+    """
+    if height > 0:
+        import streamlit.components.v1 as components
+
+        components.html(html, height=height)
+    else:
+        st.html(html)
     if _buffer is not None:
         _buffer.append(html)
     from .search import record_if_active

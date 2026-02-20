@@ -68,4 +68,4 @@ Arguments: $ARGUMENTS (collection name, e.g. "my_course_library")
 
 ## Reference Projects
 - `documentation/template_collection/` — canonical template (source of truth)
-- `documentation/manuals/sx_manuals_collection/` — working collection example
+- `documentation/manuals/stx_manuals_collection/` — working collection example

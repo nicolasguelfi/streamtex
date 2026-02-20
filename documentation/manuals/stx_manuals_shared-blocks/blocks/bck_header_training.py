@@ -2,7 +2,7 @@
 
 import streamlit as st
 from streamtex import *
-import streamtex as sx
+import streamtex as stx
 from streamtex.styles import Style
 from streamtex.enums import Tags as t
 
@@ -25,12 +25,12 @@ def build():
     
     with st_block(header_style):
         st_write(
-            sx.StreamTeX_Styles.huge + sx.StreamTeX_Styles.text.colors.white,
+            stx.StxStyles.huge + stx.StxStyles.text.colors.white,
             "StreamTeX Training Course",
             tag=t.div
         )
         st_write(
-            sx.StreamTeX_Styles.large + sx.StreamTeX_Styles.text.colors.white,
+            stx.StxStyles.large + stx.StxStyles.text.colors.white,
             "A Streamlit-based content rendering framework",
             tag=t.div
         )

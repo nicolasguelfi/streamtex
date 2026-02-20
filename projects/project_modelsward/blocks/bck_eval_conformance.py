@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 from streamtex import *
-import streamtex as sx
+import streamtex as stx
 from custom.styles import Styles as s
 from streamtex.styles import Style as ns, StyleGrid as sg
 from streamtex.enums import Tags as t, ListTypes as lt
@@ -33,7 +33,7 @@ def build():
                     "Baseline": [46.4, 5.8, 8.0],
                 }
             )
-            sx.st_bar_chart(
+            stx.st_bar_chart(
                 data,
                 x="Metric",
                 y=["Proposed", "Baseline"],

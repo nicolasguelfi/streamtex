@@ -25,4 +25,4 @@ from .container import (
 from .visibility import Visibility
 
 # Aggregation class and module-level aliases
-from .base import StreamTeX_Styles, text, container, visibility
+from .base import StxStyles, StreamTeX_Styles, text, container, visibility

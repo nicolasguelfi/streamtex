@@ -1,11 +1,11 @@
 import streamlit as st
 from contextlib import contextmanager
-from .styles import Style, StreamTeX_Styles
+from .styles import Style, StxStyles
 from .utils import generate_key
 from .export import export_push_wrapper, export_pop_wrapper, is_export_active
 
 @contextmanager
-def st_block(style: Style = StreamTeX_Styles.none, _export_wrapper: bool = True):
+def st_block(style: Style = StxStyles.none, _export_wrapper: bool = True):
     """A Context Manager that wraps content within a styled container."""
 
     # 1. Generate a unique ID to scope the CSS to this specific block
@@ -44,7 +44,7 @@ def st_block(style: Style = StreamTeX_Styles.none, _export_wrapper: bool = True)
         
         
 @contextmanager
-def st_span(style: Style = StreamTeX_Styles.none):
+def st_span(style: Style = StxStyles.none):
     """
     A Context Manager that wraps content within a styled container.
     Its contents are inserted in the same line.

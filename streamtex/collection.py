@@ -7,7 +7,7 @@ from typing import Dict, Optional
 
 import streamlit as st
 
-from .styles import Style, StreamTeX_Styles
+from .styles import Style, StxStyles
 from .write import st_write
 from .image import st_image
 from .grid import st_grid

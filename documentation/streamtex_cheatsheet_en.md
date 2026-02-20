@@ -198,53 +198,53 @@ s.text.decors.underline_text
 
 ## 📊 Export-Aware Widgets
 
-Use `sx.st_*` wrappers instead of raw `st.*` calls for data visualization — they appear in both the live app AND the HTML export.
+Use `stx.st_*` wrappers instead of raw `st.*` calls for data visualization — they appear in both the live app AND the HTML export.
 
 ### Charts
 
 ```python
 # Line / Bar / Area / Scatter charts
-sx.st_line_chart(data, x="col_x", y="col_y")
-sx.st_bar_chart(data, x="Category", y="Value")
-sx.st_area_chart(data)
-sx.st_scatter_chart(data, x="x", y="y")
+stx.st_line_chart(data, x="col_x", y="col_y")
+stx.st_bar_chart(data, x="Category", y="Value")
+stx.st_area_chart(data)
+stx.st_scatter_chart(data, x="x", y="y")
 ```
 
 ### Tables & Data
 
 ```python
 # Interactive table (sortable)
-sx.st_dataframe(df, use_container_width=True)
+stx.st_dataframe(df, use_container_width=True)
 
 # Static table
-sx.st_table(data)
+stx.st_table(data)
 
 # JSON viewer
-sx.st_json({"key": "value"})
+stx.st_json({"key": "value"})
 
 # Metric
-sx.st_metric("Revenue", "$1M", delta="+5%")
+stx.st_metric("Revenue", "$1M", delta="+5%")
 ```
 
 ### Diagrams & Media
 
 ```python
 # Graphviz (DOT language)
-sx.st_graphviz('digraph { A -> B -> C }')
+stx.st_graphviz('digraph { A -> B -> C }')
 
 # Audio
-sx.st_audio("path/to/audio.wav", format="audio/wav")
+stx.st_audio("path/to/audio.wav", format="audio/wav")
 
 # Video (local or YouTube)
-sx.st_video("path/to/video.mp4")
-sx.st_video("https://www.youtube.com/watch?v=...")
+stx.st_video("path/to/video.mp4")
+stx.st_video("https://www.youtube.com/watch?v=...")
 ```
 
 ### Generic Fallback
 
 ```python
 # For any widget not covered above
-with sx.st_export('<p>Fallback HTML for export</p>'):
+with stx.st_export('<p>Fallback HTML for export</p>'):
     st.plotly_chart(fig)
 ```
 
@@ -342,6 +342,27 @@ def build():
 
     return html
 ```
+
+## 🧩 Composite Blocks (Atomic Sub-blocks)
+
+```python
+# Composite block: loads atomic sub-blocks from _atomic/ subfolder
+import streamtex as stx
+from streamtex import st_include
+
+bck_text_basics = stx.load_atomic_block("bck_text_basics", __file__)
+bck_text_styles = stx.load_atomic_block("bck_text_styles", __file__)
+
+class BlockStyles:
+    pass
+
+def build():
+    st_include(bck_text_basics)
+    st_include(bck_text_styles)
+```
+
+- `load_atomic_block(name, __file__)` loads `_atomic/{name}.py` relative to caller
+- Raises `BlockNotFoundError` / `BlockImportError` on failure
 
 ## 📌 Important Notes
 

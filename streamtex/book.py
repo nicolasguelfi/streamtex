@@ -19,6 +19,9 @@ from .utils import inject_link_preview_scaffold
 from .zoom import add_zoom_options
 from .export import ExportConfig, reset_export_buffer, generate_export_html, is_export_active
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConfig = None, separator=None,
             export: bool = True, export_title: str = "StreamTeX Export",
@@ -51,7 +54,7 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
         return
 
     start_time = time.time()
-    print("Starting st_book function...")
+    logger.debug("Starting st_book function...")
 
     # Initialise the export buffer (no-op if export=False)
     reset_export_buffer(ExportConfig(enabled=export, page_title=export_title))
@@ -134,7 +137,7 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
 
     end_time = time.time()
     duration = end_time - start_time
-    print(f"st_book function completed in {duration:.2f} seconds.")
+    logger.debug("st_book function completed in %.2f seconds.", duration)
 
 
 def load_css(file_name: str):
@@ -143,7 +146,7 @@ def load_css(file_name: str):
         with resources.open_text('streamtex.static', file_name) as f:
             st.html(f'<style>{f.read()}</style>')
     except (FileNotFoundError, ModuleNotFoundError, TypeError) as e:
-        print(f"[StreamTeX] CSS resource fallback for '{file_name}': {e}")
+        logger.debug("[StreamTeX] CSS resource fallback for '%s': %s", file_name, e)
         current_dir = os.path.dirname(__file__)
         static_dir = os.path.join(current_dir, 'static')
         css_file_path = os.path.join(static_dir, file_name)
@@ -670,7 +673,7 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
                     export, export_title, monties_color, *args, **kwargs):
     """Paginated rendering — only renders one block per rerun."""
     start_time = time.time()
-    print("Starting st_book (paginated)...")
+    logger.debug("Starting st_book (paginated)...")
 
     total = len(module_list)
     if total == 0:
@@ -821,5 +824,5 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
                 )
 
     end_time = time.time()
-    print(f"st_book (paginated) completed in {end_time - start_time:.2f}s "
-          f"[page {current_page + 1}/{total}]")
+    logger.debug("st_book (paginated) completed in %.2fs [page %d/%d]",
+                 end_time - start_time, current_page + 1, total)

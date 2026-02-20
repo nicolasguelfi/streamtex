@@ -14,7 +14,7 @@ def st_space(direction: Literal["v", "h"] = "v", size="1em") -> str:
     - Vertical spacing is implemented using `padding-top` and horizontal spacing uses `padding-left`.
     """
     # Convert integer size to em-based string
-    if type(size) is int:
+    if isinstance(size, int):
         size = str(size) + "em"
 
     # Return appropriate HTML based on orientation
@@ -27,6 +27,7 @@ def st_space(direction: Literal["v", "h"] = "v", size="1em") -> str:
     
     _render(space_tag)
 
-def st_br():
-   
-   return st_space("v", 0)
+def st_br(count: int = 1):
+    """Add vertical line breaks. count=1 adds one <br>, count=2 adds two, etc."""
+    html = "<br>" * max(1, count)
+    _render(html)

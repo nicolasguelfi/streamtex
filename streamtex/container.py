@@ -15,14 +15,6 @@ def st_block(style: Style = StreamTeX_Styles.none, _export_wrapper: bool = True)
     # We use the :has() selector or adjacent sibling combinators to target the container
     css = f"""
     <style>
-        {f'''
-        div:has(> .stVerticalBlock > .element-container > .stHtml > span.{block_id}) {{
-            height: 100%;
-            flex-direction: row;
-
-        }}
-        ''' if False else ""}
-
         /* Target the specific container wrapper */
         div:has(> .element-container > .stHtml > span.{block_id}) {{
             {str(style)}

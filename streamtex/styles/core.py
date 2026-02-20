@@ -176,8 +176,8 @@ class ListStyle(Style):
 class StyleGrid:
     """Defines a grid of styles applied to the rows/columns of a table or grid."""
 
-    def __init__(self, css_grid: List[List[Style]] = []):
-        self.css_grid = css_grid
+    def __init__(self, css_grid: Optional[List[List[Style]]] = None):
+        self.css_grid = css_grid if css_grid is not None else []
 
     def __add__(self, other):
         if isinstance(other, StyleGrid):

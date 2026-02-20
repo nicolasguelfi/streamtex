@@ -202,3 +202,135 @@ uv run pytest tests/test_export.py -v
 # Watch mode (requires pytest-watch)
 uv run pytest-watch tests/
 ```
+
+## 13. Block Registry Patterns
+
+StreamTeX provides two registries for lazy-loading blocks.
+
+### ProjectBlockRegistry — Single project (local blocks/)
+
+Used in every project's `blocks/__init__.py` for local block discovery:
+
+```python
+# blocks/__init__.py
+from pathlib import Path
+from streamtex import ProjectBlockRegistry
+
+registry = ProjectBlockRegistry(Path(__file__).parent)
+
+def __getattr__(name: str):
+    return registry.get(name)
+
+def __dir__():
+    return sorted(registry.list_blocks())
+```
+
+Features: `registry.list_blocks()`, `registry.get_stats()`, `registry.load_all()`,
+manifest-based discovery, block type detection (atomic vs composite).
+
+### LazyBlockRegistry — Multi-source (shared blocks)
+
+Used in `book.py` to load blocks from external directories:
+
+```python
+# book.py
+import streamtex as sx
+from pathlib import Path
+
+shared_path = str(Path(__file__).parent.parent / "shared-blocks" / "blocks")
+shared_blocks = sx.LazyBlockRegistry([shared_path])
+
+st_book([
+    shared_blocks.bck_header,    # From shared-blocks
+    blocks.bck_content,          # From local blocks/
+    shared_blocks.bck_footer,    # From shared-blocks
+])
+```
+
+Priority: first source directory in the list wins. Once loaded, blocks are cached.
+
+### When to use which?
+
+| Use Case | Registry |
+|----------|----------|
+| Local blocks (blocks/) | `ProjectBlockRegistry` |
+| Shared blocks from other dirs | `LazyBlockRegistry` |
+| Both in same project | One of each (see test_project_advanced) |
+
+## 14. Hybrid Helper Patterns
+
+Block helpers (`show_code`, `show_explanation`, `show_details`) support 3 usage modes.
+
+### Mode 1: Config Injection (Recommended)
+
+```python
+# blocks/helpers.py — inject project styles globally
+from streamtex import BlockHelperConfig, set_block_helper_config
+from custom.styles import Styles as s
+
+class ProjectBlockHelperConfig(BlockHelperConfig):
+    def get_code_style(self):
+        return s.project.containers.code_box
+    def get_explanation_style(self):
+        return s.project.containers.info_box
+
+set_block_helper_config(ProjectBlockHelperConfig())
+```
+
+All `show_code()` calls in the project automatically use the injected style.
+
+### Mode 2: Standalone Functions
+
+```python
+from streamtex import show_code
+show_code("print('hello')")           # Uses injected config style
+show_code("print('hello')", style=s)  # Override with explicit style
+```
+
+### Mode 3: OOP Inheritance
+
+```python
+from streamtex import BlockHelper
+
+class ProjectBlockHelper(BlockHelper):
+    def show_comparison(self, before, after):
+        # Custom method unique to this project
+        self.show_code(before, style=s.before_style)
+        self.show_code(after, style=s.after_style)
+
+helper = ProjectBlockHelper()
+helper.show_comparison(old_code, new_code)
+```
+
+### When to use which mode?
+
+| User Level | Mode | Complexity |
+|------------|------|------------|
+| Beginner | Standalone functions | Minimal |
+| Intermediate | Config Injection (DI) | One-time setup |
+| Advanced | OOP Inheritance | Full customization |
+
+## 15. Multi-Source Block & Static Resolution
+
+### Block resolution
+
+`LazyBlockRegistry([path1, path2])` searches sources in order. First match wins.
+Use this for override patterns: project-specific blocks take priority over shared ones.
+
+### Static asset resolution
+
+```python
+import streamtex as sx
+from pathlib import Path
+
+sx.set_static_sources([
+    str(Path(__file__).parent / "static"),          # Local (highest priority)
+    str(Path(__file__).parent.parent / "shared-blocks" / "static"),  # Shared
+])
+
+# resolve_static("logo.png") searches each source in order
+# st_image() calls resolve_static() internally
+```
+
+Priority: first directory containing the file wins. If not found, falls back to
+Streamlit's built-in `app/static/images/` path.

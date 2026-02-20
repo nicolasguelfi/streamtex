@@ -93,7 +93,12 @@ class TOCRegistry:
         
     @staticmethod
     def get_key_anchor(title: str):
-        return title.replace('.', '-').replace(' ', '-').lower()
+        import re
+        # Replace dots and common punctuation with hyphens
+        slug = re.sub(r'[.\'"!?@#$%^&*()+=\[\]{}|\\/<>,;:~`]', '-', title.lower())
+        # Collapse whitespace and hyphens into single hyphens
+        slug = re.sub(r'[-\s]+', '-', slug).strip('-')
+        return slug or 'section'
     
 toc: Optional[TOCRegistry] = None
 '''The global ToC Registry.'''

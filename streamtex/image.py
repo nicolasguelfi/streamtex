@@ -50,19 +50,26 @@ def st_image(
     # 2. Get the source (URL or Base64)
     img_src = get_image_src(uri)
 
-    # 3. Construct the CSS style string
-    # We add 'display: block' to ensure the image behaves correctly in the layout 
-    # and doesn't have inline line-height gaps.
-    # We allow the passed 'style' to override or add to this.
+    # 3. Show placeholder if image not found
+    if not img_src:
+        placeholder = (
+            f'<div style="border:2px dashed #888;padding:16px;text-align:center;'
+            f'color:#888;border-radius:4px;margin:8px 0;">'
+            f'Image not found: {uri}</div>'
+        )
+        _render(placeholder)
+        return
+
+    # 4. Construct the CSS style string
     css_style = f"{str(style)} width: {width}; height: {height};"
 
-    # 4. Construct the HTML
+    # 5. Construct the HTML
     html_content = f'<img src="{img_src}" alt="{alt}" style="{css_style}">'
     
-    # 5. Handle Link Wrapping
+    # 6. Handle Link Wrapping
     html_content = contain_link(html_content, link, False, hover)
 
-    # 6. Render
+    # 7. Render
     _render(html_content)
 
 def get_image_src(uri: str) -> str:

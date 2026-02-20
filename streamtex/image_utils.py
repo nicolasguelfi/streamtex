@@ -2,6 +2,9 @@
 
 import os
 import base64
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def _is_url(path: str):
@@ -21,15 +24,19 @@ def _is_relative_path(path: str):
 
 def _get_mime_type(file_path: str):
     """Determine the MIME type based on the file extension."""
-    extension = file_path.lower().split('.')[-1]
-    if extension == "png":
-        return "image/png"
-    elif extension in ["jpg", "jpeg"]:
-        return "image/jpeg"
-    elif extension == "gif":
-        return "image/gif"
-    else:
-        return None
+    import mimetypes
+    mime, _ = mimetypes.guess_type(file_path)
+    if mime and mime.startswith('image/'):
+        return mime
+    # Fallback for common types not in mimetypes DB
+    ext = file_path.lower().rsplit('.', 1)[-1] if '.' in file_path else ''
+    fallback = {
+        'svg': 'image/svg+xml',
+        'webp': 'image/webp',
+        'bmp': 'image/bmp',
+        'ico': 'image/x-icon',
+    }
+    return fallback.get(ext)
 
 
 def _get_base64_encoded_image(file_path: str):
@@ -38,5 +45,5 @@ def _get_base64_encoded_image(file_path: str):
         with open(file_path, "rb") as image_file:
             return base64.b64encode(image_file.read()).decode('utf-8')
     except Exception as e:
-        print(f"Error reading file {file_path}: {e}")
+        logger.warning("Error reading file %s: %s", file_path, e)
         return None

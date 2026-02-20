@@ -51,9 +51,8 @@ def inject_zoom_logic(zoom_setting):
     parent.document).
     """
 
-    # Constants — 17 in × 72 pt/in = 1224 pt ; 0.5 in × 72 = 36 pt
-    PAGE_WIDTH = "1224pt"
-    PAGE_PADDING = "36pt"
+    # Constants — centralized in streamtex.constants
+    from .constants import PAGE_WIDTH, PAGE_PADDING
 
     # --- CSS ---------------------------------------------------------------
     css = f"""

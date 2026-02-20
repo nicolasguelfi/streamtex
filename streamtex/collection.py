@@ -75,7 +75,13 @@ class CollectionConfig:
             raise FileNotFoundError(f"collection.toml not found at {path}")
 
         with open(path, "rb") as f:
-            data = tomllib.load(f)
+            try:
+                data = tomllib.load(f)
+            except Exception as e:
+                raise ValueError(
+                    f"Failed to parse collection TOML at {path}: {e}\n"
+                    f"Check TOML syntax at https://toml.io"
+                ) from e
 
         # Parse collection metadata
         collection_data = data.get("collection", {})
@@ -98,10 +104,11 @@ class CollectionConfig:
             config.projects[project_key] = project
 
         # Sort projects by order
+        # Stable sort: order first, then key as tiebreaker
         config.projects = dict(
             sorted(
                 config.projects.items(),
-                key=lambda item: item[1].order,
+                key=lambda item: (item[1].order, item[0]),
             )
         )
 

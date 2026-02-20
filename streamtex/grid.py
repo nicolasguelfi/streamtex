@@ -74,9 +74,10 @@ class GridController:
 
 @contextmanager
 def st_grid(
-    cols: str | int = 2, 
-    grid_style: Style = StreamTeX_Styles.none, 
+    cols: str | int = 2,
+    grid_style: Style = StreamTeX_Styles.none,
     cell_styles: CELL_STYLES_TYPE = StreamTeX_Styles.none,
+    gap: str = None,
 ):
     """
     A context manager representing a grid layout with customizable styles for the grid and individual cells.
@@ -119,11 +120,16 @@ def st_grid(
     
     # 1. Generate ID
     grid_id = generate_key("css-grid")
-    
+
     # 2. Convert int cols to str if needed
     template = cols
     if isinstance(cols, int):
         template = " ".join(["1fr"]*cols)
+    elif isinstance(cols, str) and not cols.strip():
+        raise ValueError("st_grid cols parameter cannot be empty string")
+
+    # 2b. Resolve gap value (explicit gap parameter takes priority over grid_style)
+    gap_value = gap if gap else "0"
     
     
     # 3. Inject CSS
@@ -135,7 +141,7 @@ def st_grid(
         div[data-testid="stVerticalBlock"]:has(> .element-container .stHtml span.{grid_id}) {{
             display: grid;
             grid-template-columns: {template};
-            gap: 0;
+            gap: {gap_value};
             align-items: stretch; /* Ensures equal height cells */
         }}
         
@@ -167,7 +173,7 @@ def st_grid(
     # 4. Export wrapper (no-op when export is inactive)
     if is_export_active():
         export_push_wrapper(
-            f'<div style="display:grid;grid-template-columns:{template};gap:0;align-items:stretch;{grid_style}">')
+            f'<div style="display:grid;grid-template-columns:{template};gap:{gap_value};align-items:stretch;{grid_style}">')
 
     # 5. Render
     with st.container():

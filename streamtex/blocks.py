@@ -93,6 +93,20 @@ class LazyBlockRegistry:
         self._not_found.add(block_name)
         raise AttributeError(f"Block '{block_name}' not found in sources: {self.sources}")
 
+    def list_blocks(self) -> list:
+        """List all discoverable block names across all sources."""
+        blocks = set()
+        for source_dir in self.sources:
+            if os.path.isdir(source_dir):
+                for f in os.listdir(source_dir):
+                    if f.startswith("bck_") and f.endswith(".py"):
+                        blocks.add(f[:-3])  # Remove .py
+        return sorted(blocks)
+
+    def get(self, block_name: str):
+        """Get a block by name. Same as attribute access but explicit."""
+        return getattr(self, block_name)
+
     def __repr__(self) -> str:
         return f"LazyBlockRegistry(sources={self.sources}, cached={len(self._cache)})"
 

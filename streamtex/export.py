@@ -18,13 +18,16 @@ import streamlit as st
 # Configuration
 # ---------------------------------------------------------------------------
 
+from .constants import PAGE_WIDTH, PAGE_PADDING
+
+
 @dataclass
 class ExportConfig:
     """Settings for the HTML export feature."""
     enabled: bool = False
     page_title: str = "StreamTeX Export"
-    page_width: str = "1224pt"
-    page_padding: str = "36pt"
+    page_width: str = PAGE_WIDTH
+    page_padding: str = PAGE_PADDING
 
 
 # ---------------------------------------------------------------------------

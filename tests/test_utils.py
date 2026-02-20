@@ -115,5 +115,14 @@ class TestMimeType:
     def test_gif(self):
         assert get_mime_type("anim.gif") == "image/gif"
 
+    def test_bmp(self):
+        assert get_mime_type("file.bmp") == "image/bmp"
+
+    def test_svg(self):
+        assert get_mime_type("icon.svg") == "image/svg+xml"
+
+    def test_webp(self):
+        assert get_mime_type("photo.webp") == "image/webp"
+
     def test_unsupported(self):
-        assert get_mime_type("file.bmp") is None
+        assert get_mime_type("file.xyz") is None

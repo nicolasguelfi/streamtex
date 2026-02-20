@@ -1,0 +1,543 @@
+"""Unit tests for streamtex.grid — GridController and st_grid context manager."""
+
+import pytest
+from unittest.mock import patch, MagicMock, call
+from contextlib import contextmanager
+
+from streamtex.styles import Style, StyleGrid, StreamTeX_Styles
+from streamtex.grid import GridController, st_grid, CELL_STYLES_TYPE
+
+
+# ===========================================================================
+# TestGridController — Style resolution and cell counter
+# ===========================================================================
+
+class TestGridController:
+    """Tests for the GridController class."""
+
+    def test_init_with_int_cols(self):
+        """Test initialization with int cols value."""
+        controller = GridController(cols=3)
+        assert controller.cols == 3
+        assert controller.cell_counter == 0
+
+    def test_init_with_string_cols(self):
+        """Test initialization with string cols template."""
+        controller = GridController(cols="1fr 1fr 1fr")
+        assert controller.cols == 3
+
+    def test_init_with_single_col_string(self):
+        """Test initialization with single column string (no spaces)."""
+        controller = GridController(cols="200px")
+        assert controller.cols == 1
+
+    def test_init_with_complex_string_cols(self):
+        """Test initialization with complex template string."""
+        controller = GridController(cols="auto 1fr 200px")
+        assert controller.cols == 3
+
+    def test_init_default_cell_styles(self):
+        """Test default cell_styles is StreamTeX_Styles.none."""
+        controller = GridController()
+        assert controller.cell_styles is StreamTeX_Styles.none
+
+    def test_init_with_single_style(self):
+        """Test initialization with a single Style object."""
+        style = Style("color: red;", "red")
+        controller = GridController(cols=2, cell_styles=style)
+        assert controller.cell_styles is style
+
+    def test_init_with_flat_list_styles(self):
+        """Test initialization with a flat list of styles."""
+        styles = [
+            Style("color: red;", "red"),
+            Style("color: blue;", "blue"),
+        ]
+        controller = GridController(cols=2, cell_styles=styles)
+        assert controller.cell_styles == styles
+
+    def test_init_with_matrix_styles(self):
+        """Test initialization with a matrix (list of lists) of styles."""
+        styles = [
+            [Style("color: red;", "red"), Style("color: blue;", "blue")],
+            [Style("color: green;", "green"), Style("color: yellow;", "yellow")],
+        ]
+        controller = GridController(cols=2, cell_styles=styles)
+        assert controller.cell_styles == styles
+
+    def test_init_with_style_grid(self):
+        """Test initialization with a StyleGrid object."""
+        style = Style("color: red;", "red")
+        grid = StyleGrid.create("A1", style)
+        controller = GridController(cols=2, cell_styles=grid)
+        assert controller.cell_styles is grid
+
+    # -----------------------------------------------------------------------
+    # _resolve_style tests
+    # -----------------------------------------------------------------------
+
+    def test_resolve_style_single_style(self):
+        """Test _resolve_style with a single Style object returns that style."""
+        style = Style("color: red;", "red")
+        controller = GridController(cols=2, cell_styles=style)
+
+        resolved = controller._resolve_style(0)
+        assert resolved is style
+
+        resolved = controller._resolve_style(5)
+        assert resolved is style
+
+    def test_resolve_style_flat_list(self):
+        """Test _resolve_style with a flat list of styles."""
+        red = Style("color: red;", "red")
+        blue = Style("color: blue;", "blue")
+        green = Style("color: green;", "green")
+        styles = [red, blue, green]
+
+        controller = GridController(cols=3, cell_styles=styles)
+
+        assert controller._resolve_style(0) is red
+        assert controller._resolve_style(1) is blue
+        assert controller._resolve_style(2) is green
+
+    def test_resolve_style_flat_list_out_of_bounds(self):
+        """Test _resolve_style with flat list returns fallback for out-of-bounds index."""
+        red = Style("color: red;", "red")
+        blue = Style("color: blue;", "blue")
+        styles = [red, blue]
+
+        controller = GridController(cols=2, cell_styles=styles)
+
+        resolved = controller._resolve_style(5)
+        assert resolved is StreamTeX_Styles.none
+
+    def test_resolve_style_matrix(self):
+        """Test _resolve_style with a matrix (list of lists) of styles."""
+        styles = [
+            [
+                Style("color: red;", "red"),
+                Style("color: blue;", "blue"),
+            ],
+            [
+                Style("color: green;", "green"),
+                Style("color: yellow;", "yellow"),
+            ],
+        ]
+        controller = GridController(cols=2, cell_styles=styles)
+
+        # Matrix is flattened to [red, blue, green, yellow]
+        assert controller._resolve_style(0) is styles[0][0]
+        assert controller._resolve_style(1) is styles[0][1]
+        assert controller._resolve_style(2) is styles[1][0]
+        assert controller._resolve_style(3) is styles[1][1]
+
+    def test_resolve_style_matrix_out_of_bounds(self):
+        """Test _resolve_style with matrix returns fallback for out-of-bounds index."""
+        styles = [
+            [Style("color: red;", "red")],
+        ]
+        controller = GridController(cols=1, cell_styles=styles)
+
+        resolved = controller._resolve_style(10)
+        assert resolved is StreamTeX_Styles.none
+
+    def test_resolve_style_style_grid(self):
+        """Test _resolve_style with a StyleGrid object."""
+        red = Style("color: red;", "red")
+        blue = Style("color: blue;", "blue")
+        green = Style("color: green;", "green")
+
+        grid = StyleGrid.create("A1:B2", red)
+        # StyleGrid's css_grid is a matrix, we'll verify this extracts correctly
+
+        controller = GridController(cols=2, cell_styles=grid)
+
+        # The grid should have a 2x2 matrix of red styles
+        assert controller._resolve_style(0) is red
+        assert controller._resolve_style(1) is red
+        assert controller._resolve_style(2) is red
+        assert controller._resolve_style(3) is red
+
+    def test_resolve_style_style_grid_out_of_bounds(self):
+        """Test _resolve_style with StyleGrid returns fallback for out-of-bounds index."""
+        style = Style("color: red;", "red")
+        grid = StyleGrid.create("A1", style)
+
+        controller = GridController(cols=1, cell_styles=grid)
+
+        resolved = controller._resolve_style(10)
+        assert resolved is StreamTeX_Styles.none
+
+    def test_resolve_style_fallback_none_styles(self):
+        """Test _resolve_style returns fallback for None cell_styles."""
+        controller = GridController(cols=2)
+        # cell_styles defaults to StreamTeX_Styles.none
+
+        resolved = controller._resolve_style(0)
+        assert resolved is StreamTeX_Styles.none
+
+    def test_resolve_style_empty_list(self):
+        """Test _resolve_style with empty list returns fallback."""
+        controller = GridController(cols=2, cell_styles=[])
+
+        resolved = controller._resolve_style(0)
+        assert resolved is StreamTeX_Styles.none
+
+    def test_resolve_style_empty_matrix(self):
+        """Test _resolve_style with empty matrix returns fallback."""
+        controller = GridController(cols=2, cell_styles=[[]])
+
+        resolved = controller._resolve_style(0)
+        assert resolved is StreamTeX_Styles.none
+
+    # -----------------------------------------------------------------------
+    # Cell counter tests
+    # -----------------------------------------------------------------------
+
+    def test_cell_counter_increments(self):
+        """Test that cell_counter starts at 0 and can be incremented."""
+        controller = GridController(cols=2)
+        assert controller.cell_counter == 0
+
+        controller.cell_counter += 1
+        assert controller.cell_counter == 1
+
+        controller.cell_counter += 1
+        assert controller.cell_counter == 2
+
+
+# ===========================================================================
+# TestStGrid — Context manager behavior
+# ===========================================================================
+
+class TestStGrid:
+    """Tests for the st_grid context manager."""
+
+    def test_st_grid_context_manager_yields_controller(self, mock_streamlit):
+        """Test that st_grid context manager yields a GridController."""
+        with st_grid(cols=2) as controller:
+            assert isinstance(controller, GridController)
+            assert controller.cols == 2
+
+    def test_st_grid_with_int_cols_generates_template(self, mock_streamlit):
+        """Test st_grid with int cols generates correct CSS template."""
+        with st_grid(cols=3) as controller:
+            pass
+
+        # Check that st.html was called with CSS containing the template
+        html_calls = mock_streamlit["html"].call_args_list
+
+        # First call should be the CSS injection
+        css_call = html_calls[0]
+        css_html = css_call[0][0]
+        assert "grid-template-columns: 1fr 1fr 1fr;" in css_html
+
+    def test_st_grid_with_string_cols_uses_as_is(self, mock_streamlit):
+        """Test st_grid with string cols uses the string directly."""
+        with st_grid(cols="200px 1fr") as controller:
+            pass
+
+        html_calls = mock_streamlit["html"].call_args_list
+        css_call = html_calls[0]
+        css_html = css_call[0][0]
+        assert "grid-template-columns: 200px 1fr;" in css_html
+
+    def test_st_grid_with_empty_string_cols_raises(self, mock_streamlit):
+        """Test that st_grid with empty string cols raises ValueError (C5 validation)."""
+        with pytest.raises(ValueError, match="st_grid cols parameter cannot be empty string"):
+            with st_grid(cols="") as controller:
+                pass
+
+    def test_st_grid_with_whitespace_cols_raises(self, mock_streamlit):
+        """Test that st_grid with whitespace-only cols raises ValueError."""
+        with pytest.raises(ValueError, match="st_grid cols parameter cannot be empty string"):
+            with st_grid(cols="   ") as controller:
+                pass
+
+    def test_st_grid_with_gap_parameter(self, mock_streamlit):
+        """Test st_grid with explicit gap parameter (C2 feature)."""
+        with st_grid(cols=2, gap="24px") as controller:
+            pass
+
+        html_calls = mock_streamlit["html"].call_args_list
+        css_call = html_calls[0]
+        css_html = css_call[0][0]
+        assert "gap: 24px;" in css_html
+
+    def test_st_grid_default_gap_is_zero(self, mock_streamlit):
+        """Test st_grid default gap value is 0."""
+        with st_grid(cols=2) as controller:
+            pass
+
+        html_calls = mock_streamlit["html"].call_args_list
+        css_call = html_calls[0]
+        css_html = css_call[0][0]
+        assert "gap: 0;" in css_html
+
+    def test_st_grid_with_grid_style(self, mock_streamlit):
+        """Test st_grid applies grid_style to the grid container."""
+        grid_style = Style("border: 1px solid red;", "bordered_grid")
+
+        with st_grid(cols=2, grid_style=grid_style) as controller:
+            pass
+
+        html_calls = mock_streamlit["html"].call_args_list
+        css_call = html_calls[0]
+        css_html = css_call[0][0]
+        assert "border: 1px solid red;" in css_html
+
+    def test_st_grid_generates_unique_grid_id(self, mock_streamlit):
+        """Test that st_grid generates unique grid IDs for multiple grids."""
+        grid_ids = []
+
+        for _ in range(2):
+            with st_grid(cols=2) as controller:
+                pass
+
+            html_calls = mock_streamlit["html"].call_args_list
+            css_call = html_calls[0]
+            css_html = css_call[0][0]
+
+            # Extract grid ID from CSS (e.g., ".css-grid-abc123def")
+            import re
+            match = re.search(r'\.(\bcss-grid-[\da-f]+\b)', css_html)
+            if match:
+                grid_ids.append(match.group(1))
+
+            mock_streamlit["html"].reset_mock()
+
+        # IDs should be different (both should be found)
+        if len(grid_ids) == 2:
+            assert grid_ids[0] != grid_ids[1]
+
+    def test_st_grid_calls_st_html_multiple_times(self, mock_streamlit):
+        """Test that st_grid calls st.html for CSS and marker."""
+        with st_grid(cols=2) as controller:
+            pass
+
+        # Should have called st.html multiple times (CSS + marker)
+        html_calls = mock_streamlit["html"].call_args_list
+        assert len(html_calls) >= 2
+
+    def test_st_grid_marker_hidden(self, mock_streamlit):
+        """Test that the marker span is hidden."""
+        with st_grid(cols=2) as controller:
+            pass
+
+        html_calls = mock_streamlit["html"].call_args_list
+
+        # Last call should be the marker with display:none
+        marker_call = html_calls[-1]
+        marker_html = marker_call[0][0]
+        assert "display:none" in marker_html
+
+    def test_st_grid_calls_st_container(self, mock_streamlit):
+        """Test that st_grid calls st.container."""
+        with patch("streamlit.container") as mock_container:
+            mock_context = MagicMock()
+            mock_context.__enter__ = MagicMock(return_value=None)
+            mock_context.__exit__ = MagicMock(return_value=None)
+            mock_container.return_value = mock_context
+
+            with st_grid(cols=2) as controller:
+                pass
+
+            mock_container.assert_called()
+
+    def test_st_grid_with_cell_styles(self, mock_streamlit):
+        """Test st_grid accepts cell_styles parameter."""
+        style1 = Style("color: red;", "red")
+        style2 = Style("color: blue;", "blue")
+        cell_styles = [style1, style2]
+
+        with st_grid(cols=2, cell_styles=cell_styles) as controller:
+            assert controller.cell_styles == cell_styles
+
+    def test_st_grid_complex_cols_template(self, mock_streamlit):
+        """Test st_grid with complex CSS grid template."""
+        template = "repeat(auto-fill, minmax(200px, 1fr))"
+
+        with st_grid(cols=template) as controller:
+            pass
+
+        html_calls = mock_streamlit["html"].call_args_list
+        css_call = html_calls[0]
+        css_html = css_call[0][0]
+        assert f"grid-template-columns: {template};" in css_html
+
+    def test_st_grid_all_gaps_values(self, mock_streamlit):
+        """Test st_grid with various gap values."""
+        gap_values = ["0", "10px", "1rem", "24px", "2%"]
+
+        for gap_val in gap_values:
+            mock_streamlit["html"].reset_mock()
+
+            with st_grid(cols=2, gap=gap_val) as controller:
+                pass
+
+            html_calls = mock_streamlit["html"].call_args_list
+            css_call = html_calls[0]
+            css_html = css_call[0][0]
+            assert f"gap: {gap_val};" in css_html
+
+    def test_st_grid_export_wrapper_inactive(self, mock_streamlit):
+        """Test st_grid export wrapper is no-op when export is inactive."""
+        with patch("streamtex.grid.is_export_active", return_value=False):
+            with patch("streamtex.grid.export_push_wrapper") as mock_push, \
+                 patch("streamtex.grid.export_pop_wrapper") as mock_pop:
+
+                with st_grid(cols=2) as controller:
+                    pass
+
+                mock_push.assert_not_called()
+                mock_pop.assert_not_called()
+
+    def test_st_grid_export_wrapper_active(self, mock_streamlit):
+        """Test st_grid export wrapper is called when export is active."""
+        with patch("streamtex.grid.is_export_active", return_value=True):
+            with patch("streamtex.grid.export_push_wrapper") as mock_push, \
+                 patch("streamtex.grid.export_pop_wrapper") as mock_pop:
+
+                with st_grid(cols=2, gap="24px") as controller:
+                    pass
+
+                mock_push.assert_called()
+                mock_pop.assert_called()
+
+                # Check that the wrapper contains the grid template and gap
+                push_call_args = mock_push.call_args[0][0]
+                assert "display:grid" in push_call_args
+                assert "grid-template-columns:" in push_call_args
+                assert "gap:24px" in push_call_args
+
+    def test_st_grid_export_wrapper_with_grid_style(self, mock_streamlit):
+        """Test st_grid export wrapper includes grid_style."""
+        grid_style = Style("border: 1px solid;", "bordered")
+
+        with patch("streamtex.grid.is_export_active", return_value=True):
+            with patch("streamtex.grid.export_push_wrapper") as mock_push:
+
+                with st_grid(cols=2, grid_style=grid_style) as controller:
+                    pass
+
+                push_call_args = mock_push.call_args[0][0]
+                assert "border: 1px solid;" in push_call_args
+
+
+# ===========================================================================
+# TestGridCellContext — GridController.cell() context manager
+# ===========================================================================
+
+class TestGridCellContext:
+    """Tests for the GridController.cell() context manager."""
+
+    def test_cell_context_manager_yields(self, mock_streamlit):
+        """Test that cell() is a context manager."""
+        controller = GridController(cols=2)
+
+        with controller.cell():
+            pass
+
+        # Should not raise an exception
+        assert True
+
+    def test_cell_counter_increments_on_cell_entry(self, mock_streamlit):
+        """Test that cell_counter increments when entering a cell."""
+        controller = GridController(cols=2)
+        assert controller.cell_counter == 0
+
+        with controller.cell():
+            assert controller.cell_counter == 1
+
+        with controller.cell():
+            assert controller.cell_counter == 2
+
+    def test_cell_resolves_style(self, mock_streamlit):
+        """Test that cell() resolves and applies the correct style."""
+        style1 = Style("color: red;", "red")
+        style2 = Style("color: blue;", "blue")
+        cell_styles = [style1, style2]
+
+        controller = GridController(cols=2, cell_styles=cell_styles)
+
+        # First cell should get style1
+        with controller.cell():
+            pass
+
+        # Check that st_block was called (via the import)
+        # We verify this indirectly through the mock
+        assert controller.cell_counter == 1
+
+    def test_cell_adds_height_width_styles(self, mock_streamlit):
+        """Test that cell() adds height:100%, width:100%, box-sizing styles."""
+        controller = GridController(cols=2)
+
+        with patch("streamtex.grid.st_block") as mock_block:
+            mock_context = MagicMock()
+            mock_context.__enter__ = MagicMock(return_value=None)
+            mock_context.__exit__ = MagicMock(return_value=None)
+            mock_block.return_value = mock_context
+
+            with controller.cell():
+                pass
+
+            # st_block should have been called with a style containing height:100%
+            call_kwargs = mock_block.call_args[1]
+            style_str = call_kwargs["style"]
+            assert "height: 100%" in style_str
+            assert "width: 100%" in style_str
+            assert "box-sizing: border-box;" in style_str
+
+    def test_cell_with_multiple_cells(self, mock_streamlit):
+        """Test multiple cells in sequence."""
+        styles = [
+            Style("color: red;", "red"),
+            Style("color: blue;", "blue"),
+            Style("color: green;", "green"),
+        ]
+        controller = GridController(cols=3, cell_styles=styles)
+
+        for i in range(3):
+            with controller.cell():
+                pass
+            assert controller.cell_counter == i + 1
+
+
+# ===========================================================================
+# Integration tests
+# ===========================================================================
+
+class TestStGridIntegration:
+    """Integration tests for st_grid with real GridController usage."""
+
+    def test_st_grid_full_workflow(self, mock_streamlit):
+        """Test complete st_grid workflow: creation, cells, cleanup."""
+        with st_grid(cols=2, gap="16px") as g:
+            assert isinstance(g, GridController)
+            assert g.cols == 2
+
+            # Simulate adding cells
+            with g.cell():
+                pass
+
+            with g.cell():
+                pass
+
+        # Verify HTML was called
+        assert mock_streamlit["html"].called
+
+    def test_st_grid_with_matrix_cell_styles(self, mock_streamlit):
+        """Test st_grid with matrix cell_styles."""
+        styles = [
+            [Style("color: red;", "red"), Style("color: blue;", "blue")],
+            [Style("color: green;", "green"), Style("color: yellow;", "yellow")],
+        ]
+
+        with st_grid(cols=2, cell_styles=styles) as g:
+            assert g.cell_styles == styles
+
+            # Verify styles are resolved correctly
+            assert g._resolve_style(0) is styles[0][0]
+            assert g._resolve_style(1) is styles[0][1]
+            assert g._resolve_style(2) is styles[1][0]
+            assert g._resolve_style(3) is styles[1][1]

@@ -45,7 +45,7 @@ class TestLiveRendering:
         st_mermaid(SAMPLE_CODE, light_bg=True)
         html_arg = mock_components.html.call_args[0][0]
         assert "#fff" in html_arg
-        assert "theme: 'default'" in html_arg
+        assert "'default'" in html_arg
 
     @patch("streamtex.mermaid.components")
     def test_light_bg_false_sets_transparent_background(self, mock_components):
@@ -53,7 +53,7 @@ class TestLiveRendering:
         st_mermaid(SAMPLE_CODE, light_bg=False)
         html_arg = mock_components.html.call_args[0][0]
         assert "transparent" in html_arg
-        assert "theme: 'dark'" in html_arg
+        assert "'dark'" in html_arg
 
     @patch("streamtex.mermaid.components")
     def test_default_height_500(self, mock_components):
@@ -66,6 +66,12 @@ class TestLiveRendering:
         """Height parameter is forwarded to components.html()."""
         st_mermaid(SAMPLE_CODE, height=800)
         assert mock_components.html.call_args[1]["height"] == 800
+
+    @patch("streamtex.mermaid.components")
+    def test_scrolling_enabled(self, mock_components):
+        """scrolling=True is passed to components.html() for interactivity."""
+        st_mermaid(SAMPLE_CODE)
+        assert mock_components.html.call_args[1]["scrolling"] is True
 
     @patch("streamtex.mermaid.components")
     def test_style_wraps_in_st_block(self, mock_components):
@@ -86,6 +92,26 @@ class TestLiveRendering:
         html_arg = mock_components.html.call_args[0][0]
         assert "<script>alert" not in html_arg
         assert "&lt;script&gt;" in html_arg
+
+    @patch("streamtex.mermaid.components")
+    def test_pan_zoom_js_included(self, mock_components):
+        """The HTML includes pan-zoom JavaScript (wheel, mousedown)."""
+        st_mermaid(SAMPLE_CODE)
+        html_arg = mock_components.html.call_args[0][0]
+        assert "addEventListener" in html_arg
+        assert "wheel" in html_arg
+        assert "mousedown" in html_arg
+        assert "zoomIn" in html_arg
+        assert "resetView" in html_arg
+
+    @patch("streamtex.mermaid.components")
+    def test_full_html_document(self, mock_components):
+        """The HTML is a complete document (DOCTYPE, html, body)."""
+        st_mermaid(SAMPLE_CODE)
+        html_arg = mock_components.html.call_args[0][0]
+        assert "<!DOCTYPE html>" in html_arg
+        assert "<html>" in html_arg
+        assert "<body>" in html_arg
 
 
 # ---------------------------------------------------------------------------

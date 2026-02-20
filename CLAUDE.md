@@ -65,7 +65,6 @@ See `documentation/coding_standards.md` for the full reference. Key rules:
 streamtex/                      # Library source (Python package)
 projects/                       # User projects (self-contained StreamTeX apps)
 tests/
-  ├── test_project/            # Original comprehensive test (legacy)
   ├── test_project_intro/       # Phase 1 intro course (lazy-loading demo)
   ├── test_project_advanced/    # Phase 1 advanced + multi-source blocks
   ├── test_collection/          # Phase 2 collection hub (modern design)

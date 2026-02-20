@@ -13,7 +13,7 @@ class BlockStyles:
     heading = s.project.titles.section_title + s.center_txt
     section = s.project.titles.section_subtitle
     info_box = Style("background:rgba(100,150,200,0.1);padding:16px;border-radius:8px;", "info_box")
-    code_block = s.project.containers.code_container
+    code_block = s.project.containers.code_box
 
 
 bs = BlockStyles
@@ -66,7 +66,7 @@ def build():
         )
     st_space("v", 1)
 
-    with st_block(s.project.containers.code_container):
+    with st_block(s.project.containers.code_box):
         st_code("python", """\
 # Zoom is automatically injected by st_book()
 # No need to manually add it to your blocks

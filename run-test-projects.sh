@@ -187,6 +187,19 @@ print_pids() {
     echo ""
 }
 
+# Libère un port en tuant les processus serveur qui l'occupent
+# Note: -sTCP:LISTEN filtre uniquement les serveurs, pas les clients (navigateurs, etc.)
+free_port() {
+    local port=$1
+    local pids
+    pids=$(lsof -ti :"$port" -sTCP:LISTEN 2>/dev/null)
+    if [ -n "$pids" ]; then
+        echo "   ⚠️  Port $port occupé (PIDs: $pids) — arrêt des processus..."
+        echo "$pids" | xargs kill 2>/dev/null || true
+        sleep 2
+    fi
+}
+
 # Lance un projet
 launch_project() {
     local project_path=$1
@@ -195,6 +208,7 @@ launch_project() {
     local log_file=$4
 
     echo "🚀 Lancement $project_name (port $port)..."
+    free_port "$port"
 
     cd "$SCRIPT_DIR"
     nohup uv run streamlit run "$project_path/book.py" \

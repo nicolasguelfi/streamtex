@@ -71,7 +71,7 @@ def build():
     )
     st_space("v", 1)
 
-    with st_block(s.project.containers.code_container):
+    with st_block(bs.code_box):
         st_code("python", """\
 from streamtex.collection import CollectionConfig, ProjectMeta
 
@@ -123,7 +123,7 @@ config.projects["intro-course"] = ProjectMeta(
     )
     st_space("v", 1)
 
-    with st_block(s.project.containers.code_container):
+    with st_block(bs.code_box):
         st_code("toml", """\
 [collection]
 title = "StreamTeX Training Collection"
@@ -157,7 +157,7 @@ order = 2
     )
     st_space("v", 1)
 
-    with st_block(s.project.containers.code_container):
+    with st_block(bs.code_box):
         st_code("python", """\
 from streamtex.collection import CollectionConfig
 
@@ -200,7 +200,7 @@ st_collection(config=config, home_styles=Styles)
     st_write(bs.section, "Practical Example: st_collection()", toc_lvl="+1")
     st_space("v", 1)
 
-    with st_block(s.project.containers.code_container):
+    with st_block(bs.code_box):
         st_code("python", """\
 # book.py
 import streamlit as st
@@ -233,7 +233,7 @@ st_collection(config=config, home_styles=s)
     )
     st_space("v", 1)
 
-    with st_block(s.project.containers.code_container):
+    with st_block(bs.code_box):
         st_code("python", """\
 # Custom collection block
 import streamlit as st

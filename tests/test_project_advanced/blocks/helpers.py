@@ -116,13 +116,13 @@ class ProjectBlockHelper(BlockHelper):
     # New method: Project-specific helper
     def show_advanced_comparison(self, before: str, after: str, label: str = "Comparison"):
         """Advanced-specific helper: Side-by-side comparison."""
-        with st_block(s.advanced.comparison_container):
-            st_write(s.titles.section_title, label)
+        with st_block(s.project.containers.code_box):
+            st_write(s.project.titles.section_title, label)
             st_space("v", 1)
-            st_write(s.body, "Before:")
+            st_write(s.large, "Before:")
             _show_code(before)
             st_space("v", 2)
-            st_write(s.body, "After:")
+            st_write(s.large, "After:")
             _show_code(after)
 
 
@@ -159,35 +159,35 @@ class ExpertBlockHelper(ProjectBlockHelper):
 
 def show_advanced_warning(title: str, description: str):
     """Warning box for deprecated features."""
-    with st_block(s.advanced.warning_box):
-        st_write(s.advanced.warning_label, f"⚠️ {title}")
+    with st_block(s.project.containers.bad_callout):
+        st_write(s.project.titles.warning_label, f"⚠️ {title}")
         st_space("v", 1)
-        st_write(s.body, description)
+        st_write(s.large, description)
 
 
 def show_advanced_note(title: str, description: str):
     """Note box for important considerations."""
-    with st_block(s.advanced.note_box):
-        st_write(s.advanced.note_label, f"📌 {title}")
+    with st_block(s.project.containers.note_callout):
+        st_write(s.project.titles.tip_label, f"📌 {title}")
         st_space("v", 1)
-        st_write(s.body, description)
+        st_write(s.large, description)
 
 
 def show_performance_insight(metric: str, value: str, note: str):
     """Performance metrics and optimization tips."""
-    with st_block(s.advanced.perf_box):
-        st_write(s.advanced.perf_metric, f"{metric}: {value}")
+    with st_block(s.project.containers.explanation_box):
+        st_write(s.project.titles.section_subtitle, f"{metric}: {value}")
         st_space("v", 1)
-        st_write(s.body, note)
+        st_write(s.large, note)
 
 
 def show_api_reference(method_name: str, signature: str, description: str):
     """API reference documentation."""
-    with st_block(s.advanced.api_box):
-        st_write(s.advanced.api_method, method_name)
+    with st_block(s.project.containers.code_box):
+        st_write(s.project.titles.section_subtitle, method_name)
         _show_code(signature, language="python")
         st_space("v", 1)
-        st_write(s.body, description)
+        st_write(s.large, description)
 
 
 # ============================================================================

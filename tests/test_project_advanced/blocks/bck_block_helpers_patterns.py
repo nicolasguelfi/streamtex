@@ -27,9 +27,9 @@ def build():
     # ========================================================================
     # INTRODUCTION
     # ========================================================================
-    st_write(s.titles.page_title, "Block Helpers: 3 Usage Patterns")
+    st_write(s.project.titles.page_title, "Block Helpers: 3 Usage Patterns")
     st_space("v", 1)
-    st_write(s.body, """
+    st_write(s.large, """
 StreamTeX provides a hybrid block helpers system with 3 usage patterns.
 Choose the one that fits your needs, from simple to advanced.
     """)
@@ -37,7 +37,7 @@ Choose the one that fits your needs, from simple to advanced.
     # ========================================================================
     # PATTERN 1: CONFIG INJECTION (DI)
     # ========================================================================
-    st_write(s.titles.section_title, "Pattern 1: Config Injection (Recommended)")
+    st_write(s.project.titles.section_title, "Pattern 1: Config Injection (Recommended)")
     st_space("v", 1)
 
     show_explanation("""
@@ -46,14 +46,14 @@ Define your project's styles once in ProjectBlockHelperConfig.
 All helpers automatically use your styles globally.
     """)
 
-    st_write(s.titles.feature_title, "How it works:")
-    st_write(s.body, """
+    st_write(s.project.titles.feature_title, "How it works:")
+    st_write(s.large, """
 1. Define ProjectBlockHelperConfig with your styles
 2. Call set_block_helper_config() once at startup
 3. All show_code(), show_explanation(), etc. use your styles automatically
     """)
 
-    st_write(s.titles.feature_title, "Code example:")
+    st_write(s.project.titles.feature_title, "Code example:")
     show_code("""
 from streamtex import BlockHelperConfig, set_block_helper_config
 from custom.styles import Styles as s
@@ -72,8 +72,8 @@ from blocks.helpers import show_code
 show_code("print('hello')")  # Uses s.project.containers.code_box
     """, language="python")
 
-    st_write(s.titles.feature_title, "Benefits:")
-    st_write(s.body, """
+    st_write(s.project.titles.feature_title, "Benefits:")
+    st_write(s.large, """
 ✓ DRY: Define styles once, use everywhere
 ✓ Simple: No parameters needed
 ✓ Global: Consistent styling across all blocks
@@ -85,7 +85,7 @@ show_code("print('hello')")  # Uses s.project.containers.code_box
     # ========================================================================
     # PATTERN 2: STANDALONE FUNCTIONS (Simple)
     # ========================================================================
-    st_write(s.titles.section_title, "Pattern 2: Standalone Functions (Simple)")
+    st_write(s.project.titles.section_title, "Pattern 2: Standalone Functions (Simple)")
     st_space("v", 1)
 
     show_explanation("""
@@ -94,14 +94,14 @@ Works great with Config Injection (Pattern 1).
 Can override style per-call if needed.
     """)
 
-    st_write(s.titles.feature_title, "How it works:")
-    st_write(s.body, """
+    st_write(s.project.titles.feature_title, "How it works:")
+    st_write(s.large, """
 1. Import helpers from streamtex or local blocks
 2. Call them directly with optional style= override
 3. Styles from config are used automatically
     """)
 
-    st_write(s.titles.feature_title, "Code example:")
+    st_write(s.project.titles.feature_title, "Code example:")
     show_code("""
 from blocks.helpers import show_code, show_explanation
 from custom.styles import Styles as s
@@ -119,8 +119,8 @@ Just call the function!
 ''')
     """, language="python")
 
-    st_write(s.titles.feature_title, "Benefits:")
-    st_write(s.body, """
+    st_write(s.project.titles.feature_title, "Benefits:")
+    st_write(s.large, """
 ✓ Minimalist: No classes or complexity
 ✓ Flexible: Can override style per-call
 ✓ Intuitive: Just call the function
@@ -132,7 +132,7 @@ Just call the function!
     # ========================================================================
     # PATTERN 3: OOP INHERITANCE (Advanced)
     # ========================================================================
-    st_write(s.titles.section_title, "Pattern 3: OOP Inheritance (Advanced)")
+    st_write(s.project.titles.section_title, "Pattern 3: OOP Inheritance (Advanced)")
     st_space("v", 1)
 
     show_explanation("""
@@ -141,15 +141,15 @@ Subclass BlockHelper or ProjectBlockHelper.
 Add custom methods specific to your project.
     """)
 
-    st_write(s.titles.feature_title, "How it works:")
-    st_write(s.body, """
+    st_write(s.project.titles.feature_title, "How it works:")
+    st_write(s.large, """
 1. Subclass BlockHelper or ProjectBlockHelper
 2. Override methods to add custom logic
 3. Add new project-specific methods
 4. Instantiate and use in your blocks
     """)
 
-    st_write(s.titles.feature_title, "Code example:")
+    st_write(s.project.titles.feature_title, "Code example:")
     show_code("""
 from streamtex import BlockHelper
 from custom.styles import Styles as s
@@ -163,9 +163,9 @@ class MyCustomHelper(BlockHelper):
     # Add new project-specific method
     def show_comparison(self, before, after):
         '''Compare two code snippets.'''
-        st_write(s.body, "Before:")
+        st_write(s.large, "Before:")
         self.show_code(before)
-        st_write(s.body, "After:")
+        st_write(s.large, "After:")
         self.show_code(after)
 
 # Usage
@@ -174,8 +174,8 @@ helper.show_code("print('hello')")
 helper.show_comparison("old_code()", "new_code()")
     """, language="python")
 
-    st_write(s.titles.feature_title, "Benefits:")
-    st_write(s.body, """
+    st_write(s.project.titles.feature_title, "Benefits:")
+    st_write(s.large, """
 ✓ Extensible: Add custom logic before/after parent calls
 ✓ Organized: Group related helpers in a class
 ✓ Type-safe: IDEs can autocomplete methods
@@ -187,7 +187,7 @@ helper.show_comparison("old_code()", "new_code()")
     # ========================================================================
     # PATTERN 4: EXPERT (Bonus)
     # ========================================================================
-    st_write(s.titles.section_title, "Pattern 4: Expert (All 3 Combined)")
+    st_write(s.project.titles.section_title, "Pattern 4: Expert (All 3 Combined)")
     st_space("v", 1)
 
     show_explanation("""
@@ -196,15 +196,15 @@ Use Config Injection + OOP Inheritance + Function overrides.
 Maximum flexibility when you need it.
     """)
 
-    st_write(s.titles.feature_title, "How it works:")
-    st_write(s.body, """
+    st_write(s.project.titles.feature_title, "How it works:")
+    st_write(s.large, """
 1. Config Injection provides global styles (Pattern 1)
 2. OOP class adds custom methods (Pattern 3)
 3. Function calls can still override with style= (Pattern 2)
 4. Chain everything together
     """)
 
-    st_write(s.titles.feature_title, "Code example:")
+    st_write(s.project.titles.feature_title, "Code example:")
     show_code("""
 from blocks.helpers import ExpertBlockHelper
 
@@ -222,8 +222,8 @@ from streamtex import show_code
 show_code("print('world')", style=s.custom.style)
     """, language="python")
 
-    st_write(s.titles.feature_title, "When to use:")
-    st_write(s.body, """
+    st_write(s.project.titles.feature_title, "When to use:")
+    st_write(s.large, """
 ✓ Complex projects with varied requirements
 ✓ Need both global config + custom logic
 ✓ Runtime overrides for special cases
@@ -235,7 +235,7 @@ show_code("print('world')", style=s.custom.style)
     # ========================================================================
     # COMPARISON TABLE
     # ========================================================================
-    st_write(s.titles.section_title, "Pattern Comparison")
+    st_write(s.project.titles.section_title, "Pattern Comparison")
     st_space("v", 1)
 
     show_details("""
@@ -243,7 +243,7 @@ Comparison of all patterns.
 Choose based on your project's needs and complexity level.
     """)
 
-    st_write(s.body, """
+    st_write(s.large, """
 Pattern 1 (Config Injection)
   Complexity: ⭐ Easy
   Setup: One config class + set_block_helper_config()
@@ -270,7 +270,7 @@ Pattern 4 (Expert)
     # ========================================================================
     # BEST PRACTICES
     # ========================================================================
-    st_write(s.titles.section_title, "Best Practices")
+    st_write(s.project.titles.section_title, "Best Practices")
     st_space("v", 1)
 
     show_explanation("""
@@ -278,7 +278,7 @@ Guidelines for using block helpers effectively.
 Follow these to keep your helpers clean and maintainable.
     """)
 
-    st_write(s.body, """
+    st_write(s.large, """
 1. Start with Pattern 1 (Config Injection)
    - It covers 90% of use cases
    - Simple to understand and maintain
@@ -305,33 +305,33 @@ Follow these to keep your helpers clean and maintainable.
     # ========================================================================
     # LIVE DEMONSTRATION
     # ========================================================================
-    st_write(s.titles.section_title, "Live Demonstration")
+    st_write(s.project.titles.section_title, "Live Demonstration")
     st_space("v", 1)
 
-    st_write(s.body, """
+    st_write(s.large, """
 Each pattern demonstrated with actual code below:
     """)
 
     # Demo 1: Simple pattern
-    st_write(s.titles.subsection_title, "Demo 1: Simple Pattern")
+    st_write(s.project.titles.subsection_title, "Demo 1: Simple Pattern")
     demonstrate_simple_pattern()
 
     st_space("v", 1)
 
     # Demo 2: Config pattern
-    st_write(s.titles.subsection_title, "Demo 2: Config Injection Pattern")
+    st_write(s.project.titles.subsection_title, "Demo 2: Config Injection Pattern")
     demonstrate_config_pattern()
 
     st_space("v", 1)
 
     # Demo 3: OOP pattern
-    st_write(s.titles.subsection_title, "Demo 3: OOP Pattern")
+    st_write(s.project.titles.subsection_title, "Demo 3: OOP Pattern")
     demonstrate_oop_pattern()
 
     st_space("v", 1)
 
     # Demo 4: Expert pattern
-    st_write(s.titles.subsection_title, "Demo 4: Expert Pattern (All Combined)")
+    st_write(s.project.titles.subsection_title, "Demo 4: Expert Pattern (All Combined)")
     demonstrate_expert_pattern()
 
     st_space("v", 2)
@@ -339,7 +339,7 @@ Each pattern demonstrated with actual code below:
     # ========================================================================
     # SUMMARY
     # ========================================================================
-    st_write(s.titles.section_title, "Summary")
+    st_write(s.project.titles.section_title, "Summary")
     st_space("v", 1)
 
     show_explanation("""
@@ -348,7 +348,7 @@ Block helpers are a flexible system for rendering styled content.
 Choose what works for your project.
     """)
 
-    st_write(s.body, """
+    st_write(s.large, """
 🎯 Recommended path:
   1. Start with Config Injection (Pattern 1)
   2. Add project-specific helpers

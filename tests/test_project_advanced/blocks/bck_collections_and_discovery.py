@@ -24,7 +24,7 @@ bs = BlockStyles
 def build():
     """Build the collections system documentation block."""
 
-    st_write(s.titles.page_title, "Collections: Multi-Project Management", tag=t.h1, toc_lvl="1")
+    st_write(s.project.titles.page_title, "Collections: Multi-Project Management", tag=t.h1, toc_lvl="1")
     st_space("v", 1)
 
     show_explanation("""
@@ -36,11 +36,11 @@ Think: Coursera with multiple courses, or a documentation portal with multiple d
     # ========================================================================
     # WHAT ARE COLLECTIONS?
     # ========================================================================
-    st_write(s.titles.section_title, "What Are Collections?", toc_lvl="+1")
+    st_write(s.project.titles.section_title, "What Are Collections?", toc_lvl="+1")
     st_space("v", 1)
 
     with st_block(bs.feature_box):
-        st_write(s.body, """
+        st_write(s.large, """
 A **Collection** is a container for multiple StreamTeX projects.
 Each project is a complete application (book, course, documentation).
 The collection provides discovery, navigation, and project management.
@@ -56,10 +56,10 @@ Examples:
     # ========================================================================
     # COMPONENTS
     # ========================================================================
-    st_write(s.titles.section_title, "Collections Components", toc_lvl="+1")
+    st_write(s.project.titles.section_title, "Collections Components", toc_lvl="+1")
     st_space("v", 1)
 
-    st_write(s.titles.feature_title, "1. st_collection() - Main Function")
+    st_write(s.project.titles.feature_title, "1. st_collection() - Main Function")
     show_code("""
 from streamtex import st_collection, CollectionConfig
 
@@ -76,7 +76,7 @@ st_collection(config)
 
     st_space("v", 1)
 
-    st_write(s.titles.feature_title, "2. CollectionConfig - Configuration Class")
+    st_write(s.project.titles.feature_title, "2. CollectionConfig - Configuration Class")
     show_code("""
 from streamtex import CollectionConfig, ProjectMeta
 
@@ -94,7 +94,7 @@ config = CollectionConfig(
 
     st_space("v", 1)
 
-    st_write(s.titles.feature_title, "3. ProjectMeta - Project Metadata")
+    st_write(s.project.titles.feature_title, "3. ProjectMeta - Project Metadata")
     show_code("""
 from streamtex import ProjectMeta
 
@@ -115,10 +115,10 @@ project = ProjectMeta(
     # ========================================================================
     # CONFIGURATION METHODS
     # ========================================================================
-    st_write(s.titles.section_title, "Configuration Methods", toc_lvl="+1")
+    st_write(s.project.titles.section_title, "Configuration Methods", toc_lvl="+1")
     st_space("v", 1)
 
-    st_write(s.titles.feature_title, "Method 1: Programmatic (Python)")
+    st_write(s.project.titles.feature_title, "Method 1: Programmatic (Python)")
     show_code("""
 from streamtex import st_collection, CollectionConfig, ProjectMeta
 
@@ -151,7 +151,7 @@ st_collection(config)
 
     st_space("v", 1)
 
-    st_write(s.titles.feature_title, "Method 2: TOML Configuration File")
+    st_write(s.project.titles.feature_title, "Method 2: TOML Configuration File")
     show_code("""
 # collection.toml
 [collection]
@@ -183,10 +183,10 @@ st_collection(config)
     # ========================================================================
     # FEATURES
     # ========================================================================
-    st_write(s.titles.section_title, "Collection Features", toc_lvl="+1")
+    st_write(s.project.titles.section_title, "Collection Features", toc_lvl="+1")
     st_space("v", 1)
 
-    st_write(s.body, """
+    st_write(s.large, """
 **Project Discovery**
 - Browse all available projects
 - Filter by tags or categories
@@ -219,7 +219,7 @@ st_collection(config)
     # ========================================================================
     # PRACTICAL EXAMPLE
     # ========================================================================
-    st_write(s.titles.section_title, "Complete Example: Training Hub", toc_lvl="+1")
+    st_write(s.project.titles.section_title, "Complete Example: Training Hub", toc_lvl="+1")
     st_space("v", 1)
 
     show_explanation("""
@@ -281,10 +281,10 @@ st_collection(hub_config)
     # ========================================================================
     # BEST PRACTICES
     # ========================================================================
-    st_write(s.titles.section_title, "Best Practices", toc_lvl="+1")
+    st_write(s.project.titles.section_title, "Best Practices", toc_lvl="+1")
     st_space("v", 1)
 
-    st_write(s.body, """
+    st_write(s.large, """
 ✓ **DO:**
 - Use meaningful project names
 - Provide descriptive descriptions (100+ chars)
@@ -308,7 +308,7 @@ st_collection(hub_config)
     # ========================================================================
     # DEPLOYMENT
     # ========================================================================
-    st_write(s.titles.section_title, "Deploying Collections", toc_lvl="+1")
+    st_write(s.project.titles.section_title, "Deploying Collections", toc_lvl="+1")
     st_space("v", 1)
 
     show_explanation("""
@@ -316,7 +316,7 @@ Collections can be deployed to cloud platforms like other projects.
 Use the same deployment methods as single projects.
     """)
 
-    st_write(s.titles.feature_title, "Docker Deployment:")
+    st_write(s.project.titles.feature_title, "Docker Deployment:")
     show_code("""
 # Build collection container
 docker build --build-arg FOLDER=collection -t my-training-hub .
@@ -327,7 +327,7 @@ docker run -p 8501:8501 my-training-hub
 
     st_space("v", 1)
 
-    st_write(s.titles.feature_title, "Hugging Face Spaces:")
+    st_write(s.project.titles.feature_title, "Hugging Face Spaces:")
     show_code("""
 # Push to HF Space with collection folder
 git remote add space https://huggingface.co/spaces/username/my-hub
@@ -339,10 +339,10 @@ git push space main
     # ========================================================================
     # COMPARISON: PROJECT VS COLLECTION
     # ========================================================================
-    st_write(s.titles.section_title, "Project vs Collection", toc_lvl="+1")
+    st_write(s.project.titles.section_title, "Project vs Collection", toc_lvl="+1")
     st_space("v", 1)
 
-    st_write(s.body, """
+    st_write(s.large, """
 **Single Project** (st_book):
 - One application/course/documentation
 - Self-contained

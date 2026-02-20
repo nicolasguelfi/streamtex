@@ -74,17 +74,17 @@ def show_details(text: str):
 
 def show_intro_welcome(title: str, subtitle: str, description: str):
     """Welcome box for intro homepage."""
-    with st_block(s.intro.welcome_container):
-        st_write(s.titles.page_title, title)
-        st_write(s.titles.section_subtitle, subtitle)
+    with st_block(s.project.containers.tip_callout):
+        st_write(s.project.titles.page_title, title)
+        st_write(s.project.titles.section_subtitle, subtitle)
         st_space("v", 2)
-        st_write(s.body, description)
+        st_write(s.large, description)
 
 
 def show_feature_highlight(feature_name: str, icon: str, description: str):
     """Highlight a specific feature with icon."""
-    with st_block(s.intro.feature_box):
-        st_write(s.intro.feature_icon, icon)
-        st_write(s.titles.section_title, feature_name)
+    with st_block(s.project.containers.explanation_box):
+        st_write(s.large + s.bold, icon)
+        st_write(s.project.titles.section_title, feature_name)
         st_space("v", 1)
-        st_write(s.body, description)
+        st_write(s.large, description)

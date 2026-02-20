@@ -31,7 +31,7 @@ def build():
         )
         st_write(
             sx.StreamTeX_Styles.large + sx.StreamTeX_Styles.text.colors.white,
-            "Learn styling, layouts, and advanced features",
+            "A Streamlit-based content rendering framework",
             tag=t.div
         )
     st_space("v", 1)

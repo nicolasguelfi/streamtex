@@ -2,7 +2,7 @@
 
 import streamlit as st
 import setup
-from streamtex import st_book
+from streamtex import st_book, TOCConfig
 from custom.themes import dark
 import streamtex.styles as sts
 import blocks
@@ -15,7 +15,9 @@ st.set_page_config(
 sts.theme = dark
 
 # Display the collection home with modern design and management guide
+toc = TOCConfig(numerate_titles=False)
+
 st_book([
     blocks.bck_home_collection,
     blocks.bck_collection_management,
-], paginate=False)
+], toc_config=toc, paginate=False)

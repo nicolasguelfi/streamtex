@@ -2,7 +2,6 @@
 
 import streamlit as st
 import setup
-import streamtex as sx
 from streamtex import st_book, TOCConfig, MarkerConfig
 
 from custom.styles import Styles as s
@@ -34,7 +33,14 @@ marker_config = MarkerConfig(
 
 # Orchestrate composites in pedagogical order
 st_book([
-    blocks.bck_welcome_intro,
+    # Welcome page (gradient header + level badge)
+    blocks.bck_level_badge,
+
+    # Quick Start (local intro blocks)
+    blocks.bck_qs_installation,
+    blocks.bck_qs_new_project,
+    blocks.bck_qs_first_block,
+
     blocks.bck_architecture_guide,
 
     # Text & styling

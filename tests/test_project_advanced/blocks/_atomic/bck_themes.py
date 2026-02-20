@@ -137,10 +137,10 @@ def build():
             cell_styles[(2, 2)] = ns("background: rgba(122, 184, 245, 0.1);")
 
             with st_grid(cols="1fr 1fr", cell_styles=cell_styles):
-                with g.cell(): st_write(s.body, "Top-left")
-                with g.cell(): st_write(s.body, "Top-right (with border)")
-                with g.cell(): st_write(s.body, "Bottom-left")
-                with g.cell(): st_write(s.body, "Bottom-right (with bg)")
+                with g.cell(): st_write(s.large, "Top-left")
+                with g.cell(): st_write(s.large, "Top-right (with border)")
+                with g.cell(): st_write(s.large, "Bottom-left")
+                with g.cell(): st_write(s.large, "Bottom-right (with bg)")
         """))
         st_space("v", 2)
 
@@ -218,7 +218,7 @@ def build():
         st_write(bs.sub, "Creating custom themes: best practices", toc_lvl="+1")
         st_space("v", 1)
 
-        st_write(s.body, """\
+        st_write(s.large, """\
 **DO:**
 - Use consistent color palettes (same hue, different lightness)
 - Override only what changes between themes (not everything)

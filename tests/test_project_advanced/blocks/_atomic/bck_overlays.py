@@ -185,7 +185,7 @@ def build():
                 # Main content
                 with st_block(s.container.bg_colors.light_blue_bg
                               + ns("height: 100px; padding: 20px;")):
-                    st_write(s.body, "Feature List")
+                    st_write(s.large, "Feature List")
 
                 # Annotation arrows/labels
                 with o.layer(top=30, right=10):
@@ -238,7 +238,7 @@ def build():
         show_code(textwrap.dedent("""\
             with st_overlay(s.container.sizes.width_full) as o:
                 with st_block(ns("height: 200px; background: #f0f0f0;")):
-                    st_write(s.body, "Container (responsive)")
+                    st_write(s.large, "Container (responsive)")
 
                 # Top-right corner (responsive to container size)
                 with o.layer(top="10%", right="10%"):
@@ -256,7 +256,7 @@ def build():
                  toc_lvl="+1")
         st_space("v", 1)
 
-        st_write(s.body, """\
+        st_write(s.large, """\
 **DO:**
 - Use overlays for static decorative elements
 - Position labels, badges, and annotations

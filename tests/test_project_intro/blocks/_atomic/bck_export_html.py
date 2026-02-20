@@ -208,7 +208,7 @@ def build():
         st_write(bs.sub, "Export file size optimization", toc_lvl="+1")
         st_space("v", 1)
 
-        st_write(s.body, """\
+        st_write(s.large, """\
 **What increases file size:**
 - High-resolution images (use 72dpi or 96dpi)
 - Many large images (prefer diagrams/SVG)

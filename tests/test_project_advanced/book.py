@@ -58,8 +58,8 @@ marker_config = MarkerConfig(
 # and Phase 2 (collections) features
 # ============================================================================
 st_book([
-    # Shared block from shared-blocks (Phase 1 demo)
-    shared_blocks.bck_header_training,
+    # Welcome page (gradient header + level badge)
+    blocks.bck_level_badge,
 
     # Phase 1: Multi-source blocks and static resolution
     blocks.bck_lazy_block_registry_demo,

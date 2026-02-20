@@ -149,7 +149,7 @@ def build():
         st_write(bs.sub, "st_br vs st_space: when to use each", toc_lvl="+1")
         st_space("v", 1)
 
-        st_write(s.body, """
+        st_write(s.large, """
 **st_br()** — Implicit spacing
 - Simple line break
 - Fixed height (consistent)
@@ -166,14 +166,14 @@ def build():
 
         show_code(textwrap.dedent("""\
             # Simple spacing with st_br
-            st_write(s.body, "Paragraph 1")
+            st_write(s.large, "Paragraph 1")
             st_br()
-            st_write(s.body, "Paragraph 2")
+            st_write(s.large, "Paragraph 2")
 
             # Explicit spacing with st_space
-            st_write(s.body, "Section 1")
+            st_write(s.large, "Section 1")
             st_space("v", 3)  # More space
-            st_write(s.body, "Section 2")
+            st_write(s.large, "Section 2")
         """))
         st_space("v", 2)
 

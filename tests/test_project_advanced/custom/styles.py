@@ -36,6 +36,10 @@ class TextStylesCustom:
         ColorsCustom.primary_blue + Text.weights.bold_weight + Text.sizes.Giant_size,
         "course_title"
     )
+    page_title = Style.create(
+        ColorsCustom.primary_blue + Text.weights.bold_weight + Text.sizes.Giant_size,
+        "page_title"
+    )
     section_title = Style.create(
         ColorsCustom.primary_blue + Text.weights.bold_weight + Text.sizes.huge_size,
         "section_title"
@@ -43,6 +47,14 @@ class TextStylesCustom:
     section_subtitle = Style.create(
         ColorsCustom.accent_teal + Text.weights.bold_weight + Text.sizes.Large_size,
         "section_subtitle"
+    )
+    subsection_title = Style.create(
+        ColorsCustom.accent_teal + Text.weights.bold_weight + Text.sizes.large_size,
+        "subsection_title"
+    )
+    feature_title = Style.create(
+        ColorsCustom.accent_teal + Text.weights.bold_weight + Text.sizes.large_size,
+        "feature_title"
     )
     tip_label = Style.create(
         ColorsCustom.primary_blue + Text.weights.bold_weight + Text.sizes.large_size,

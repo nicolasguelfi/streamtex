@@ -105,21 +105,21 @@ def build():
         st_write(
             s.medium,
             "• ",
-            (s.text.colors.primary_blue, "Documentation", "https://github.com/streamtex"),
+            (s.project.colors.primary_blue, "Documentation", "https://github.com/streamtex"),
         )
         st_space("v", 0.5)
 
         st_write(
             s.medium,
             "• ",
-            (s.text.colors.primary_blue, "PyPI Package", "https://pypi.org/project/streamtex"),
+            (s.project.colors.primary_blue, "PyPI Package", "https://pypi.org/project/streamtex"),
         )
         st_space("v", 0.5)
 
         st_write(
             s.medium,
             "• ",
-            (s.text.colors.primary_blue, "GitHub Repository", "https://github.com/streamtex/streamtex"),
+            (s.project.colors.primary_blue, "GitHub Repository", "https://github.com/streamtex/streamtex"),
         )
 
     st_space("v", 2)
@@ -131,7 +131,7 @@ def build():
     st_write(s.medium + s.text.weights.bold_weight, "Enable hover (default):")
     st_space("v", 1)
 
-    with st_block(s.project.containers.code_container):
+    with st_block(s.project.containers.code_box):
         st_code("python", """\
 from streamtex import st_write
 
@@ -149,7 +149,7 @@ st_write(
     st_write(s.medium + s.text.weights.bold_weight, "Disable hover (if needed):")
     st_space("v", 1)
 
-    with st_block(s.project.containers.code_container):
+    with st_block(s.project.containers.code_box):
         st_code("python", """\
 from streamtex import st_write
 
@@ -174,7 +174,7 @@ st_write(
     )
     st_space("v", 1)
 
-    with st_block(s.project.containers.code_container):
+    with st_block(s.project.containers.code_box):
         st_code("python", """\
 from streamtex import st_write
 from streamtex.styles import Style

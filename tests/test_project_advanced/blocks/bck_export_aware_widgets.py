@@ -135,7 +135,7 @@ def build():
     st_write(s.medium + s.text.weights.bold_weight, "WRONG — Won't appear in export:")
     st_space("v", 1)
 
-    with st_block(s.project.containers.code_container):
+    with st_block(s.project.containers.code_box):
         st_code("python", """\
 # ❌ BAD - disappears in export
 import streamlit as st
@@ -149,7 +149,7 @@ st.line_chart(data)  # Invisible in HTML export
     st_write(s.medium + s.text.weights.bold_weight, "CORRECT — Visible in both:")
     st_space("v", 1)
 
-    with st_block(s.project.containers.code_container):
+    with st_block(s.project.containers.code_box):
         st_code("python", """\
 # ✓ GOOD - visible in live app AND export
 import streamtex as sx

@@ -21,7 +21,7 @@ bs = BlockStyles
 def build():
     """Build the style composition documentation block."""
 
-    st_write(s.titles.page_title, "Style Composition: Operators", tag=t.h1, toc_lvl="1")
+    st_write(s.project.titles.page_title, "Style Composition: Operators", tag=t.h1, toc_lvl="1")
     st_space("v", 1)
 
     show_explanation("""
@@ -33,7 +33,7 @@ This enables DRY (Don't Repeat Yourself) styling.
     # ========================================================================
     # STYLE ADDITION (+)
     # ========================================================================
-    st_write(s.titles.section_title, "Adding Styles (+ operator)", toc_lvl="+1")
+    st_write(s.project.titles.section_title, "Adding Styles (+ operator)", toc_lvl="+1")
     st_space("v", 1)
 
     show_explanation("""
@@ -42,7 +42,7 @@ The result is a new style with properties from both.
 Order matters: second style can override first style's properties.
     """)
 
-    st_write(s.titles.feature_title, "Style + Style combination:")
+    st_write(s.project.titles.feature_title, "Style + Style combination:")
     show_code("""
 from streamtex import Style
 
@@ -57,11 +57,11 @@ red_heading = heading + red
     """, language="python")
 
     with st_block(bs.example_box):
-        st_write(s.body, "💡 Tip: Combine base + modifier styles for consistency")
+        st_write(s.large, "💡 Tip: Combine base + modifier styles for consistency")
 
     st_space("v", 2)
 
-    st_write(s.titles.feature_title, "Style + String combination:")
+    st_write(s.project.titles.feature_title, "Style + String combination:")
     show_code("""
 from streamtex import Style
 
@@ -75,14 +75,14 @@ modified = base_style + "color:blue;text-decoration:underline;"
     """, language="python")
 
     with st_block(bs.example_box):
-        st_write(s.body, "💡 Tip: CSS strings are automatically turned into Style objects")
+        st_write(s.large, "💡 Tip: CSS strings are automatically turned into Style objects")
 
     st_space("v", 2)
 
     # ========================================================================
     # STYLE SUBTRACTION (-)
     # ========================================================================
-    st_write(s.titles.section_title, "Removing Properties (- operator)", toc_lvl="+1")
+    st_write(s.project.titles.section_title, "Removing Properties (- operator)", toc_lvl="+1")
     st_space("v", 1)
 
     show_explanation("""
@@ -90,7 +90,7 @@ Use the - operator to remove a property from a style.
 Useful when you want most of a style but need to override one property.
     """)
 
-    st_write(s.titles.feature_title, "Removing properties:")
+    st_write(s.project.titles.feature_title, "Removing properties:")
     show_code("""
 from streamtex import Style
 
@@ -107,17 +107,17 @@ text_only = box_style - "background"
     """, language="python")
 
     with st_block(bs.example_box):
-        st_write(s.body, "💡 Tip: Provide property name only (no value) with - operator")
+        st_write(s.large, "💡 Tip: Provide property name only (no value) with - operator")
 
     st_space("v", 2)
 
     # ========================================================================
     # PRACTICAL PATTERNS
     # ========================================================================
-    st_write(s.titles.section_title, "Practical Composition Patterns", toc_lvl="+1")
+    st_write(s.project.titles.section_title, "Practical Composition Patterns", toc_lvl="+1")
     st_space("v", 1)
 
-    st_write(s.titles.feature_title, "Pattern 1: Base + Modifiers")
+    st_write(s.project.titles.feature_title, "Pattern 1: Base + Modifiers")
     show_code("""
 # Define base styles once
 base_text = Style("font-family:sans-serif;font-size:16px;", "base_text")
@@ -132,7 +132,7 @@ success = base_text + Style("color:green;", "green")
 
     st_space("v", 1)
 
-    st_write(s.titles.feature_title, "Pattern 2: Remove and Replace")
+    st_write(s.project.titles.feature_title, "Pattern 2: Remove and Replace")
     show_code("""
 # Start with a complex style
 primary_button = Style(
@@ -147,7 +147,7 @@ danger_button = (primary_button - "background") + "background:red;"
 
     st_space("v", 1)
 
-    st_write(s.titles.feature_title, "Pattern 3: Progressive Enhancement")
+    st_write(s.project.titles.feature_title, "Pattern 3: Progressive Enhancement")
     show_code("""
 # Start minimal
 simple = Style("font-size:14px;", "simple")
@@ -163,7 +163,7 @@ full = advanced + "box-shadow:0 2px 4px rgba(0,0,0,0.1);"
     # ========================================================================
     # OPERATOR PRECEDENCE
     # ========================================================================
-    st_write(s.titles.section_title, "Operator Precedence & Overrides", toc_lvl="+1")
+    st_write(s.project.titles.section_title, "Operator Precedence & Overrides", toc_lvl="+1")
     st_space("v", 1)
 
     show_explanation("""
@@ -171,7 +171,7 @@ When combining styles, the RIGHTMOST style wins if properties conflict.
 Use this to your advantage for predictable overrides.
     """)
 
-    st_write(s.titles.feature_title, "Override behavior:")
+    st_write(s.project.titles.feature_title, "Override behavior:")
     show_code("""
 from streamtex import Style
 
@@ -184,14 +184,14 @@ result = style_a + style_b
     """, language="python")
 
     with st_block(bs.example_box):
-        st_write(s.body, "💡 Tip: Place overrides on the right side of + for clarity")
+        st_write(s.large, "💡 Tip: Place overrides on the right side of + for clarity")
 
     st_space("v", 2)
 
     # ========================================================================
     # REAL-WORLD EXAMPLE
     # ========================================================================
-    st_write(s.titles.section_title, "Real-World Example", toc_lvl="+1")
+    st_write(s.project.titles.section_title, "Real-World Example", toc_lvl="+1")
     st_space("v", 1)
 
     show_explanation("""
@@ -229,10 +229,10 @@ with st_block(dark_box):
     # ========================================================================
     # BEST PRACTICES
     # ========================================================================
-    st_write(s.titles.section_title, "Best Practices", toc_lvl="+1")
+    st_write(s.project.titles.section_title, "Best Practices", toc_lvl="+1")
     st_space("v", 1)
 
-    st_write(s.body, """
+    st_write(s.large, """
 ✓ **DO:**
 - Use + to combine related styles
 - Place overrides on the right side

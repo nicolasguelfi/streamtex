@@ -21,7 +21,7 @@ bs = BlockStyles
 def build():
     """Build the ListStyle documentation block."""
 
-    st_write(s.titles.page_title, "List Styling with ListStyle", tag=t.h1, toc_lvl="1")
+    st_write(s.project.titles.page_title, "List Styling with ListStyle", tag=t.h1, toc_lvl="1")
     st_space("v", 1)
 
     show_explanation("""
@@ -33,7 +33,7 @@ Compose ListStyles just like other styles.
     # ========================================================================
     # DEFAULT LIST STYLES
     # ========================================================================
-    st_write(s.titles.section_title, "Default List Styles", toc_lvl="+1")
+    st_write(s.project.titles.section_title, "Default List Styles", toc_lvl="+1")
     st_space("v", 1)
 
     show_explanation("""
@@ -41,7 +41,7 @@ StreamTeX provides pre-built list styles for common use cases.
 Access them from the custom.styles.Styles class.
     """)
 
-    st_write(s.titles.feature_title, "Built-in styles:")
+    st_write(s.project.titles.feature_title, "Built-in styles:")
     show_code("""
 from streamtex import st_list
 
@@ -61,7 +61,7 @@ st_list(["point a", "point b"], list_type="ul",
     # ========================================================================
     # CREATING CUSTOM LIST STYLES
     # ========================================================================
-    st_write(s.titles.section_title, "Creating Custom ListStyle", toc_lvl="+1")
+    st_write(s.project.titles.section_title, "Creating Custom ListStyle", toc_lvl="+1")
     st_space("v", 1)
 
     show_explanation("""
@@ -69,7 +69,7 @@ Create a ListStyle to define custom symbols for each nesting level.
 Symbols cycle through levels, repeating if needed.
     """)
 
-    st_write(s.titles.feature_title, "Basic custom ListStyle:")
+    st_write(s.project.titles.feature_title, "Basic custom ListStyle:")
     show_code("""
 from streamtex import ListStyle, st_list
 
@@ -86,7 +86,7 @@ st_list(items, list_type="ul", style=my_list_style)
 
     st_space("v", 2)
 
-    st_write(s.titles.feature_title, "Nested list example:")
+    st_write(s.project.titles.feature_title, "Nested list example:")
     show_code("""
 from streamtex import ListStyle, st_list
 
@@ -115,7 +115,7 @@ st_list(nested_items, style=custom_style)
     # ========================================================================
     # SYMBOL CYCLING
     # ========================================================================
-    st_write(s.titles.section_title, "Symbol Cycling Behavior", toc_lvl="+1")
+    st_write(s.project.titles.section_title, "Symbol Cycling Behavior", toc_lvl="+1")
     st_space("v", 1)
 
     show_explanation("""
@@ -123,7 +123,7 @@ If your list has more nesting levels than symbols defined,
 symbols repeat in a cycle from the beginning.
     """)
 
-    st_write(s.titles.feature_title, "Cycling example:")
+    st_write(s.project.titles.feature_title, "Cycling example:")
     show_code("""
 # Only 2 symbols defined
 short_style = ListStyle(symbols=["→", "•"])
@@ -137,14 +137,14 @@ short_style = ListStyle(symbols=["→", "•"])
     """, language="python")
 
     with st_block(Style("background:rgba(255,200,0,0.08);padding:8px;border-radius:4px;", "tip")):
-        st_write(s.body, "💡 Define enough symbols to avoid confusion in deeply nested lists")
+        st_write(s.large, "💡 Define enough symbols to avoid confusion in deeply nested lists")
 
     st_space("v", 2)
 
     # ========================================================================
     # LIST STYLE OPERATORS
     # ========================================================================
-    st_write(s.titles.section_title, "ListStyle Operators (+ and -)", toc_lvl="+1")
+    st_write(s.project.titles.section_title, "ListStyle Operators (+ and -)", toc_lvl="+1")
     st_space("v", 1)
 
     show_explanation("""
@@ -152,7 +152,7 @@ Like regular styles, ListStyles can be combined using + and -.
 Add symbols or remove/replace them.
     """)
 
-    st_write(s.titles.feature_title, "Combining ListStyles:")
+    st_write(s.project.titles.feature_title, "Combining ListStyles:")
     show_code("""
 from streamtex import ListStyle
 
@@ -172,7 +172,7 @@ minimal = base - "◦"  # Remove the second symbol
     # ========================================================================
     # STYLING LIST APPEARANCE
     # ========================================================================
-    st_write(s.titles.section_title, "Styling List HTML/CSS", toc_lvl="+1")
+    st_write(s.project.titles.section_title, "Styling List HTML/CSS", toc_lvl="+1")
     st_space("v", 1)
 
     show_explanation("""
@@ -180,7 +180,7 @@ The style parameter in ListStyle applies CSS to the <ul> or <ol> element.
 Control spacing, color, margins, etc.
     """)
 
-    st_write(s.titles.feature_title, "Styled lists:")
+    st_write(s.project.titles.feature_title, "Styled lists:")
     show_code("""
 from streamtex import ListStyle, Style, st_list
 
@@ -202,7 +202,7 @@ st_list(items, style=compact_style)
     # ========================================================================
     # ORDERED LISTS
     # ========================================================================
-    st_write(s.titles.section_title, "Ordered Lists (ol)", toc_lvl="+1")
+    st_write(s.project.titles.section_title, "Ordered Lists (ol)", toc_lvl="+1")
     st_space("v", 1)
 
     show_explanation("""
@@ -210,7 +210,7 @@ For ordered lists, the list_type="ol" generates numbers automatically.
 ListStyle symbols don't affect numbering, but CSS styling does.
     """)
 
-    st_write(s.titles.feature_title, "Styled ordered list:")
+    st_write(s.project.titles.feature_title, "Styled ordered list:")
     show_code("""
 from streamtex import ListStyle, st_list
 
@@ -229,10 +229,10 @@ st_list(steps, list_type="ol", style=ordered_style)
     # ========================================================================
     # PRACTICAL EXAMPLES
     # ========================================================================
-    st_write(s.titles.section_title, "Practical Examples", toc_lvl="+1")
+    st_write(s.project.titles.section_title, "Practical Examples", toc_lvl="+1")
     st_space("v", 1)
 
-    st_write(s.titles.feature_title, "Example 1: Task Checklist")
+    st_write(s.project.titles.feature_title, "Example 1: Task Checklist")
     show_code("""
 from streamtex import ListStyle, st_list
 
@@ -255,7 +255,7 @@ st_list(tasks, style=checklist)
 
     st_space("v", 1)
 
-    st_write(s.titles.feature_title, "Example 2: Hierarchical TOC")
+    st_write(s.project.titles.feature_title, "Example 2: Hierarchical TOC")
     show_code("""
 from streamtex import ListStyle, st_list
 
@@ -284,10 +284,10 @@ st_list(structure, style=toc_style)
     # ========================================================================
     # BEST PRACTICES
     # ========================================================================
-    st_write(s.titles.section_title, "Best Practices", toc_lvl="+1")
+    st_write(s.project.titles.section_title, "Best Practices", toc_lvl="+1")
     st_space("v", 1)
 
-    st_write(s.body, """
+    st_write(s.large, """
 ✓ **DO:**
 - Define ListStyle once, reuse everywhere
 - Use meaningful symbols (emoji, arrows, bullets)

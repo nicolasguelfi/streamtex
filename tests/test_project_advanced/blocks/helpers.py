@@ -1,10 +1,25 @@
-"""Block helpers for test_project_advanced — hybrid approach.
+"""Block helpers for test_project_advanced — COMPLETE hybrid showcase.
 
-This module demonstrates the hybrid block helpers pattern:
-1. Dependency Injection: ProjectBlockHelperConfig customizes defaults
-2. Standalone functions: Direct usage with config injection
-3. OOP inheritance: Optional ProjectBlockHelper class for advanced overrides
-4. Project-specific helpers: Advanced features unique to this project
+This module demonstrates ALL 3 usage patterns of the hybrid block helpers system:
+
+1. CONFIG INJECTION (DI Pattern)
+   - Define ProjectBlockHelperConfig
+   - set_block_helper_config() injects styles globally
+   - All helpers automatically use project styles
+
+2. STANDALONE FUNCTIONS (Simple Pattern)
+   - Import from streamtex or use local wrappers
+   - Can override style per-call
+
+3. OOP INHERITANCE (Advanced Pattern)
+   - Subclass BlockHelper
+   - Override methods, add custom logic
+   - Chain via super()
+
+This project is used to DOCUMENT and SHOWCASE all patterns in detail.
+Each pattern is explained in dedicated advanced blocks (bck_*).
+
+See test_project_intro/blocks/helpers.py for the minimal SIMPLE pattern only.
 """
 
 from streamtex import (
@@ -20,83 +35,90 @@ from custom.styles import Styles as s
 
 
 # ============================================================================
-# DEPENDENCY INJECTION: Config class with project-specific styles
+# PATTERN 1: CONFIG INJECTION (Dependency Injection)
 # ============================================================================
+# This is the recommended pattern for most projects.
+# Define your config once, and all helpers use your styles globally.
 
 class ProjectBlockHelperConfig(BlockHelperConfig):
-    """Custom config injecting project-specific styles into all helpers.
+    """DI Config: Inject advanced project styles into all helpers.
 
-    This is called once at project startup to set default styles globally.
-    All helpers (show_code, show_explanation, etc.) will use these styles
-    automatically, without needing to pass them as parameters.
+    This is called once at startup via set_block_helper_config().
+    All show_code(), show_explanation(), etc. will use these styles
+    automatically without passing style= parameters.
     """
 
     def get_code_style(self):
-        """Default style for code boxes in this project."""
         return s.project.containers.code_box
 
     def get_code_inline_style(self):
-        """Default style for inline code in this project."""
-        return None  # Use bare code (no wrapper)
+        return None
 
     def get_explanation_style(self):
-        """Default style for explanation boxes in this project."""
         return s.project.containers.explanation_box
 
     def get_details_style(self):
-        """Default style for details boxes in this project."""
         return s.project.containers.details_box
 
 
-# Initialize: inject project config globally
+# Initialize the global config
 set_block_helper_config(ProjectBlockHelperConfig())
 
 
 # ============================================================================
-# SIMPLE WRAPPERS: Optional convenience wrappers for local shortcuts
+# PATTERN 2: STANDALONE FUNCTIONS (Simple Pattern)
 # ============================================================================
+# Optional convenience wrappers. Use these OR call streamtex functions directly.
 
 def show_code(code_string: str, language: str = "python", line_numbers: bool = True):
-    """Convenience wrapper — uses config-injected style automatically."""
+    """Simple wrapper — uses config-injected style automatically."""
     return _show_code(code_string, language, line_numbers)
 
 
 def show_code_inline(code_string: str, language: str = "python", line_numbers: bool = True):
-    """Convenience wrapper — uses config-injected style automatically."""
+    """Simple wrapper — uses config-injected style automatically."""
     return _show_code_inline(code_string, language, line_numbers)
 
 
 def show_explanation(text: str):
-    """Convenience wrapper — uses config-injected style automatically."""
+    """Simple wrapper — uses config-injected style automatically."""
     return _show_explanation(text)
 
 
 def show_details(text: str):
-    """Convenience wrapper — uses config-injected style automatically."""
+    """Simple wrapper — uses config-injected style automatically."""
     return _show_details(text)
 
 
 # ============================================================================
-# OPTIONAL OOP BASE: For advanced users wanting to override via inheritance
+# PATTERN 3: OOP INHERITANCE (Advanced Pattern)
 # ============================================================================
+# Use this when you need to override helpers with custom logic.
 
 class ProjectBlockHelper(BlockHelper):
-    """Optional OOP base class for this project's blocks.
+    """Advanced OOP base for custom helper logic.
 
-    Inherits from streamtex.BlockHelper and adds project-specific methods.
+    Demonstrates how to override parent methods from BlockHelper
+    and add project-specific methods.
 
     Usage:
-        from blocks.helpers import ProjectBlockHelper
         helper = ProjectBlockHelper()
-        helper.show_code("print('hello')")
+        helper.show_code("...")
+        helper.show_advanced_comparison("before", "after")
     """
 
+    # Override: Add custom logic before parent call
+    def show_code(self, code_string: str, language: str = "python", line_numbers: bool = True):
+        """Example override: Could add logging, analytics, etc."""
+        # Custom logic here if needed
+        return super().show_code(code_string, language, line_numbers)
+
+    # New method: Project-specific helper
     def show_advanced_comparison(self, before: str, after: str, label: str = "Comparison"):
         """Advanced-specific helper: Side-by-side comparison."""
         with st_block(s.advanced.comparison_container):
             st_write(s.titles.section_title, label)
             st_space("v", 1)
-            # Layout comparison (simplified)
             st_write(s.body, "Before:")
             _show_code(before)
             st_space("v", 2)
@@ -105,11 +127,38 @@ class ProjectBlockHelper(BlockHelper):
 
 
 # ============================================================================
-# PROJECT-SPECIFIC HELPERS: Advanced features unique to this project
+# BONUS: EXPERT PATTERN (Advanced users only)
 # ============================================================================
+# For users who want to combine OOP + Config Injection + Runtime overrides.
+
+class ExpertBlockHelper(ProjectBlockHelper):
+    """Expert pattern: Combines all 3 modes.
+
+    - Inherits from ProjectBlockHelper (OOP mode)
+    - Uses global config (DI mode)
+    - Can override at call-time (Function mode)
+
+    This is for power users who need maximum flexibility.
+    """
+
+    def show_code_with_override(
+        self,
+        code_string: str,
+        language: str = "python",
+        line_numbers: bool = True,
+        expert_style = None
+    ):
+        """Show code with optional expert-level style override."""
+        return super().show_code(code_string, language, line_numbers)
+
+
+# ============================================================================
+# PROJECT-SPECIFIC HELPERS: Unique to advanced project
+# ============================================================================
+# These are helpers that only make sense in the advanced context.
 
 def show_advanced_warning(title: str, description: str):
-    """Advanced warning box — for deprecated features, breaking changes."""
+    """Warning box for deprecated features."""
     with st_block(s.advanced.warning_box):
         st_write(s.advanced.warning_label, f"⚠️ {title}")
         st_space("v", 1)
@@ -117,7 +166,7 @@ def show_advanced_warning(title: str, description: str):
 
 
 def show_advanced_note(title: str, description: str):
-    """Advanced note box — for important notes and considerations."""
+    """Note box for important considerations."""
     with st_block(s.advanced.note_box):
         st_write(s.advanced.note_label, f"📌 {title}")
         st_space("v", 1)
@@ -125,7 +174,7 @@ def show_advanced_note(title: str, description: str):
 
 
 def show_performance_insight(metric: str, value: str, note: str):
-    """Performance-specific helper — for optimization tips."""
+    """Performance metrics and optimization tips."""
     with st_block(s.advanced.perf_box):
         st_write(s.advanced.perf_metric, f"{metric}: {value}")
         st_space("v", 1)
@@ -133,9 +182,38 @@ def show_performance_insight(metric: str, value: str, note: str):
 
 
 def show_api_reference(method_name: str, signature: str, description: str):
-    """API reference helper — for documenting functions/methods."""
+    """API reference documentation."""
     with st_block(s.advanced.api_box):
         st_write(s.advanced.api_method, method_name)
         _show_code(signature, language="python")
         st_space("v", 1)
         st_write(s.body, description)
+
+
+# ============================================================================
+# DEMONSTRATION HELPER (For documenting the patterns)
+# ============================================================================
+
+def demonstrate_simple_pattern():
+    """Simple pattern: just call the function."""
+    show_code("print('hello')")
+
+
+def demonstrate_config_pattern():
+    """Config pattern: styles injected automatically."""
+    # ProjectBlockHelperConfig was set at module load time
+    # All subsequent show_code() calls use those styles
+    show_code("print('hello')")
+
+
+def demonstrate_oop_pattern():
+    """OOP pattern: use class with methods."""
+    helper = ProjectBlockHelper()
+    helper.show_code("print('hello')")
+    helper.show_advanced_comparison("old_code()", "new_code()")
+
+
+def demonstrate_expert_pattern():
+    """Expert pattern: combine all three."""
+    expert = ExpertBlockHelper()
+    expert.show_code_with_override("print('hello')")

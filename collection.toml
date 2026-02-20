@@ -1,0 +1,73 @@
+# StreamTeX Collection Configuration Example
+# This TOML file demonstrates how to configure a multi-project collection.
+#
+# Usage:
+#   from streamtex import CollectionConfig, st_collection
+#   config = CollectionConfig.from_toml("collection.toml")
+#   st_collection(config)
+#
+
+[collection]
+title = "StreamTeX Training Platform"
+description = "Complete learning paths for StreamTeX development"
+cards_per_row = 3
+
+# ============================================================================
+# PROJECT 1: Introduction Course
+# ============================================================================
+[projects.intro-course]
+title = "Introduction to StreamTeX"
+description = "Learn the basics: text, styling, containers, and navigation"
+cover = "static/covers/intro-course.png"
+project_url = "http://localhost:8502"
+order = 1
+
+# ============================================================================
+# PROJECT 2: Advanced Patterns
+# ============================================================================
+[projects.advanced-patterns]
+title = "Advanced StreamTeX Patterns"
+description = "Master block registries, themes, overlays, and exports"
+cover = "static/covers/advanced-patterns.png"
+project_url = "http://localhost:8503"
+order = 2
+
+# ============================================================================
+# PROJECT 3: Collections & Multi-Project Systems
+# ============================================================================
+[projects.collections-hub]
+title = "Collections & Multi-Project Systems"
+description = "Build project hubs, manage shared blocks, organize at scale"
+cover = "static/covers/collections-hub.png"
+project_url = "http://localhost:8504"
+order = 3
+
+# ============================================================================
+# PROJECT 4: Real-World Applications
+# ============================================================================
+[projects.real-world-apps]
+title = "Real-World Applications"
+description = "Case studies: Documentation portals, training platforms, dashboards"
+cover = "static/covers/real-world-apps.png"
+project_url = "http://localhost:8505"
+order = 4
+
+# ============================================================================
+# PROJECT 5: HTML Migration Workshop
+# ============================================================================
+[projects.html-migration]
+title = "HTML to StreamTeX Migration"
+description = "Transform static HTML into interactive StreamTeX applications"
+cover = "static/covers/html-migration.png"
+project_url = "http://localhost:8506"
+order = 5
+
+# ============================================================================
+# PROJECT 6: Reference & API Documentation
+# ============================================================================
+[projects.api-reference]
+title = "Complete API Reference"
+description = "Comprehensive documentation for all StreamTeX functions and classes"
+cover = "static/covers/api-reference.png"
+project_url = "http://localhost:8507"
+order = 6

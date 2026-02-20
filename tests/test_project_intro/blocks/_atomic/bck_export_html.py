@@ -120,3 +120,137 @@ def build():
             Interactive features (markers, zoom) are not included.
             The HTML is fully self-contained: no external dependencies.
         """))
+        st_space("v", 2)
+
+        # --- 6. ExportConfig detailed ---
+        st_write(bs.sub, "ExportConfig: Full configuration", toc_lvl="+1")
+        st_space("v", 1)
+
+        show_explanation(textwrap.dedent("""\
+            ExportConfig is a dataclass that controls every aspect of HTML export.
+            Use it for fine-grained control over the exported document.
+        """))
+        st_space("v", 1)
+
+        show_code(textwrap.dedent("""\
+            from streamtex.export import ExportConfig
+
+            config = ExportConfig(
+                enabled=True,                    # Enable/disable export
+                page_title="My Document",        # <title> tag
+                page_width="1224pt",             # Page width in export
+                page_padding="36pt",             # Page padding/margins
+                include_styles=True,             # Include all CSS
+                include_images=True,             # Embed images as base64
+                prettify_html=False,             # Format HTML (slower)
+            )
+
+            st_book([...], export_config=config)
+        """))
+        st_space("v", 2)
+
+        # --- 7. CSS customization ---
+        st_write(bs.sub, "Custom CSS in exports", toc_lvl="+1")
+        st_space("v", 1)
+
+        show_explanation(textwrap.dedent("""\
+            Add custom CSS rules that only apply to the exported HTML.
+            Use for print-specific styling or responsive layouts.
+        """))
+        st_space("v", 1)
+
+        show_code(textwrap.dedent("""\
+            from streamtex.export import ExportConfig
+
+            # Print-friendly CSS for exports
+            export_css = \"\"\"
+            @media print {
+                body { font-size: 12pt; line-height: 1.5; }
+                .no-print { display: none; }
+                a { text-decoration: underline; }
+            }
+            \"\"\"
+
+            # Note: Currently, use inline styles in blocks instead
+            # Future: ExportConfig will support custom_css parameter
+            st_book([...])
+        """))
+        st_space("v", 2)
+
+        # --- 8. Image optimization ---
+        st_write(bs.sub, "Image handling in exports", toc_lvl="+1")
+        st_space("v", 1)
+
+        show_explanation(textwrap.dedent("""\
+            All images are embedded as base64 in the exported HTML.
+            Large images increase file size significantly.
+            Optimize images before export for smaller files.
+        """))
+        st_space("v", 1)
+
+        show_code(textwrap.dedent("""\
+            # Large images slow down export
+            st_image("huge_photo.png")  # ~5MB when embedded
+
+            # Smaller images are better
+            st_image("icon.png")  # ~50KB when embedded
+
+            # Use image compression:
+            # - JPG for photos (lossy, smaller)
+            # - PNG for graphics (lossless)
+            # - WebP for web (best compression, but less supported)
+
+            # Recommendation: Keep images < 500KB before export
+        """))
+        st_space("v", 2)
+
+        # --- 9. File size and performance ---
+        st_write(bs.sub, "Export file size optimization", toc_lvl="+1")
+        st_space("v", 1)
+
+        st_write(s.body, """\
+**What increases file size:**
+- High-resolution images (use 72dpi or 96dpi)
+- Many large images (prefer diagrams/SVG)
+- Embedded fonts (if ever supported)
+- Minified CSS (small benefit)
+
+**Typical sizes:**
+- Text-only document: 50-200 KB
+- With images (optimized): 500 KB - 2 MB
+- Complex layouts: 1-5 MB
+
+**Best practices:**
+- Compress images before including
+- Use CSS instead of images for simple graphics
+- Remove interactive elements from exported content
+- Test export size regularly
+        """)
+        st_space("v", 2)
+
+        # --- 10. Advanced: multi-format export ---
+        st_write(bs.sub, "Exporting to multiple formats (future)", toc_lvl="+1")
+        st_space("v", 1)
+
+        show_explanation(textwrap.dedent("""\
+            Currently, StreamTeX exports to HTML only.
+            Future versions may support PDF, Markdown, or other formats.
+        """))
+        st_space("v", 1)
+
+        show_code(textwrap.dedent("""\
+            # Current (HTML only)
+            st_book([...], export_title="My Document")
+
+            # Future possibility (not yet implemented)
+            # st_book([...],
+            #     export_title="My Document",
+            #     export_formats=["html", "pdf", "markdown"])
+        """))
+        st_space("v", 2)
+
+        show_details(textwrap.dedent("""\
+            Export is useful for sharing static documents.
+            For interactive content, keep using Streamlit streaming.
+            Export works best with text-heavy or diagram-heavy content.
+        """))

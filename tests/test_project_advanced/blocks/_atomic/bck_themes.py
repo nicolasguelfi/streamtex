@@ -114,3 +114,129 @@ def build():
             Most styles work well in both modes
             if you avoid hardcoded black/white.
         """))
+        st_space("v", 2)
+
+        # StyleGrid in themed layouts
+        st_write(bs.sub, "StyleGrid: Per-cell styling in themes", toc_lvl="+1")
+        st_space("v", 1)
+
+        show_explanation(textwrap.dedent("""\
+            StyleGrid allows different cells in a grid to have different styles.
+            Perfect for creating themed table layouts where each cell inherits
+            the theme's overrides.
+        """))
+        st_space("v", 1)
+
+        show_code(textwrap.dedent("""\
+            from streamtex import st_grid, StyleGrid, Style as ns
+
+            # Create a grid with per-cell styling
+            # Cell (1,1) gets border, cell (2,2) gets background
+            cell_styles = StyleGrid()
+            cell_styles[(1, 1)] = ns("border: 2px solid #7AB8F5;")
+            cell_styles[(2, 2)] = ns("background: rgba(122, 184, 245, 0.1);")
+
+            with st_grid(cols="1fr 1fr", cell_styles=cell_styles):
+                with g.cell(): st_write(s.body, "Top-left")
+                with g.cell(): st_write(s.body, "Top-right (with border)")
+                with g.cell(): st_write(s.body, "Bottom-left")
+                with g.cell(): st_write(s.body, "Bottom-right (with bg)")
+        """))
+        st_space("v", 2)
+
+        # Theme composition
+        st_write(bs.sub, "Theme composition and merging", toc_lvl="+1")
+        st_space("v", 1)
+
+        show_explanation(textwrap.dedent("""\
+            Themes are dictionaries that can be composed:
+            - Base theme with foundational colors
+            - Light/dark variants override specific entries
+            - Merge multiple themes for compound effects
+        """))
+        st_space("v", 1)
+
+        show_code(textwrap.dedent("""\
+            # Define a base theme
+            base_theme = {
+                "primary_blue": "color: #4A90D9;",
+                "primary_text": "color: #333333;",
+                "accent_green": "color: #2ECC71;",
+            }
+
+            # Dark variant overrides specific colors
+            dark_theme = {
+                **base_theme,  # Inherit all base colors
+                "primary_blue": "color: #7AB8F5;",  # Lighter blue
+                "primary_text": "color: #E0E0E0;",  # Lighter text
+            }
+
+            # Activate in book.py
+            import streamtex.styles as sts
+            sts.theme = dark_theme
+        """))
+        st_space("v", 2)
+
+        # Theme switching patterns
+        st_write(bs.sub, "Dynamic theme switching", toc_lvl="+1")
+        st_space("v", 1)
+
+        show_explanation(textwrap.dedent("""\
+            Use Streamlit session state to switch themes at runtime.
+            Each theme change updates the global sts.theme dictionary.
+        """))
+        st_space("v", 1)
+
+        show_code(textwrap.dedent("""\
+            import streamlit as st
+            import streamtex.styles as sts
+            from custom.themes import light_theme, dark_theme
+
+            if "theme" not in st.session_state:
+                st.session_state.theme = "dark"
+
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("Light Theme"):
+                    st.session_state.theme = "light"
+            with col2:
+                if st.button("Dark Theme"):
+                    st.session_state.theme = "dark"
+
+            # Apply selected theme
+            if st.session_state.theme == "light":
+                sts.theme = light_theme
+            else:
+                sts.theme = dark_theme
+
+            # Now render blocks - they use the active theme
+            st_book(blocks=[...])
+        """))
+        st_space("v", 2)
+
+        # Custom theme creation best practices
+        st_write(bs.sub, "Creating custom themes: best practices", toc_lvl="+1")
+        st_space("v", 1)
+
+        st_write(s.body, """\
+**DO:**
+- Use consistent color palettes (same hue, different lightness)
+- Override only what changes between themes (not everything)
+- Use RGBA colors for backgrounds to support transparency
+- Document which style_ids are overridden in comments
+- Test both light and dark modes
+
+**DON'T:**
+- Hardcode black (#000000) or white (#FFFFFF)
+- Override every single style_id (most work in both modes)
+- Mix color schemes (don't mix warm and cool accents)
+- Use opaque colors that hide content (use transparency)
+- Assume all users have same display brightness
+        """)
+        st_space("v", 2)
+
+        show_details(textwrap.dedent("""\
+            The theme system is optional. Styles work fine without themes.
+            Themes are powerful when you need dark/light mode or brand customization.
+            Keep themes focused on color and contrast — not layout or typography.
+        """))

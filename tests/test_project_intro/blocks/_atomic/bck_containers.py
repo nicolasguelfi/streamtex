@@ -116,3 +116,69 @@ def build():
             Use st_block for sections and logical grouping.
             Use st_span when you need side-by-side elements within a block.
         """))
+        st_space("v", 2)
+
+        # st_br
+        st_write(bs.sub, "st_br: line breaks", toc_lvl="+1")
+        st_space("v", 1)
+
+        show_explanation(textwrap.dedent("""\
+            st_br() adds vertical spacing between elements.
+            Useful for breaking up visual density without large gaps.
+            More subtle than st_space() which can be configured more explicitly.
+        """))
+        st_space("v", 1)
+
+        show_code(textwrap.dedent("""\
+            st_write(s.large, "First line of text")
+            st_br()  # Add vertical space
+            st_write(s.large, "Second line of text")
+            st_br()
+            st_write(s.large, "Third line of text")
+        """))
+        st_space("v", 1)
+
+        st_write(s.large, "First line of text")
+        st_br()
+        st_write(s.large, "Second line of text")
+        st_br()
+        st_write(s.large, "Third line of text")
+        st_space("v", 2)
+
+        # Difference: st_br vs st_space
+        st_write(bs.sub, "st_br vs st_space: when to use each", toc_lvl="+1")
+        st_space("v", 1)
+
+        st_write(s.body, """
+**st_br()** — Implicit spacing
+- Simple line break
+- Fixed height (consistent)
+- No parameters
+- Use: Quick spacing between related elements
+
+**st_space(direction, amount)** — Explicit sizing
+- Configurable height/width
+- Control exact spacing
+- Takes "v" or "h" + amount
+- Use: Precise layout control, responsive spacing
+        """)
+        st_space("v", 1)
+
+        show_code(textwrap.dedent("""\
+            # Simple spacing with st_br
+            st_write(s.body, "Paragraph 1")
+            st_br()
+            st_write(s.body, "Paragraph 2")
+
+            # Explicit spacing with st_space
+            st_write(s.body, "Section 1")
+            st_space("v", 3)  # More space
+            st_write(s.body, "Section 2")
+        """))
+        st_space("v", 2)
+
+        show_details(textwrap.dedent("""\
+            st_br is simpler for casual spacing.
+            st_space is better when you need control.
+            Combine them: st_br between sentences, st_space between sections.
+        """))

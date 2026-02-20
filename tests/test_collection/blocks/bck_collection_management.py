@@ -13,7 +13,10 @@ class BlockStyles:
     """Styles for collection management demo."""
 
     heading = s.project.titles.main_title + s.center_txt
-    section = s.project.titles.course_title
+    section = Style(
+        "font-size:1.8rem;font-weight:bold;color:#7AB8F5;",
+        "section_title"
+    )
     code_box = Style(
         "background:rgba(40,40,40,0.8);padding:16px;border-radius:8px;overflow:auto;",
         "code_box",

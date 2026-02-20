@@ -74,6 +74,9 @@ st_book([
     # Library patterns and best practices
     blocks.bck_block_helpers_patterns,
 
+    # Phase 2: Collections and multi-project management
+    blocks.bck_collections_and_discovery,
+
     blocks.bck_static_assets_loading,
     blocks.bck_export_aware_widgets,
     blocks.bck_hover_and_preview,

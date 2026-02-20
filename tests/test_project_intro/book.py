@@ -36,9 +36,18 @@ marker_config = MarkerConfig(
 st_book([
     blocks.bck_welcome_intro,
     blocks.bck_architecture_guide,
+
+    # Text & styling
     blocks.bck_text_and_styling,
+    blocks.bck_tags_enum,
+    blocks.bck_style_composition,
+
+    # Layout & content
     blocks.bck_containers_and_layout,
     blocks.bck_grids_and_lists,
+    blocks.bck_list_styles,
+
+    # Media & advanced
     blocks.bck_media_rendering,
     blocks.bck_navigation_and_organization,
     blocks.bck_zoom_and_responsive,

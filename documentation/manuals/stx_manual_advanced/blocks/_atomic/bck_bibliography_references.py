@@ -2,10 +2,11 @@ import streamlit as st
 from streamtex import *
 import streamtex as stx
 from streamtex.styles import Style as ns, StyleGrid as sg
-from streamtex.enums import Tags as t, ListTypes as lt
+from streamtex.enums import Tags as t
 from custom.styles import Styles as s
 from blocks.helpers import show_code, show_explanation, show_details
-from streamtex.bib import cite, st_bibliography, export_bibtex, BibFormat, get_bib_registry
+from streamtex.bib import cite, st_bibliography, export_bibtex, get_bib_registry
+from custom.bib_refs import st_refs
 import textwrap
 
 
@@ -65,39 +66,48 @@ def build():
         st_space("v", 3)
 
         # --- Section 2: Inline Citations ---
-        st_write(bs.sub, "2. Inline Citations with cite()", toc_lvl="+1")
+        st_write(bs.sub, "2. Inline Citations with cite() and st_refs", toc_lvl="+1")
         st_space("v", 2)
 
         show_code(textwrap.dedent("""\
             from streamtex.bib import cite
+            from custom.bib_refs import st_refs  # Generated — IDE completion!
 
+            # Option A: cite() with string keys
             st_write(s.big,
                 "The Transformer architecture ",
                 cite("vaswani2017attention"),
-                " revolutionized NLP. "
-                "Pre-trained models like BERT ",
-                cite("devlin2019bert"),
-                " extended this to transfer learning."
+                " revolutionized NLP."
             )
+
+            # Option B: st_refs with IDE autocompletion (recommended)
+            st_write(s.big,
+                "The Transformer architecture ",
+                st_refs.vaswani2017attention,    # ← Ctrl+Space completes!
+                " revolutionized NLP."
+            )
+
+            # For multi-key citations, use cite() directly:
+            cite("lecun2015deep", "goodfellow2016deep")  # (LeCun; Goodfellow)
         """))
         st_space("v", 2)
 
-        # Live demo
+        # Live demo — using st_refs
         with st_block(bs.cite_demo):
-            st_write(s.project.titles.tip_label, "Live result:")
+            st_write(s.project.titles.tip_label, "Live result (using st_refs):")
             st_space("v", 1)
             st_write(s.big,
                 "The Transformer architecture ",
-                cite("vaswani2017attention"),
+                st_refs.vaswani2017attention,
                 " revolutionized NLP. "
                 "Pre-trained models like BERT ",
-                cite("devlin2019bert"),
+                st_refs.devlin2019bert,
                 " extended this to transfer learning."
             )
             st_space("v", 2)
             st_write(s.big,
                 "Scaling laws ",
-                cite("brown2020language"),
+                st_refs.brown2020language,
                 " showed that larger models achieve remarkable few-shot performance, "
                 "building on foundational work in deep learning ",
                 cite("lecun2015deep", "goodfellow2016deep"),
@@ -107,9 +117,9 @@ def build():
         st_space("v", 2)
 
         show_details(textwrap.dedent("""\
-            cite() returns an HTML string — embed it directly in st_write() tuples.
-            Multiple keys: cite("key1", "key2") produces (Author1; Author2, Year).
-            Hover over citations above to see the preview card with title, authors, journal, and DOI.
+            st_refs.key is equivalent to cite("key") but enables IDE autocompletion.
+            For multi-key citations, use cite("key1", "key2") → (Author1; Author2, Year).
+            Hover over citations above to see the preview card. Click Copy or Open.
         """))
         st_space("v", 3)
 
@@ -281,3 +291,41 @@ def build():
                 mime="application/x-bibtex",
                 key="bck_bib_download",
             )
+
+        st_space("v", 3)
+
+        # --- Section 9: st_refs & IDE Autocompletion ---
+        st_write(bs.sub, "9. st_refs & IDE Autocompletion", toc_lvl="+1")
+        st_space("v", 2)
+
+        show_explanation(textwrap.dedent("""\
+            st_refs maps attribute access to cite() calls with full IDE autocompletion.
+            Generate a typed Python module from your .bib file, then import st_refs
+            from there. Your IDE shows all keys with docstrings (title, authors, year).
+        """))
+        st_space("v", 1)
+
+        show_code(textwrap.dedent("""\
+            # Step 1: Generate typed module from your bibliography file
+            # Run once (or whenever your .bib changes):
+            #   uv run python -m streamtex generate-stubs static/refs.bib -o custom/bib_refs.py
+
+            # Step 2: Import st_refs from the generated module
+            from custom.bib_refs import st_refs  # ← IDE sees all keys!
+
+            st_write(s.big,
+                "According to ", st_refs.vaswani2017attention,   # Ctrl+Space!
+                " the Transformer architecture..."
+            )
+
+            # cite() still works for multi-key and prefix/suffix:
+            cite("lecun2015deep", "goodfellow2016deep")  # (LeCun; Goodfellow)
+            cite("vaswani2017attention", prefix="cf. ", suffix=", p. 42")
+        """))
+        st_space("v", 2)
+
+        show_details(textwrap.dedent("""\
+            The generated .py contains @property definitions with docstrings for each key.
+            Unknown keys (added after generation) still work via __getattr__ fallback — just without completion.
+            Regenerate with the same command when you add or modify bibliography entries.
+        """))

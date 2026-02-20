@@ -80,4 +80,5 @@ from .bib import (
     load_bib, load_bibtex, load_bib_json, load_bib_ris, load_bib_csl_json,
     register_bib_parser, parse_bibtex_string, parse_ris_string,
     cite, st_cite, st_bibliography, format_entry, export_bibtex,
+    st_refs, BibRefs, generate_bib_stubs,
 )

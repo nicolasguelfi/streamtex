@@ -18,6 +18,7 @@ from streamtex.bib import (
     format_entry,
     _format_apa, _format_ieee, _format_mla, _format_chicago, _format_harvard,
     _fields_to_entry,
+    st_refs, generate_bib_stubs,
 )
 
 
@@ -719,3 +720,176 @@ class TestFieldsToEntry:
         fields = {"authors": ["A", "B"]}
         e = _fields_to_entry("k", "misc", fields)
         assert e.authors == ["A", "B"]
+
+
+# ===================================================================
+# BibRefs proxy
+# ===================================================================
+
+class TestBibRefs:
+    def setup_method(self):
+        reset_bib_registry()
+        set_bib_config(BibConfig(hover_enabled=False))
+        reg = get_bib_registry()
+        reg.register(BibEntry(key="smith2024", title="A Paper",
+                               authors=["Smith, J."], year="2024"))
+        reg.register(BibEntry(key="doe2023", title="Another Paper",
+                               authors=["Doe, K."], year="2023"))
+
+    def teardown_method(self):
+        reset_bib_registry()
+        set_bib_config(BibConfig())
+
+    def test_getattr_returns_cite_html(self):
+        result = st_refs.smith2024
+        assert "Smith" in result
+        assert "2024" in result
+
+    def test_getattr_unknown_key(self):
+        result = st_refs.unknown_key
+        assert "[unknown_key?]" in result
+
+    def test_private_attr_raises(self):
+        with pytest.raises(AttributeError):
+            _ = st_refs._private
+
+    def test_repr(self):
+        r = repr(st_refs)
+        assert "BibRefs" in r
+        assert "doe2023" in r or "smith2024" in r
+
+    def test_equivalent_to_cite(self):
+        ref_result = st_refs.smith2024
+        cite_result = cite("smith2024")
+        # Both produce the same HTML (cite is called twice, but same format)
+        assert "Smith" in ref_result
+        assert "Smith" in cite_result
+
+
+# ===================================================================
+# generate_bib_stubs
+# ===================================================================
+
+class TestGenerateBibStubs:
+    def test_generates_py_module(self, tmp_path):
+        bib_file = tmp_path / "test.bib"
+        bib_file.write_text(
+            '@article{smith2024, title={A Paper}, author={Smith, John}, year={2024}}\n'
+            '@book{doe2023, title={A Book}, author={Doe, K.}, year={2023}}\n'
+        )
+
+        content = generate_bib_stubs(str(bib_file))
+        assert "class _ProjectBibRefs:" in content
+        assert "def smith2024(self) -> str:" in content
+        assert "def doe2023(self) -> str:" in content
+        assert "A Paper" in content
+        assert "st_refs = _ProjectBibRefs()" in content
+        assert "from streamtex.bib import cite" in content
+
+    def test_properties_call_cite(self, tmp_path):
+        bib_file = tmp_path / "test.bib"
+        bib_file.write_text(
+            '@article{mykey, title={T}, author={A}, year={2024}}\n'
+        )
+
+        content = generate_bib_stubs(str(bib_file))
+        assert 'return cite("mykey")' in content
+
+    def test_getattr_fallback(self, tmp_path):
+        bib_file = tmp_path / "test.bib"
+        bib_file.write_text(
+            '@article{k1, title={T}, author={A}, year={2024}}\n'
+        )
+
+        content = generate_bib_stubs(str(bib_file))
+        assert "def __getattr__" in content
+        assert "return cite(key)" in content
+
+    def test_writes_to_file(self, tmp_path):
+        bib_file = tmp_path / "test.bib"
+        bib_file.write_text(
+            '@article{alpha2024, title={Alpha}, author={A, B}, year={2024}}\n'
+        )
+        out_path = tmp_path / "output.py"
+
+        generate_bib_stubs(str(bib_file), output_path=str(out_path))
+
+        assert out_path.exists()
+        content = out_path.read_text()
+        assert "def alpha2024" in content
+        assert 'return cite("alpha2024")' in content
+
+    def test_multiple_sources(self, tmp_path):
+        bib1 = tmp_path / "a.bib"
+        bib1.write_text('@article{ref1, title={T1}, author={A}, year={2024}}\n')
+        bib2 = tmp_path / "b.bib"
+        bib2.write_text('@article{ref2, title={T2}, author={B}, year={2023}}\n')
+
+        content = generate_bib_stubs(str(bib1), str(bib2))
+        assert "def ref1" in content
+        assert "def ref2" in content
+
+    def test_empty_source(self, tmp_path):
+        bib_file = tmp_path / "empty.bib"
+        bib_file.write_text("")
+
+        content = generate_bib_stubs(str(bib_file))
+        assert "class _ProjectBibRefs:" in content
+        assert "pass" in content
+
+    def test_docstring_format(self, tmp_path):
+        bib_file = tmp_path / "test.bib"
+        bib_file.write_text(
+            '@article{v2017, title={Attention Is All You Need}, '
+            'author={Vaswani, Ashish and Shazeer, Noam and Parmar, Niki}, year={2017}}\n'
+        )
+
+        content = generate_bib_stubs(str(bib_file))
+        assert "Attention Is All You Need" in content
+        assert "Vaswani et al." in content
+        assert "2017" in content
+
+    def test_property_decorator(self, tmp_path):
+        bib_file = tmp_path / "test.bib"
+        bib_file.write_text(
+            '@article{k1, title={T}, author={A}, year={2024}}\n'
+        )
+
+        content = generate_bib_stubs(str(bib_file))
+        assert "@property" in content
+        assert "def k1(self) -> str:" in content
+
+    def test_generated_module_is_importable(self, tmp_path):
+        """The generated .py can be imported and st_refs works."""
+        bib_file = tmp_path / "test.bib"
+        bib_file.write_text(
+            '@article{abc2024, title={Test}, author={Author, A.}, year={2024}}\n'
+        )
+        out_path = tmp_path / "bib_refs.py"
+        generate_bib_stubs(str(bib_file), output_path=str(out_path))
+
+        # Import the generated module dynamically
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("bib_refs", str(out_path))
+        mod = importlib.util.module_from_spec(spec)
+
+        # Register entry in global registry before exec
+        reset_bib_registry()
+        set_bib_config(BibConfig(hover_enabled=False))
+        reg = get_bib_registry()
+        reg.register(BibEntry(key="abc2024", title="Test",
+                               authors=["Author, A."], year="2024"))
+
+        spec.loader.exec_module(mod)
+
+        # The generated st_refs should work
+        result = mod.st_refs.abc2024
+        assert "Author" in result
+        assert "2024" in result
+
+        # Fallback should work for unknown keys
+        result2 = mod.st_refs.unknown_key_xyz
+        assert "[unknown_key_xyz?]" in result2
+
+        reset_bib_registry()
+        set_bib_config(BibConfig())

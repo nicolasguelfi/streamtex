@@ -4,10 +4,77 @@
 > extraits de code et instructions nécessaires pour exécuter chaque tâche sans contexte
 > supplémentaire. Il a été produit après une inspection approfondie complète du projet.
 
+---
+
+## ÉTAT D'AVANCEMENT — Dernière mise à jour : 2026-02-20
+
+> **Exécution arrêtée après E1** (sur instruction utilisateur).
+> Phases A, B, C, D, E1 terminées. Phases E2→E7 et F1→F4 restent à faire.
+
+| Phase | Statut | Tests avant | Tests après |
+|-------|--------|-------------|-------------|
+| **A** (A1-A7) | ✅ TERMINÉE | 203 | 203 |
+| **B** (B1-B8) | ✅ TERMINÉE | 203 | 206 |
+| **C** (C1-C6) | ✅ TERMINÉE | 206 | 206 |
+| **D** (D1-D8) | ✅ TERMINÉE | 206 | 466 |
+| **E1** | ✅ TERMINÉE | 466 | 466 |
+| **E2-E7** | ⬜ À FAIRE | — | — |
+| **F1-F4** | ⬜ À FAIRE | — | — |
+
+### Notes importantes post-exécution
+
+1. **B4 (ancres TOC)** — L'implémentation initiale proposée dans le plan (`re.sub(r'[^\w\s-]', '', ...)`)
+   supprimait les `.` au lieu de les remplacer par `-`, ce qui cassait le test existant
+   `test_key_anchor_format` (attendait `"1-2-my-title"`, obtenait `"12-my-title"`).
+   **Correction appliquée** : les `.` et caractères de ponctuation courants sont remplacés
+   par `-` (pas supprimés), puis les `-` multiples sont collapsés. Le regex final est :
+   ```python
+   slug = re.sub(r'[.\'"!?@#$%^&*()+=\[\]{}|\\/<>,;:~`]', '-', title.lower())
+   slug = re.sub(r'[-\s]+', '-', slug).strip('-')
+   ```
+
+2. **B6 (MIME étendu)** — Le test `test_unsupported` existant utilisait `"file.bmp"` comme
+   cas non-supporté. Avec `mimetypes.guess_type()`, BMP est maintenant supporté.
+   **Correction appliquée** : test mis à jour pour utiliser `"file.xyz"` comme cas non-supporté,
+   et 3 nouveaux tests ajoutés (`test_bmp`, `test_svg`, `test_webp`).
+
+3. **C2 (gap parameter)** — Le paramètre `gap` explicite est injecté dans le CSS généré.
+   Si `grid_style` contient aussi un `gap` en CSS, le `gap` du CSS de `grid_style` sera
+   écrasé par le `gap` explicite car ce dernier est dans le sélecteur plus spécifique
+   du grid container. **Documenter ce comportement** dans coding_standards.md si nécessaire.
+
+4. **C3 (st_br count)** — L'ancien `st_br()` appelait `st_space("v", 0)` qui générait
+   `padding-top: 0` (invisible). Le nouveau génère de vrais `<br>` tags. C'est un
+   **changement de comportement** mais strictement bénéfique (l'ancien ne faisait rien).
+
+5. **D (tests)** — 260 nouveaux tests ajoutés (206→466). Les tests D1-D8 utilisent
+   `unittest.mock.patch` pour mocker Streamlit et le module export. Certains tests
+   documentent des comportements actuels qui pourraient changer :
+   - `test_list.py` documente le `ZeroDivisionError` quand `ListStyle.symbols=[]`
+     (sera corrigé par E3)
+   - `test_book_integration.py` documente que `st_include(None)` lève `AttributeError`
+     (accès à `None.__path__`)
+
+6. **E1 (constants.py)** — L'import dans `zoom.py` est fait à l'intérieur de la fonction
+   `inject_zoom_logic()` (pas au top-level) car les constantes étaient des variables
+   locales. L'import dans `export.py` est au top-level car il sert de default dans
+   la dataclass `ExportConfig`. Les constantes ne sont **pas exportées** dans
+   `__init__.py` — elles sont internes à la librairie.
+
+### Prochaine étape recommandée
+
+Reprendre à **E2** (normaliser `add_css()`). C'est la tâche la plus délicate des phases
+restantes car elle affecte **toute la composition de styles**. Recommandation :
+- Lancer les 3 projets tests visuellement AVANT E2 pour avoir une référence
+- Appliquer E2
+- Relancer les 466 tests + vérification visuelle des 3 projets
+
+---
+
 ## Contexte du projet
 
 - **Version** : 0.2.0 | Python >=3.10 | Streamlit >=1.54.0
-- **Tests** : 203 tests unitaires (tous passent au 2026-02-20)
+- **Tests** : 466 tests unitaires (tous passent au 2026-02-20, après exécution A1→E1)
 - **Structure** : librairie `streamtex/` + 3 projets tests + 2 templates + shared-blocks
 - **Environnement** : uv uniquement (`uv run pytest`, `uv run streamlit run ...`)
 - **Racine projet** : `/Volumes/Mac_Data/.../github/streamtex/`
@@ -24,7 +91,7 @@ Le plan est ordonné du **moins risqué au plus risqué** :
 6. **Phase F** — Refactoring d'API publique (risque le plus élevé, nécessite migration)
 
 **Règle impérative** : après chaque tâche, lancer `uv run pytest tests/ -v` et vérifier
-que les 203+ tests passent. Si un test échoue, corriger avant de passer à la suite.
+que les 466+ tests passent. Si un test échoue, corriger avant de passer à la suite.
 
 ---
 
@@ -32,7 +99,7 @@ que les 203+ tests passent. Si un test échoue, corriger avant de passer à la s
 
 > **Risque : ZÉRO.** Aucun code Python de la librairie n'est modifié.
 
-### A1. Corriger CLAUDE.md — supprimer la référence au dossier supprimé
+### A1. ✅ Corriger CLAUDE.md — supprimer la référence au dossier supprimé
 
 **Fichier** : `CLAUDE.md`
 **Ligne ~68** : contient `├── test_project/            # Original comprehensive test (legacy)`
@@ -45,7 +112,7 @@ que les 203+ tests passent. Si un test échoue, corriger avant de passer à la s
 
 ---
 
-### A2. Corriger le Dockerfile — mettre à jour le FOLDER par défaut
+### A2. ✅ Corriger le Dockerfile — mettre à jour le FOLDER par défaut
 
 **Fichier** : `Dockerfile`
 **Ligne 28** : `ARG FOLDER="tests/test_project"`
@@ -59,7 +126,7 @@ ARG FOLDER="tests/test_project_intro"
 
 ---
 
-### A3. Corriger template_project/book.py — auto_marker_on_toc
+### A3. ✅ Corriger template_project/book.py — auto_marker_on_toc
 
 **Fichier** : `documentation/template_project/book.py`
 **Ligne 27** : `auto_marker_on_toc=1,`
@@ -74,7 +141,7 @@ trompeur pour les débutants et incohérent avec les projets tests.
 
 ---
 
-### A4. Implémenter les 3 blocs placeholder dans test_project_advanced
+### A4. ✅ Implémenter les 3 blocs placeholder dans test_project_advanced
 
 **Fichiers concernés** (tous dans `tests/test_project_advanced/blocks/`) :
 - `bck_lazy_block_registry_demo.py` (26 lignes, contient "Content coming soon!")
@@ -111,7 +178,7 @@ from blocks.helpers import show_code, show_explanation, show_details
 
 ---
 
-### A5. Mettre à jour coding_standards.md
+### A5. ✅ Mettre à jour coding_standards.md
 
 **Fichier** : `documentation/coding_standards.md` (204 lignes actuellement)
 
@@ -136,7 +203,7 @@ from blocks.helpers import show_code, show_explanation, show_details
 
 ---
 
-### A6. Mettre à jour template_project/helpers.py
+### A6. ✅ Mettre à jour template_project/helpers.py
 
 **Fichier** : `documentation/template_project/blocks/helpers.py` (8 lignes actuellement)
 
@@ -171,7 +238,7 @@ set_block_helper_config(ProjectBlockHelperConfig())
 
 ---
 
-### A7. Compléter template_collection
+### A7. ✅ Compléter template_collection
 
 **Dossier** : `documentation/template_collection/`
 
@@ -193,7 +260,7 @@ utilise un pattern différent des autres projets.
 > **Risque : FAIBLE.** Chaque correction touche un seul fichier, une seule ligne ou
 > un seul pattern. Facilement réversible avec `git checkout -- <file>`.
 
-### B1. Fix StyleGrid mutable default argument
+### B1. ✅ Fix StyleGrid mutable default argument
 
 **Fichier** : `streamtex/styles/core.py`
 **Ligne 179** :
@@ -214,7 +281,7 @@ def __init__(self, css_grid: Optional[List[List[Style]]] = None):
 
 ---
 
-### B2. Fix isinstance au lieu de type() dans space.py
+### B2. ✅ Fix isinstance au lieu de type() dans space.py
 
 **Fichier** : `streamtex/space.py`
 **Ligne 17** :
@@ -227,7 +294,7 @@ if isinstance(size, int):
 
 ---
 
-### B3. Supprimer le code mort `if False` dans container.py
+### B3. ✅ Supprimer le code mort `if False` dans container.py
 
 **Fichier** : `streamtex/container.py`
 **Lignes 18-24** : Bloc CSS conditionné par `if False` — ne s'exécute jamais.
@@ -236,7 +303,7 @@ if isinstance(size, int):
 
 ---
 
-### B4. Améliorer la génération d'ancres dans toc.py
+### B4. ✅ Améliorer la génération d'ancres dans toc.py (voir notes post-exécution #1)
 
 **Fichier** : `streamtex/toc.py`
 **Lignes 94-96** :
@@ -271,7 +338,7 @@ def test_key_anchor_special_chars(self):
 
 ---
 
-### B5. Remplacer print() par logging dans book.py
+### B5. ✅ Remplacer print() par logging dans book.py
 
 **Fichier** : `streamtex/book.py`
 **Lignes concernées** : 54, 137, 673, 824-825
@@ -289,7 +356,7 @@ sauf s'ils activent le logging explicitement.
 
 ---
 
-### B6. Étendre la détection MIME dans image_utils.py
+### B6. ✅ Étendre la détection MIME dans image_utils.py (voir notes post-exécution #2)
 
 **Fichier** : `streamtex/image_utils.py`
 **Lignes 22-32** :
@@ -326,7 +393,7 @@ def test_webp(self): assert _get_mime_type("photo.webp") == "image/webp"
 
 ---
 
-### B7. Ajouter validation TOML dans collection.py
+### B7. ✅ Ajouter validation TOML dans collection.py
 
 **Fichier** : `streamtex/collection.py`
 **Lignes 77-78** : `data = tomllib.load(f)` sans try/except.
@@ -344,7 +411,7 @@ except Exception as e:
 
 ---
 
-### B8. Remplacer print() par logging dans image_utils.py
+### B8. ✅ Remplacer print() par logging dans image_utils.py
 
 **Fichier** : `streamtex/image_utils.py`
 **Ligne 41** : `print(f"Error reading file {file_path}: {e}")`
@@ -364,7 +431,7 @@ logger.warning(f"Error reading file {file_path}: {e}")
 > **Risque : FAIBLE À MODÉRÉ.** Ajout de fonctionnalités nouvelles. L'existant n'est
 > pas modifié. Risque uniquement si les exports `__init__.py` changent.
 
-### C1. Ajouter `list_blocks()` à LazyBlockRegistry
+### C1. ✅ Ajouter `list_blocks()` à LazyBlockRegistry
 
 **Fichier** : `streamtex/blocks.py`
 **Après la méthode `__repr__` de LazyBlockRegistry (ligne ~97)** :
@@ -390,7 +457,7 @@ def get(self, block_name: str):
 
 ---
 
-### C2. Ajouter paramètre `gap` à st_grid()
+### C2. ✅ Ajouter paramètre `gap` à st_grid() (voir notes post-exécution #3)
 
 **Fichier** : `streamtex/grid.py`
 **Signature actuelle** (~ligne 120) : `def st_grid(cols=1, grid_style=None, cell_styles=None):`
@@ -414,7 +481,7 @@ a priorité. Documenter ce comportement.
 
 ---
 
-### C3. Ajouter paramètre `count` à st_br()
+### C3. ✅ Ajouter paramètre `count` à st_br() (voir notes post-exécution #4)
 
 **Fichier** : `streamtex/space.py`
 **Lignes 30-32** :
@@ -438,7 +505,7 @@ La nouvelle version génère de vrais `<br>` tags.
 
 ---
 
-### C4. Ajouter placeholder pour images non trouvées
+### C4. ✅ Ajouter placeholder pour images non trouvées
 
 **Fichier** : `streamtex/image.py`
 **Lignes 88-90** : Actuellement `img_src = ""` si image non trouvée.
@@ -457,7 +524,7 @@ if not img_src:
 
 ---
 
-### C5. Ajouter validation du paramètre `cols` dans st_grid()
+### C5. ✅ Ajouter validation du paramètre `cols` dans st_grid()
 
 **Fichier** : `streamtex/grid.py`
 **Après la conversion int → str (~ligne 126)** :
@@ -472,7 +539,7 @@ if isinstance(cols, str):
 
 ---
 
-### C6. Ajouter tri stable dans collection.py
+### C6. ✅ Ajouter tri stable dans collection.py
 
 **Fichier** : `streamtex/collection.py`
 **Lignes 101-106** :
@@ -504,7 +571,7 @@ config.projects = dict(
 > **Risque : ZÉRO.** Ajout de fichiers de tests sans modification du code source.
 > Peut révéler des bugs existants, ce qui est une bonne chose.
 
-### D1. Créer test_grid.py
+### D1. ✅ Créer test_grid.py (45 tests)
 
 **Fichier à créer** : `tests/test_grid.py`
 
@@ -518,7 +585,7 @@ config.projects = dict(
 
 ---
 
-### D2. Créer test_container.py
+### D2. ✅ Créer test_container.py (42 tests)
 
 **Fichier à créer** : `tests/test_container.py`
 
@@ -530,7 +597,7 @@ config.projects = dict(
 
 ---
 
-### D3. Créer test_list.py
+### D3. ✅ Créer test_list.py (31 tests)
 
 **Fichier à créer** : `tests/test_list.py`
 
@@ -543,7 +610,7 @@ config.projects = dict(
 
 ---
 
-### D4. Créer test_space.py
+### D4. ✅ Créer test_space.py (40 tests)
 
 **Fichier à créer** : `tests/test_space.py`
 
@@ -556,7 +623,7 @@ config.projects = dict(
 
 ---
 
-### D5. Créer test_image.py
+### D5. ✅ Créer test_image.py (44 tests)
 
 **Fichier à créer** : `tests/test_image.py`
 
@@ -568,7 +635,7 @@ config.projects = dict(
 
 ---
 
-### D6. Créer test_code.py
+### D6. ✅ Créer test_code.py (14 tests)
 
 **Fichier à créer** : `tests/test_code.py`
 
@@ -580,7 +647,7 @@ config.projects = dict(
 
 ---
 
-### D7. Créer test_overlay.py
+### D7. ✅ Créer test_overlay.py (18 tests)
 
 **Fichier à créer** : `tests/test_overlay.py`
 
@@ -592,7 +659,7 @@ config.projects = dict(
 
 ---
 
-### D8. Créer test_book_integration.py
+### D8. ✅ Créer test_book_integration.py (22 tests, voir notes post-exécution #5)
 
 **Fichier à créer** : `tests/test_book_integration.py`
 
@@ -610,7 +677,7 @@ config.projects = dict(
 > **Risque : MODÉRÉ.** Ces changements touchent l'architecture interne. Chaque
 > modification doit être suivie d'un run complet de tests.
 
-### E1. Centraliser les constantes dupliquées
+### E1. ✅ Centraliser les constantes dupliquées (voir notes post-exécution #6)
 
 **Problème** : `PAGE_WIDTH="1224pt"` et `PAGE_PADDING="36pt"` sont définies dans :
 - `streamtex/zoom.py` lignes 54-56
@@ -903,23 +970,20 @@ uv run python -c "from streamtex.doctor import validate_project; print(validate_
 
 ## Résumé du plan d'exécution
 
-| Phase | Tâches | Risque | Estimation |
-|-------|--------|--------|------------|
-| **A** | A1-A7 | ZÉRO | Documentation, fichiers projet |
-| **B** | B1-B8 | FAIBLE | Corrections isolées, un fichier chacune |
-| **C** | C1-C6 | FAIBLE-MODÉRÉ | Nouvelles features additives |
-| **D** | D1-D8 | ZÉRO | Tests unitaires (ajout pur) |
-| **E** | E1-E7 | MODÉRÉ | Refactoring interne |
-| **F** | F1-F4 | ÉLEVÉ | Refactoring API publique |
+| Phase | Tâches | Risque | Statut |
+|-------|--------|--------|--------|
+| **A** | A1-A7 | ZÉRO | ✅ TERMINÉE |
+| **B** | B1-B8 | FAIBLE | ✅ TERMINÉE |
+| **C** | C1-C6 | FAIBLE-MODÉRÉ | ✅ TERMINÉE |
+| **D** | D1-D8 | ZÉRO | ✅ TERMINÉE (260 tests ajoutés) |
+| **E** | E1 | MODÉRÉ | ✅ E1 TERMINÉE |
+| **E** | E2-E7 | MODÉRÉ | ⬜ À FAIRE |
+| **F** | F1-F4 | ÉLEVÉ | ⬜ À FAIRE |
 
-### Ordre d'exécution recommandé
+### Ordre d'exécution recommandé (restant)
 
 ```
-A1 → A2 → A3 → B1 → B2 → B3 → B4 → B5 → B6 → B7 → B8
-→ C3 → C4 → C5 → C1 → C2 → C6
-→ A4 → A5 → A6 → A7
-→ D1 → D2 → D3 → D4 → D5 → D6 → D7 → D8
-→ E1 → E2 → E3 → E4 → E5 → E6 → E7
+→ E2 → E3 → E4 → E5 → E6 → E7
 → F1 → F2 → F3 (optionnel) → F4 (optionnel)
 ```
 
@@ -927,7 +991,7 @@ A1 → A2 → A3 → B1 → B2 → B3 → B4 → B5 → B6 → B7 → B8
 
 ```bash
 uv run pytest tests/ -v
-# Attendu : 203+ tests passent (le nombre augmente avec Phase D)
+# Attendu : 466+ tests passent
 ```
 
 ### Points de non-retour
@@ -940,4 +1004,5 @@ uv run pytest tests/ -v
 ---
 
 *Plan généré le 2026-02-20 à 11:23 par inspection approfondie du projet StreamTeX v0.2.0.*
-*203 tests passent. 77 blocs vérifiés. 24 fichiers source audités.*
+*Phases A→E1 exécutées le 2026-02-20. 466 tests passent (203 initiaux + 3 MIME + 260 Phase D).*
+*Fichiers créés : 8 tests + constants.py + 3 template_collection. Fichiers modifiés : 12 librairie + 4 documentation.*

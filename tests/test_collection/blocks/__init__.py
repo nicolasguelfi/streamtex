@@ -1,21 +1,17 @@
-"""Blocks for the test collection."""
-
-import importlib.util
+"""Blocks package — lazy-loaded via streamtex.ProjectBlockRegistry."""
 from pathlib import Path
+from streamtex import ProjectBlockRegistry, BlockNotFoundError, BlockImportError
+
+registry = ProjectBlockRegistry(Path(__file__).parent)
+__all__ = ["registry", "BlockNotFoundError", "BlockImportError"]
 
 
-def _load_block(name):
-    """Lazy-load a block module by name."""
-    block_path = Path(__file__).parent / f"{name}.py"
-    spec = importlib.util.spec_from_file_location(name, block_path)
-    if spec and spec.loader:
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-        return module
-    raise ModuleNotFoundError(f"Block {name} not found at {block_path}")
+def __getattr__(name: str):
+    try:
+        return registry.get(name)
+    except (BlockNotFoundError, BlockImportError) as e:
+        raise AttributeError(str(e)) from e
 
 
-# Lazy-load available blocks
-bck_home_collection = _load_block("bck_home_collection")
-
-__all__ = ["bck_home_collection"]
+def __dir__():
+    return sorted(registry.list_blocks() + __all__)

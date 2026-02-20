@@ -44,7 +44,11 @@ from .export_widgets import (
 from .utils import inject_link_preview_scaffold
 
 # Multi-source block registry and static resolution
-from .blocks import LazyBlockRegistry, set_static_sources, get_static_sources, resolve_static
+from .blocks import (
+    LazyBlockRegistry, ProjectBlockRegistry,
+    BlockNotFoundError, BlockImportError,
+    set_static_sources, get_static_sources, resolve_static
+)
 
 # Collection system
 from .collection import st_collection, CollectionConfig, ProjectMeta

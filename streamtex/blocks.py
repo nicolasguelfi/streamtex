@@ -2,7 +2,8 @@
 
 import os
 import importlib.util
-from typing import List, Optional
+from pathlib import Path
+from typing import Dict, List, Optional
 
 
 class LazyBlockRegistry:
@@ -94,6 +95,124 @@ class LazyBlockRegistry:
 
     def __repr__(self) -> str:
         return f"LazyBlockRegistry(sources={self.sources}, cached={len(self._cache)})"
+
+
+class BlockNotFoundError(ImportError):
+    """Raised when a requested block is not found."""
+    pass
+
+
+class BlockImportError(ImportError):
+    """Raised when a block fails to import."""
+    pass
+
+
+class ProjectBlockRegistry:
+    """
+    Registry for a single project's blocks/ directory.
+
+    Features:
+    - Lazy-loading with O(1) startup (manifest-based)
+    - Block type detection (atomic vs composite)
+    - Introspection: list_blocks(), get_stats(), load_all()
+    - Attribute access: registry.bck_name or registry.get("bck_name")
+    - Custom error classes with helpful messages
+
+    Usage in blocks/__init__.py:
+        from pathlib import Path
+        from streamtex import ProjectBlockRegistry
+
+        registry = ProjectBlockRegistry(Path(__file__).parent)
+    """
+
+    def __init__(self, blocks_dir: Path):
+        self.blocks_dir = Path(blocks_dir)
+        self._cache: Dict[str, object] = {}
+        self._manifest: Optional[Dict] = None
+
+    @property
+    def manifest(self) -> Dict[str, dict]:
+        if self._manifest is None:
+            self._manifest = self._build_manifest()
+        return self._manifest
+
+    def _build_manifest(self) -> Dict[str, dict]:
+        manifest = {}
+        composites = self._detect_composites()
+        for path in sorted(self.blocks_dir.glob("bck_*.py")):
+            name = path.stem
+            manifest[name] = {
+                "path": str(path),
+                "loaded": False,
+                "type": "composite" if name in composites else "atomic",
+            }
+        return manifest
+
+    def _detect_composites(self) -> set:
+        composites = set()
+        for path in self.blocks_dir.glob("bck_*.py"):
+            try:
+                with open(path, encoding="utf-8") as f:
+                    content = f.read(1000)
+                    if "_load_atomic" in content or "st_include" in content:
+                        composites.add(path.stem)
+            except (IOError, UnicodeDecodeError):
+                pass
+        return composites
+
+    def get(self, block_name: str) -> object:
+        if block_name not in self.manifest:
+            available = ", ".join(sorted(self.manifest.keys()))
+            raise BlockNotFoundError(
+                f"Block '{block_name}' not found.\nAvailable: {available}"
+            )
+        if block_name not in self._cache:
+            path = self.manifest[block_name]["path"]
+            try:
+                spec = importlib.util.spec_from_file_location(
+                    f"project_blocks.{block_name}", path
+                )
+                if spec and spec.loader:
+                    module = importlib.util.module_from_spec(spec)
+                    spec.loader.exec_module(module)
+                    self._cache[block_name] = module
+                    self.manifest[block_name]["loaded"] = True
+                else:
+                    raise BlockImportError(f"Cannot create spec for '{block_name}'")
+            except Exception as e:
+                raise BlockImportError(f"Failed to import '{block_name}': {e}") from e
+        return self._cache[block_name]
+
+    def __getattr__(self, name: str):
+        if name.startswith("_"):
+            raise AttributeError(f"ProjectBlockRegistry has no attribute '{name}'")
+        try:
+            return self.get(name)
+        except (BlockNotFoundError, BlockImportError) as e:
+            raise AttributeError(str(e)) from e
+
+    def load_all(self) -> None:
+        for name in sorted(self.manifest.keys()):
+            self.get(name)
+
+    def list_blocks(self, block_type: Optional[str] = None) -> list:
+        if block_type:
+            return sorted(n for n, m in self.manifest.items() if m["type"] == block_type)
+        return sorted(self.manifest.keys())
+
+    def get_stats(self) -> dict:
+        m = self.manifest
+        return {
+            "total": len(m),
+            "loaded": sum(1 for v in m.values() if v["loaded"]),
+            "composites": sum(1 for v in m.values() if v["type"] == "composite"),
+            "atomics": sum(1 for v in m.values() if v["type"] == "atomic"),
+        }
+
+    def __repr__(self) -> str:
+        s = self.get_stats()
+        return (f"ProjectBlockRegistry(total={s['total']}, loaded={s['loaded']}, "
+                f"composites={s['composites']}, atomics={s['atomics']})")
 
 
 # Global state for static file resolution

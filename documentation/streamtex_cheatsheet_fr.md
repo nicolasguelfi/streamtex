@@ -130,6 +130,12 @@ st_write(style, "Section", toc_lvl="1")
 # Sous-niveau
 st_write(style, "Sous-section", toc_lvl="+1")
 
+# TOCConfig avec filtrage de la sidebar
+toc = TOCConfig(
+    numerate_titles=False,
+    toc_position=0,
+    sidebar_max_level=None,  # None = auto (paginé: 1, continu: 2)
+)
 ```
 
 ## 🎯 Styles Prédéfinis

@@ -4,8 +4,8 @@ Arguments: $ARGUMENTS (target: "docker", "huggingface", or "gcp")
 
 ## Pre-Deployment Checks (all targets)
 
-1. **Read configuration**: Read `Dockerfile`, `pyproject.toml`, `requirements.txt`, and the active project's `.streamlit/config.toml`.
-2. **Run tests**: Execute `pytest tests/ -v` and abort if any fail.
+1. **Read configuration**: Read `Dockerfile`, `pyproject.toml`, and the active project's `.streamlit/config.toml`.
+2. **Run tests**: Execute `uv run pytest tests/ -v` and abort if any fail.
 3. **Verify requirements**:
    - `streamlit>=1.54.0` is in `pyproject.toml` dependencies
    - `.streamlit/config.toml` has `enableStaticServing = true`
@@ -14,7 +14,7 @@ Arguments: $ARGUMENTS (target: "docker", "huggingface", or "gcp")
 
 ## Target: docker
 
-Build and run locally in Docker (uses `pip install -e .` for packaging):
+Build and run locally in Docker:
 ```bash
 # Replace <your_project> with the actual project path (e.g., projects/my_project)
 docker build --build-arg FOLDER=<your_project> -t streamtex-app .

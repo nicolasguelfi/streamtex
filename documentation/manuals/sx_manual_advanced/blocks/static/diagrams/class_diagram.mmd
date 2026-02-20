@@ -1,0 +1,25 @@
+classDiagram
+    class Style {
+        +str css
+        +str name
+        +__add__(other) Style
+        +__sub__(other) Style
+        +create(base, name) Style
+    }
+    class StreamTeX_Styles {
+        +Text text
+        +Container container
+    }
+    class BlockStyles {
+        +Style heading
+        +Style sub
+    }
+    class BlockHelper {
+        +show_code(code)
+        +show_explanation(text)
+        +show_details(text)
+    }
+
+    StreamTeX_Styles --> Style : composes
+    BlockStyles --> Style : uses
+    BlockHelper --> Style : renders with

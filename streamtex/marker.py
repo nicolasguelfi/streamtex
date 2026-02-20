@@ -11,15 +11,35 @@ from .export import _render
 
 @dataclass
 class MarkerConfig:
-    """Configuration for the marker navigation system."""
-    keyboard_nav: bool = True
+    """Configuration for the marker navigation system.
+
+    Pass an instance to ``st_book(marker_config=...)`` to enable
+    marker-based navigation with a floating widget and keyboard shortcuts.
+    """
+
     show_nav_ui: bool = True
+    """Show the floating navigation widget (counter, prev/next buttons, popup list)."""
+
     auto_marker_on_toc: int | bool = False
+    """Bridge TOC headings to markers automatically.
+    True = all levels, int N = up to level N, False = disabled."""
+
     nav_position: str = "bottom-right"
+    """Widget position: ``"bottom-right"`` or ``"bottom-center"``."""
+
     nav_label_chars: int = 40
+    """Max characters for the current marker label in the widget. 0 = hidden."""
+
     popup_open: bool = False
+    """Initial state of the marker popup list (open or closed)."""
+
     next_keys: list[str] = field(default_factory=lambda: ["PageDown"])
+    """Keys to navigate to the next marker (JS KeyboardEvent.key values).
+    Supports modifier syntax: ``"Ctrl+ArrowRight"``."""
+
     prev_keys: list[str] = field(default_factory=lambda: ["PageUp"])
+    """Keys to navigate to the previous marker.
+    Supports modifier syntax: ``"Ctrl+ArrowLeft"``."""
 
 
 class MarkerRegistry:

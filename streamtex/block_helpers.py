@@ -8,6 +8,7 @@ Block rendering helpers with 3 usage modes:
 from typing import Optional, Callable
 import streamtex as sx
 from streamtex import st_write, st_block, st_space, st_br
+from streamtex.styles import StreamTeX_Styles
 
 
 class BlockHelperConfig:
@@ -152,10 +153,10 @@ def show_explanation(text: str, style: Optional[object] = None) -> None:
     resolved_style = style or _block_helper_config.get_explanation_style()
     lines = [line.strip() for line in text.strip().split("\n") if line.strip()]
     with st_block(resolved_style):
-        st_write(None, "Purpose")  # Label
+        st_write(StreamTeX_Styles.none, "Purpose")  # Label
         st_space("v", 1)
         for i, line in enumerate(lines):
-            st_write(None, line)
+            st_write(StreamTeX_Styles.none, line)
             if i < len(lines) - 1:
                 st_br()
 
@@ -185,14 +186,14 @@ def show_details(text: str, style: Optional[object] = None) -> None:
     resolved_style = style or _block_helper_config.get_details_style()
     lines = [line.strip() for line in text.strip().split("\n") if line.strip()]
     with st_block(resolved_style):
-        st_write(None, "Details:")  # Label
+        st_write(StreamTeX_Styles.none, "Details:")  # Label
         st_space("v", 1)
         if lines:
-            st_write(None, lines[0])  # Summary (bold could be applied here)
+            st_write(StreamTeX_Styles.none, lines[0])  # Summary (bold could be applied here)
             if len(lines) > 1:
                 st_space("v", 1)
                 for i, line in enumerate(lines[1:]):
-                    st_write(None, line)
+                    st_write(StreamTeX_Styles.none, line)
                     if i < len(lines) - 2:
                         st_br()
 

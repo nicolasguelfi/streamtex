@@ -1,0 +1,16 @@
+\begin{tikzpicture}[
+    ->, >=stealth, shorten >=1pt,
+    node distance=3cm,
+    state/.style={circle, draw, minimum size=1cm, thick},
+    accepting/.style={state, double},
+]
+    \node[state, initial] (q0) {$q_0$};
+    \node[state] (q1) [right of=q0] {$q_1$};
+    \node[accepting] (q2) [right of=q1] {$q_2$};
+
+    \path (q0) edge [bend left] node [above] {a} (q1)
+          (q0) edge [loop above] node {b} ()
+          (q1) edge [bend left] node [above] {a} (q2)
+          (q1) edge [bend left] node [below] {b} (q0)
+          (q2) edge [loop above] node {a,b} ();
+\end{tikzpicture}

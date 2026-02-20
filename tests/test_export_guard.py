@@ -23,7 +23,7 @@ EXPECTED_ST_HTML_COUNTS = {
     "list.py": 4,           # 2 CSS injections + 2 hidden markers
     "zoom.py": 1,           # CSS injection
     "link_preview.py": 2,   # CSS + JS scaffold
-    "book.py": 4,           # 2 load_css + 1 populate_toc + 1 populate_markers
+    "book.py": 4,           # 2 load_css + 1 populate_toc (no-search branch) + 1 populate_markers
 }
 
 STREAMTEX_DIR = Path(__file__).resolve().parent.parent / "streamtex"

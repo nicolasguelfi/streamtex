@@ -29,7 +29,7 @@ START HERE:
 3. Add your project-specific helpers at the bottom
 4. Call set_block_helper_config() once in your book.py
 
-See test_project_intro/blocks/helpers.py for a complete example.
+See documentation/manuals/sx_manual_intro/blocks/helpers.py for a complete example.
 """
 
 from streamtex import (

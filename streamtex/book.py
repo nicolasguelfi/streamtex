@@ -18,9 +18,25 @@ from .enums import Tags
 from .utils import inject_link_preview_scaffold
 from .zoom import add_zoom_options
 from .export import ExportConfig, reset_export_buffer, generate_export_html, is_export_active
+from .search import start_collector, stop_collector, generate_search_input_html, generate_search_script
 
 import logging
 logger = logging.getLogger(__name__)
+
+
+def _resolve_sidebar_max_level(toc_config: TOCConfig, paginated: bool) -> int | None:
+    """Return the effective max TOC level for the sidebar.
+
+    If the user set ``sidebar_max_level`` explicitly, honour it.
+    Otherwise fall back to a mode-dependent default:
+    paginated → 1, continuous → 2.
+    Returns ``None`` when *toc_config* is ``None`` (no TOC).
+    """
+    if toc_config is None:
+        return None
+    if toc_config.sidebar_max_level is not None:
+        return toc_config.sidebar_max_level
+    return 1 if paginated else 2
 
 
 def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConfig = None, separator=None,
@@ -80,8 +96,9 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
     use_toc_block = use_toc_sidebar and toc_config.toc_position is not None
     markers_sidebar = None
     if use_toc_sidebar:
-        toc_sidebar, markers_sidebar = build_ToC_sidebar_placeholder(
-            has_markers=marker_config is not None
+        toc_sidebar, markers_sidebar, search_js_ph = build_ToC_sidebar_placeholder(
+            has_markers=marker_config is not None,
+            has_search=toc_config.search,
         )
         toc_block = None
         toc_content_style = None
@@ -93,6 +110,10 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
         toc_title_style = toc_config.title_style
         toc_content_style = toc_config.content_style
 
+    # Start search collector if enabled
+    use_search = use_toc_sidebar and toc_config.search
+    collector = start_collector() if use_search else None
+
     # Run the blocks (potentially populating the ToC registry)
     for i, module in enumerate(module_list):
 
@@ -100,7 +121,18 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
         if use_toc_block and i == toc_pos:
             toc_block = st_toc(toc_title_style)
 
+        if collector is not None:
+            collector.set_block(i)
+
+        toc_before = len(toc_entries()) if use_toc_sidebar else 0
+
         st_include(module, *args, **kwargs)
+
+        # Tag new TOC entries with their block index
+        if use_toc_sidebar:
+            for entry in toc_entries()[toc_before:]:
+                if "block_idx" not in entry:
+                    entry["block_idx"] = i
 
         # Separator between blocks (not after the last one)
         if separator and i < len(module_list) - 1:
@@ -108,13 +140,19 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
 
         st_space("v", "70px")
 
+    # Stop collector and get search index
+    block_index = stop_collector() if use_search else None
+
     # Generate Toc at appropriate position
     if use_toc_block and toc_pos == len(module_list):
         toc_block = st_toc(toc_title_style)
 
     # Fill the ToC placeholder
     if use_toc_sidebar:
-        populate_toc(toc_sidebar, toc_block, toc_content_style)
+        effective_max_level = _resolve_sidebar_max_level(toc_config, paginated=False)
+        populate_toc(toc_sidebar, toc_block, toc_content_style,
+                     block_index=block_index, search_js_placeholder=search_js_ph,
+                     max_level=effective_max_level)
         if markers_sidebar is not None:
             populate_markers_sidebar(markers_sidebar)
 
@@ -155,39 +193,76 @@ def load_css(file_name: str):
             st.html(f'<style>{f.read()}</style>')
 
 
-def build_ToC_sidebar_placeholder(has_markers=False):
+def build_ToC_sidebar_placeholder(has_markers=False, has_search=False):
     with st.sidebar:
+        # Search input above tabs (always visible regardless of active tab)
+        if has_search:
+            st.markdown(generate_search_input_html(), unsafe_allow_html=True)
+            search_js_placeholder = st.empty()
+        else:
+            search_js_placeholder = None
         if has_markers:
             tab_markers, tab_toc = st.tabs(["Markers", "Contents"])
             toc_sidebar = tab_toc.empty()
             markers_sidebar = tab_markers.empty()
-            return toc_sidebar, markers_sidebar
+            return toc_sidebar, markers_sidebar, search_js_placeholder
         else:
             st.header("Table of Contents")
             toc_sidebar = st.empty()
-            return toc_sidebar, None
+            return toc_sidebar, None, search_js_placeholder
 
 
-def populate_toc(toc_sidebar: Delta, toc_block: Delta = None, toc_content_style: Style = None):
+def populate_toc(toc_sidebar: Delta, toc_block: Delta = None, toc_content_style: Style = None,
+                 block_index: dict[int, str] = None, search_js_placeholder=None,
+                 max_level: int | None = None):
     toc_entry_list = toc_entries()
     marker_anchors = {m['anchor'] for m in marker_entries()}
     indent_char = "&nbsp;"
 
     with toc_sidebar.container():
-        for entry in toc_entry_list:
-            # Indentation based on level
-            indent = indent_char * (entry['level'] - 1) * 4
+        if block_index is not None:
+            # Search-enabled: single st.markdown block (entries with data-stx-block)
+            toc_parts = []
+            for entry in toc_entry_list:
+                if max_level is not None and entry['level'] > max_level:
+                    continue
+                indent = indent_char * (entry['level'] - 1) * 4
+                dot = (
+                    '<span style="opacity:.5;font-size:6px;vertical-align:middle;'
+                    'margin-right:4px;">&#9679;</span>'
+                    if entry['key_anchor'] in marker_anchors else ''
+                )
+                block_attr = f' data-stx-block="{entry.get("block_idx", 0)}"'
+                toc_parts.append(
+                    f'<div{block_attr} style="overflow:hidden;text-overflow:ellipsis;'
+                    f'white-space:nowrap;padding:1px 0;font-size:14px;">'
+                    f'{indent}{dot}<a href="#{entry["key_anchor"]}">'
+                    f'{entry["title"]}</a></div>'
+                )
+            toc_parts.append('<div style="height:40px;"></div>')
+            st.markdown("\n".join(toc_parts), unsafe_allow_html=True)
+        else:
+            for entry in toc_entry_list:
+                if max_level is not None and entry['level'] > max_level:
+                    continue
+                indent = indent_char * (entry['level'] - 1) * 4
+                dot = (
+                    '<span style="opacity:.5;font-size:6px;vertical-align:middle;'
+                    'margin-right:4px;">&#9679;</span>'
+                    if entry['key_anchor'] in marker_anchors else ''
+                )
+                st.html(
+                    f'<span style="overflow:hidden;text-overflow:ellipsis;'
+                    f'text-wrap:nowrap;word-wrap:normal;">'
+                    f'{indent}{dot}<a href="#{entry["key_anchor"]}">'
+                    f'{entry["title"]}</a></span>'
+                )
 
-            # Marker indicator dot for TOC entries that are also navigation markers
-            dot = ('<span style="opacity:.5;font-size:6px;vertical-align:middle;'
-                   'margin-right:4px;">&#9679;</span>'
-                   if entry['key_anchor'] in marker_anchors else '')
+    # Inject search JS into the dedicated placeholder (above tabs)
+    if search_js_placeholder is not None and block_index is not None:
+        with search_js_placeholder.container():
+            components.html(generate_search_script(block_index), height=0)
 
-            # Native Streamlit Link to ID
-            st.html(
-                f"<span style=\"overflow: hidden; text-overflow: ellipsis; text-wrap: nowrap; word-wrap: normal;\">"
-                f"{indent}{dot}<a href=\"#{entry['key_anchor']}\">{entry['title']}</a></span>"
-            )
     if toc_block is not None:
         with toc_block.container():
             for entry in toc_entry_list:
@@ -283,11 +358,17 @@ def _build_page_cache(module_list, toc_config, marker_config, separator,
     if marker_config is not None:
         reset_marker_registry(marker_config)
 
+    use_search = toc_config is not None and toc_config.search
+    collector = start_collector() if use_search else None
+
     hidden = st.empty()
     with hidden.container():
         for i, module in enumerate(module_list):
             toc_before = len(toc_entries()) if toc_config else 0
             markers_before = len(marker_entries()) if marker_config else 0
+
+            if collector is not None:
+                collector.set_block(i)
 
             st_include(module, *args, **kwargs)
 
@@ -307,17 +388,27 @@ def _build_page_cache(module_list, toc_config, marker_config, separator,
 
     hidden.empty()
 
+    search_index = stop_collector() if use_search else None
+
     st.session_state[_STX_CACHE_KEY] = {
         "hash": cache_hash,
         "toc": copy.deepcopy(toc_entries()) if toc_config else [],
         "markers": copy.deepcopy(marker_entries()) if marker_config else [],
         "total": len(module_list),
+        "search_index": search_index,
     }
 
 
 def _build_paginated_sidebar(cache, current_page, total, toc_config, marker_config):
     """Populate the sidebar from cached data (st.markdown for direct DOM access)."""
+    search_index = cache.get("search_index")
+    show_search = toc_config is not None and toc_config.search
+
     with st.sidebar:
+        # Search input above tabs (always visible regardless of active tab)
+        if show_search:
+            st.markdown(generate_search_input_html(), unsafe_allow_html=True)
+
         has_markers = marker_config is not None and cache.get("markers")
 
         if has_markers:
@@ -330,9 +421,13 @@ def _build_paginated_sidebar(cache, current_page, total, toc_config, marker_conf
         cached_toc = cache.get("toc", [])
         marker_anchors = {m["anchor"] for m in cache.get("markers", [])}
         indent_char = "&nbsp;"
+        effective_max_level = _resolve_sidebar_max_level(toc_config, paginated=True)
 
         toc_parts = []
+
         for entry in cached_toc:
+            if effective_max_level is not None and entry["level"] > effective_max_level:
+                continue
             indent = indent_char * (entry["level"] - 1) * 4
             dot = (
                 '<span style="opacity:.5;font-size:6px;vertical-align:middle;'
@@ -348,11 +443,15 @@ def _build_paginated_sidebar(cache, current_page, total, toc_config, marker_conf
                     f'<a href="#stx-goto-{page_idx}" class="stx-page-link" '
                     f'style="opacity:.6;">{title_esc}</a>'
                 )
+            block_attr = f' data-stx-block="{page_idx}"' if show_search else ''
             toc_parts.append(
-                f'<div style="overflow:hidden;text-overflow:ellipsis;'
+                f'<div{block_attr} style="overflow:hidden;text-overflow:ellipsis;'
                 f'white-space:nowrap;padding:1px 0;font-size:14px;">'
                 f'{indent}{dot}{link}</div>'
             )
+
+        # Bottom spacer so Download button doesn't overlap last entry
+        toc_parts.append('<div style="height:40px;"></div>')
 
         with tab_toc:
             if toc_parts:
@@ -371,13 +470,19 @@ def _build_paginated_sidebar(cache, current_page, total, toc_config, marker_conf
                         f'<a href="#stx-goto-{page_idx}" class="stx-page-link" '
                         f'style="opacity:.6;">{idx}. {entry["label"]}</a>'
                     )
+                block_attr = f' data-stx-block="{page_idx}"' if show_search else ''
                 marker_parts.append(
-                    f'<div style="overflow:hidden;text-overflow:ellipsis;'
+                    f'<div{block_attr} style="overflow:hidden;text-overflow:ellipsis;'
                     f'white-space:nowrap;font-size:14px;">{link}</div>'
                 )
+            marker_parts.append('<div style="height:40px;"></div>')
             with tab_markers:
                 if marker_parts:
                     st.markdown("\n".join(marker_parts), unsafe_allow_html=True)
+
+        # Search JS (above tabs level, invisible iframe)
+        if search_index:
+            components.html(generate_search_script(search_index), height=0)
 
 
 def _inject_paginated_nav_js(current_page, total, marker_config,
@@ -692,6 +797,10 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
         and cache.get("hash") == cache_hash
         and cache.get("total") == total
     )
+    # Invalidate cache if search was enabled but cache lacks search_index
+    if has_valid_cache and toc_config and toc_config.search:
+        if cache.get("search_index") is None:
+            has_valid_cache = False
 
     if not has_valid_cache:
         reset_export_buffer(ExportConfig(enabled=False))

@@ -37,7 +37,7 @@ uv run streamlit run projects/<autre_projet>/book.py --server.port 8502
 
 ### 3. Lancer le projet de test/démonstration
 ```bash
-uv run streamlit run tests/test_project/book.py
+uv run streamlit run documentation/manuals/sx_manual_intro/book.py
 ```
 
 ### 4. Lancer les tests unitaires
@@ -125,7 +125,7 @@ Users may create theme dictionaries which can be used to replace the look of cer
 
 
 ### Custom Styles
-In ```custom/styles.py```, you may define a new Custom class, which will hold all new styles you may want to create and not available through StreamTeX. At the end of the python file, define a new class Styles, a subclass of ```streamtex.styles.StreamTeX_Styles```, with a new property referencing your new custom styles class. For reference, see ```documentation/template_project/custom/styles.py``` or ```tests/test_project/custom/styles.py```
+In ```custom/styles.py```, you may define a new Custom class, which will hold all new styles you may want to create and not available through StreamTeX. At the end of the python file, define a new class Styles, a subclass of ```streamtex.styles.StreamTeX_Styles```, with a new property referencing your new custom styles class. For reference, see ```documentation/template_project/custom/styles.py``` or ```documentation/manuals/sx_manual_intro/custom/styles.py```
 
 Example:
 ```python 

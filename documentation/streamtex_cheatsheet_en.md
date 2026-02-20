@@ -123,6 +123,35 @@ st_write(style, "Section", toc_lvl="1")
 
 # Sub-level
 st_write(style, "Subsection", toc_lvl="+1")
+
+# TOCConfig with sidebar filtering
+toc = TOCConfig(
+    numerate_titles=False,
+    toc_position=0,
+    sidebar_max_level=None,  # None = auto (paginated: 1, continuous: 2)
+)
+```
+
+### Marker Navigation
+
+```python
+from streamtex import st_marker, MarkerConfig, st_book
+
+# Place markers manually
+st_marker("Section Start", visible=True)   # Visible marker (dashed border + label)
+st_marker("Hidden Waypoint")               # Invisible marker (default)
+
+# Auto-markers from TOC headings (in book.py)
+marker = MarkerConfig(
+    auto_marker_on_toc=1,          # Level-1 TOC headings become markers
+    next_keys=["PageDown"],        # Navigate forward
+    prev_keys=["PageUp"],          # Navigate backward
+)
+st_book([...], marker_config=marker)
+
+# Control per heading
+st_write(s.huge, "Appendix", toc_lvl="1", marker=False)   # Exclude from markers
+st_write(s.huge, "Important", toc_lvl="2", marker=True)    # Force include
 ```
 
 ## 🎯 Predefined Styles

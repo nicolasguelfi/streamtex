@@ -1,10 +1,12 @@
 """Tests for the Marker Navigation system."""
 
 import pytest
+from unittest.mock import patch, MagicMock
 from streamtex.marker import (
     MarkerConfig, MarkerRegistry,
     reset_marker_registry, register_marker,
     marker_entries, marker_count, get_marker_config,
+    st_marker,
 )
 import streamtex.marker as marker_mod
 
@@ -12,16 +14,16 @@ import streamtex.marker as marker_mod
 class TestMarkerConfig:
     def test_defaults(self):
         cfg = MarkerConfig()
-        assert cfg.keyboard_nav is True
         assert cfg.show_nav_ui is True
         assert cfg.auto_marker_on_toc is False
         assert cfg.nav_position == "bottom-right"
+        assert cfg.nav_label_chars == 40
+        assert cfg.popup_open is False
         assert cfg.next_keys == ["PageDown"]
         assert cfg.prev_keys == ["PageUp"]
 
     def test_custom(self):
-        cfg = MarkerConfig(keyboard_nav=False, auto_marker_on_toc=2, nav_position="bottom-center")
-        assert cfg.keyboard_nav is False
+        cfg = MarkerConfig(auto_marker_on_toc=2, nav_position="bottom-center")
         assert cfg.auto_marker_on_toc == 2
         assert cfg.nav_position == "bottom-center"
 
@@ -114,3 +116,115 @@ class TestGlobalFunctions:
         reset_marker_registry()  # reset without new config
         assert marker_count() == 0
         assert get_marker_config() is not None
+
+
+class TestStMarker:
+    """Test the st_marker() public API — HTML rendering for visible/invisible markers."""
+
+    def setup_method(self):
+        marker_mod._registry = None
+
+    def test_noop_without_registry(self):
+        """st_marker() should be a no-op if registry is not initialized."""
+        st_marker("test")  # should not raise
+        assert marker_count() == 0
+
+    @patch("streamtex.marker._render")
+    def test_visible_marker_html(self, mock_render):
+        reset_marker_registry(MarkerConfig())
+        st_marker("Section A", visible=True)
+        assert marker_count() == 1
+        html = mock_render.call_args[0][0]
+        assert 'class="streamtex-marker"' in html
+        assert 'data-marker-index="0"' in html
+        assert "Section A" in html
+        assert "border-top: 1px dashed" in html
+
+    @patch("streamtex.marker._render")
+    def test_invisible_marker_html(self, mock_render):
+        reset_marker_registry(MarkerConfig())
+        st_marker("Hidden")
+        assert marker_count() == 1
+        html = mock_render.call_args[0][0]
+        assert 'class="streamtex-marker"' in html
+        assert "height: 0" in html
+        # Invisible markers should NOT contain the label text in the HTML
+        assert ">Hidden<" not in html
+
+    @patch("streamtex.marker._render")
+    def test_auto_label(self, mock_render):
+        reset_marker_registry(MarkerConfig())
+        st_marker()  # no label provided
+        entries = marker_entries()
+        assert entries[0]["label"] == "Marker 1"
+
+    @patch("streamtex.marker._render")
+    def test_multiple_markers_indexed(self, mock_render):
+        reset_marker_registry(MarkerConfig())
+        st_marker("A")
+        st_marker("B")
+        st_marker("C")
+        assert marker_count() == 3
+        entries = marker_entries()
+        assert entries[0]["index"] == 0
+        assert entries[1]["index"] == 1
+        assert entries[2]["index"] == 2
+
+
+class TestAutoMarkerOnToc:
+    """Test the TOC → Marker bridge in write.py._handle_toc()."""
+
+    def setup_method(self):
+        marker_mod._registry = None
+
+    @patch("streamtex.write.register_toc_entry")
+    def test_auto_true_registers_marker(self, mock_toc):
+        """auto_marker_on_toc=True should register a marker for any TOC heading."""
+        mock_toc.return_value = ("anchor-1", "", 1)
+        reset_marker_registry(MarkerConfig(auto_marker_on_toc=True))
+        from streamtex.write import _handle_toc
+        _handle_toc("Heading", toc_lvl="1")
+        assert marker_count() == 1
+        assert marker_entries()[0]["label"] == "Heading"
+
+    @patch("streamtex.write.register_toc_entry")
+    def test_auto_int_filters_by_level(self, mock_toc):
+        """auto_marker_on_toc=1 should only register level 1 headings."""
+        reset_marker_registry(MarkerConfig(auto_marker_on_toc=1))
+        from streamtex.write import _handle_toc
+        # Level 1 — should register
+        mock_toc.return_value = ("anchor-1", "", 1)
+        _handle_toc("Level 1", toc_lvl="1")
+        # Level 2 — should NOT register
+        mock_toc.return_value = ("anchor-2", "", 2)
+        _handle_toc("Level 2", toc_lvl="2")
+        assert marker_count() == 1
+        assert marker_entries()[0]["label"] == "Level 1"
+
+    @patch("streamtex.write.register_toc_entry")
+    def test_auto_false_no_markers(self, mock_toc):
+        """auto_marker_on_toc=False should not register any markers."""
+        mock_toc.return_value = ("anchor-1", "", 1)
+        reset_marker_registry(MarkerConfig(auto_marker_on_toc=False))
+        from streamtex.write import _handle_toc
+        _handle_toc("Heading", toc_lvl="1")
+        assert marker_count() == 0
+
+    @patch("streamtex.write.register_toc_entry")
+    def test_marker_false_excludes(self, mock_toc):
+        """marker=False should exclude the heading even when auto is True."""
+        mock_toc.return_value = ("anchor-1", "", 1)
+        reset_marker_registry(MarkerConfig(auto_marker_on_toc=True))
+        from streamtex.write import _handle_toc
+        _handle_toc("Excluded", toc_lvl="1", marker=False)
+        assert marker_count() == 0
+
+    @patch("streamtex.write.register_toc_entry")
+    def test_marker_true_forces_include(self, mock_toc):
+        """marker=True should force-include even when auto is False."""
+        mock_toc.return_value = ("anchor-1", "", 1)
+        reset_marker_registry(MarkerConfig(auto_marker_on_toc=False))
+        from streamtex.write import _handle_toc
+        _handle_toc("Forced", toc_lvl="1", marker=True)
+        assert marker_count() == 1
+        assert marker_entries()[0]["label"] == "Forced"

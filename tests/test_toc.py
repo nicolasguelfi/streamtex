@@ -2,6 +2,7 @@
 
 import pytest
 from streamtex.toc import TOCConfig, TOCRegistry
+from streamtex.book import _resolve_sidebar_max_level
 
 
 class TestTOCConfig:
@@ -13,6 +14,30 @@ class TestTOCConfig:
     def test_custom_position(self):
         config = TOCConfig(toc_position=3)
         assert config.toc_position == 3
+
+    def test_sidebar_max_level_default_is_none(self):
+        config = TOCConfig()
+        assert config.sidebar_max_level is None
+
+    def test_sidebar_max_level_explicit(self):
+        config = TOCConfig(sidebar_max_level=3)
+        assert config.sidebar_max_level == 3
+
+
+class TestResolveSidebarMaxLevel:
+    def test_none_config(self):
+        assert _resolve_sidebar_max_level(None, True) is None
+
+    def test_paginated_default_1(self):
+        assert _resolve_sidebar_max_level(TOCConfig(), True) == 1
+
+    def test_continuous_default_2(self):
+        assert _resolve_sidebar_max_level(TOCConfig(), False) == 2
+
+    def test_explicit_overrides(self):
+        c = TOCConfig(sidebar_max_level=5)
+        assert _resolve_sidebar_max_level(c, True) == 5
+        assert _resolve_sidebar_max_level(c, False) == 5
 
 
 class TestTOCRegistry:

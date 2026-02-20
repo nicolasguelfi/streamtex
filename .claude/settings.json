@@ -1,16 +1,16 @@
 {
   "permissions": {
     "allow": [
-      "Bash(streamlit run *)",
+      "Bash(uv run *)",
+      "Bash(uv sync*)",
+      "Bash(uv add *)",
       "Bash(docker build *)",
       "Bash(docker run *)",
-      "Bash(python *)",
-      "Bash(pip install *)",
-      "Bash(pip freeze*)",
       "Bash(git status*)",
       "Bash(git diff*)",
       "Bash(git log*)",
       "Bash(git add *)",
+      "Bash(git commit *)",
       "Bash(ls *)"
     ]
   }

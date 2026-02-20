@@ -11,7 +11,7 @@ StreamTeX is a wrapper around Streamlit with a block-based architecture. You are
 
 ## 2. Source of Truth
 - **Syntax Reference:** Read `documentation/streamtex_cheatsheet_en.md` before writing any block code.
-- **Architecture Reference:** Inspect any project's `book.py` to understand how it orchestrates `blocks/`, and how to build a web book with modular blocks that may be nested and reusable. For illustration, see `tests/test_project/book.py` or `documentation/template_project/book.py`.
+- **Architecture Reference:** Inspect any project's `book.py` to understand how it orchestrates `blocks/`, and how to build a web book with modular blocks that may be nested and reusable. For illustration, see `documentation/manuals/sx_manual_intro/book.py` or `documentation/template_project/book.py`.
 
 ### Directory Structure
 - Follow the standard StreamTeX project structure:

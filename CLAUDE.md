@@ -31,6 +31,7 @@ See `documentation/coding_standards.md` for the full reference. Key rules:
 - **Style reuse** — one generic style, reused everywhere
 
 ## Key Components
+
 ### Core Rendering
 - `streamtex/write.py` — Text rendering (st_write with tuple support for inline mixed styles)
 - `streamtex/grid.py` — CSS Grid layout (st_grid with responsive columns)
@@ -41,11 +42,11 @@ See `documentation/coding_standards.md` for the full reference. Key rules:
 - `streamtex/book.py` — Book orchestration (st_book with paginated/continuous modes)
 - `streamtex/toc.py` — Table of Contents registry (auto-numbering, anchoring)
 - `streamtex/marker.py` — Navigation markers (slide-like navigation with PageUp/PageDown)
-- `streamtex/collection.py` — Collection system (Phase 2: multi-project hub)
+- `streamtex/collection.py` — Collection system (st_collection, CollectionConfig, ProjectMeta)
 
 ### Styling & Themes
 - `streamtex/styles/` — Core style system (modular: Style, ListStyle, StyleGrid)
-- `streamtex/styles/core.py` — Style class with composition (+, -) operators
+- `streamtex/styles/core.py` — Style class with composition (+, -) operators, add_css, remove_css
 
 ### Media & Visual
 - `streamtex/image.py` — Image handling with base64 encoding
@@ -55,25 +56,56 @@ See `documentation/coding_standards.md` for the full reference. Key rules:
 - `streamtex/overlay.py` — Absolute positioning layers (st_overlay)
 - `streamtex/zoom.py` — Zoom controls via CSS zoom property (Baseline 2024)
 
-### Advanced Features
-- `streamtex/export.py` — HTML export system (self-contained, dual rendering)
+### Export
+- `streamtex/export.py` — HTML export system (ExportConfig, HtmlExportBuffer, st_export context manager)
+- `streamtex/export_widgets.py` — Export-aware widget wrappers (st_dataframe, st_table, st_metric, st_json, st_graphviz, charts, st_audio, st_video)
+
+### Block Infrastructure
+- `streamtex/blocks.py` — ProjectBlockRegistry, LazyBlockRegistry, static resolution API (set_static_sources, get_static_sources, resolve_static), BlockNotFoundError, BlockImportError
+- `streamtex/block_helpers.py` — BlockHelper, show_code, show_code_inline, show_explanation, show_details (3 usage modes: functions, config injection via BlockHelperConfig, OOP inheritance)
+
+### Utilities & Internal
+- `streamtex/constants.py` — Internal constants (PAGE_WIDTH, PAGE_PADDING)
+- `streamtex/enums.py` — Tags, ListTypes
+- `streamtex/utils.py` — generate_key, contain_link, inject_link_preview_scaffold
 - `streamtex/link_preview.py` — Hover link preview scaffold
-- `streamtex/blocks.py` — LazyBlockRegistry for enterprise-scale block management
+- `streamtex/search.py` — Full-text search engine (WIP, not yet exported from __init__.py)
 
 ## Repository Layout
 ```
 streamtex/                      # Library source (Python package)
 projects/                       # User projects (self-contained StreamTeX apps)
+  ├── project_aiai18h/          # Projet AIAI18H
+  ├── project_html_example/     # HTML migration example
+  └── project_modelsward/       # Projet MODELSWARD
 tests/
-  ├── test_project_intro/       # Phase 1 intro course (lazy-loading demo)
-  ├── test_project_advanced/    # Phase 1 advanced + multi-source blocks
-  ├── test_collection/          # Phase 2 collection hub (modern design)
-  └── test_*.py                 # Unit tests for library components
-documentation/                  # Standards, cheatsheets, templates
+  ├── conftest.py               # Pytest fixtures
+  └── test_*.py                 # 19 unit test files
+documentation/
   ├── coding_standards.md       # Single source of truth for development
   ├── streamtex_cheatsheet_en.md
-  ├── template_project/         # Starter template
-  └── template_collection/      # Starter collection template
+  ├── streamtex_cheatsheet_fr.md
+  ├── export_to_pdf_cli.md      # PDF export CLI notes
+  ├── architecture_collections_multirepo.md
+  ├── maintenance/              # Maintenance plans and notes
+  ├── template_project/         # Starter template (single project)
+  ├── template_collection/      # Starter template (multi-project hub)
+  └── manuals/                  # StreamTeX manuals (runnable demo projects)
+      ├── sx_manual_intro/      # Phase 1 intro course (lazy-loading demo)
+      ├── sx_manual_advanced/   # Phase 1 advanced + multi-source blocks
+      ├── sx_manuals_collection/# Phase 2 collection hub (modern design)
+      └── sx_manuals_shared-blocks/ # Cross-project shared block library
+.claude/
+  ├── commands/                 # Slash commands (all discoverable)
+  │   ├── Designer: new-project, new-collection, new-block, new-slide,
+  │   │   migrate-html, export-html, preview-block, style-audit,
+  │   │   audit-slide, fix-slide, refactor-styles, upgrade-project
+  │   └── Developer: run-tests, lint, deploy
+  ├── designer/                 # Designer reference knowledge
+  │   ├── skills/               # visual-design-rules, style-conventions, quick-reference
+  │   └── agents/               # slide-designer, slide-reviewer
+  └── developer/                # Developer reference knowledge
+      └── skills/               # architecture, testing-patterns
 ```
 
 ## Running & Testing
@@ -82,7 +114,7 @@ uv sync                                                # Install all dependencie
 
 # Run individual projects
 uv run streamlit run projects/<your_project>/book.py
-uv run streamlit run tests/test_project_intro/book.py
+uv run streamlit run documentation/manuals/sx_manual_intro/book.py
 
 # Run multiple projects simultaneously (with different ports)
 ./run-test-projects.sh --intro --advanced --collection
@@ -100,16 +132,19 @@ uv run pytest tests/ -v
 - Static asset management across multiple sources
 - Paginated and continuous view modes
 - TOC with auto-numbering and navigation markers
+- HTML export (self-contained, dual rendering pipeline)
+- Block helpers with DI pattern
 
-**Demo projects**: `test_project_intro`, `test_project_advanced`
+**Demo projects**: `documentation/manuals/sx_manual_intro`, `documentation/manuals/sx_manual_advanced`
 
 ### Phase 2: Collections & Hub
 - Multi-project collections via st_collection()
+- TOML-based project configuration (CollectionConfig)
 - Modern collection home page with st_book()
 - Project discovery cards with navigation
 - Dark mode support with gradient styling
 
-**Demo project**: `test_collection`
+**Demo project**: `documentation/manuals/sx_manuals_collection`
 
 ## Deployment
 - **Docker**: `docker build --build-arg FOLDER=projects/<your_project> -t streamtex-app .`
@@ -118,8 +153,12 @@ uv run pytest tests/ -v
 - **Multiple projects**: Use `--server.port` flag or run-test-projects.sh script
 
 ## Workflows
-1. **New Block** -> Read coding_standards.md, inspect test projects for patterns
-2. **New Project** -> Copy template_project, update custom/styles.py
-3. **HTML Migration** -> Read html-migration rules, reconstruct visuals
-4. **Large Block Count** -> Use LazyBlockRegistry for enterprise-scale
-5. **Testing** -> Run `uv run pytest tests/ -v` after library changes
+1. **New Block** -> Read coding_standards.md, inspect test projects for patterns (`/new-block`)
+2. **New Slide** -> Read designer skills (visual-design-rules, style-conventions) (`/new-slide`)
+3. **New Project** -> Copy template_project, update custom/styles.py (`/new-project`)
+4. **New Collection** -> Copy template_collection, configure collection.toml (`/new-collection`)
+5. **HTML Migration** -> Read html-migration rules, reconstruct visuals (`/migrate-html`)
+6. **HTML Export** -> Configure ExportConfig, audit widgets (`/export-html`)
+7. **Large Block Count** -> Use LazyBlockRegistry for enterprise-scale
+8. **Testing** -> Run `uv run pytest tests/ -v` after library changes (`/run-tests`)
+9. **Linting** -> Run `uv run ruff check streamtex/` (`/lint`)

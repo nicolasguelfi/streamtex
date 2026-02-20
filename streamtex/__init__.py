@@ -40,6 +40,10 @@ from .export_widgets import (
     st_audio, st_video,
 )
 
+# Diagram rendering
+from .mermaid import st_mermaid
+from .tikz import st_tikz
+
 # Utilities
 from .utils import inject_link_preview_scaffold
 

@@ -21,6 +21,13 @@ class TOCConfig:
     '''A Style object dictating how the ToC main title should look.'''
     content_style: Style = s.text.titles.subtitle
     '''A Style object dictating how the ToC content (the listing of titles) should look.'''
+    search: bool = False
+    '''Enable full-text search filtering in the TOC sidebar.'''
+    search_placeholder: str = "Search..."
+    '''Placeholder text for the search input field.'''
+    sidebar_max_level: int | None = None
+    '''Max TOC hierarchy level shown in sidebar.
+    None = mode-dependent default (paginated: 1, continuous: 2).'''
 
 
 class TOCRegistry:

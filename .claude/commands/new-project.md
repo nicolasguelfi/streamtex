@@ -8,7 +8,7 @@ Arguments: $ARGUMENTS (project name, e.g. "project_mycoursename")
    - `documentation/template_project/book.py`
    - `documentation/template_project/setup.py`
    - `documentation/template_project/blocks/__init__.py`
-   - `documentation/template_project/blocks/base.py`
+   - `documentation/template_project/blocks/helpers.py`
    - `documentation/template_project/custom/styles.py`
    - `documentation/template_project/custom/themes.py`
    - `documentation/template_project/.streamlit/config.toml`
@@ -22,6 +22,7 @@ Arguments: $ARGUMENTS (project name, e.g. "project_mycoursename")
      setup.py
      blocks/
        __init__.py
+       helpers.py
        bck_welcome.py
      custom/
        styles.py
@@ -35,7 +36,8 @@ Arguments: $ARGUMENTS (project name, e.g. "project_mycoursename")
 4. **Configure each file**:
    - `book.py`: Import setup, import blocks, configure `st.set_page_config(layout="wide")`, create `TOCConfig`, call `st_book()`
    - `setup.py`: Standard PATH setup (copy from template)
-   - `blocks/__init__.py`: Dynamic import loader (copy from template)
+   - `blocks/__init__.py`: ProjectBlockRegistry lazy loader (copy from template)
+   - `blocks/helpers.py`: Block helper config with DI pattern (copy from template)
    - `blocks/bck_welcome.py`: Starter block with a title and placeholder content
    - `custom/styles.py`: Custom styles class inheriting from `StreamTeX_Styles`, with example color and title styles
    - `custom/themes.py`: Empty theme dictionary ready for overrides
@@ -45,10 +47,16 @@ Arguments: $ARGUMENTS (project name, e.g. "project_mycoursename")
 
 6. **Validate**: Confirm the project can run:
    ```bash
-   cd [project_name] && streamlit run book.py
+   uv run streamlit run projects/[project_name]/book.py
    ```
 
 7. **Show next steps** to the user:
    - How to add new blocks (`/new-block`)
    - How to customize styles in `custom/styles.py`
+   - How to configure block helpers in `blocks/helpers.py`
    - How to configure the table of contents in `book.py`
+
+## Reference Projects
+- `documentation/template_project/` — canonical template (source of truth)
+- `documentation/manuals/sx_manual_intro/` — Phase 1 intro course example
+- `documentation/manuals/sx_manual_advanced/` — Phase 1 advanced + multi-source blocks example

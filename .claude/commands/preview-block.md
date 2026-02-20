@@ -1,6 +1,6 @@
 Preview and validate a StreamTeX block by checking its structure and dependencies.
 
-Arguments: $ARGUMENTS (block file path, e.g. "tests/test_project/blocks/bck_00_welcome.py")
+Arguments: $ARGUMENTS (block file path, e.g. "documentation/manuals/sx_manual_intro/blocks/bck_level_badge.py")
 
 ## Steps
 

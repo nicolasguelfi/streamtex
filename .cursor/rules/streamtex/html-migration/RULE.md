@@ -94,7 +94,7 @@ Links default to 12pt. When the HTML shows links at a larger size (e.g. 42pt, 48
 1.  **Text:** Extract clean text. Replace `<br>` with `sx.st_br()`.
 2.  **Lists:** Convert `<ul>/<ol>` or manual bullets to `sx.st_list()`.
 
-When unsure how to represent a particular HTML construct, look for the closest equivalent in existing blocks within the project or in `tests/test_project/blocks/`.
+When unsure how to represent a particular HTML construct, look for the closest equivalent in existing blocks within the project or in `documentation/manuals/sx_manual_intro/blocks/`.
 
 ## 4. Migration Checklist
 - [ ] Did I remove all raw HTML strings?
@@ -111,7 +111,7 @@ When unsure how to represent a particular HTML construct, look for the closest e
 - [ ] Did I map all non-default **background/border colors** (cards, callouts, highlights)?
 - [ ] Did I add a color-mapping summary and dropped-colors log in `BlockStyles`?
 - [ ] Did I pass the color sanity check (visual parity of key elements)?
-- [ ] Did I reuse or learn from patterns found in existing project blocks or `tests/test_project/blocks/`?
+- [ ] Did I reuse or learn from patterns found in existing project blocks or `documentation/manuals/sx_manual_intro/blocks/`?
 
 ## 5. Second-Pass Verification & Refinement (MANDATORY)
 

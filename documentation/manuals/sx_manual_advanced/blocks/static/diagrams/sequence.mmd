@@ -1,0 +1,18 @@
+sequenceDiagram
+    participant U as User
+    participant B as Browser
+    participant S as Streamlit
+    participant SX as StreamTeX
+
+    U->>B: Open app
+    B->>S: HTTP request
+    S->>SX: st_book(blocks)
+    SX->>SX: Load TOC + Markers
+    SX->>S: Render HTML
+    S->>B: Response
+    B->>U: Display page
+    U->>B: Navigate (PageDown)
+    B->>S: Rerun
+    S->>SX: Render next block
+    SX->>S: HTML fragment
+    S->>B: Updated page

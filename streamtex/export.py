@@ -188,3 +188,5 @@ def _render(html: str) -> None:
     st.html(html)
     if _buffer is not None:
         _buffer.append(html)
+    from .search import record_if_active
+    record_if_active(html)

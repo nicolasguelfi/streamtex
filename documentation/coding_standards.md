@@ -10,7 +10,7 @@ StreamTeX wraps Streamlit with a block-based architecture. Never manually write 
 
 ## 2. Source of Truth
 - **Syntax Reference:** `documentation/streamtex_cheatsheet_en.md`
-- **Architecture Reference:** Any project's `book.py` (orchestrates blocks/). See `tests/test_project/` or `documentation/template_project/` for illustration.
+- **Architecture Reference:** Any project's `book.py` (orchestrates blocks/). See `documentation/template_project/` or `documentation/manuals/sx_manual_intro/` for illustration.
 
 ## 3. Project Structure
 ```
@@ -175,10 +175,10 @@ with st_grid(cols=2, grid_style=grid_gap):
 # Single project
 uv run streamlit run projects/<project_name>/book.py
 
-# Test projects
-uv run streamlit run tests/test_project_intro/book.py
-uv run streamlit run tests/test_project_advanced/book.py
-uv run streamlit run tests/test_collection/book.py
+# Manual projects (documentation/manuals/)
+uv run streamlit run documentation/manuals/sx_manual_intro/book.py
+uv run streamlit run documentation/manuals/sx_manual_advanced/book.py
+uv run streamlit run documentation/manuals/sx_manuals_collection/book.py
 
 # Multiple projects simultaneously (different ports)
 ./run-test-projects.sh --intro --advanced --collection
@@ -237,13 +237,13 @@ Used in `book.py` to load blocks from external directories:
 import streamtex as sx
 from pathlib import Path
 
-shared_path = str(Path(__file__).parent.parent / "shared-blocks" / "blocks")
+shared_path = str(Path(__file__).parent.parent / "sx_manuals_shared-blocks" / "blocks")
 shared_blocks = sx.LazyBlockRegistry([shared_path])
 
 st_book([
-    shared_blocks.bck_header,    # From shared-blocks
+    shared_blocks.bck_header,    # From sx_manuals_shared-blocks
     blocks.bck_content,          # From local blocks/
-    shared_blocks.bck_footer,    # From shared-blocks
+    shared_blocks.bck_footer,    # From sx_manuals_shared-blocks
 ])
 ```
 
@@ -255,7 +255,7 @@ Priority: first source directory in the list wins. Once loaded, blocks are cache
 |----------|----------|
 | Local blocks (blocks/) | `ProjectBlockRegistry` |
 | Shared blocks from other dirs | `LazyBlockRegistry` |
-| Both in same project | One of each (see test_project_advanced) |
+| Both in same project | One of each (see sx_manual_advanced) |
 
 ## 14. Hybrid Helper Patterns
 
@@ -325,7 +325,7 @@ from pathlib import Path
 
 sx.set_static_sources([
     str(Path(__file__).parent / "static"),          # Local (highest priority)
-    str(Path(__file__).parent.parent / "shared-blocks" / "static"),  # Shared
+    str(Path(__file__).parent.parent / "sx_manuals_shared-blocks" / "static"),  # Shared
 ])
 
 # resolve_static("logo.png") searches each source in order
@@ -334,3 +334,51 @@ sx.set_static_sources([
 
 Priority: first directory containing the file wins. If not found, falls back to
 Streamlit's built-in `app/static/images/` path.
+
+## 16. Marker Navigation
+
+### When to use markers
+
+Use markers for slide-like or section-based navigation in long documents
+and presentations. They provide keyboard shortcuts (PageDown/PageUp) and a
+floating widget with prev/next buttons and a popup list of all waypoints.
+
+### Recommended setup
+
+The recommended approach is `auto_marker_on_toc=1` in MarkerConfig, which
+automatically bridges level-1 TOC headings to markers — no manual `st_marker()` calls
+needed for standard content.
+
+```python
+from streamtex import MarkerConfig, st_book, TOCConfig
+
+toc = TOCConfig(
+    sidebar_max_level=None,  # None = auto (paginated: 1, continuous: 2)
+)
+marker_config = MarkerConfig(
+    auto_marker_on_toc=1,
+    next_keys=["PageDown"],
+    prev_keys=["PageUp"],
+)
+st_book([...], toc_config=toc, marker_config=marker_config)
+```
+
+### Per-heading overrides
+
+Use `marker=False` on `st_write()` to exclude specific headings (appendices,
+indexes). Use `marker=True` to force-include a heading even when auto is off.
+
+### Manual markers
+
+Call `st_marker("Label", visible=True)` for visible waypoints or
+`st_marker("Label")` for invisible ones (scroll-only targets).
+
+### Architecture
+
+Three files collaborate:
+- `marker.py` — MarkerConfig dataclass, MarkerRegistry singleton, st_marker(),
+  inject_marker_navigation() (floating widget + JS)
+- `book.py` — Lifecycle: reset_marker_registry() → render blocks →
+  inject_marker_navigation(). In paginated mode, provides cross-page callbacks.
+- `write.py` — _handle_toc() bridges TOC headings to markers based on
+  auto_marker_on_toc and the per-heading marker= parameter.

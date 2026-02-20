@@ -19,7 +19,7 @@ Before generating code for a block, always read:
 1. `documentation/streamtex_cheatsheet_en.md`
 2. The target project's `book.py` (for structure)
 
-For architectural reference, inspect `tests/test_project/` (comprehensive feature showcase) or `documentation/template_project/` (starter template).
+For architectural reference, inspect `documentation/manuals/sx_manual_intro/` (comprehensive feature showcase) or `documentation/template_project/` (starter template).
 
 ## Workflows & Capabilities
 ### 1. New Feature / Text Description

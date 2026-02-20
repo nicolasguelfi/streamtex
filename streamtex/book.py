@@ -39,10 +39,40 @@ def _resolve_sidebar_max_level(toc_config: TOCConfig, paginated: bool) -> int | 
     return 1 if paginated else 2
 
 
+def _setup_bibliography(bib_sources, bib_config):
+    """Load bibliography sources and set config (called at start of st_book)."""
+    from .bib import reset_bib_registry, set_bib_config, get_bib_registry, load_bib
+
+    reset_bib_registry()
+
+    if bib_config is not None:
+        set_bib_config(bib_config)
+
+    if bib_sources:
+        registry = get_bib_registry()
+        for source_path in bib_sources:
+            try:
+                entries = load_bib(source_path)
+                registry.register_many(entries)
+                logger.debug(f"Loaded {len(entries)} bib entries from {source_path}")
+            except Exception as e:
+                logger.warning(f"Failed to load bibliography from {source_path}: {e}")
+
+
+def _inject_bib_preview_if_enabled():
+    """Inject bib hover scaffold if bibliography hover is enabled."""
+    from .bib import get_bib_config
+    from .bib_preview import inject_bib_preview_scaffold
+
+    if get_bib_config().hover_enabled:
+        inject_bib_preview_scaffold()
+
+
 def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConfig = None, separator=None,
             export: bool = True, export_title: str = "StreamTeX Export",
             paginate: bool = False,
             monties_color: str = "rgba(211, 47, 47, 0.8)",
+            bib_sources=None, bib_config=None,
             *args, **kwargs):
     """Generates a web page e-book from a list of block modules.
 
@@ -51,7 +81,11 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
     :param export_title: Title used for the exported HTML document.
     :param paginate: If True, renders one block at a time for faster widget interactions.
     :param monties_color: Background color for paginated navigation banners (CSS value).
+    :param bib_sources: Optional list of paths to .bib, .json, .ris, or .csl-json files.
+    :param bib_config: Optional BibConfig to configure bibliography formatting.
     """
+    # --- Bibliography setup ---
+    _setup_bibliography(bib_sources, bib_config)
     # --- View mode toggle (sidebar) ---
     if _STX_VIEW_MODE_KEY not in st.session_state:
         st.session_state[_STX_VIEW_MODE_KEY] = "Paginated" if paginate else "Continuous"
@@ -80,6 +114,9 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
 
     # Ensure the hover card is ready before any content is rendered.
     inject_link_preview_scaffold()
+
+    # Inject bibliography hover preview if enabled
+    _inject_bib_preview_if_enabled()
 
     # Add zoom options to sidebar
     add_zoom_options()
@@ -787,6 +824,7 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
     # --- Common setup ---
     load_css("default.css")
     inject_link_preview_scaffold()
+    _inject_bib_preview_if_enabled()
     add_zoom_options()
 
     # --- Cache management ---

@@ -23,6 +23,7 @@ EXPECTED_ST_HTML_COUNTS = {
     "list.py": 4,           # 2 CSS injections + 2 hidden markers
     "zoom.py": 1,           # CSS injection
     "link_preview.py": 2,   # CSS + JS scaffold
+    "bib_preview.py": 1,    # CSS only (JS via components.html)
     "book.py": 4,           # 2 load_css + 1 populate_toc (no-search branch) + 1 populate_markers
 }
 

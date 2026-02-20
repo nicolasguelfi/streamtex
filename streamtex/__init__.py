@@ -64,3 +64,20 @@ from .block_helpers import (
 
 # Collection system
 from .collection import st_collection, CollectionConfig, ProjectMeta
+
+# Google Sheets import
+from .gsheet import (
+    GSheetConfig, GSheetSource, GSheetError, AuthMode,
+    set_gsheet_config, get_gsheet_config,
+    load_gsheet, load_gsheet_df,
+)
+
+# Bibliography system
+from .bib import (
+    BibEntry, BibConfig, BibFormat, CitationStyle, BibParseError,
+    BibRegistry, set_bib_config, get_bib_config,
+    get_bib_registry, reset_bib_registry,
+    load_bib, load_bibtex, load_bib_json, load_bib_ris, load_bib_csl_json,
+    register_bib_parser, parse_bibtex_string, parse_ris_string,
+    cite, st_cite, st_bibliography, format_entry, export_bibtex,
+)

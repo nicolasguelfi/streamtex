@@ -4,6 +4,7 @@ import streamlit as st
 import setup
 import streamtex as stx
 from streamtex import st_book, TOCConfig, MarkerConfig
+from streamtex.bib import BibConfig, BibFormat, CitationStyle
 
 from custom.styles import Styles as s
 from custom.themes import dark
@@ -54,6 +55,20 @@ marker_config = MarkerConfig(
 )
 
 # ============================================================================
+# Bibliography configuration
+# ============================================================================
+bib_sources = [
+    str(Path(__file__).parent / "static" / "various" / "references.bib"),
+]
+
+bib_config = BibConfig(
+    format=BibFormat.APA,
+    citation_style=CitationStyle.AUTHOR_YEAR,
+    hover_enabled=True,
+    hover_show_abstract=True,
+)
+
+# ============================================================================
 # Orchestrate composites in pedagogical order
 #
 # Note: This includes 3 new demo blocks that showcase Phase 1 (shared blocks)
@@ -89,6 +104,11 @@ st_book([
     blocks.bck_ui_components,
     blocks.bck_diagrams_and_viz,
 
+    # Data integration and external sources
+    blocks.bck_gsheet_import,
+    blocks.bck_bibliography_references,
+
     # Shared block footer
     shared_blocks.bck_footer_training,
-], toc_config=toc, marker_config=marker_config, paginate=True)
+], toc_config=toc, marker_config=marker_config, paginate=True,
+   bib_sources=bib_sources, bib_config=bib_config)

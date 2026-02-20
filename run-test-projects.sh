@@ -192,7 +192,7 @@ print_pids() {
 free_port() {
     local port=$1
     local pids
-    pids=$(lsof -ti :"$port" -sTCP:LISTEN 2>/dev/null)
+    pids=$(lsof -ti :"$port" -sTCP:LISTEN 2>/dev/null || true)
     if [ -n "$pids" ]; then
         echo "   ⚠️  Port $port occupé (PIDs: $pids) — arrêt des processus..."
         echo "$pids" | xargs kill 2>/dev/null || true

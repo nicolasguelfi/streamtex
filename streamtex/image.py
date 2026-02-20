@@ -17,7 +17,8 @@ def st_image(
     style: Style = StxStyles.none,
     width="100%", height="auto",
     uri: str="", alt:str="",
-    link:str="", hover:bool=True
+    link:str="", hover:bool=True,
+    light_bg: bool = False,
 ):
     """
     Generates an HTML `img` tag based on the image URI, with optional styles, link wrapping, and hover effects.
@@ -69,8 +70,9 @@ def st_image(
     # 6. Handle Link Wrapping
     html_content = contain_link(html_content, link, False, hover)
 
-    # 7. Render
-    _render(html_content)
+    # 7. Render (pass light_bg to force a white background inside the
+    #    iframe — useful for SVG diagrams designed for light mode)
+    _render(html_content, light_bg=light_bg)
 
 def get_image_src(uri: str) -> str:
     """

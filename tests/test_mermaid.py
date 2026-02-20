@@ -12,10 +12,9 @@ SAMPLE_CODE = "graph TD\n    A --> B"
 
 @contextmanager
 def _patched_mermaid(**overrides):
-    """Patch sys.modules for streamlit-mermaid and mermaid-py."""
+    """Patch sys.modules for mermaid-py (export path only)."""
     mermaid_lib = overrides.pop("mermaid", MagicMock())
     modules = {
-        "streamlit_mermaid": MagicMock(),
         "mermaid": mermaid_lib,
         "mermaid.graph": MagicMock(),
     }
@@ -25,27 +24,68 @@ def _patched_mermaid(**overrides):
 
 
 # ---------------------------------------------------------------------------
-# Live rendering
+# Live rendering (via components.html with Mermaid JS CDN)
 # ---------------------------------------------------------------------------
 
 class TestLiveRendering:
-    """Tests for the live Streamlit component path."""
+    """Tests for the live components.html() rendering path."""
 
-    @patch("streamtex.mermaid.st")
-    def test_calls_streamlit_mermaid_component(self, mock_st):
-        """The streamlit-mermaid component is called with the code."""
-        mock_module = MagicMock()
-        with patch.dict("sys.modules", {"streamlit_mermaid": mock_module}):
-            st_mermaid(SAMPLE_CODE)
-            mock_module.st_mermaid.assert_called_once_with(SAMPLE_CODE)
+    @patch("streamtex.mermaid.components")
+    def test_renders_via_components_html(self, mock_components):
+        """The diagram is rendered via components.html()."""
+        st_mermaid(SAMPLE_CODE)
+        mock_components.html.assert_called_once()
+        html_arg = mock_components.html.call_args[0][0]
+        assert "mermaid" in html_arg
+        assert "graph TD" in html_arg
 
-    @patch("streamtex.mermaid.st")
-    def test_fallback_when_component_missing(self, mock_st):
-        """When streamlit-mermaid is not installed, show warning + code."""
-        with patch.dict("sys.modules", {"streamlit_mermaid": None}):
-            st_mermaid(SAMPLE_CODE)
-        mock_st.warning.assert_called_once()
-        mock_st.code.assert_called_once_with(SAMPLE_CODE, language="mermaid")
+    @patch("streamtex.mermaid.components")
+    def test_light_bg_true_sets_white_background(self, mock_components):
+        """When light_bg=True, background is white and theme is default."""
+        st_mermaid(SAMPLE_CODE, light_bg=True)
+        html_arg = mock_components.html.call_args[0][0]
+        assert "#fff" in html_arg
+        assert "theme: 'default'" in html_arg
+
+    @patch("streamtex.mermaid.components")
+    def test_light_bg_false_sets_transparent_background(self, mock_components):
+        """When light_bg=False, background is transparent and theme is dark."""
+        st_mermaid(SAMPLE_CODE, light_bg=False)
+        html_arg = mock_components.html.call_args[0][0]
+        assert "transparent" in html_arg
+        assert "theme: 'dark'" in html_arg
+
+    @patch("streamtex.mermaid.components")
+    def test_default_height_500(self, mock_components):
+        """Default height is 500 pixels."""
+        st_mermaid(SAMPLE_CODE)
+        assert mock_components.html.call_args[1]["height"] == 500
+
+    @patch("streamtex.mermaid.components")
+    def test_custom_height(self, mock_components):
+        """Height parameter is forwarded to components.html()."""
+        st_mermaid(SAMPLE_CODE, height=800)
+        assert mock_components.html.call_args[1]["height"] == 800
+
+    @patch("streamtex.mermaid.components")
+    def test_style_wraps_in_st_block(self, mock_components):
+        """When style is provided, diagram is wrapped in st_block."""
+        from streamtex.styles import Style
+        my_style = Style("border: 1px solid red;")
+        with patch("streamtex.mermaid.st_block") as mock_block:
+            mock_block.return_value.__enter__ = MagicMock()
+            mock_block.return_value.__exit__ = MagicMock(return_value=False)
+            st_mermaid(SAMPLE_CODE, style=my_style)
+            mock_block.assert_called_once_with(my_style)
+
+    @patch("streamtex.mermaid.components")
+    def test_escapes_html_in_code(self, mock_components):
+        """HTML special characters in code are escaped."""
+        malicious = 'graph TD\n    A["<script>alert(1)</script>"] --> B'
+        st_mermaid(malicious)
+        html_arg = mock_components.html.call_args[0][0]
+        assert "<script>alert" not in html_arg
+        assert "&lt;script&gt;" in html_arg
 
 
 # ---------------------------------------------------------------------------
@@ -59,15 +99,15 @@ class TestExportRendering:
     def teardown_method(self):
         export_mod._buffer = None
 
-    @patch("streamtex.mermaid.st")
-    def test_noop_when_inactive(self, mock_st):
+    @patch("streamtex.mermaid.components")
+    def test_noop_when_inactive(self, mock_components):
         """No export output when export is not active."""
         with _patched_mermaid():
             st_mermaid(SAMPLE_CODE)
         assert generate_export_html() is None
 
-    @patch("streamtex.mermaid.st")
-    def test_export_svg_when_active(self, mock_st):
+    @patch("streamtex.mermaid.components")
+    def test_export_svg_when_active(self, mock_components):
         """When export is active and mermaid-py succeeds, SVG is appended."""
         reset_export_buffer(ExportConfig(enabled=True))
         mock_lib = MagicMock()
@@ -78,8 +118,8 @@ class TestExportRendering:
         assert "stx-mermaid" in html
         assert "<svg>mermaid diagram</svg>" in html
 
-    @patch("streamtex.mermaid.st")
-    def test_export_fallback_on_error(self, mock_st):
+    @patch("streamtex.mermaid.components")
+    def test_export_fallback_on_error(self, mock_components):
         """When mermaid-py fails, raw code is exported as <pre>."""
         reset_export_buffer(ExportConfig(enabled=True))
         mock_lib = MagicMock()
@@ -91,8 +131,8 @@ class TestExportRendering:
         assert "<pre" in html
         assert "graph TD" in html
 
-    @patch("streamtex.mermaid.st")
-    def test_export_escapes_html(self, mock_st):
+    @patch("streamtex.mermaid.components")
+    def test_export_escapes_html(self, mock_components):
         """Fallback properly escapes HTML special characters."""
         reset_export_buffer(ExportConfig(enabled=True))
         malicious = 'graph TD\n    A["<script>alert(1)</script>"] --> B'

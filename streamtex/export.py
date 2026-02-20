@@ -183,7 +183,12 @@ def st_export(fallback_html: str):
 # Dual render — the single bridge from content modules to st.html()
 # ---------------------------------------------------------------------------
 
-def _render(html: str, *, height: int = 0) -> None:
+# Injected into iframes to force light-mode defaults (white background,
+# black text) regardless of OS / browser dark-mode settings.
+_LIGHT_SCHEME = "<style>:root{color-scheme:light}</style>"
+
+
+def _render(html: str, *, height: int = 0, light_bg: bool = False) -> None:
     """Send *html* to Streamlit **and** to the export buffer (if active).
 
     Parameters
@@ -192,13 +197,18 @@ def _render(html: str, *, height: int = 0) -> None:
         When > 0, use ``components.html()`` with an explicit pixel height
         instead of ``st.html()``.  This is required for content (e.g. SVG
         diagrams) that cannot be auto-sized by the Shadow DOM iframe.
+    light_bg : bool
+        When True, inject ``color-scheme: light`` into the iframe so that
+        diagram / image content renders on a white background even when the
+        OS or browser is in dark mode.
     """
+    live = f"{_LIGHT_SCHEME}{html}" if light_bg else html
     if height > 0:
         import streamlit.components.v1 as components
 
-        components.html(html, height=height)
+        components.html(live, height=height)
     else:
-        st.html(html)
+        st.html(live)
     if _buffer is not None:
         _buffer.append(html)
     from .search import record_if_active

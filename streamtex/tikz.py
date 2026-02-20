@@ -145,7 +145,13 @@ def _extract_svg_height(svg: str) -> int:
     return 400
 
 
-def st_tikz(code: str, *, style: Style | None = None, preamble: str = "") -> None:
+def st_tikz(
+    code: str,
+    *,
+    style: Style | None = None,
+    light_bg: bool = True,
+    preamble: str = "",
+) -> None:
     """Render a TikZ diagram.
 
     Parameters
@@ -155,6 +161,10 @@ def st_tikz(code: str, *, style: Style | None = None, preamble: str = "") -> Non
         ``\\end{document}`` is handled automatically).
     style : Style | None
         Optional StreamTeX style to wrap the diagram in a styled container.
+    light_bg : bool
+        When True (default), render the SVG on a white background so it
+        stays readable on dark-mode pages.  Set to False to let the
+        diagram follow the page theme.
     preamble : str
         Extra LaTeX preamble lines (e.g. ``\\usepackage{pgfplots}``).
     """
@@ -175,7 +185,11 @@ def st_tikz(code: str, *, style: Style | None = None, preamble: str = "") -> Non
 
         # --- Live + export rendering ---
         if svg is not None:
-            html = f'<div class="stx-tikz" style="background:#fff;padding:8px;display:inline-block">{svg}</div>'
-            _render(html, height=_extract_svg_height(svg))
+            if light_bg:
+                css = "background:#fff;padding:8px"
+            else:
+                css = "padding:8px"
+            html = f'<div class="stx-tikz" style="{css}">{svg}</div>'
+            _render(html, height=_extract_svg_height(svg), light_bg=light_bg)
         elif is_export_active():
             export_append(f'<pre class="stx-tikz">{escape(code)}</pre>')

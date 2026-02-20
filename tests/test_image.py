@@ -157,8 +157,6 @@ class TestGetImageSrc:
         import streamtex.image as img_mod
         fake_bytes = b"PNG\x89data"
         fake_b64 = base64.b64encode(fake_bytes).decode("utf-8")
-        # image.py binds the helpers as module-level double-underscore names
-        # (e.g. __get_mime_type). Patch them directly on the module object.
         with patch("os.path.exists", return_value=True), \
              patch.object(img_mod, "__get_mime_type", return_value="image/png"), \
              patch.object(img_mod, "__get_base64_encoded_image", return_value=fake_b64):
@@ -178,7 +176,6 @@ class TestGetImageSrc:
         with patch("streamtex.image.get_static_sources", return_value=[]), \
              patch("os.path.isfile", return_value=False):
             result = get_image_src("logo.png")
-        # Falls back to "{_static_image_base}/logo.png"
         assert "logo.png" in result
 
     def test_static_source_resolved_to_data_uri(self):
@@ -186,14 +183,11 @@ class TestGetImageSrc:
         import streamtex.image as img_mod
         fake_bytes = b"PNG data"
         fake_b64 = base64.b64encode(fake_bytes).decode("utf-8")
-
-        # Patch the double-underscore helpers bound on streamtex.image directly.
         with patch("streamtex.image.get_static_sources", return_value=["/static"]), \
              patch("os.path.isfile", return_value=True), \
              patch.object(img_mod, "__get_mime_type", return_value="image/png"), \
              patch.object(img_mod, "__get_base64_encoded_image", return_value=fake_b64):
             result = img_mod.get_image_src("logo.png")
-
         assert result.startswith("data:image/png;base64,")
         assert fake_b64 in result
 
@@ -209,13 +203,20 @@ class TestConfigureImagePath:
             img_mod._static_image_base = original
 
 
+def _capture_render(captured):
+    """Side-effect for _render mock that accepts the light_bg kwarg."""
+    def _side_effect(html, **kw):
+        captured.append(html)
+    return _side_effect
+
+
 class TestStImage:
     """Tests for streamtex.image.st_image — mock _render to capture output."""
 
     def test_url_renders_img_tag(self):
         from streamtex.image import st_image
         captured = []
-        with patch("streamtex.image._render", side_effect=captured.append):
+        with patch("streamtex.image._render", side_effect=_capture_render(captured)):
             st_image(uri="https://example.com/img.png")
         assert len(captured) == 1
         assert '<img src="https://example.com/img.png"' in captured[0]
@@ -224,36 +225,52 @@ class TestStImage:
         from streamtex.image import st_image
         captured = []
         with patch("streamtex.image.get_image_src", return_value=""), \
-             patch("streamtex.image._render", side_effect=captured.append):
+             patch("streamtex.image._render", side_effect=_capture_render(captured)):
             st_image(uri="missing.png")
         assert len(captured) == 1
         assert "Image not found" in captured[0]
-        assert "border" in captured[0]  # dashed border placeholder
+        assert "border" in captured[0]
 
     def test_integer_width_converted_to_px(self):
         from streamtex.image import st_image
         captured = []
-        with patch("streamtex.image._render", side_effect=captured.append):
+        with patch("streamtex.image._render", side_effect=_capture_render(captured)):
             st_image(uri="https://example.com/img.png", width=200)
         assert "200px" in captured[0]
 
     def test_integer_height_converted_to_px(self):
         from streamtex.image import st_image
         captured = []
-        with patch("streamtex.image._render", side_effect=captured.append):
+        with patch("streamtex.image._render", side_effect=_capture_render(captured)):
             st_image(uri="https://example.com/img.png", height=150)
         assert "150px" in captured[0]
 
     def test_alt_text_included(self):
         from streamtex.image import st_image
         captured = []
-        with patch("streamtex.image._render", side_effect=captured.append):
+        with patch("streamtex.image._render", side_effect=_capture_render(captured)):
             st_image(uri="https://example.com/img.png", alt="My photo")
         assert 'alt="My photo"' in captured[0]
 
     def test_link_wraps_image(self):
         from streamtex.image import st_image
         captured = []
-        with patch("streamtex.image._render", side_effect=captured.append):
+        with patch("streamtex.image._render", side_effect=_capture_render(captured)):
             st_image(uri="https://example.com/img.png", link="https://example.com")
         assert "https://example.com" in captured[0]
+
+    def test_light_bg_default_false(self):
+        """By default, light_bg is False (no assumption about image type)."""
+        from streamtex.image import st_image
+        mock_render = MagicMock()
+        with patch("streamtex.image._render", mock_render):
+            st_image(uri="https://example.com/photo.png")
+        assert mock_render.call_args.kwargs.get("light_bg") is False
+
+    def test_light_bg_true_passed_to_render(self):
+        """When light_bg=True, it is forwarded to _render."""
+        from streamtex.image import st_image
+        mock_render = MagicMock()
+        with patch("streamtex.image._render", mock_render):
+            st_image(uri="https://example.com/diagram.svg", light_bg=True)
+        assert mock_render.call_args.kwargs.get("light_bg") is True

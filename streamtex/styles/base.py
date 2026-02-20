@@ -29,6 +29,10 @@ class StxStyles:
 
     reset = text.colors.reset + BackgroundColors.reset_bg + text.weights.normal_weight + text.sizes.medium_size + text.alignments.left_align
 
+    light_bg = Style("background-color: White; padding: 8px;", "light_bg")
+    """White background with padding — use with ``st_block``, ``st_image``,
+    ``st_mermaid``, or ``st_tikz`` to make diagrams readable on dark pages."""
+
     GIANT = text.sizes.GIANT_size
     """196pt"""
     Giant = text.sizes.Giant_size

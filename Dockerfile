@@ -25,7 +25,7 @@ COPY streamtex/ ./streamtex/
 RUN uv sync --frozen --no-dev
 
 # Copy the target project
-ARG FOLDER="tests/test_project"
+ARG FOLDER="tests/test_project_intro"
 COPY ${FOLDER}/ ./${FOLDER}/
 
 WORKDIR /app/${FOLDER}

@@ -149,6 +149,7 @@ def st_json(data, **kw):
 
 def st_graphviz(dot_source, **kw):
     """Display a Graphviz graph with ``st.graphviz_chart()`` and export SVG."""
+    kw.setdefault("use_container_width", True)
     st.graphviz_chart(dot_source, **kw)
     if is_export_active():
         try:

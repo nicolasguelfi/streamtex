@@ -186,9 +186,9 @@ def st_tikz(
         # --- Live + export rendering ---
         if svg is not None:
             if light_bg:
-                css = "background:#fff;padding:8px"
+                css = "background:#fff;padding:8px;text-align:center"
             else:
-                css = "padding:8px"
+                css = "padding:8px;text-align:center"
             html = f'<div class="stx-tikz" style="{css}">{svg}</div>'
             _render(html, height=_extract_svg_height(svg), light_bg=light_bg)
         elif is_export_active():

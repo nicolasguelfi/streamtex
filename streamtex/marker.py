@@ -5,8 +5,8 @@ import streamlit as st
 import streamlit.components.v1 as components
 from dataclasses import dataclass, field
 from typing import Optional
-from .utils import generate_key
 from .export import _render
+from .toc import TOCRegistry
 
 
 @dataclass
@@ -127,11 +127,14 @@ def st_marker(label: str = "", visible: bool = False) -> None:
     if _registry is None:
         return
 
-    anchor = generate_key("marker")
     idx = _registry.count()
 
     if not label:
         label = f"Marker {idx + 1}"
+
+    # Deterministic anchor so cache-build and live-render produce the same ID
+    slug = TOCRegistry.get_key_anchor(label)
+    anchor = f"stx-marker-{slug}-{idx}"
 
     _registry.register(label, anchor)
 

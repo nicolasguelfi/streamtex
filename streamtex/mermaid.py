@@ -42,6 +42,7 @@ _MERMAID_TEMPLATE = """\
   #viewport {
     width: 100%; height: calc(100% - 32px);
     overflow: hidden; cursor: grab;
+    display: flex; justify-content: center; align-items: start;
   }
   #viewport.dragging { cursor: grabbing; }
   #viewport svg { transform-origin: 0 0; }

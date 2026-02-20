@@ -210,7 +210,7 @@ class TestStGraphviz:
     def test_calls_st_graphviz_chart(self, mock_st):
         dot = "digraph { A -> B }"
         st_graphviz(dot)
-        mock_st.graphviz_chart.assert_called_once_with(dot)
+        mock_st.graphviz_chart.assert_called_once_with(dot, use_container_width=True)
 
     @patch("streamtex.export_widgets.gv", create=True)
     def test_appends_svg_when_active(self, mock_gv, mock_st):

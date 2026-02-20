@@ -118,6 +118,15 @@ a {
     height: auto;
 }
 
+.stx-tikz {
+    text-align: center;
+    margin: 0.5em 0;
+}
+.stx-tikz svg {
+    max-width: 100%;
+    height: auto;
+}
+
 .stx-media {
     display: block;
     max-width: 100%;

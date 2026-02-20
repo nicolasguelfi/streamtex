@@ -50,5 +50,12 @@ from .blocks import (
     set_static_sources, get_static_sources, resolve_static
 )
 
+# Block helpers (3 usage modes: functions, config injection, OOP inheritance)
+from .block_helpers import (
+    BlockHelperConfig, BlockHelper,
+    show_code, show_code_inline, show_explanation, show_details,
+    set_block_helper_config, get_block_helper_config
+)
+
 # Collection system
 from .collection import st_collection, CollectionConfig, ProjectMeta

@@ -1,52 +1,141 @@
-"""Shared helper functions for block files. No build() — ignored by st_include."""
+"""Block helpers for test_project_advanced — hybrid approach.
 
-from streamtex import st_write, st_block, st_space, st_br
-import streamtex as sx
+This module demonstrates the hybrid block helpers pattern:
+1. Dependency Injection: ProjectBlockHelperConfig customizes defaults
+2. Standalone functions: Direct usage with config injection
+3. OOP inheritance: Optional ProjectBlockHelper class for advanced overrides
+4. Project-specific helpers: Advanced features unique to this project
+"""
+
+from streamtex import (
+    BlockHelperConfig, BlockHelper,
+    show_code as _show_code,
+    show_code_inline as _show_code_inline,
+    show_explanation as _show_explanation,
+    show_details as _show_details,
+    set_block_helper_config,
+)
+from streamtex import st_write, st_block, st_space
 from custom.styles import Styles as s
 
 
-def show_code(code_string, language="python", line_numbers=True):
-    """Centered styled box with syntax-highlighted code — uses native st_code()."""
-    sx.st_code(s.project.containers.code_box, code=code_string,
-               language=language, line_numbers=line_numbers)
+# ============================================================================
+# DEPENDENCY INJECTION: Config class with project-specific styles
+# ============================================================================
 
+class ProjectBlockHelperConfig(BlockHelperConfig):
+    """Custom config injecting project-specific styles into all helpers.
 
-def show_code_inline(code_string, language="python", line_numbers=True):
-    """Code display without box wrapper — for use inside callout containers."""
-    sx.st_code(code=code_string, language=language, line_numbers=line_numbers)
-
-
-def show_explanation(text):
-    """Styled explanation box before an example.
-
-    Pass a multi-line string (use textwrap.dedent). Each non-empty line
-    is rendered on its own line for readability.
+    This is called once at project startup to set default styles globally.
+    All helpers (show_code, show_explanation, etc.) will use these styles
+    automatically, without needing to pass them as parameters.
     """
-    lines = [line.strip() for line in text.strip().split("\n") if line.strip()]
-    with st_block(s.project.containers.explanation_box):
-        st_write(s.project.titles.explanation_label, "Purpose")
-        st_space("v", 1)
-        for i, line in enumerate(lines):
-            st_write(s.large, line)
-            if i < len(lines) - 1:
-                st_br()
+
+    def get_code_style(self):
+        """Default style for code boxes in this project."""
+        return s.project.containers.code_box
+
+    def get_code_inline_style(self):
+        """Default style for inline code in this project."""
+        return None  # Use bare code (no wrapper)
+
+    def get_explanation_style(self):
+        """Default style for explanation boxes in this project."""
+        return s.project.containers.explanation_box
+
+    def get_details_style(self):
+        """Default style for details boxes in this project."""
+        return s.project.containers.details_box
 
 
-def show_details(text):
-    """'Details:' section with summary + expanded text.
+# Initialize: inject project config globally
+set_block_helper_config(ProjectBlockHelperConfig())
 
-    Pass a multi-line string (use textwrap.dedent). The first line becomes
-    the bold summary; subsequent lines are detail text.
+
+# ============================================================================
+# SIMPLE WRAPPERS: Optional convenience wrappers for local shortcuts
+# ============================================================================
+
+def show_code(code_string: str, language: str = "python", line_numbers: bool = True):
+    """Convenience wrapper — uses config-injected style automatically."""
+    return _show_code(code_string, language, line_numbers)
+
+
+def show_code_inline(code_string: str, language: str = "python", line_numbers: bool = True):
+    """Convenience wrapper — uses config-injected style automatically."""
+    return _show_code_inline(code_string, language, line_numbers)
+
+
+def show_explanation(text: str):
+    """Convenience wrapper — uses config-injected style automatically."""
+    return _show_explanation(text)
+
+
+def show_details(text: str):
+    """Convenience wrapper — uses config-injected style automatically."""
+    return _show_details(text)
+
+
+# ============================================================================
+# OPTIONAL OOP BASE: For advanced users wanting to override via inheritance
+# ============================================================================
+
+class ProjectBlockHelper(BlockHelper):
+    """Optional OOP base class for this project's blocks.
+
+    Inherits from streamtex.BlockHelper and adds project-specific methods.
+
+    Usage:
+        from blocks.helpers import ProjectBlockHelper
+        helper = ProjectBlockHelper()
+        helper.show_code("print('hello')")
     """
-    lines = [line.strip() for line in text.strip().split("\n") if line.strip()]
-    with st_block(s.project.containers.details_box):
-        st_write(s.project.titles.details_label, "Details:")
+
+    def show_advanced_comparison(self, before: str, after: str, label: str = "Comparison"):
+        """Advanced-specific helper: Side-by-side comparison."""
+        with st_block(s.advanced.comparison_container):
+            st_write(s.titles.section_title, label)
+            st_space("v", 1)
+            # Layout comparison (simplified)
+            st_write(s.body, "Before:")
+            _show_code(before)
+            st_space("v", 2)
+            st_write(s.body, "After:")
+            _show_code(after)
+
+
+# ============================================================================
+# PROJECT-SPECIFIC HELPERS: Advanced features unique to this project
+# ============================================================================
+
+def show_advanced_warning(title: str, description: str):
+    """Advanced warning box — for deprecated features, breaking changes."""
+    with st_block(s.advanced.warning_box):
+        st_write(s.advanced.warning_label, f"⚠️ {title}")
         st_space("v", 1)
-        if lines:
-            st_write(s.large + s.bold, lines[0])
-            if len(lines) > 1:
-                st_space("v", 1)
-                for i, line in enumerate(lines[1:]):
-                    st_write(s.large, line)
-                    if i < len(lines) - 2:
-                        st_br()
+        st_write(s.body, description)
+
+
+def show_advanced_note(title: str, description: str):
+    """Advanced note box — for important notes and considerations."""
+    with st_block(s.advanced.note_box):
+        st_write(s.advanced.note_label, f"📌 {title}")
+        st_space("v", 1)
+        st_write(s.body, description)
+
+
+def show_performance_insight(metric: str, value: str, note: str):
+    """Performance-specific helper — for optimization tips."""
+    with st_block(s.advanced.perf_box):
+        st_write(s.advanced.perf_metric, f"{metric}: {value}")
+        st_space("v", 1)
+        st_write(s.body, note)
+
+
+def show_api_reference(method_name: str, signature: str, description: str):
+    """API reference helper — for documenting functions/methods."""
+    with st_block(s.advanced.api_box):
+        st_write(s.advanced.api_method, method_name)
+        _show_code(signature, language="python")
+        st_space("v", 1)
+        st_write(s.body, description)

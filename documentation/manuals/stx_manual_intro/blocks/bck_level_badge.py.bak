@@ -52,7 +52,7 @@ def build():
         st_space("v", 0.5)
         st_write(
             s.Large + s.text.weights.bold_weight,
-            "A XX Hands-On Guide to the Basic Features",
+            "A Hands-On Guide to the Basic Features",
         )
         st_space("v", 1)
         st_write(

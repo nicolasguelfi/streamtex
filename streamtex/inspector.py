@@ -24,6 +24,17 @@ import streamlit as st
 _STX_INSPECTOR_OPEN = "_stx_inspector_open"
 _STX_INSPECTOR_BLOCK = "_stx_inspector_block"
 _STX_INSPECTOR_AUTH = "_stx_inspector_auth"
+_STX_INSPECTOR_WIDTH = "_stx_inspector_width"
+
+# Width presets for the inspector sidebar.
+# CSS min-width overrides Streamlit's hardcoded 600px clamp because
+# per the CSS spec, min-width takes precedence over width.
+_WIDTH_PRESETS = {
+    "Default": "",        # Streamlit native (up to 600px)
+    "Medium": "700px",
+    "Large": "900px",
+    "XL": "1100px",
+}
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -364,6 +375,10 @@ def inject_inspector_css() -> None:
 
     Called once in ``st_book`` when the inspector is enabled.
     This replaces per-button CSS injection (N calls → 1 call).
+
+    Sidebar width is handled separately by :func:`_inject_sidebar_width_css`,
+    which is called from the panel renderer so it can react to the user's
+    width-preset selection.
     """
     css = f"""
     <style>
@@ -388,12 +403,6 @@ def inject_inspector_css() -> None:
             font-size: 1.1rem;
             line-height: 1.2;
         }}
-        /* --- Sidebar: remove ALL width limits for inspector editing --- */
-        [data-testid="stSidebar"],
-        [data-testid="stSidebar"] > div,
-        [data-testid="stSidebar"] > div > div {{
-            max-width: none !important;
-        }}
         /* Keep ace editor responsive inside sidebar */
         [data-testid="stSidebar"] iframe {{
             width: 100% !important;
@@ -402,36 +411,26 @@ def inject_inspector_css() -> None:
     """
     st.html(css)
 
-    # JavaScript: persist sidebar width across reruns.
-    # Streamlit resets the sidebar width on each rerun; this script saves
-    # the user's chosen width in sessionStorage and restores it.
-    import streamlit.components.v1 as components
-    components.html("""
-    <script>
-    (function() {
-        const KEY = '_stx_sidebar_width';
-        const sidebar = window.parent.document.querySelector(
-            '[data-testid="stSidebar"]');
-        if (!sidebar) return;
 
-        // Restore saved width
-        const saved = window.sessionStorage.getItem(KEY);
-        if (saved) {
-            sidebar.style.width = saved;
-            sidebar.style.flexBasis = saved;
-        }
+def _inject_sidebar_width_css(min_width: str) -> None:
+    """Inject CSS to widen the sidebar beyond Streamlit's 600px cap.
 
-        // Watch for resize (user drags the handle)
-        const observer = new MutationObserver(function() {
-            const w = sidebar.style.width;
-            if (w) window.sessionStorage.setItem(KEY, w);
-        });
-        observer.observe(sidebar, {
-            attributes: true, attributeFilter: ['style']
-        });
-    })();
-    </script>
-    """, height=0)
+    Streamlit's frontend ``clampSidebarWidth()`` hard-caps the sidebar
+    ``width`` inline style to 600px.  Per the CSS spec, ``min-width``
+    takes precedence over ``width``, so setting ``min-width`` with
+    ``!important`` reliably overrides the JS-applied inline width
+    without any JavaScript hacks.
+    """
+    if not min_width:
+        return
+    st.html(f"""
+    <style>
+        section[data-testid="stSidebar"] {{
+            min-width: {min_width} !important;
+            max-width: none !important;
+        }}
+    </style>
+    """)
 
 
 def render_edit_button(module_name: str, config: InspectorConfig) -> None:
@@ -588,9 +587,25 @@ def render_inspector_panel(
                 st.button("Close", key="_stx_insp_close_auth", on_click=_close_inspector)
             return
 
-        # --- Header: title ---
+        # --- Header: title + width selector ---
         block_name = st.session_state.get(_STX_INSPECTOR_BLOCK, "")
         st.markdown(f"**Inspector:** `{block_name}`")
+
+        width_labels = [*_WIDTH_PRESETS]
+        current_label = st.session_state.get(_STX_INSPECTOR_WIDTH, "Large")
+        current_idx = width_labels.index(current_label) if current_label in width_labels else 2
+        selected_width = st.segmented_control(
+            "Panel width",
+            width_labels,
+            default=width_labels[current_idx],
+            key="_stx_insp_width_ctrl",
+            label_visibility="collapsed",
+        )
+        if selected_width and selected_width != current_label:
+            st.session_state[_STX_INSPECTOR_WIDTH] = selected_width
+        # Apply the chosen width via CSS min-width
+        effective_label = selected_width or current_label
+        _inject_sidebar_width_css(_WIDTH_PRESETS.get(effective_label, ""))
 
         if not sources:
             st.info("No source files found for this block.")

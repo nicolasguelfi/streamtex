@@ -425,7 +425,7 @@ def _inject_sidebar_width_css(min_width: str) -> None:
         return
     st.html(f"""
     <style>
-        section[data-testid="stSidebar"] {{
+        section[data-testid="stSidebar"][aria-expanded="true"] {{
             min-width: {min_width} !important;
             max-width: none !important;
         }}

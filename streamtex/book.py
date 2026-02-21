@@ -357,11 +357,12 @@ def st_toc(toc_title_style):
 
 def st_include(block_file_module, *args, _inspector_config=None, **kwargs):
     if not block_file_module:
-        st.markdown(f":red-background[File {block_file_module.__path__} not found]")
+        st.markdown(":red-background[Block module is None — not found]")
         return
 
+    mod_path = getattr(block_file_module, '__file__', None) or getattr(block_file_module, '__name__', '?')
     if not hasattr(block_file_module, 'build'):
-        st.markdown(f":red-background[The file {block_file_module.__path__} does not contain a build() function.]")
+        st.markdown(f":red-background[The file {mod_path} does not contain a build() function.]")
         return
 
     module_name = getattr(block_file_module, '__name__', str(block_file_module))

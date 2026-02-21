@@ -33,6 +33,8 @@ class LazyBlockRegistry:
         ```
     """
 
+    _instances: List["LazyBlockRegistry"] = []
+
     def __init__(self, sources: List[str]):
         """
         Initialize the registry with a list of source directories.
@@ -44,6 +46,7 @@ class LazyBlockRegistry:
         self.sources = [os.path.abspath(s) for s in sources]
         self._cache = {}
         self._not_found = set()  # Track blocks we've already searched for (not found)
+        LazyBlockRegistry._instances.append(self)
 
     def __getattr__(self, block_name: str):
         """
@@ -107,6 +110,17 @@ class LazyBlockRegistry:
         """Get a block by name. Same as attribute access but explicit."""
         return getattr(self, block_name)
 
+    def invalidate(self) -> None:
+        """Clear the block cache so modules are reloaded from disk."""
+        self._cache.clear()
+        self._not_found.clear()
+
+    @classmethod
+    def invalidate_all(cls) -> None:
+        """Clear caches on **all** ``LazyBlockRegistry`` instances."""
+        for reg in cls._instances:
+            reg.invalidate()
+
     def __repr__(self) -> str:
         return f"LazyBlockRegistry(sources={self.sources}, cached={len(self._cache)})"
 
@@ -139,10 +153,13 @@ class ProjectBlockRegistry:
         registry = ProjectBlockRegistry(Path(__file__).parent)
     """
 
+    _instances: List["ProjectBlockRegistry"] = []
+
     def __init__(self, blocks_dir: Path):
         self.blocks_dir = Path(blocks_dir)
         self._cache: Dict[str, object] = {}
         self._manifest: Optional[Dict] = None
+        ProjectBlockRegistry._instances.append(self)
 
     @property
     def manifest(self) -> Dict[str, dict]:
@@ -222,6 +239,17 @@ class ProjectBlockRegistry:
             "composites": sum(1 for v in m.values() if v["type"] == "composite"),
             "atomics": sum(1 for v in m.values() if v["type"] == "atomic"),
         }
+
+    def invalidate(self) -> None:
+        """Clear the block cache and manifest so modules are reloaded from disk."""
+        self._cache.clear()
+        self._manifest = None
+
+    @classmethod
+    def invalidate_all(cls) -> None:
+        """Clear caches on **all** ``ProjectBlockRegistry`` instances."""
+        for reg in cls._instances:
+            reg.invalidate()
 
     def __repr__(self) -> str:
         s = self.get_stats()

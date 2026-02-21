@@ -11,7 +11,6 @@ import hashlib
 import json
 import os
 import shutil
-import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Dict, List, Optional
@@ -339,7 +338,7 @@ def _render_editor(content: str, language: str, key: str, height: int = 450) -> 
             theme="monokai",
             key=key,
             height=height,
-            auto_update=False,
+            auto_update=True,
         )
         return result if result is not None else content
     except ImportError:
@@ -368,6 +367,7 @@ def inject_inspector_css() -> None:
     """
     css = f"""
     <style>
+        /* --- Edit button positioning (✎) --- */
         div:has(> .element-container > .stHtml > span.{_STX_EDIT_MARKER_CLASS}) {{
             position: relative;
         }}
@@ -388,9 +388,50 @@ def inject_inspector_css() -> None:
             font-size: 1.1rem;
             line-height: 1.2;
         }}
+        /* --- Sidebar: remove ALL width limits for inspector editing --- */
+        [data-testid="stSidebar"],
+        [data-testid="stSidebar"] > div,
+        [data-testid="stSidebar"] > div > div {{
+            max-width: none !important;
+        }}
+        /* Keep ace editor responsive inside sidebar */
+        [data-testid="stSidebar"] iframe {{
+            width: 100% !important;
+        }}
     </style>
     """
     st.html(css)
+
+    # JavaScript: persist sidebar width across reruns.
+    # Streamlit resets the sidebar width on each rerun; this script saves
+    # the user's chosen width in sessionStorage and restores it.
+    import streamlit.components.v1 as components
+    components.html("""
+    <script>
+    (function() {
+        const KEY = '_stx_sidebar_width';
+        const sidebar = window.parent.document.querySelector(
+            '[data-testid="stSidebar"]');
+        if (!sidebar) return;
+
+        // Restore saved width
+        const saved = window.sessionStorage.getItem(KEY);
+        if (saved) {
+            sidebar.style.width = saved;
+            sidebar.style.flexBasis = saved;
+        }
+
+        // Watch for resize (user drags the handle)
+        const observer = new MutationObserver(function() {
+            const w = sidebar.style.width;
+            if (w) window.sessionStorage.setItem(KEY, w);
+        });
+        observer.observe(sidebar, {
+            attributes: true, attributeFilter: ['style']
+        });
+    })();
+    </script>
+    """, height=0)
 
 
 def render_edit_button(module_name: str, config: InspectorConfig) -> None:
@@ -434,53 +475,80 @@ def _auth_inspector(password_key: str, expected: str):
         st.session_state[_STX_INSPECTOR_AUTH] = True
 
 
-def _save_file(file_path: str, editor_key: str, backup: bool):
-    """on_click callback — writes editor content to disk with optional .bak.
+_STX_INSPECTOR_PENDING = "_stx_inspector_pending"
 
-    After writing, invalidates:
-    - **Python module cache** (``sys.modules``) for all project modules,
-      so the block is re-imported from disk on the next rerun.
-    - **Paginated page cache** (``_stx_page_cache``), so the block is
-      re-rendered instead of served from stale cache.
+
+def _apply_edits(file_path: str, editor_key: str):
+    """on_click callback — stage the current editor content for saving.
+
+    Reads the last-applied value from the ``st_ace`` widget (transferred
+    to session state via Cmd+Enter or the ace APPLY button) and stores it
+    in a *pending* dict.  Multiple files can be staged before a single
+    :func:`_save_and_reload` writes them all to disk.
     """
-    content = st.session_state.get(editor_key, "")
-    if backup:
+    content = st.session_state.get(editor_key)
+    if content is None:
+        return
+    pending = st.session_state.setdefault(_STX_INSPECTOR_PENDING, {})
+    pending[file_path] = content
+
+
+def _save_and_reload(file_path: str, editor_key: str, backup: bool):
+    """on_click callback — write all pending + current file to disk.
+
+    1. Writes every file in the *pending* dict to disk.
+    2. Also writes the **current** file from its editor session-state key
+       (in case the user edited and applied via Cmd+Enter but did not
+       click *Apply edits*).
+    3. Invalidates block-registry caches and the paginated page cache
+       so the next rerun picks up the new code.
+    """
+    pending = st.session_state.pop(_STX_INSPECTOR_PENDING, {})
+
+    # Include the current file from session state (convenience shortcut
+    # so the user can skip "Apply edits" for single-file edits).
+    current_content = st.session_state.get(editor_key)
+    if current_content is not None:
+        pending[file_path] = current_content
+
+    if not pending:
+        return
+
+    for fp, content in pending.items():
+        if backup:
+            try:
+                shutil.copy2(fp, fp + ".bak")
+            except OSError:
+                pass
         try:
-            shutil.copy2(file_path, file_path + ".bak")
+            with open(fp, "w", encoding="utf-8") as f:
+                f.write(content)
         except OSError:
-            pass
-    try:
-        with open(file_path, "w", encoding="utf-8") as f:
-            f.write(content)
-    except OSError:
-        return  # error shown on next render via disk read
+            continue
 
-    # --- Invalidate caches so changes take effect on rerun ---
-    if file_path.endswith(".py"):
-        _invalidate_module_cache(file_path)
-    # Invalidate paginated book cache (forces re-render of all pages)
+    _invalidate_module_cache()
     st.session_state.pop("_stx_page_cache", None)
+    st.session_state["_stx_inspector_needs_rerun"] = True
 
 
-def _invalidate_module_cache(file_path: str) -> None:
-    """Remove project modules from ``sys.modules`` so they are re-imported.
+def _cancel_edits(file_path: str):
+    """on_click callback — discard pending changes for *file_path*."""
+    pending = st.session_state.get(_STX_INSPECTOR_PENDING, {})
+    pending.pop(file_path, None)
 
-    Walks up from *file_path* to find the project root (directory
-    containing ``book.py``), then removes every cached module whose
-    ``__file__`` is inside that tree.
+
+def _invalidate_module_cache() -> None:
+    """Clear block registry caches so modules are reloaded from disk.
+
+    Both ``ProjectBlockRegistry`` and ``LazyBlockRegistry`` cache loaded
+    modules.  After a file is saved, their caches must be cleared so that
+    the next ``blocks.bck_xxx`` access re-imports the module from the
+    updated file on disk.
     """
-    abs_path = os.path.abspath(file_path)
-    project_dir = _find_project_root(abs_path)
-    if project_dir is None:
-        project_dir = os.path.dirname(abs_path)
+    from .blocks import ProjectBlockRegistry, LazyBlockRegistry
 
-    to_remove = [
-        name for name, mod in sys.modules.items()
-        if getattr(mod, "__file__", None)
-        and os.path.abspath(mod.__file__).startswith(project_dir)
-    ]
-    for name in to_remove:
-        del sys.modules[name]
+    ProjectBlockRegistry.invalidate_all()
+    LazyBlockRegistry.invalidate_all()
 
 
 def render_inspector_panel(
@@ -520,14 +588,9 @@ def render_inspector_panel(
                 st.button("Close", key="_stx_insp_close_auth", on_click=_close_inspector)
             return
 
-        # --- Header: title + close button ---
+        # --- Header: title ---
         block_name = st.session_state.get(_STX_INSPECTOR_BLOCK, "")
-        col_title, col_close = st.columns([5, 1])
-        with col_title:
-            st.markdown(f"**Inspector:** `{block_name}`")
-        with col_close:
-            st.button("✕", key="_stx_insp_close", on_click=_close_inspector,
-                       help="Close Inspector")
+        st.markdown(f"**Inspector:** `{block_name}`")
 
         if not sources:
             st.info("No source files found for this block.")
@@ -568,8 +631,30 @@ def _render_category_files(
         _render_file_editor(files[idx], config)
 
 
+@st.fragment
 def _render_file_editor(source: SourceFile, config: InspectorConfig) -> None:
-    """Render the editor for a single source file with save/cancel actions."""
+    """Render the editor for a single source file (as a Streamlit fragment).
+
+    Using ``@st.fragment`` isolates the editor from the main app:
+    keystrokes only rerun this fragment, not the full page, so the
+    sidebar width stays stable and the main content is not re-rendered.
+
+    Layout::
+
+        path/to/file.py
+        [Apply edits] [Save & Reload] [Cancel] [Close]
+        ┌──────────────────────────────────────────────┐
+        │  ace editor (auto_update=True)                │
+        └──────────────────────────────────────────────┘
+
+    Workflow:
+
+    1. Edit code in the ace editor (content synced automatically).
+    2. Click **Apply edits** to *stage* the file (optional — useful when
+       editing multiple files before saving).
+    3. Click **Save & Reload** to write staged + current file to disk
+       and trigger a full re-render (``st.rerun(scope="app")``).
+    """
     file_path = source.path
 
     try:
@@ -584,6 +669,45 @@ def _render_file_editor(source: SourceFile, config: InspectorConfig) -> None:
     path_hash = hashlib.md5(file_path.encode()).hexdigest()[:8]
     editor_key = f"_stx_insp_editor_{path_hash}"
 
+    # --- Full-rerun triggers (set by on_click callbacks) ---
+    # st.rerun() cannot be called inside callbacks, so callbacks set
+    # flags in session state and we call st.rerun(scope="app") here
+    # (in the fragment body, where it IS allowed).
+    if st.session_state.pop("_stx_inspector_needs_rerun", False):
+        st.rerun(scope="app")
+    if not st.session_state.get(_STX_INSPECTOR_OPEN, True):
+        st.rerun(scope="app")
+
+    # --- Pending indicator ---
+    pending = st.session_state.get(_STX_INSPECTOR_PENDING, {})
+    if file_path in pending:
+        st.success("Changes applied — pending save")
+
+    # --- Toolbar: Apply | Save & Reload | Cancel | Close ---
+    col_apply, col_save, col_cancel, col_close = st.columns(4)
+    with col_apply:
+        st.button(
+            "Apply edits", key=f"_stx_insp_apply_{path_hash}",
+            on_click=_apply_edits, args=(file_path, editor_key),
+        )
+    with col_save:
+        st.button(
+            "Save & Reload", key=f"_stx_insp_save_{path_hash}", type="primary",
+            on_click=_save_and_reload,
+            args=(file_path, editor_key, config.backup),
+        )
+    with col_cancel:
+        st.button(
+            "Cancel", key=f"_stx_insp_cancel_{path_hash}",
+            on_click=_cancel_edits, args=(file_path,),
+        )
+    with col_close:
+        st.button(
+            "Close", key=f"_stx_insp_close_{path_hash}",
+            on_click=_close_inspector,
+        )
+
+    # --- Editor ---
     edited = _render_editor(
         disk_content,
         language=source.category.ace_mode,
@@ -595,13 +719,3 @@ def _render_file_editor(source: SourceFile, config: InspectorConfig) -> None:
         error = source.category.validator(edited)
         if error:
             st.warning(f"Validation: {error}")
-
-    # Save / Cancel
-    col_save, col_cancel = st.columns(2)
-    with col_save:
-        st.button(
-            "Save", key=f"_stx_insp_save_{path_hash}", type="primary",
-            on_click=_save_file, args=(file_path, editor_key, config.backup),
-        )
-    with col_cancel:
-        st.button("Cancel", key=f"_stx_insp_cancel_{path_hash}")

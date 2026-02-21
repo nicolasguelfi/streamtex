@@ -214,18 +214,13 @@ class TestStInclude:
         assert "build()" in call_args or "does not contain" in call_args
 
     def test_none_module_shows_error_markdown(self):
-        """st_include(None) triggers the falsy-module guard.
-
-        book.py accesses block_file_module.__path__ in the error f-string even
-        when the module is falsy (None).  That raises AttributeError before
-        st.markdown is reached — this test documents that current behaviour.
-        """
+        """st_include(None) triggers the falsy-module guard and shows an error."""
         from streamtex.book import st_include
 
-        with patch("streamtex.book.st"):
-            # None has no __path__, so book.py raises AttributeError internally
-            with pytest.raises(AttributeError):
-                st_include(None)
+        with patch("streamtex.book.st") as mock_st:
+            st_include(None)
+            mock_st.markdown.assert_called_once()
+            assert "not found" in mock_st.markdown.call_args[0][0].lower()
 
     def test_build_exception_is_reraised(self):
         from streamtex.book import st_include

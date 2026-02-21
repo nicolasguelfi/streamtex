@@ -18,6 +18,7 @@ dependencies = [
     "matplotlib>=3.10.8",
     "streamlit-mermaid>=0.3.0",
     "mermaid-py>=0.5.0",
+    "streamlit-ace>=0.1.1",
 ]
 
 [project.optional-dependencies]

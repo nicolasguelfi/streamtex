@@ -22,11 +22,14 @@ from streamtex.inspector import (
     render_inspector_panel,
     _find_project_root,
     _close_inspector,
-    _save_file,
+    _apply_edits,
+    _save_and_reload,
+    _cancel_edits,
     _invalidate_module_cache,
     _STX_INSPECTOR_OPEN,
     _STX_INSPECTOR_BLOCK,
     _STX_INSPECTOR_AUTH,
+    _STX_INSPECTOR_PENDING,
 )
 
 
@@ -364,9 +367,11 @@ class TestRenderEditor:
     def test_fallback_to_text_area(self, mock_st):
         """When streamlit_ace is not installed, fall back to st.text_area."""
         mock_st.text_area.return_value = "edited content"
-        result = _render_editor("original", "python", "key1")
-        mock_st.text_area.assert_called_once()
-        assert result == "edited content"
+        # Hide streamlit_ace so the ImportError fallback is triggered
+        with patch.dict("sys.modules", {"streamlit_ace": None}):
+            result = _render_editor("original", "python", "key1")
+            mock_st.text_area.assert_called_once()
+            assert result == "edited content"
 
     def test_ace_editor_used_when_available(self):
         """When streamlit_ace is importable, st_ace should be called."""
@@ -487,50 +492,83 @@ class TestCloseInspector:
         assert mock_st.session_state[_STX_INSPECTOR_OPEN] is False
 
 
-class TestSaveFile:
-    def test_save_writes_content_with_backup(self, tmp_path):
-        test_file = tmp_path / "test.py"
-        test_file.write_text("original", encoding="utf-8")
-        editor_key = "_stx_insp_editor_test"
+class TestApplyEdits:
+    @patch("streamtex.inspector.st")
+    def test_stages_content_in_pending(self, mock_st):
+        mock_st.session_state = {"_stx_insp_editor_abc": "new code"}
+        _apply_edits("/project/block.py", "_stx_insp_editor_abc")
+        pending = mock_st.session_state[_STX_INSPECTOR_PENDING]
+        assert pending["/project/block.py"] == "new code"
+
+    @patch("streamtex.inspector.st")
+    def test_skips_when_editor_is_none(self, mock_st):
+        mock_st.session_state = {}
+        _apply_edits("/project/block.py", "_stx_insp_editor_abc")
+        assert _STX_INSPECTOR_PENDING not in mock_st.session_state
+
+    @patch("streamtex.inspector.st")
+    def test_stages_multiple_files(self, mock_st):
+        mock_st.session_state = {
+            "_stx_insp_editor_a": "code A",
+            "_stx_insp_editor_b": "code B",
+        }
+        _apply_edits("/project/a.py", "_stx_insp_editor_a")
+        _apply_edits("/project/b.py", "_stx_insp_editor_b")
+        pending = mock_st.session_state[_STX_INSPECTOR_PENDING]
+        assert pending["/project/a.py"] == "code A"
+        assert pending["/project/b.py"] == "code B"
+
+
+class TestCancelEdits:
+    @patch("streamtex.inspector.st")
+    def test_removes_file_from_pending(self, mock_st):
+        mock_st.session_state = {
+            _STX_INSPECTOR_PENDING: {"/project/a.py": "x", "/project/b.py": "y"},
+        }
+        _cancel_edits("/project/a.py")
+        assert "/project/a.py" not in mock_st.session_state[_STX_INSPECTOR_PENDING]
+        assert "/project/b.py" in mock_st.session_state[_STX_INSPECTOR_PENDING]
+
+
+class TestSaveAndReload:
+    def test_writes_pending_and_current_with_backup(self, tmp_path):
+        file_a = tmp_path / "a.py"
+        file_b = tmp_path / "b.py"
+        file_a.write_text("old A", encoding="utf-8")
+        file_b.write_text("old B", encoding="utf-8")
 
         with patch("streamtex.inspector.st") as mock_st:
-            mock_st.session_state = {editor_key: "edited content"}
-            _save_file(str(test_file), editor_key, backup=True)
+            mock_st.session_state = {
+                _STX_INSPECTOR_PENDING: {str(file_a): "new A"},
+                "_stx_insp_editor_b": "new B",
+            }
+            _save_and_reload(str(file_b), "_stx_insp_editor_b", backup=True)
 
-        assert test_file.read_text() == "edited content"
-        assert (tmp_path / "test.py.bak").read_text() == "original"
+        assert file_a.read_text() == "new A"
+        assert file_b.read_text() == "new B"
+        assert (tmp_path / "a.py.bak").read_text() == "old A"
+        assert (tmp_path / "b.py.bak").read_text() == "old B"
 
-    def test_save_writes_content_without_backup(self, tmp_path):
+    def test_writes_without_backup(self, tmp_path):
         test_file = tmp_path / "test.py"
         test_file.write_text("original", encoding="utf-8")
-        editor_key = "_stx_insp_editor_test"
 
         with patch("streamtex.inspector.st") as mock_st:
-            mock_st.session_state = {editor_key: "new content"}
-            _save_file(str(test_file), editor_key, backup=False)
+            mock_st.session_state = {"_stx_insp_editor_x": "new content"}
+            _save_and_reload(str(test_file), "_stx_insp_editor_x", backup=False)
 
         assert test_file.read_text() == "new content"
         assert not (tmp_path / "test.py.bak").exists()
 
-
-class TestFileSaveBackup:
-    def test_backup_created_on_save(self, tmp_path):
-        """Verify .bak file is created when config.backup is True."""
+    def test_noop_when_no_content(self, tmp_path):
         test_file = tmp_path / "test.py"
         test_file.write_text("original", encoding="utf-8")
 
-        config = InspectorConfig(enabled=True, backup=True)
+        with patch("streamtex.inspector.st") as mock_st:
+            mock_st.session_state = {}
+            _save_and_reload(str(test_file), "_stx_insp_editor_x", backup=False)
 
-        # Simulate the save logic from _render_file_editor
-        import shutil
-        bak_path = str(test_file) + ".bak"
-        shutil.copy2(str(test_file), bak_path)
-
-        with open(str(test_file), "w", encoding="utf-8") as f:
-            f.write("edited")
-
-        assert test_file.read_text() == "edited"
-        assert Path(bak_path).read_text() == "original"
+        assert test_file.read_text() == "original"
 
 
 # ---------------------------------------------------------------------------
@@ -539,56 +577,47 @@ class TestFileSaveBackup:
 
 
 class TestInvalidateModuleCache:
-    def test_removes_project_modules(self, tmp_path):
-        """Modules whose __file__ is inside the project tree are evicted."""
-        import sys
+    def test_clears_project_registry_cache(self, tmp_path):
+        """ProjectBlockRegistry caches are cleared on invalidation."""
+        from streamtex.blocks import ProjectBlockRegistry
 
-        (tmp_path / "book.py").touch()
-        block_file = tmp_path / "blocks" / "bck_test.py"
-        block_file.parent.mkdir()
-        block_file.write_text("x = 1\n", encoding="utf-8")
-
-        # Inject a fake module into sys.modules
-        fake_mod = types.ModuleType("fake_project_block")
-        fake_mod.__file__ = str(block_file)
-        sys.modules["fake_project_block"] = fake_mod
-
-        _invalidate_module_cache(str(block_file))
-
-        assert "fake_project_block" not in sys.modules
-
-    def test_keeps_unrelated_modules(self, tmp_path):
-        """Modules outside the project tree are left untouched."""
-        import sys
-
-        (tmp_path / "book.py").touch()
-        block_file = tmp_path / "blocks" / "bck_test.py"
-        block_file.parent.mkdir()
-        block_file.write_text("x = 1\n", encoding="utf-8")
-
-        # Inject a fake module outside the project tree
-        fake_mod = types.ModuleType("unrelated_module")
-        fake_mod.__file__ = "/somewhere/else/mod.py"
-        sys.modules["unrelated_module"] = fake_mod
+        reg = ProjectBlockRegistry(tmp_path)
+        reg._cache["bck_test"] = types.ModuleType("bck_test")
 
         try:
-            _invalidate_module_cache(str(block_file))
-            assert "unrelated_module" in sys.modules
+            _invalidate_module_cache()
+            assert reg._cache == {}
         finally:
-            sys.modules.pop("unrelated_module", None)
+            ProjectBlockRegistry._instances.remove(reg)
 
-    def test_fallback_when_no_book_py(self, tmp_path):
-        """Without book.py, uses the file's directory as project root."""
-        import sys
+    def test_clears_lazy_registry_cache(self, tmp_path):
+        """LazyBlockRegistry caches are cleared on invalidation."""
+        from streamtex.blocks import LazyBlockRegistry
 
-        block_file = tmp_path / "standalone" / "script.py"
-        block_file.parent.mkdir()
-        block_file.write_text("x = 1\n", encoding="utf-8")
+        reg = LazyBlockRegistry([str(tmp_path)])
+        reg._cache["bck_shared"] = types.ModuleType("bck_shared")
+        reg._not_found.add("bck_missing")
 
-        fake_mod = types.ModuleType("standalone_mod")
-        fake_mod.__file__ = str(block_file)
-        sys.modules["standalone_mod"] = fake_mod
+        try:
+            _invalidate_module_cache()
+            assert reg._cache == {}
+            assert reg._not_found == set()
+        finally:
+            LazyBlockRegistry._instances.remove(reg)
 
-        _invalidate_module_cache(str(block_file))
+    def test_clears_both_registries(self, tmp_path):
+        """Both registry types are cleared in a single call."""
+        from streamtex.blocks import ProjectBlockRegistry, LazyBlockRegistry
 
-        assert "standalone_mod" not in sys.modules
+        preg = ProjectBlockRegistry(tmp_path)
+        preg._cache["bck_a"] = types.ModuleType("a")
+        lreg = LazyBlockRegistry([str(tmp_path)])
+        lreg._cache["bck_b"] = types.ModuleType("b")
+
+        try:
+            _invalidate_module_cache()
+            assert preg._cache == {}
+            assert lreg._cache == {}
+        finally:
+            ProjectBlockRegistry._instances.remove(preg)
+            LazyBlockRegistry._instances.remove(lreg)

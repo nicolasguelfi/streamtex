@@ -20,6 +20,9 @@ dependencies = [
     "mermaid-py>=0.5.0",
 ]
 
+[project.optional-dependencies]
+inspector = ["streamlit-ace>=0.1.1"]
+
 [dependency-groups]
 dev = [
     "pytest>=7.0",

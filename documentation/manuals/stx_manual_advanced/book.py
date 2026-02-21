@@ -111,4 +111,5 @@ st_book([
     # Shared block footer
     shared_blocks.bck_footer_training,
 ], toc_config=toc, marker_config=marker_config, paginate=True,
-   bib_sources=bib_sources, bib_config=bib_config)
+   bib_sources=bib_sources, bib_config=bib_config,
+   inspector=stx.InspectorConfig(enabled=True))

@@ -2,6 +2,7 @@
 
 import streamlit as st
 import setup
+import streamtex as stx
 from streamtex import st_book, TOCConfig
 from custom.themes import dark
 import streamtex.styles as sts
@@ -21,4 +22,5 @@ st_book([
     blocks.bck_level_badge,
     blocks.bck_home_collection,
     blocks.bck_collection_management,
-], toc_config=toc, paginate=False)
+], toc_config=toc, paginate=False,
+   inspector=stx.InspectorConfig(enabled=True))

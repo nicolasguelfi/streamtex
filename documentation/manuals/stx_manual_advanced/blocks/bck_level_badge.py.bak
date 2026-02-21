@@ -57,7 +57,7 @@ def build():
         st_space("v", 1)
         st_write(
             bs.description,
-            "This course covers advanced StreamTeX patterns for production use. "
+            "This XXX course covers advanced StreamTeX patterns for production use. "
             "Multi-source blocks, collections, export, and deployment strategies.",
         )
         st_space("v", 1)

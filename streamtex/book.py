@@ -73,6 +73,7 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
             paginate: bool = False,
             monties_color: str = "rgba(211, 47, 47, 0.8)",
             bib_sources=None, bib_config=None,
+            inspector=None,
             *args, **kwargs):
     """Generates a web page e-book from a list of block modules.
 
@@ -83,6 +84,7 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
     :param monties_color: Background color for paginated navigation banners (CSS value).
     :param bib_sources: Optional list of paths to .bib, .json, .ris, or .csl-json files.
     :param bib_config: Optional BibConfig to configure bibliography formatting.
+    :param inspector: Optional InspectorConfig to enable the block inspector panel.
     """
     # --- Bibliography setup ---
     _setup_bibliography(bib_sources, bib_config)
@@ -100,7 +102,8 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
 
     if st.session_state[_STX_VIEW_MODE_KEY] == "Paginated":
         _paginated_book(module_list, toc_config, marker_config, separator,
-                        export, export_title, monties_color, *args, **kwargs)
+                        export, export_title, monties_color, *args,
+                        inspector=inspector, **kwargs)
         return
 
     start_time = time.time()
@@ -120,6 +123,14 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
 
     # Add zoom options to sidebar
     add_zoom_options()
+
+    # Inject inspector CSS once + reserve sidebar placeholder
+    _inspector_placeholder = None
+    if inspector and inspector.enabled:
+        from .inspector import inject_inspector_css
+        inject_inspector_css()
+        with st.sidebar:
+            _inspector_placeholder = st.empty()
 
     # Clear previous run's headers
     reset_toc_registry(toc_config)
@@ -163,7 +174,7 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
 
         toc_before = len(toc_entries()) if use_toc_sidebar else 0
 
-        st_include(module, *args, **kwargs)
+        st_include(module, *args, _inspector_config=inspector, **kwargs)
 
         # Tag new TOC entries with their block index
         if use_toc_sidebar:
@@ -209,6 +220,20 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
                     file_name=file_name,
                     mime="text/html",
                 )
+
+    # --- Inspector panel (opt-in, rendered into reserved sidebar placeholder) ---
+    if _inspector_placeholder is not None and st.session_state.get("_stx_inspector_open", False):
+        from .inspector import render_inspector_panel, discover_sources, FileCategoryRegistry
+        _block_name = st.session_state.get("_stx_inspector_block", "")
+        _target = next(
+            (m for m in module_list
+             if getattr(m, '__name__', '').rsplit('.', 1)[-1] == _block_name),
+            None,
+        )
+        if _target:
+            _cat_registry = FileCategoryRegistry()
+            _sources = discover_sources(_target, _cat_registry)
+            render_inspector_panel(_sources, inspector, _cat_registry, _inspector_placeholder)
 
     end_time = time.time()
     duration = end_time - start_time
@@ -330,7 +355,7 @@ def st_toc(toc_title_style):
     return toc_block
 
 
-def st_include(block_file_module, *args, **kwargs):
+def st_include(block_file_module, *args, _inspector_config=None, **kwargs):
     if not block_file_module:
         st.markdown(f":red-background[File {block_file_module.__path__} not found]")
         return
@@ -340,6 +365,14 @@ def st_include(block_file_module, *args, **kwargs):
         return
 
     module_name = getattr(block_file_module, '__name__', str(block_file_module))
+
+    # Inspector edit button (opt-in)
+    # Uses st.html() directly (not _render()), so never appears in exported HTML.
+    if _inspector_config and _inspector_config.enabled:
+        from .inspector import render_edit_button
+        short_name = module_name.rsplit('.', 1)[-1]
+        render_edit_button(short_name, _inspector_config)
+
     try:
         block_file_module.build(*args, **kwargs)
     except Exception as e:
@@ -812,7 +845,7 @@ def _inject_paginated_nav_js(current_page, total, marker_config,
 
 
 def _paginated_book(module_list, toc_config, marker_config, separator,
-                    export, export_title, monties_color, *args, **kwargs):
+                    export, export_title, monties_color, *args, inspector=None, **kwargs):
     """Paginated rendering — only renders one block per rerun."""
     start_time = time.time()
     logger.debug("Starting st_book (paginated)...")
@@ -826,6 +859,14 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
     inject_link_preview_scaffold()
     _inject_bib_preview_if_enabled()
     add_zoom_options()
+
+    # Inject inspector CSS once + reserve sidebar placeholder
+    _inspector_placeholder = None
+    if inspector and inspector.enabled:
+        from .inspector import inject_inspector_css
+        inject_inspector_css()
+        with st.sidebar:
+            _inspector_placeholder = st.empty()
 
     # --- Cache management ---
     cache_hash = _compute_cache_hash(module_list)
@@ -896,7 +937,7 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
         st.divider()
 
     # --- Render current block ---
-    st_include(module_list[current_page], *args, **kwargs)
+    st_include(module_list[current_page], *args, _inspector_config=inspector, **kwargs)
 
     # Monties — bottom banner (next section, clickable via JS)
     if current_page < total - 1:
@@ -969,6 +1010,20 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
                     file_name=file_name,
                     mime="text/html",
                 )
+
+    # --- Inspector panel (opt-in, rendered into reserved sidebar placeholder) ---
+    if _inspector_placeholder is not None and st.session_state.get("_stx_inspector_open", False):
+        from .inspector import render_inspector_panel, discover_sources, FileCategoryRegistry
+        _block_name = st.session_state.get("_stx_inspector_block", "")
+        _target = next(
+            (m for m in module_list
+             if getattr(m, '__name__', '').rsplit('.', 1)[-1] == _block_name),
+            None,
+        )
+        if _target:
+            _cat_registry = FileCategoryRegistry()
+            _sources = discover_sources(_target, _cat_registry)
+            render_inspector_panel(_sources, inspector, _cat_registry, _inspector_placeholder)
 
     end_time = time.time()
     logger.debug("st_book (paginated) completed in %.2fs [page %d/%d]",

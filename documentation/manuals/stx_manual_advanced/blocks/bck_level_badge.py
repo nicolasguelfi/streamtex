@@ -52,7 +52,7 @@ def build():
         st_space("v", 0.5)
         st_write(
             s.Large + s.text.weights.bold_weight,
-            "Master XXX Advanced Patterns and Enterprise Features",
+            "Master Advanced Patterns and Enterprise Features",
         )
         st_space("v", 1)
         st_write(

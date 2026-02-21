@@ -26,10 +26,16 @@ from streamtex.inspector import (
     _save_and_reload,
     _cancel_edits,
     _invalidate_module_cache,
+    _scan_project_files,
+    _get_cached_project_files,
+    _EXCLUDED_DIRS,
     _STX_INSPECTOR_OPEN,
     _STX_INSPECTOR_BLOCK,
     _STX_INSPECTOR_AUTH,
     _STX_INSPECTOR_PENDING,
+    _STX_INSPECTOR_MODE,
+    _STX_INSPECTOR_PROJECT_ROOT,
+    _STX_INSPECTOR_PROJECT_FILES,
 )
 
 
@@ -621,3 +627,244 @@ class TestInvalidateModuleCache:
         finally:
             ProjectBlockRegistry._instances.remove(preg)
             LazyBlockRegistry._instances.remove(lreg)
+
+
+# ---------------------------------------------------------------------------
+# _scan_project_files
+# ---------------------------------------------------------------------------
+
+
+class TestScanProjectFiles:
+    def test_finds_known_extensions(self, tmp_path):
+        (tmp_path / "block.py").write_text("x = 1", encoding="utf-8")
+        (tmp_path / "diagram.mmd").write_text("graph TD", encoding="utf-8")
+        (tmp_path / "data.json").write_text("{}", encoding="utf-8")
+        reg = FileCategoryRegistry()
+        files = _scan_project_files(str(tmp_path), reg)
+        labels = {f.label for f in files}
+        assert "block.py" in labels
+        assert "diagram.mmd" in labels
+        assert "data.json" in labels
+
+    def test_excludes_venv_and_pycache(self, tmp_path):
+        venv_dir = tmp_path / ".venv"
+        venv_dir.mkdir()
+        (venv_dir / "lib.py").write_text("pass", encoding="utf-8")
+        cache_dir = tmp_path / "__pycache__"
+        cache_dir.mkdir()
+        (cache_dir / "mod.py").write_text("pass", encoding="utf-8")
+        (tmp_path / "real.py").write_text("pass", encoding="utf-8")
+        reg = FileCategoryRegistry()
+        files = _scan_project_files(str(tmp_path), reg)
+        labels = {f.label for f in files}
+        assert "real.py" in labels
+        assert not any(".venv" in l for l in labels)
+        assert not any("__pycache__" in l for l in labels)
+
+    def test_relative_labels(self, tmp_path):
+        sub = tmp_path / "blocks"
+        sub.mkdir()
+        (sub / "bck_intro.py").write_text("pass", encoding="utf-8")
+        reg = FileCategoryRegistry()
+        files = _scan_project_files(str(tmp_path), reg)
+        labels = {f.label for f in files}
+        assert os.path.join("blocks", "bck_intro.py") in labels
+
+    def test_subdirectories_scanned(self, tmp_path):
+        deep = tmp_path / "a" / "b" / "c"
+        deep.mkdir(parents=True)
+        (deep / "deep.py").write_text("pass", encoding="utf-8")
+        reg = FileCategoryRegistry()
+        files = _scan_project_files(str(tmp_path), reg)
+        paths = [f.path for f in files]
+        assert str(deep / "deep.py") in paths
+
+    def test_unknown_extensions_skipped(self, tmp_path):
+        (tmp_path / "photo.png").write_bytes(b"\x89PNG")
+        (tmp_path / "archive.zip").write_bytes(b"PK")
+        (tmp_path / "real.py").write_text("pass", encoding="utf-8")
+        reg = FileCategoryRegistry()
+        files = _scan_project_files(str(tmp_path), reg)
+        labels = {f.label for f in files}
+        assert "photo.png" not in labels
+        assert "archive.zip" not in labels
+        assert "real.py" in labels
+
+    def test_empty_directory(self, tmp_path):
+        reg = FileCategoryRegistry()
+        files = _scan_project_files(str(tmp_path), reg)
+        assert files == []
+
+
+# ---------------------------------------------------------------------------
+# discover_sources — static fallback
+# ---------------------------------------------------------------------------
+
+
+class TestDiscoverSourcesStaticFallback:
+    def _make_module(self, path):
+        m = types.ModuleType("test_block")
+        m.__file__ = str(path)
+        m.build = lambda: None
+        return m
+
+    def test_finds_file_in_static_subdir(self, tmp_path):
+        """When a basename is referenced but not adjacent, find it in static/."""
+        (tmp_path / "book.py").touch()
+        static_sub = tmp_path / "static" / "diagrams"
+        static_sub.mkdir(parents=True)
+        mmd_file = static_sub / "sequence.mmd"
+        mmd_file.write_text("sequenceDiagram", encoding="utf-8")
+
+        blocks_dir = tmp_path / "blocks"
+        blocks_dir.mkdir()
+        block_file = blocks_dir / "bck_test.py"
+        block_file.write_text(
+            'def build():\n    path = "sequence.mmd"\n',
+            encoding="utf-8",
+        )
+
+        module = self._make_module(block_file)
+        reg = FileCategoryRegistry()
+        sources = discover_sources(module, reg)
+        paths = [s.path for s in sources]
+        assert str(mmd_file) in paths
+
+    def test_no_crash_without_static_dir(self, tmp_path):
+        """No static/ directory → no crash, just normal missing-file behaviour."""
+        (tmp_path / "book.py").touch()
+        blocks_dir = tmp_path / "blocks"
+        blocks_dir.mkdir()
+        block_file = blocks_dir / "bck_test.py"
+        block_file.write_text(
+            'def build():\n    path = "missing.mmd"\n',
+            encoding="utf-8",
+        )
+
+        module = self._make_module(block_file)
+        reg = FileCategoryRegistry()
+        sources = discover_sources(module, reg)
+        # Only main file — no crash
+        assert len(sources) == 1
+        assert sources[0].path == str(block_file)
+
+
+# ---------------------------------------------------------------------------
+# _get_cached_project_files
+# ---------------------------------------------------------------------------
+
+
+class TestGetCachedProjectFiles:
+    @patch("streamtex.inspector.st")
+    def test_cache_hit(self, mock_st, tmp_path):
+        (tmp_path / "block.py").write_text("pass", encoding="utf-8")
+        reg = FileCategoryRegistry()
+
+        # First call populates cache
+        mock_st.session_state = {}
+        files1 = _get_cached_project_files(str(tmp_path), reg)
+        assert len(files1) == 1
+
+        # Second call returns same object from cache
+        files2 = _get_cached_project_files(str(tmp_path), reg)
+        assert files2 is files1
+
+    @patch("streamtex.inspector.st")
+    def test_cache_invalidation_on_root_change(self, mock_st, tmp_path):
+        dir_a = tmp_path / "a"
+        dir_a.mkdir()
+        (dir_a / "file_a.py").write_text("pass", encoding="utf-8")
+        dir_b = tmp_path / "b"
+        dir_b.mkdir()
+        (dir_b / "file_b.py").write_text("pass", encoding="utf-8")
+        reg = FileCategoryRegistry()
+
+        mock_st.session_state = {}
+        files_a = _get_cached_project_files(str(dir_a), reg)
+        assert any("file_a.py" in f.label for f in files_a)
+
+        files_b = _get_cached_project_files(str(dir_b), reg)
+        assert any("file_b.py" in f.label for f in files_b)
+        assert not any("file_a.py" in f.label for f in files_b)
+
+
+# ---------------------------------------------------------------------------
+# render_inspector_panel — mode selector & filter UI
+# ---------------------------------------------------------------------------
+
+
+class TestProjectModeUI:
+    @patch("streamtex.inspector.st")
+    def test_mode_selector_shown_with_project_root(self, mock_st):
+        mock_st.session_state = {
+            _STX_INSPECTOR_OPEN: True,
+            _STX_INSPECTOR_BLOCK: "bck_test",
+        }
+        mock_st.segmented_control.return_value = None
+        mock_st.text_input.return_value = ""
+        mock_st.columns.return_value = [MagicMock(), MagicMock()]
+        for col in mock_st.columns.return_value:
+            col.__enter__ = MagicMock(return_value=col)
+            col.__exit__ = MagicMock(return_value=False)
+
+        config = InspectorConfig(enabled=True)
+        reg = FileCategoryRegistry()
+        src = SourceFile(
+            path="/fake/bck_test.py",
+            category=FileCategory(name="Python", extensions={".py"}),
+        )
+        render_inspector_panel([src], config, reg, project_root="/fake/project")
+
+        # segmented_control called twice: width selector + mode selector
+        assert mock_st.segmented_control.call_count == 2
+        mode_call = mock_st.segmented_control.call_args_list[1]
+        assert "Block files" in mode_call[0][1]
+        assert "Project" in mode_call[0][1]
+
+    @patch("streamtex.inspector.st")
+    def test_mode_selector_hidden_without_project_root(self, mock_st):
+        mock_st.session_state = {
+            _STX_INSPECTOR_OPEN: True,
+            _STX_INSPECTOR_BLOCK: "bck_test",
+        }
+        mock_st.segmented_control.return_value = None
+        mock_st.text_input.return_value = ""
+        mock_st.columns.return_value = [MagicMock(), MagicMock()]
+        for col in mock_st.columns.return_value:
+            col.__enter__ = MagicMock(return_value=col)
+            col.__exit__ = MagicMock(return_value=False)
+
+        config = InspectorConfig(enabled=True)
+        reg = FileCategoryRegistry()
+        src = SourceFile(
+            path="/fake/bck_test.py",
+            category=FileCategory(name="Python", extensions={".py"}),
+        )
+        render_inspector_panel([src], config, reg)  # no project_root
+
+        # Only width selector — no mode selector
+        assert mock_st.segmented_control.call_count == 1
+
+    @patch("streamtex.inspector.st")
+    def test_filter_always_present(self, mock_st):
+        mock_st.session_state = {
+            _STX_INSPECTOR_OPEN: True,
+            _STX_INSPECTOR_BLOCK: "bck_test",
+        }
+        mock_st.segmented_control.return_value = None
+        mock_st.text_input.return_value = ""
+        mock_st.columns.return_value = [MagicMock(), MagicMock()]
+        for col in mock_st.columns.return_value:
+            col.__enter__ = MagicMock(return_value=col)
+            col.__exit__ = MagicMock(return_value=False)
+
+        config = InspectorConfig(enabled=True)
+        reg = FileCategoryRegistry()
+        src = SourceFile(
+            path="/fake/bck_test.py",
+            category=FileCategory(name="Python", extensions={".py"}),
+        )
+        render_inspector_panel([src], config, reg)
+
+        # text_input should be called for the filter
+        mock_st.text_input.assert_called_once()

@@ -25,6 +25,15 @@ _STX_INSPECTOR_OPEN = "_stx_inspector_open"
 _STX_INSPECTOR_BLOCK = "_stx_inspector_block"
 _STX_INSPECTOR_AUTH = "_stx_inspector_auth"
 _STX_INSPECTOR_WIDTH = "_stx_inspector_width"
+_STX_INSPECTOR_MODE = "_stx_insp_mode"
+_STX_INSPECTOR_PROJECT_ROOT = "_stx_insp_proj_root"
+_STX_INSPECTOR_PROJECT_FILES = "_stx_insp_proj_files"
+
+_EXCLUDED_DIRS = {
+    ".venv", "__pycache__", ".git", ".claude", "node_modules",
+    ".mypy_cache", ".pytest_cache", ".ruff_cache", ".streamlit",
+    ".tox", "dist", "build",
+}
 
 # Width presets for the inspector sidebar.
 # CSS min-width overrides Streamlit's hardcoded 600px clamp because
@@ -299,13 +308,26 @@ def discover_sources(module, category_registry: FileCategoryRegistry) -> List[So
                         _add(candidate)
                         continue
                     # Try via resolve_static
+                    resolved_ok = False
                     try:
                         from .blocks import resolve_static
                         resolved = resolve_static(val)
                         if resolved != val and os.path.isfile(resolved):
                             _add(resolved)
+                            resolved_ok = True
                     except Exception:
                         pass
+                    # Fallback: recursive search in {project_root}/static/
+                    if not resolved_ok:
+                        project_root = _find_project_root(py_path)
+                        if project_root:
+                            static_dir = os.path.join(project_root, "static")
+                            basename = os.path.basename(val)
+                            if os.path.isdir(static_dir):
+                                for dp, _, fns in os.walk(static_dir):
+                                    if basename in fns:
+                                        _add(os.path.join(dp, basename))
+                                        break
 
     # 4. Styles file: look for "from custom.styles import"
     for node in ast.walk(tree):
@@ -328,6 +350,66 @@ def discover_sources(module, category_registry: FileCategoryRegistry) -> List[So
                     _add(os.path.join(main_dir, src))
 
     return sources
+
+
+# ---------------------------------------------------------------------------
+# Project-wide file scanning
+# ---------------------------------------------------------------------------
+
+# Extensions recognised when scanning the whole project tree.
+_PROJECT_EXTENSIONS = {
+    ".py", ".mmd", ".tex", ".puml", ".dot",
+    ".json", ".csv", ".toml", ".yaml", ".yml",
+    ".txt", ".md", ".bib", ".ris",
+}
+
+
+def _scan_project_files(
+    project_root: str,
+    category_registry: FileCategoryRegistry,
+) -> List[SourceFile]:
+    """Walk *project_root* and collect editable files with known extensions.
+
+    Prunes directories listed in ``_EXCLUDED_DIRS``.
+    Each ``SourceFile.label`` is the path relative to *project_root*.
+    """
+    results: List[SourceFile] = []
+    root = os.path.abspath(project_root)
+
+    for dirpath, dirnames, filenames in os.walk(root):
+        # Prune excluded directories in-place (modifying dirnames)
+        dirnames[:] = [
+            d for d in dirnames if d not in _EXCLUDED_DIRS
+        ]
+        dirnames.sort()
+
+        for fn in sorted(filenames):
+            ext = os.path.splitext(fn)[1].lower()
+            if ext not in _PROJECT_EXTENSIONS:
+                continue
+            abs_path = os.path.join(dirpath, fn)
+            rel_path = os.path.relpath(abs_path, root)
+            cat = category_registry.detect(abs_path)
+            results.append(SourceFile(path=abs_path, category=cat, label=rel_path))
+
+    return results
+
+
+def _get_cached_project_files(
+    project_root: str,
+    category_registry: FileCategoryRegistry,
+) -> List[SourceFile]:
+    """Return project files, rescanning only when *project_root* changes."""
+    cached_root = st.session_state.get(_STX_INSPECTOR_PROJECT_ROOT)
+    if cached_root == project_root:
+        cached = st.session_state.get(_STX_INSPECTOR_PROJECT_FILES)
+        if cached is not None:
+            return cached
+
+    files = _scan_project_files(project_root, category_registry)
+    st.session_state[_STX_INSPECTOR_PROJECT_ROOT] = project_root
+    st.session_state[_STX_INSPECTOR_PROJECT_FILES] = files
+    return files
 
 
 # ---------------------------------------------------------------------------
@@ -526,7 +608,15 @@ def _save_and_reload(file_path: str, editor_key: str, backup: bool):
             continue
 
     _invalidate_module_cache()
-    st.session_state.pop("_stx_page_cache", None)
+    st.session_state.pop(_STX_INSPECTOR_PROJECT_FILES, None)
+    # NOTE: we do NOT clear "_stx_page_cache" here.  The page cache
+    # stores TOC/marker/search metadata — not block output.  Clearing
+    # it forces _build_page_cache to re-execute ALL blocks in a hidden
+    # container, which causes StreamlitDuplicateElementKey errors when
+    # the current page's block is then rendered a second time (blocks
+    # with hardcoded widget keys like st.selectbox(key=...) crash).
+    # The registry invalidation above is sufficient: the next access
+    # to any block module re-imports it from the updated file on disk.
     st.session_state["_stx_inspector_needs_rerun"] = True
 
 
@@ -544,7 +634,7 @@ def _invalidate_module_cache() -> None:
     the next ``blocks.bck_xxx`` access re-imports the module from the
     updated file on disk.
     """
-    from .blocks import ProjectBlockRegistry, LazyBlockRegistry
+    from .blocks import LazyBlockRegistry, ProjectBlockRegistry
 
     ProjectBlockRegistry.invalidate_all()
     LazyBlockRegistry.invalidate_all()
@@ -555,6 +645,7 @@ def render_inspector_panel(
     config: InspectorConfig,
     category_registry: FileCategoryRegistry,
     placeholder=None,
+    project_root: Optional[str] = None,
 ) -> None:
     """Render the inspector panel inside a **pre-reserved sidebar placeholder**.
 
@@ -564,6 +655,10 @@ def render_inspector_panel(
     does not get displaced by TOC rebuilds or search JS injections.
 
     Falls back to ``with st.sidebar:`` if no placeholder is provided.
+
+    When *project_root* is provided, a mode selector lets the user
+    switch between "Block files" (discovered sources) and "Project"
+    (all editable files under the project root).
     """
     if not st.session_state.get(_STX_INSPECTOR_OPEN, False):
         return
@@ -607,9 +702,66 @@ def render_inspector_panel(
         effective_label = selected_width or current_label
         _inject_sidebar_width_css(_WIDTH_PRESETS.get(effective_label, ""))
 
+        # --- Mode selector (Block files / Project) ---
+        mode_options = ["Block files"]
+        if project_root:
+            mode_options.append("Project")
+
+        if len(mode_options) > 1:
+            current_mode = st.session_state.get(_STX_INSPECTOR_MODE, "Block files")
+            if current_mode not in mode_options:
+                current_mode = "Block files"
+            selected_mode = st.segmented_control(
+                "Browse mode",
+                mode_options,
+                default=current_mode,
+                key="_stx_insp_mode_ctrl",
+                label_visibility="collapsed",
+            )
+            active_mode = selected_mode or current_mode
+            if active_mode != current_mode:
+                st.session_state[_STX_INSPECTOR_MODE] = active_mode
+        else:
+            active_mode = "Block files"
+
+        # --- Text filter (both modes) ---
+        filter_text = st.text_input(
+            "Filter files",
+            key="_stx_insp_filter",
+            placeholder="Type to filter...",
+            label_visibility="collapsed",
+        )
+
+        # --- Project mode ---
+        if active_mode == "Project" and project_root:
+            all_files = _get_cached_project_files(project_root, category_registry)
+            if filter_text:
+                ft_lower = filter_text.lower()
+                all_files = [f for f in all_files if ft_lower in f.label.lower()]
+            if not all_files:
+                st.info("No matching files found.")
+                return
+            labels = [f.label for f in all_files]
+            selected_label = st.selectbox(
+                "Project file", labels, key="_stx_insp_proj_sel",
+                label_visibility="collapsed",
+            )
+            idx = labels.index(selected_label) if selected_label in labels else 0
+            _render_file_editor(all_files[idx], config)
+            return
+
+        # --- Block files mode (existing behaviour) ---
         if not sources:
             st.info("No source files found for this block.")
             return
+
+        # Apply text filter to block sources
+        if filter_text:
+            ft_lower = filter_text.lower()
+            sources = [s for s in sources if ft_lower in s.label.lower()]
+            if not sources:
+                st.info("No matching files found.")
+                return
 
         # --- Group sources by category ---
         cat_sources: Dict[str, List[SourceFile]] = {}

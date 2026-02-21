@@ -223,7 +223,7 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
 
     # --- Inspector panel (opt-in, rendered into reserved sidebar placeholder) ---
     if _inspector_placeholder is not None and st.session_state.get("_stx_inspector_open", False):
-        from .inspector import render_inspector_panel, discover_sources, FileCategoryRegistry
+        from .inspector import FileCategoryRegistry, _find_project_root, discover_sources, render_inspector_panel
         _block_name = st.session_state.get("_stx_inspector_block", "")
         _target = next(
             (m for m in module_list
@@ -233,7 +233,11 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
         if _target:
             _cat_registry = FileCategoryRegistry()
             _sources = discover_sources(_target, _cat_registry)
-            render_inspector_panel(_sources, inspector, _cat_registry, _inspector_placeholder)
+            _proj_root = _find_project_root(getattr(_target, '__file__', '') or '')
+            render_inspector_panel(
+                _sources, inspector, _cat_registry, _inspector_placeholder,
+                project_root=_proj_root,
+            )
 
     end_time = time.time()
     duration = end_time - start_time
@@ -1014,7 +1018,7 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
 
     # --- Inspector panel (opt-in, rendered into reserved sidebar placeholder) ---
     if _inspector_placeholder is not None and st.session_state.get("_stx_inspector_open", False):
-        from .inspector import render_inspector_panel, discover_sources, FileCategoryRegistry
+        from .inspector import FileCategoryRegistry, _find_project_root, discover_sources, render_inspector_panel
         _block_name = st.session_state.get("_stx_inspector_block", "")
         _target = next(
             (m for m in module_list
@@ -1024,7 +1028,11 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
         if _target:
             _cat_registry = FileCategoryRegistry()
             _sources = discover_sources(_target, _cat_registry)
-            render_inspector_panel(_sources, inspector, _cat_registry, _inspector_placeholder)
+            _proj_root = _find_project_root(getattr(_target, '__file__', '') or '')
+            render_inspector_panel(
+                _sources, inspector, _cat_registry, _inspector_placeholder,
+                project_root=_proj_root,
+            )
 
     end_time = time.time()
     logger.debug("st_book (paginated) completed in %.2fs [page %d/%d]",

@@ -18,6 +18,7 @@ tokens.md
 # === Generated ===
 html_exports/
 test.html
+projects/convert_html_to_streamtex/exports/
 
 # === Large files ===
 /big/

@@ -1,10 +1,16 @@
 """Project cards for the collection home page."""
 
+import os
+
 import streamlit as st
 from streamtex import *
 from streamtex.styles import Style
-from streamtex.enums import Tags as t
 from custom.styles import Styles as s
+
+# URLs: environment variables override localhost defaults (set by Render envVars)
+_URL_INTRO = os.environ.get("STX_URL_TEST_INTRO", "http://localhost:8502")
+_URL_ADVANCED = os.environ.get("STX_URL_TEST_ADVANCED", "http://localhost:8503")
+_URL_DEPLOY = os.environ.get("STX_URL_TEST_DEPLOY", "http://localhost:8504")
 
 
 class BlockStyles:
@@ -54,7 +60,7 @@ def build():
     # ========================================================================
     st_space("v", 2)
 
-    with st_grid(cols=2, grid_style=bs.grid_with_gap):
+    with st_grid(cols=3, grid_style=bs.grid_with_gap):
 
         # ====================================================================
         # PROJECT 1: Introduction
@@ -88,7 +94,7 @@ def build():
             with col2:
                 st.link_button(
                     "🚀 Open Course",
-                    "http://localhost:8502",
+                    _URL_INTRO,
                     use_container_width=True
                 )
 
@@ -126,7 +132,45 @@ def build():
             with col2:
                 st.link_button(
                     "🚀 Open Course",
-                    "http://localhost:8503",
+                    _URL_ADVANCED,
+                    use_container_width=True
+                )
+
+            st_space("v", 1)
+
+        # ====================================================================
+        # PROJECT 3: Deployment Guide
+        # ====================================================================
+        with st_block(bs.card_container):
+            st_space("v", 1)
+
+            # Icon + title area
+            st_write(
+                s.huge + "text-align:center;",
+                "🚀"
+            )
+            st_space("v", 1)
+
+            # Project title
+            st_write(
+                bs.project_title + "text-align:center;",
+                "Deployment Guide"
+            )
+            st_space("v", 1)
+
+            # Description
+            st_write(
+                bs.card_description + "text-align:center;",
+                "Deploy StreamTeX projects: Docker, Streamlit Cloud, Render.com, GCP, CI/CD"
+            )
+            st_space("v", 2)
+
+            # Button
+            col1, col2, col3 = st.columns([1, 2, 1])
+            with col2:
+                st.link_button(
+                    "🚀 Open Course",
+                    _URL_DEPLOY,
                     use_container_width=True
                 )
 

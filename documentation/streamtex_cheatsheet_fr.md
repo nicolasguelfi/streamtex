@@ -184,6 +184,30 @@ s.text.decors.underline_text
 
 ```
 
+## HTML brut (`st_html`)
+
+Utilisez `stx.st_html()` pour rendre du HTML brut (graphiques, règles décoratives, iframes). Passe par le pipeline dual-rendering (live + export) et injecte automatiquement `font-family: Source Sans Pro` dans les iframes.
+
+```python
+# HTML inline (height=0, par défaut) — rendu via st.html()
+stx.st_html('<hr style="border:none;height:3px;">')
+
+# HTML iframe (height>0) — rendu via components.html() avec font auto
+stx.st_html('<div>contenu graphique</div>', height=400)
+
+# Iframe avec défilement
+stx.st_html('<div>contenu long</div>', height=600, scrolling=True)
+
+# Fond clair (forcer un bg blanc en dark mode)
+stx.st_html('<svg>...</svg>', height=300, light_bg=True)
+```
+
+**Paramètres :**
+- `html` — Chaîne HTML à rendre
+- `height` — Si > 0, rendu dans une iframe avec hauteur en pixels (défaut : 0 = inline)
+- `light_bg` — Forcer le color-scheme light dans l'iframe (défaut : False)
+- `scrolling` — Activer le défilement dans l'iframe (défaut : False)
+
 ## 🔧 Utilitaires
 
 ### Espacement

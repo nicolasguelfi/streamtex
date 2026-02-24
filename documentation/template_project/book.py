@@ -1,49 +1,58 @@
 import streamlit as st
 import setup
+import streamtex as stx
 from streamtex import st_book, TOCConfig, MarkerConfig
-import blocks
+from pathlib import Path
+
 from custom.styles import Styles as s
 from custom.themes import dark
 import streamtex.styles as sts
+import blocks
 
+# Configure static sources
+stx.set_static_sources([str(Path(__file__).parent / "static")])
+
+# Page configuration
 st.set_page_config(
     page_title="My Project",
-    page_icon=None,
     layout="wide",
     initial_sidebar_state="collapsed",
-    menu_items=None
 )
 
-st.sidebar.title("Table of Contents")
+# Inject dark theme
+sts.theme = dark
 
+# Table of Contents
 toc = TOCConfig(
     numerate_titles=False,
     toc_position=0,
     title_style=s.project.titles.main_title + s.center_txt + s.text.wrap.nowrap,
-    content_style=s.large + s.text.colors.reset
+    content_style=s.large + s.text.colors.reset,
+    search=True,
 )
 
-marker = MarkerConfig(
+# Marker navigation (PageUp/PageDown)
+marker_config = MarkerConfig(
     auto_marker_on_toc=1,
-    show_nav_ui=True,
-    popup_open=False,
-    next_keys=["PageDown", "n"],
-    prev_keys=["PageUp", "p"],
+    next_keys=["PageDown"],
+    prev_keys=["PageUp"],
 )
 
-sts.theme = dark
-
-module_list = [
-    blocks.bck_01_welcome,
-    blocks.bck_02_text_and_styles,
-    blocks.bck_03_containers_and_spacing,
-    blocks.bck_04_grids,
-    blocks.bck_05_lists,
-    blocks.bck_06_images,
-    blocks.bck_07_code_blocks,
-    blocks.bck_08_overlays_and_includes,
-    blocks.bck_09_interactivity,
-]
-
-st_book(module_list, toc_config=toc, marker_config=marker,
-        separator=blocks.separator, paginate=True)
+# Orchestrate blocks
+st_book(
+    [
+        blocks.bck_01_welcome,
+        blocks.bck_02_text_and_styles,
+        blocks.bck_03_containers_and_spacing,
+        blocks.bck_04_grids,
+        blocks.bck_05_lists,
+        blocks.bck_06_images,
+        blocks.bck_07_code_blocks,
+        blocks.bck_08_overlays_and_includes,
+        blocks.bck_09_interactivity,
+    ],
+    toc_config=toc,
+    marker_config=marker_config,
+    paginate=True,
+    inspector=stx.InspectorConfig(enabled=True),
+)

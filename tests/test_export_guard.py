@@ -1,11 +1,11 @@
-"""Guard test — ensures every content-rendering st.html() goes through _render().
+"""Guard test — ensures every content-rendering st.html() goes through st_html().
 
 Scans the AST of all *.py files under streamtex/ and verifies that each file
 has exactly the expected number of ``st.html()`` calls.  Any file absent from
 the whitelist MUST have zero calls.
 
 If this test fails, you probably added a ``st.html(...)`` call in a content
-module.  Replace it with ``_render(...)`` from ``streamtex.export``.
+module.  Replace it with ``st_html(...)`` from ``streamtex.export``.
 """
 
 import ast
@@ -15,9 +15,9 @@ from pathlib import Path
 import pytest
 
 # Expected st.html() call counts per file (infrastructure only).
-# Content calls MUST use _render() from export.py instead.
+# Content calls MUST use st_html() from export.py instead.
 EXPECTED_ST_HTML_COUNTS = {
-    "export.py": 1,         # _render() — the only authorised bridge
+    "export.py": 1,         # st_html() — the only authorised bridge
     "container.py": 4,      # 2 CSS injections + 2 hidden markers
     "grid.py": 2,           # 1 CSS + 1 hidden marker
     "list.py": 4,           # 2 CSS injections + 2 hidden markers
@@ -62,9 +62,9 @@ class TestStHtmlGuard:
                 errors.append(
                     f"  {py_file.relative_to(STREAMTEX_DIR)}: "
                     f"expected {expected} st.html() calls, found {actual}. "
-                    f"Use _render() from streamtex.export for content rendering."
+                    f"Use st_html() from streamtex.export for content rendering."
                 )
         assert not errors, (
-            "st.html() call count mismatch — content calls must use _render():\n"
+            "st.html() call count mismatch — content calls must use st_html():\n"
             + "\n".join(errors)
         )

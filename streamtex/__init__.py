@@ -31,7 +31,7 @@ from .enums import Tags
 from .zoom import add_zoom_options, inject_zoom_logic
 
 # Export
-from .export import ExportConfig, st_export
+from .export import ExportConfig, st_export, st_html
 
 # Export-aware widget wrappers
 from .export_widgets import (

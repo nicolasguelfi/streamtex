@@ -106,14 +106,14 @@ def build():
         st_space("v", 1)
 
         show_explanation(textwrap.dedent("""\
-            Embed PDFs using st.html() with an iframe
+            Embed PDFs using st_html() with an iframe
             pointing to the static-served file.
         """))
         st_space("v", 1)
 
         show_code(textwrap.dedent("""\
             pdf_url = "app/static/pdf/sample_document.pdf"
-            st.html(
+            st_html(
                 f'<iframe src="{pdf_url}" '
                 f'width="100%" height="400" '
                 f'style="border:none;"></iframe>'
@@ -122,7 +122,7 @@ def build():
         st_space("v", 1)
 
         pdf_url = "app/static/pdf/sample_document.pdf"
-        st.html(
+        st_html(
             f'<iframe src="{pdf_url}" '
             f'width="100%" height="400" '
             f'style="border:none;"></iframe>'

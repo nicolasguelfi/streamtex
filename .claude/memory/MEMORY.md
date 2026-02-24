@@ -31,14 +31,23 @@
 - `project_aiai18h` — projet utilisateur
 - `project_html_example` — exemple de migration HTML
 
-## Slash commands disponibles (.claude/commands/)
-- `/run-tests` `/lint` `/deploy` `/preview-block` `/style-audit`
-- `/new-project` `/new-block` `/migrate-html` `/refactor-styles` `/upgrade-project`
+## Slash commands (.claude/commands/ — nommage domaine-action, sous-dossiers par catégorie)
+- **designer/**: `/designer:slide-audit` `/designer:slide-fix` `/designer:slide-new` `/designer:block-new` `/designer:block-preview` `/designer:style-audit` `/designer:style-refactor` `/designer:presentation-audit` `/designer:presentation-fix`
+- **developer/**: `/developer:test-run` `/developer:lint` `/developer:deploy`
+- **migration/**: `/migration:conversion-audit` `/migration:html-convert-batch` `/migration:html-convert-block` `/migration:html-export` `/migration:html-migrate`
+- **project/**: `/project:project-new` `/project:collection-new` `/project:project-upgrade` `/project:course-generate`
 
-## Système slides (.claude/slides/)
-- Commands: `/new-slide` `/audit-slide` `/fix-slide`
-- Skills: `visual-design-rules.md` `style-conventions.md`
-- Agents: `slide-designer.md` `slide-reviewer.md`
+## Système design (.claude/designer/)
+- **Shared skills**: `visual-design-rules.md` `style-conventions.md` `streamtex-quick-reference.md`
+- **Shared agents**: `slide-designer.md` `slide-reviewer.md`
+- **ros_designer_default/**: Rôle "Présentation live" (10-20m distance)
+  - Skills: `presentation-design-rules.md` (9 règles, override base)
+  - Agents: `presentation-designer.md`
+
+## Changements structurels
+- **PAGE_WIDTH → "100%"** (était "1224pt") : pleine largeur navigateur par défaut, configurable via `st_book(page_width="1224pt")`
+- **Zoom Fill mode** ajouté : `Math.min(2, available/pageWidth)` — remplit toujours la largeur disponible (contrairement à Fit qui cap à 1)
+- **page_width param** propagé dans `st_book → add_zoom_options → inject_zoom_logic` et `ExportConfig`
 
 ## Développement récent
 - **export.py** ajouté : export HTML self-contained

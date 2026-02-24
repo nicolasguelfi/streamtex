@@ -57,6 +57,17 @@ class ContainerStylesCustom:
         "code_box"
     )
 
+    # Responsive grid column presets (use as cols= value in st_grid)
+    responsive_2col = "repeat(auto-fit, minmax(350px, 1fr))"
+    responsive_3col = "repeat(auto-fit, minmax(280px, 1fr))"
+    responsive_cards = "repeat(auto-fit, minmax(200px, 1fr))"
+
+    # Layout gaps
+    gap_32 = Style("gap: 32px;", "gap_32")
+    gap_24 = Style("gap: 24px;", "gap_24")
+    gap_16 = Style("gap: 16px;", "gap_16")
+    gap_12 = Style("gap: 12px;", "gap_12")
+
 
 class Custom:
     """Aggregation class for all project-specific styles."""

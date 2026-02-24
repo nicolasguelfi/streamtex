@@ -48,7 +48,7 @@ def build():
         st_space("v", 1)
 
         show_explanation(textwrap.dedent("""\
-            Every stx.* content call goes through _render(),
+            Every stx.* content call goes through st_html(),
             which sends HTML to both Streamlit and an export buffer.
             Context managers (st_block, st_grid, st_list) push/pop
             wrapper tags so the exported HTML keeps the nesting structure.
@@ -60,7 +60,7 @@ def build():
             #
             #   stx.st_write(...)
             #        |
-            #   _render(html)
+            #   st_html(html)
             #        |
             #   +----+----+
             #   |         |
@@ -88,7 +88,7 @@ def build():
             # ExportConfig fields:
             #   enabled: bool       = False   (st_book sets this to True)
             #   page_title: str     = "StreamTeX Export"
-            #   page_width: str     = "1224pt"
+            #   page_width: str     = "100%"
             #   page_padding: str   = "36pt"
 
             # The simplest way: just set export_title in st_book()

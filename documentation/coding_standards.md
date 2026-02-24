@@ -47,7 +47,7 @@ import blocks
 ```
 
 ## 5. sx vs st — When to Use What
-- **ALL layout and content** -> `stx.*`: st_write, st_image, st_grid, st_list, st_block, st_span, st_space, st_br, st_overlay
+- **ALL layout and content** -> `stx.*`: st_write, st_image, st_grid, st_list, st_block, st_span, st_space, st_br, st_overlay, st_html
 - **Data visualization (export-aware)** -> `stx.*`: st_dataframe, st_table, st_metric, st_json, st_graphviz, st_line_chart, st_bar_chart, st_area_chart, st_scatter_chart, st_audio, st_video
 - **ONLY interactivity** -> `st.*`: buttons, inputs, sliders, forms, selectbox, checkbox
 
@@ -75,6 +75,21 @@ with stx.st_export('<p>Static fallback for export</p>'):
 ```
 
 Interactive widgets (`st.button`, `st.slider`, etc.) have no meaningful static representation and are expected to be absent from the export.
+
+### Raw HTML (`st_html`)
+When you need to render raw HTML (e.g. custom bar charts, decorative rules, embedded iframes), use `stx.st_html()` instead of `st.html()` or `components.html()`. It routes through the dual-rendering pipeline (live + export buffer) and auto-injects `font-family: Source Sans Pro` in iframes.
+
+```python
+# BAD — bypasses export pipeline
+st.html('<hr style="border:none;height:3px;">')
+import streamlit.components.v1 as components
+components.html('<div>chart</div>', height=400)
+
+# GOOD — goes through st_html (export-aware, auto font in iframes)
+stx.st_html('<hr style="border:none;height:3px;">')
+stx.st_html('<div>chart</div>', height=400)
+stx.st_html('<div>long content</div>', height=600, scrolling=True)
+```
 
 ## 6. Critical Layout Rules
 1. **Inline text**: Multiple `st_write()` calls STACK VERTICALLY. For inline mixed-style text, use ONE `st_write()` with tuple arguments:
@@ -108,6 +123,30 @@ st_grid(cols="1fr 1fr 1fr")                       # 3 equal columns (CSS syntax)
 st_grid(cols="auto 1fr")                          # First col: fit content, second: rest
 st_grid(cols="repeat(auto-fill, minmax(200px, 1fr))")  # Responsive cards
 ```
+
+### Responsive-First Grid Design (MANDATORY)
+Content is designed for **variable-width screens** (laptop, tablet, projected). All multi-column layouts MUST use responsive CSS Grid patterns so columns stack vertically when the viewport is too narrow.
+
+```python
+# BAD — fixed columns, breaks on narrow screens
+st_grid(cols=2)                       # Never wraps
+st_grid(cols="2fr 3fr")              # Never wraps
+
+# GOOD — responsive columns, auto-wrap below minmax threshold
+st_grid(cols="repeat(auto-fit, minmax(350px, 1fr))")   # 2-col → 1-col
+st_grid(cols="repeat(auto-fit, minmax(280px, 1fr))")   # 3-col → fewer
+st_grid(cols="repeat(auto-fit, minmax(200px, 1fr))")   # Card grid
+
+# Use project responsive presets (defined in custom/styles.py):
+with st_grid(cols=s.project.containers.responsive_2col, grid_style=s.project.containers.gap_24):
+    # columns auto-wrap below 350px min-width
+```
+
+**Rules:**
+1. **Default to responsive** — Every `st_grid()` with 2+ columns MUST use `repeat(auto-fit, minmax(...))` or a responsive preset
+2. **Fixed columns only for data tables** — Use `st_grid(cols=N)` only when rendering tabular data with a known column count
+3. **Test narrow viewport** — Resize the browser to ~600px to verify stacking behavior
+4. **Define responsive presets** in `custom/styles.py` — Reuse across blocks instead of repeating minmax strings
 
 ## 7. Block Architecture
 Every block file MUST contain:

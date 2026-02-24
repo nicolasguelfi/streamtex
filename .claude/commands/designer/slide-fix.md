@@ -4,7 +4,7 @@ Arguments: $ARGUMENTS (file path or block name)
 
 ## Steps
 
-1. **Run audit first**: Follow the audit process from `/audit-slide` to identify all violations.
+1. **Run audit first**: Follow the audit process from `/designer:slide-audit` to identify all violations.
 2. **Load rules**: Read `.claude/designer/skills/visual-design-rules.md`.
 3. **Apply fixes** for each violation found:
    - **Long lines**: Break into `st_write()` + `st_br()` pattern

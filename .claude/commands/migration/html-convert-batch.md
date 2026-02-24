@@ -21,4 +21,4 @@ Run the batch HTML-to-StreamTeX conversion pipeline.
    uv run python projects/convert_html_to_streamtex/tools/validate_blocks.py
    ```
 
-5. **Suggest next steps**: Create blocks.csv files for courses, then run `/generate-course --all`.
+5. **Suggest next steps**: Create blocks.csv files for courses, then run `/project:course-generate --all`.

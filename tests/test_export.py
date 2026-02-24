@@ -1,4 +1,4 @@
-"""Unit tests for streamtex.export — buffer, config, global functions, _render."""
+"""Unit tests for streamtex.export — buffer, config, global functions, st_html."""
 
 from unittest.mock import patch, MagicMock
 import pytest
@@ -12,8 +12,10 @@ from streamtex.export import (
     export_push_wrapper,
     export_pop_wrapper,
     generate_export_html,
+    st_html,
     _render,
     st_export,
+    _IFRAME_BASE,
 )
 import streamtex.export as export_mod
 
@@ -27,7 +29,7 @@ class TestExportConfig:
         cfg = ExportConfig()
         assert cfg.enabled is False
         assert cfg.page_title == "StreamTeX Export"
-        assert cfg.page_width == "1224pt"
+        assert cfg.page_width == "100%"
         assert cfg.page_padding == "36pt"
 
     def test_custom(self):
@@ -160,7 +162,73 @@ class TestGlobalFunctions:
 
 
 # ---------------------------------------------------------------------------
-# _render — dual rendering
+# st_html — public dual-rendering bridge
+# ---------------------------------------------------------------------------
+
+class TestStHtml:
+    """Tests for the public st_html() function."""
+
+    def setup_method(self):
+        export_mod._buffer = None
+
+    def teardown_method(self):
+        export_mod._buffer = None
+
+    @patch("streamtex.export.st")
+    def test_inline_calls_st_html(self, mock_st):
+        st_html("<p>hi</p>")
+        mock_st.html.assert_called_once_with("<p>hi</p>")
+
+    @patch("streamtex.export.st")
+    def test_appends_to_buffer(self, mock_st):
+        reset_export_buffer(ExportConfig(enabled=True))
+        st_html("<p>hi</p>")
+        mock_st.html.assert_called_once_with("<p>hi</p>")
+        assert "<p>hi</p>" in generate_export_html()
+
+    @patch("streamtex.export.st")
+    def test_no_buffer_when_inactive(self, mock_st):
+        st_html("<p>hi</p>")
+        mock_st.html.assert_called_once()
+        assert generate_export_html() is None
+
+    def test_alias_is_same_function(self):
+        assert _render is st_html
+
+    @patch("streamlit.components.v1.html")
+    def test_iframe_injects_font(self, mock_comp):
+        st_html("<p>chart</p>", height=300)
+        call_args = mock_comp.call_args
+        html_arg = call_args[0][0]
+        assert "font-family:Source Sans Pro,sans-serif" in html_arg
+        assert "margin:0" in html_arg
+        assert "<p>chart</p>" in html_arg
+
+    @patch("streamlit.components.v1.html")
+    def test_iframe_scrolling(self, mock_comp):
+        st_html("<p>long</p>", height=400, scrolling=True)
+        call_args = mock_comp.call_args
+        assert call_args[1]["scrolling"] is True
+
+    @patch("streamlit.components.v1.html")
+    def test_iframe_no_scrolling_by_default(self, mock_comp):
+        st_html("<p>short</p>", height=200)
+        call_args = mock_comp.call_args
+        assert call_args[1]["scrolling"] is False
+
+    @patch("streamlit.components.v1.html")
+    def test_iframe_buffer_gets_raw_html(self, mock_comp):
+        """Export buffer receives the original HTML, not the iframe-wrapped version."""
+        reset_export_buffer(ExportConfig(enabled=True))
+        st_html("<p>chart</p>", height=300)
+        exported = generate_export_html()
+        assert "<p>chart</p>" in exported
+        # _IFRAME_BASE should NOT leak into export buffer
+        assert "font-family:Source Sans Pro" not in exported
+
+
+# ---------------------------------------------------------------------------
+# _render — backward-compat alias (legacy tests kept for safety)
 # ---------------------------------------------------------------------------
 
 class TestRender:

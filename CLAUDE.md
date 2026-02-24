@@ -37,9 +37,10 @@ See `documentation/coding_standards.md` for the full reference. Key rules:
 - `streamtex/grid.py` — CSS Grid layout (st_grid with responsive columns)
 - `streamtex/container.py` — st_block, st_span context managers
 - `streamtex/list.py` — List rendering (st_list with ul/ol support)
+- `streamtex/export.py` — st_html: raw HTML bridge (inline or iframe with auto font injection)
 
 ### Organization & Navigation
-- `streamtex/book.py` — Book orchestration (st_book with paginated/continuous modes)
+- `streamtex/book.py` — Book orchestration (st_book with paginated/continuous modes, page_width param)
 - `streamtex/toc.py` — Table of Contents registry (auto-numbering, anchoring)
 - `streamtex/marker.py` — Navigation markers (slide-like navigation with PageUp/PageDown)
 - `streamtex/collection.py` — Collection system (st_collection, CollectionConfig, ProjectMeta)
@@ -54,10 +55,10 @@ See `documentation/coding_standards.md` for the full reference. Key rules:
 - `streamtex/code.py` — Code block rendering with Pygments
 - `streamtex/space.py` — Vertical/horizontal spacing (st_space, st_br)
 - `streamtex/overlay.py` — Absolute positioning layers (st_overlay)
-- `streamtex/zoom.py` — Zoom controls via CSS zoom property (Baseline 2024)
+- `streamtex/zoom.py` — Zoom controls via CSS zoom property (Baseline 2024) — Fit/Fill/% modes, page_width param
 
 ### Export
-- `streamtex/export.py` — HTML export system (ExportConfig, HtmlExportBuffer, st_export context manager)
+- `streamtex/export.py` — HTML export system (ExportConfig, HtmlExportBuffer, st_export context manager, st_html raw HTML bridge)
 - `streamtex/export_widgets.py` — Export-aware widget wrappers (st_dataframe, st_table, st_metric, st_json, st_graphviz, charts, st_audio, st_video)
 
 ### Block Infrastructure
@@ -65,7 +66,7 @@ See `documentation/coding_standards.md` for the full reference. Key rules:
 - `streamtex/block_helpers.py` — BlockHelper, show_code, show_code_inline, show_explanation, show_details (3 usage modes: functions, config injection via BlockHelperConfig, OOP inheritance)
 
 ### Utilities & Internal
-- `streamtex/constants.py` — Internal constants (PAGE_WIDTH, PAGE_PADDING)
+- `streamtex/constants.py` — Configurable defaults (PAGE_WIDTH="100%", PAGE_PADDING="36pt") — overridable per project via st_book(page_width=...)
 - `streamtex/enums.py` — Tags, ListTypes
 - `streamtex/utils.py` — generate_key, contain_link, inject_link_preview_scaffold
 - `streamtex/link_preview.py` — Hover link preview scaffold
@@ -96,14 +97,20 @@ documentation/
       ├── stx_manuals_collection/# Phase 2 collection hub (modern design)
       └── stx_manuals_shared-blocks/ # Cross-project shared block library
 .claude/
-  ├── commands/                 # Slash commands (all discoverable)
-  │   ├── Designer: new-project, new-collection, new-block, new-slide,
-  │   │   migrate-html, export-html, preview-block, style-audit,
-  │   │   audit-slide, fix-slide, refactor-styles, upgrade-project
-  │   └── Developer: run-tests, lint, deploy
+  ├── commands/                 # Slash commands (domain-action naming, grouped by category)
+  │   ├── designer/             # slide-audit, slide-fix, slide-new, block-new, block-preview,
+  │   │                         # style-audit, style-refactor, presentation-audit, presentation-fix,
+  │   │                         # survey-convert
+  │   ├── developer/            # test-run, lint, deploy
+  │   ├── migration/            # conversion-audit, html-convert-batch, html-convert-block,
+  │   │                         # html-export, html-migrate
+  │   └── project/              # project-new, collection-new, project-upgrade, course-generate
   ├── designer/                 # Designer reference knowledge
   │   ├── skills/               # visual-design-rules, style-conventions, quick-reference
-  │   └── agents/               # slide-designer, slide-reviewer
+  │   ├── agents/               # slide-designer, slide-reviewer
+  │   └── ros_designer_default/ # Presentation design role (live projection 10-20m)
+  │       ├── skills/           # presentation-design-rules
+  │       └── agents/           # presentation-designer
   └── developer/                # Developer reference knowledge
       └── skills/               # architecture, testing-patterns
 ```
@@ -153,12 +160,14 @@ uv run pytest tests/ -v
 - **Multiple projects**: Use `--server.port` flag or run-test-projects.sh script
 
 ## Workflows
-1. **New Block** -> Read coding_standards.md, inspect test projects for patterns (`/new-block`)
-2. **New Slide** -> Read designer skills (visual-design-rules, style-conventions) (`/new-slide`)
-3. **New Project** -> Copy template_project, update custom/styles.py (`/new-project`)
-4. **New Collection** -> Copy template_collection, configure collection.toml (`/new-collection`)
-5. **HTML Migration** -> Read html-migration rules, reconstruct visuals (`/migrate-html`)
-6. **HTML Export** -> Configure ExportConfig, audit widgets (`/export-html`)
+1. **New Block** -> Read coding_standards.md, inspect test projects for patterns (`/designer:block-new`)
+2. **New Slide** -> Read designer skills (visual-design-rules, style-conventions) (`/designer:slide-new`)
+3. **New Project** -> Copy template_project, update custom/styles.py (`/project:project-new`)
+4. **New Collection** -> Copy template_collection, configure collection.toml (`/project:collection-new`)
+5. **HTML Migration** -> Read html-migration rules, reconstruct visuals (`/migration:html-migrate`)
+6. **HTML Export** -> Configure ExportConfig, audit widgets (`/migration:html-export`)
 7. **Large Block Count** -> Use LazyBlockRegistry for enterprise-scale
-8. **Testing** -> Run `uv run pytest tests/ -v` after library changes (`/run-tests`)
-9. **Linting** -> Run `uv run ruff check streamtex/` (`/lint`)
+8. **Testing** -> Run `uv run pytest tests/ -v` after library changes (`/developer:test-run`)
+9. **Linting** -> Run `uv run ruff check streamtex/` (`/developer:lint`)
+10. **Presentation Audit** -> Check block for live projection compliance (`/designer:presentation-audit`)
+11. **Presentation Fix** -> Auto-fix presentation design violations (`/designer:presentation-fix`)

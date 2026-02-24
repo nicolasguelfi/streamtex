@@ -187,29 +187,45 @@ def st_export(fallback_html: str):
 # black text) regardless of OS / browser dark-mode settings.
 _LIGHT_SCHEME = "<style>:root{color-scheme:light}</style>"
 
+# Injected into iframes (height > 0) to ensure consistent font rendering.
+_IFRAME_BASE = "<style>body{font-family:Source Sans Pro,sans-serif;margin:0;}</style>"
 
-def _render(html: str, *, height: int = 0, light_bg: bool = False) -> None:
+
+def st_html(html: str, *, height: int = 0, light_bg: bool = False,
+            scrolling: bool = False) -> None:
     """Send *html* to Streamlit **and** to the export buffer (if active).
+
+    This is the **single bridge** for rendering raw HTML content in StreamTeX.
+    Internal modules use ``_render`` (backward-compat alias); project blocks
+    should import ``st_html`` from ``streamtex``.
 
     Parameters
     ----------
     height : int
         When > 0, use ``components.html()`` with an explicit pixel height
         instead of ``st.html()``.  This is required for content (e.g. SVG
-        diagrams) that cannot be auto-sized by the Shadow DOM iframe.
+        diagrams, bar charts) that cannot be auto-sized by the Shadow DOM
+        iframe.  The iframe automatically gets ``font-family: Source Sans Pro``
+        and ``margin: 0`` injected via ``_IFRAME_BASE``.
     light_bg : bool
         When True, inject ``color-scheme: light`` into the iframe so that
         diagram / image content renders on a white background even when the
         OS or browser is in dark mode.
+    scrolling : bool
+        When True and *height* > 0, enable scrolling inside the iframe.
     """
     live = f"{_LIGHT_SCHEME}{html}" if light_bg else html
     if height > 0:
         import streamlit.components.v1 as components
 
-        components.html(live, height=height)
+        live = f"{_IFRAME_BASE}{live}"
+        components.html(live, height=height, scrolling=scrolling)
     else:
         st.html(live)
     if _buffer is not None:
         _buffer.append(html)
     from .search import record_if_active
     record_if_active(html)
+
+
+_render = st_html  # backward-compat alias for internal modules

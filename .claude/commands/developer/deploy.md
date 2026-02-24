@@ -49,4 +49,4 @@ Report the health check status.
 
 - Report deployment status (success/failure)
 - Show the app URL
-- Suggest running `/preview-block` on key blocks if visual issues are suspected
+- Suggest running `/designer:block-preview` on key blocks if visual issues are suspected

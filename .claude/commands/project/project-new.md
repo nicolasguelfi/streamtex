@@ -51,7 +51,7 @@ Arguments: $ARGUMENTS (project name, e.g. "project_mycoursename")
    ```
 
 7. **Show next steps** to the user:
-   - How to add new blocks (`/new-block`)
+   - How to add new blocks (`/designer:block-new`)
    - How to customize styles in `custom/styles.py`
    - How to configure block helpers in `blocks/helpers.py`
    - How to configure the table of contents in `book.py`

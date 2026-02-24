@@ -12,7 +12,7 @@ __init__.py (public API re-exports)
   |     __init__.py re-exports: Style, ListStyle, StyleGrid, StxStyles, theme
   |
   +-- enums.py (Tags, ListTypes — independent)
-  +-- constants.py (PAGE_WIDTH, PAGE_PADDING — independent)
+  +-- constants.py (PAGE_WIDTH, PAGE_PADDING — configurable defaults)
   +-- utils.py (generate_key, contain_link, inject_link_preview_scaffold — independent)
   |
   +-- write.py (st_write) -> styles, enums, export
@@ -31,7 +31,7 @@ __init__.py (public API re-exports)
   +-- toc.py (TOCConfig, reset_toc_registry, toc_entries) -> independent singleton
   +-- marker.py (MarkerConfig, st_marker) -> toc
   +-- book.py (st_book, st_include, st_toc, load_css) -> toc, marker, export, zoom
-  +-- zoom.py (add_zoom_options, inject_zoom_logic) -> independent
+  +-- zoom.py (add_zoom_options, inject_zoom_logic) -> constants
   |
   +-- blocks.py (LazyBlockRegistry, ProjectBlockRegistry, static resolution) -> independent
   +-- block_helpers.py (BlockHelper, show_code/explanation/details, DI config) -> code, container, write, styles

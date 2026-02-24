@@ -1,8 +1,11 @@
-import streamlit as st
 from contextlib import contextmanager
-from .styles import Style, StxStyles
+
+import streamlit as st
+
+from .export import export_pop_wrapper, export_push_wrapper, is_export_active
+from .styles import StxStyles, Style
 from .utils import generate_key
-from .export import export_push_wrapper, export_pop_wrapper, is_export_active
+
 
 @contextmanager
 def st_block(style: Style = StxStyles.none, _export_wrapper: bool = True):
@@ -41,8 +44,8 @@ def st_block(style: Style = StxStyles.none, _export_wrapper: bool = True):
 
     if is_export_active() and _export_wrapper:
         export_pop_wrapper("</div>")
-        
-        
+
+
 @contextmanager
 def st_span(style: Style = StxStyles.none):
     """
@@ -94,6 +97,6 @@ def st_span(style: Style = StxStyles.none):
 
     if is_export_active():
         export_pop_wrapper("</div>")
-        
-        
-        
+
+
+

@@ -1,26 +1,27 @@
-import streamlit as st
-from streamlit.delta_generator import DeltaGenerator as Delta
-import streamlit.components.v1 as components
 import copy
 import hashlib
-import json
-import time
-import os
 import importlib.resources as resources
-
-from .styles import Style
-from .write import st_write
-from .space import st_space, st_br
-from . import toc as _toc_mod
-from .toc import reset_toc_registry, toc_entries, TOCConfig
-from .marker import reset_marker_registry, inject_marker_navigation, MarkerConfig, marker_entries
-from .enums import Tags
-from .utils import inject_link_preview_scaffold
-from .zoom import add_zoom_options, _PAGE_WIDTH_KEY
-from .export import ExportConfig, reset_export_buffer, generate_export_html, is_export_active
-from .search import start_collector, stop_collector, generate_search_input_html, generate_search_script
-
+import json
 import logging
+import os
+import time
+
+import streamlit as st
+import streamlit.components.v1 as components
+from streamlit.delta_generator import DeltaGenerator as Delta
+
+from . import toc as _toc_mod
+from .enums import Tags
+from .export import ExportConfig, generate_export_html, is_export_active, reset_export_buffer
+from .marker import MarkerConfig, inject_marker_navigation, marker_entries, reset_marker_registry
+from .search import generate_search_input_html, generate_search_script, start_collector, stop_collector
+from .space import st_br, st_space
+from .styles import Style
+from .toc import TOCConfig, reset_toc_registry, toc_entries
+from .utils import inject_link_preview_scaffold
+from .write import st_write
+from .zoom import _PAGE_WIDTH_KEY, add_zoom_options
+
 logger = logging.getLogger(__name__)
 
 
@@ -41,7 +42,7 @@ def _resolve_sidebar_max_level(toc_config: TOCConfig, paginated: bool) -> int | 
 
 def _setup_bibliography(bib_sources, bib_config):
     """Load bibliography sources and set config (called at start of st_book)."""
-    from .bib import reset_bib_registry, set_bib_config, get_bib_registry, load_bib
+    from .bib import get_bib_registry, load_bib, reset_bib_registry, set_bib_config
 
     reset_bib_registry()
 

@@ -1,17 +1,15 @@
 """Collection system for organizing multiple StreamTeX projects."""
 
 import os
-import tomllib
 from dataclasses import dataclass, field
 from typing import Dict, Optional
 
 import streamlit as st
+import tomllib
 
-from .styles import Style, StxStyles
-from .write import st_write
-from .image import st_image
-from .grid import st_grid
 from .export import _render
+from .grid import st_grid
+from .write import st_write
 
 
 @dataclass

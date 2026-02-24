@@ -28,7 +28,7 @@ import os
 import re
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -765,7 +765,8 @@ def cite(*keys: str, prefix: str = "", suffix: str = "") -> str:
                 f' data-bib-url="{_escape_attr(ref_url)}"'
                 f' data-bib-volume="{entry.volume}"'
                 f' data-bib-pages="{entry.pages}"'
-                f' data-bib-abstract="{_escape_attr(entry.abstract[:200]) if cfg.hover_show_abstract and entry.abstract else ""}"'
+                f' data-bib-abstract="'
+                f'{_escape_attr(entry.abstract[:200]) if cfg.hover_show_abstract and entry.abstract else ""}"'
             )
         parts.append(f'<span{hover_attrs}>{label}</span>')
 
@@ -823,11 +824,11 @@ def st_bibliography(*, style=None, title: str = "References",
         only_cited: Only show cited entries (vs all registered)
         format: Override BibConfig format
     """
-    from .export import _render
-    from .write import st_write
     from .container import st_block
+    from .export import _render
     from .space import st_space
     from .styles import StxStyles
+    from .write import st_write
 
     cfg = _bib_config
     fmt = format or cfg.format

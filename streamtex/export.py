@@ -17,8 +17,7 @@ import streamlit as st
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
-
-from .constants import PAGE_WIDTH, PAGE_PADDING
+from .constants import PAGE_PADDING, PAGE_WIDTH
 
 
 @dataclass

@@ -1,6 +1,7 @@
 """Text-related style definitions: Colors, Sizes, Fonts, Decors, Weights, Alignments, Titles."""
 
 from typing import Optional, Union
+
 from .core import Style
 
 

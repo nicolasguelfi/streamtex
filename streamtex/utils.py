@@ -9,20 +9,16 @@ import re
 import uuid
 
 # Re-export image utilities (backward compat for `from .utils import __is_url` etc.)
-from .image_utils import (
-    _is_url as __is_url,
-    _is_absolute_path as __is_absolute_path,
-    _is_relative_path as __is_relative_path,
-    _get_mime_type as __get_mime_type,
-    _get_base64_encoded_image as __get_base64_encoded_image,
-)
+from .image_utils import _get_base64_encoded_image as __get_base64_encoded_image  # noqa: F401
+from .image_utils import _get_mime_type as __get_mime_type  # noqa: F401
+from .image_utils import _is_absolute_path as __is_absolute_path  # noqa: F401
+from .image_utils import _is_relative_path as __is_relative_path  # noqa: F401
+from .image_utils import _is_url as __is_url  # noqa: F401
 
 # Re-export link preview utilities
-from .link_preview import (
-    inject_link_preview_scaffold,
-    contain_link,
-    _get_page_preview as __get_page_preview,
-)
+from .link_preview import _get_page_preview as __get_page_preview  # noqa: F401
+from .link_preview import contain_link  # noqa: F401
+from .link_preview import inject_link_preview_scaffold  # noqa: F401
 
 
 def strip_html(html_string):

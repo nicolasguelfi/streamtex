@@ -49,3 +49,16 @@ line-length = 120
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "W"]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401", "I001"]
+# Files with embedded HTML/CSS/JS/SVG strings that cannot be shortened
+"streamtex/bib_preview.py" = ["E501"]
+"streamtex/marker.py" = ["E501"]
+"streamtex/collection.py" = ["E501"]
+"streamtex/grid.py" = ["E501"]
+"streamtex/link_preview.py" = ["E501"]
+"streamtex/list.py" = ["E501"]
+"streamtex/image.py" = ["E501"]
+# Re-export file with intentional import organization by section
+"streamtex/utils.py" = ["I001"]

@@ -21,7 +21,7 @@ import io
 import logging
 import os
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 from urllib.parse import quote
 
@@ -264,9 +264,9 @@ def _load_oauth2(sheet_id: str, tab: str, cell_range: Optional[str],
                  headers: bool, client_secret_path: str) -> List[Dict[str, Any]]:
     """Load via Google Sheets API v4 with OAuth2 (interactive browser auth)."""
     try:
+        from google.auth.transport.requests import Request
         from google.oauth2.credentials import Credentials
         from google_auth_oauthlib.flow import InstalledAppFlow
-        from google.auth.transport.requests import Request
         from googleapiclient.discovery import build
     except ImportError:
         raise GSheetError(

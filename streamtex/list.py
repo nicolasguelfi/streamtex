@@ -1,12 +1,15 @@
-import streamlit as st
 import re
 from contextlib import contextmanager
 from contextvars import ContextVar
-from .styles import Style, StxStyles as s, ListStyle
+
+import streamlit as st
+
 from .container import st_block
 from .enums import ListType, ListTypes
+from .export import export_pop_wrapper, export_push_wrapper, is_export_active
+from .styles import ListStyle, Style
+from .styles import StxStyles as s
 from .utils import generate_key
-from .export import export_push_wrapper, export_pop_wrapper, is_export_active
 
 _current_list_level = ContextVar("list_level", default=0)
 
@@ -39,9 +42,9 @@ class ListController:
                 flex-direction: row;
                 align-items: baseline; /* Aligns bullet with the first line of text */
                 gap: 0.5rem;
-                {f"counter-increment: streamtex-counter;" if self.is_ordered else ""}
+                {"counter-increment: streamtex-counter;" if self.is_ordered else ""}
             }}
-            
+
             /* 2. THE BULLET (::before on Outer) */
             div[data-testid="stVerticalBlock"]:has(> .element-container .stHtml span.{item_id})::before {{
                 content: {self.bullet_content};
@@ -50,11 +53,11 @@ class ListController:
                 min-width: 1.2rem;
                 color: inherit;
                 font-weight: inherit;
-                
+
                 /* Alignment tweak: prevents bullet from jumping if baseline is weird */
-                align-self: baseline; 
+                align-self: baseline;
             }}
-            
+
             /* 3. HIDE THE MARKER CONTAINER */
             /* We hide the technical div that holds our span.{item_id} so it doesn't take up space in the flex row */
             div[data-testid="stVerticalBlock"]:has(> .element-container .stHtml span.{item_id}) > .element-container:has(span.{item_id}) {{
@@ -102,8 +105,8 @@ class ListController:
 
 @contextmanager
 def st_list(
-    list_type: ListType = ListTypes.unordered, 
-    l_style: Style = s.none, 
+    list_type: ListType = ListTypes.unordered,
+    l_style: Style = s.none,
     li_style: Style = s.none
 ):
     """
@@ -115,7 +118,7 @@ def st_list(
 
     Notes:
     - Supports nested lists recursively, with the nesting level affecting the style if `l_style` is a `ListStyle`.
-    
+
     ## Syntax Example:
     ```
     with st_list(
@@ -124,7 +127,7 @@ def st_list(
         li_style=bs.list_item_style
         ) as l:
         with l.item(): st_write("List Item 1")
-        with l.item(): 
+        with l.item():
             st_write("List Item 2")
             with st_list() as l2:
                 with l2.item(): st_write("Nested Item 1")
@@ -133,28 +136,30 @@ def st_list(
     """
     current_level = _current_list_level.get()
     next_level = current_level + 1
-    token = _current_list_level.set(next_level) 
+    token = _current_list_level.set(next_level)
 
     try:
         # Resolve Bullet Content
-        bullet_content = "'•'" 
+        bullet_content = "'•'"
         is_ordered = (list_type == ListTypes.ordered)
 
         if is_ordered:
-            counter_style = "decimal" 
+            counter_style = "decimal"
             style_str = str(l_style)
             match = re.search(r"list-style-type\s*:\s*([\w-]+)", style_str)
             if match:
                 counter_style = match.group(1)
             bullet_content = f"counter(streamtex-counter, {counter_style}) '.'"
-        
+
         elif isinstance(l_style, ListStyle) and l_style.symbols:
             idx = (next_level - 1) % len(l_style.symbols)
             symbol_char = l_style.symbols[idx]
             bullet_content = f"'{symbol_char}'"
         else:
-            if next_level == 2: bullet_content = "'○'"
-            elif next_level >= 3: bullet_content = "'■'"
+            if next_level == 2:
+                bullet_content = "'○'"
+            elif next_level >= 3:
+                bullet_content = "'■'"
 
         list_id = generate_key("ul")
         tag = "ol" if is_ordered else "ul"
@@ -180,6 +185,6 @@ def st_list(
 
         if is_export_active():
             export_pop_wrapper(f"</{tag}>")
-            
+
     finally:
         _current_list_level.reset(token)

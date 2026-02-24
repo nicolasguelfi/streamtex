@@ -1,8 +1,8 @@
 """Image utility functions: base64 encoding, MIME detection, URL/path detection."""
 
-import os
 import base64
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 

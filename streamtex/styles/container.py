@@ -1,7 +1,8 @@
 """Container-related style definitions: BackgroundColors, Paddings, Margins, Borders, etc."""
 
 from typing import Optional, Union
-from .core import Style, ListStyle
+
+from .core import ListStyle, Style
 
 
 class BackgroundColors:
@@ -270,7 +271,10 @@ class Layouts:
     inline                = Style("display: inline-block;",        "inline")
     col_layout            = Style("display: flex; flex-direction: column;", "col_layout")
     row_layout            = Style("display: flex; flex-direction: row;",    "row_layout")
-    vertical_center_layout= Style("display: flex; align-items: center; justify-content: center; align-content: center", "vertical_center_layout")
+    vertical_center_layout = Style(
+        "display: flex; align-items: center; justify-content: center; align-content: center",
+        "vertical_center_layout"
+    )
     table_layout          = Style("table-layout: fixed; width: 100%;",      "table_layout")
     list_layout           = Style("display: list-item;",  "list_layout")
     fit                   = Style("object-fit: contain;", "fit_layout")

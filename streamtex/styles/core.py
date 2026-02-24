@@ -1,8 +1,7 @@
 """Core style primitives: Style, ListStyle, StyleGrid, CSS helpers, theme."""
 
-from typing import List, Tuple, Optional, Union
 import re
-
+from typing import List, Optional, Tuple
 
 theme = {}
 '''The theme style dictionary.

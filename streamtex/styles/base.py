@@ -1,8 +1,8 @@
 """StxStyles — the aggregation class that composes all style categories."""
 
+from .container import BackgroundColors, Container
 from .core import Style
 from .text import Text
-from .container import Container, BackgroundColors
 from .visibility import Visibility
 
 # Wire up Text.bg_colors now that BackgroundColors is available
@@ -27,7 +27,8 @@ class StxStyles:
     italic = text.decors.italic_text
     center_txt = text.alignments.center_align
 
-    reset = text.colors.reset + BackgroundColors.reset_bg + text.weights.normal_weight + text.sizes.medium_size + text.alignments.left_align
+    reset = (text.colors.reset + BackgroundColors.reset_bg
+             + text.weights.normal_weight + text.sizes.medium_size + text.alignments.left_align)
 
     light_bg = Style("background-color: White; padding: 8px;", "light_bg")
     """White background with padding — use with ``st_block``, ``st_image``,

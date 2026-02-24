@@ -1,10 +1,11 @@
 """Marker Navigation System — opt-in slide-like navigation for StreamTeX books."""
 
 import json
-import streamlit as st
-import streamlit.components.v1 as components
 from dataclasses import dataclass, field
 from typing import Optional
+
+import streamlit.components.v1 as components
+
 from .export import _render
 from .toc import TOCRegistry
 

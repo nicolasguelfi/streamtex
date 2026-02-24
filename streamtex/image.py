@@ -1,9 +1,16 @@
 import os
-import streamlit as st
-from .styles import Style, StxStyles
-from .export import _render
-from .utils import __is_url, __is_absolute_path, __is_relative_path, __get_mime_type, __get_base64_encoded_image, contain_link
+
 from .blocks import get_static_sources
+from .export import _render
+from .styles import StxStyles, Style
+from .utils import (
+    __get_base64_encoded_image,
+    __get_mime_type,
+    __is_absolute_path,
+    __is_relative_path,
+    __is_url,
+    contain_link,
+)
 
 _static_image_base = "app/static/images"
 
@@ -47,7 +54,7 @@ def st_image(
         width = f"{width}px"
     if isinstance(height, int):
         height = f"{height}px"
-    
+
     # 2. Get the source (URL or Base64)
     img_src = get_image_src(uri)
 
@@ -66,7 +73,7 @@ def st_image(
 
     # 5. Construct the HTML
     html_content = f'<img src="{img_src}" alt="{alt}" style="{css_style}">'
-    
+
     # 6. Handle Link Wrapping
     html_content = contain_link(html_content, link, False, hover)
 
@@ -85,7 +92,7 @@ def get_image_src(uri: str) -> str:
     elif __is_absolute_path(uri) or __is_relative_path(uri):
         # If it's an absolute or relative path, try converting the file to base64
         file_path = uri if __is_absolute_path(uri) else os.path.join(os.getcwd(), uri)
-        
+
         # Check if file exists before trying to read it
         if os.path.exists(file_path):
             mime_type = __get_mime_type(file_path)

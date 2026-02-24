@@ -1,6 +1,5 @@
-import streamlit as st
-from .styles import Style, StxStyles
 from .export import _render
+from .styles import StxStyles, Style
 
 
 def st_code(
@@ -22,8 +21,8 @@ def st_code(
     """
     try:
         from pygments import highlight
-        from pygments.lexers import get_lexer_by_name, TextLexer
         from pygments.formatters import HtmlFormatter
+        from pygments.lexers import TextLexer, get_lexer_by_name
 
         try:
             lexer = get_lexer_by_name(language, stripall=True)

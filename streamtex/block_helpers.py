@@ -5,9 +5,10 @@ Block rendering helpers with 3 usage modes:
 3. Expert: set_block_helper_config(MyConfig())
 """
 
-from typing import Optional, Callable
+from typing import Optional
+
 import streamtex as stx
-from streamtex import st_write, st_block, st_space, st_br
+from streamtex import st_block, st_br, st_space, st_write
 from streamtex.styles import StxStyles
 
 

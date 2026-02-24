@@ -1,10 +1,12 @@
-import streamlit as st
-from typing import List, Union
 from contextlib import contextmanager
-from .styles import Style, StyleGrid, StxStyles
+from typing import List, Union
+
+import streamlit as st
+
 from .container import st_block
+from .export import export_pop_wrapper, export_push_wrapper, is_export_active
+from .styles import StxStyles, Style, StyleGrid
 from .utils import generate_key
-from .export import export_push_wrapper, export_pop_wrapper, is_export_active
 
 # Helper type definition
 CELL_STYLES_TYPE = Union[List[List[Style]], List[Style], Style, StyleGrid]
@@ -13,7 +15,7 @@ class GridController:
     def __init__(self, cols: str | int = 2, cell_styles: CELL_STYLES_TYPE = StxStyles.none):
         self.cell_styles = cell_styles
         self.cell_counter = 0 # Tracks total cells to map styles to flat list/matrix
-        
+
         # Infer column count
         if isinstance(cols, int):
             self.cols = cols
@@ -43,7 +45,7 @@ class GridController:
                 # Flat List
                 if idx < len(styles):
                     return styles[idx]
-                    
+
         # Case 3: StyleGrid (Matrix object)
         elif isinstance(styles, StyleGrid):
             # Flatten logic for StyleGrid
@@ -62,7 +64,7 @@ class GridController:
         # 1. Resolve Style
         style_to_apply = self._resolve_style(self.cell_counter)
         self.cell_counter += 1
-        
+
         # 2. Add 'height: 100%' so the background fills the grid cell vertically
         final_style = "height: 100%; width: 100%; box-sizing: border-box; " + str(style_to_apply)
 
@@ -83,7 +85,7 @@ def st_grid(
     A context manager representing a grid layout with customizable styles for the grid and individual cells.
 
     :param cols: The column layout, as either an int, or a CSS grid-template-columns string.
-                    Examples: 
+                    Examples:
                     - 2 (2 equal cols)
                     - "1fr 1fr 1fr" (3 equal cols)
                     - "auto 1fr" (First col fits content, second takes rest)
@@ -95,10 +97,10 @@ def st_grid(
         - A matrix (list of lists) of `Style` objects.
         - A flat list of `Style` objects.
         - A single `Style` applied to all cells.
-    
-    ## Notes: 
+
+    ## Notes:
     - Cells are filled from top to bottom, left to right.
-    
+
     ## Usage Examples:
         ```
         with st_grid(2) as g:
@@ -117,7 +119,7 @@ def st_grid(
             with g.cell(): ...
         ```
     """
-    
+
     # 1. Generate ID
     grid_id = generate_key("css-grid")
 
@@ -130,8 +132,8 @@ def st_grid(
 
     # 2b. Resolve gap value (explicit gap parameter takes priority over grid_style)
     gap_value = gap if gap else "0"
-    
-    
+
+
     # 3. Inject CSS
     # We target the direct parent stVerticalBlock of our marker.
     # We essentially turn the Streamlit Container into a CSS Grid Container.
@@ -144,9 +146,9 @@ def st_grid(
             gap: {gap_value};
             align-items: stretch; /* Ensures equal height cells */
         }}
-        
+
         /* 2. Hide Non-Cell Elements */
-        /* Streamlit injects script tags and empty divs for st.html(). 
+        /* Streamlit injects script tags and empty divs for st.html().
            We must force them to not take up grid slots. */
         div[data-testid="stVerticalBlock"]:has(> .element-container .stHtml span.{grid_id}) > .element-container:has(style),
         div[data-testid="stVerticalBlock"]:has(> .element-container .stHtml span.{grid_id}) > .element-container:has(span.{grid_id}),
@@ -160,8 +162,8 @@ def st_grid(
             width: auto !important; /* Override Streamlit's width logic */
             min-width: 0; /* Prevent grid blowout from large images */
         }}
-        
-        /* Apply Wrapper Style to the grid container itself if needed, 
+
+        /* Apply Wrapper Style to the grid container itself if needed,
            or we can wrap it. Here we apply to the grid container. */
         div[data-testid="stVerticalBlock"]:has(> .element-container .stHtml span.{grid_id}) {{
             {str(grid_style)}

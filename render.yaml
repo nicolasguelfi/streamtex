@@ -11,7 +11,7 @@ services:
   - type: web
     name: streamtex
     runtime: docker
-    repo: https://github.com/YOUR_USER/YOUR_REPO
+    repo: https://github.com/nicolasguelfi/streamtex
     branch: main
     plan: free
     dockerfilePath: ./Dockerfile
@@ -23,6 +23,7 @@ services:
     buildFilter:
       paths:
         - streamtex/**
+        - documentation/manuals/stx_manual_intro/**
         - Dockerfile
         - pyproject.toml
         - uv.lock

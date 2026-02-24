@@ -1,10 +1,11 @@
 """Link preview scaffold: hover card JS/CSS injection and page preview fetching."""
 
 import textwrap
-import streamlit as st
+
 import requests
-from requests.exceptions import ConnectionError, Timeout
+import streamlit as st
 from bs4 import BeautifulSoup as bs
+from requests.exceptions import ConnectionError, Timeout
 
 
 def _get_page_preview(url: str):

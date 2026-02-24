@@ -5,6 +5,6 @@ digraph {
     A -> B
     B -> C
     C -> D
-    D -> D
+    D -> A
     A -> C
 }

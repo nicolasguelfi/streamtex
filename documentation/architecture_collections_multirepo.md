@@ -1,8 +1,8 @@
 # StreamTeX — Collections & Multi-Repo Architecture
 
 > **Specification document** for two new features:
-> 1. `st_collection()` — A course library / project collection layer
-> 2. `configure_sources()` — Multi-directory block and static asset resolution
+> 1. `st_collection()` — A course library / project collection layer — **IMPLEMENTED** ✓
+> 2. `configure_sources()` — Multi-directory block and static asset resolution — **PLANNED** (not yet implemented; current library uses `set_static_sources()` / `get_static_sources()` / `resolve_static()` instead)
 >
 > These features are independent but complementary. A collection can contain multi-repo projects, and multi-repo projects can run standalone without a collection.
 

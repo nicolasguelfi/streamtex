@@ -6,7 +6,7 @@ Usage in blocks:
     st_write(s.project.titles.course_title, "StreamTeX Training")
 """
 
-from streamtex.styles import Style, Text, Container, StxStyles
+from streamtex.styles import Container, StxStyles, Style, Text
 
 
 class ColorsCustom:
@@ -37,23 +37,23 @@ class TextStylesCustom:
         "course_title"
     )
     page_title = Style.create(
-        ColorsCustom.primary_blue + Text.weights.bold_weight + Text.sizes.Giant_size,
+        ColorsCustom.primary_blue + Text.weights.bold_weight + Text.sizes.Huge_size,
         "page_title"
     )
     section_title = Style.create(
-        ColorsCustom.primary_blue + Text.weights.bold_weight + Text.sizes.huge_size,
+        ColorsCustom.accent_teal + Text.weights.bold_weight + Text.sizes.LARGE_size,
         "section_title"
     )
     section_subtitle = Style.create(
-        ColorsCustom.accent_teal + Text.weights.bold_weight + Text.sizes.Large_size,
+        ColorsCustom.highlight_amber + Text.weights.bold_weight + Text.sizes.Large_size,
         "section_subtitle"
     )
     subsection_title = Style.create(
-        ColorsCustom.accent_teal + Text.weights.bold_weight + Text.sizes.large_size,
+        ColorsCustom.success_green + Text.weights.bold_weight + Text.sizes.large_size,
         "subsection_title"
     )
     feature_title = Style.create(
-        ColorsCustom.accent_teal + Text.weights.bold_weight + Text.sizes.large_size,
+        ColorsCustom.success_green + Text.weights.bold_weight + Text.sizes.large_size,
         "feature_title"
     )
     tip_label = Style.create(

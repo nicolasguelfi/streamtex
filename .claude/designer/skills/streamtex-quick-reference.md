@@ -110,7 +110,7 @@ st_image(uri="static/images/logo.png", link="https://...", hover=True)
 ## Code Blocks — `st_code()`
 
 ```python
-stx.st_code(style, code="print('hello')", language="python", line_numbers=True)
+st_code(style, code="print('hello')", language="python", line_numbers=True)
 ```
 
 ## Spacing

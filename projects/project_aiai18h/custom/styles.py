@@ -1,4 +1,4 @@
-from streamtex.styles import Style, Text, Container, StxStyles
+from streamtex.styles import Container, StxStyles, Style, Text
 
 
 class ColorsCustom:
@@ -24,6 +24,25 @@ class ColorsCustom:
     orange_03    = Style("color: #cc4125;", "orange_03")
 
 class TextStylesCustom:
+    # Standard 4-level hierarchy: 96pt → 64pt → 48pt → 32pt (floor)
+    page_title = Style.create(
+        ColorsCustom.blue_01 + Text.weights.bold_weight + Text.sizes.Huge_size,
+        "page_title"
+    )
+    section_title = Style.create(
+        ColorsCustom.green_01 + Text.weights.bold_weight + Text.sizes.LARGE_size,
+        "section_title"
+    )
+    section_subtitle = Style.create(
+        ColorsCustom.orange_02 + Text.weights.bold_weight + Text.sizes.Large_size,
+        "section_subtitle"
+    )
+    subsection_title = Style.create(
+        ColorsCustom.purple_01 + Text.weights.bold_weight + Text.sizes.large_size,
+        "subsection_title"
+    )
+
+    # Project-specific titles (kept for existing blocks)
     title_intro_green_lime_01 = Style.create(
         Text.colors.lime + Text.weights.bold_weight + Text.sizes.Giant_size + Text.fonts.font_arial,
         "title_intro_green_lime_01"
@@ -81,12 +100,12 @@ class Custom:
 
     # Other styles
     content = Style.create(
-        Text.colors.black + Text.sizes.big_size,
+        Text.sizes.big_size,
         "content"
     )
 
     new = Style.create(
-        Text.colors.black + Text.sizes.big_size,
+        Text.sizes.big_size,
         "new"
     )
 

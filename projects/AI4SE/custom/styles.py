@@ -9,8 +9,7 @@ Usage in blocks:
     st_write(s.project.titles.course_title, "Generative SE")
 """
 
-from streamtex.styles import Style, Text, Container, StxStyles
-
+from streamtex.styles import StxStyles, Style, Text
 
 # ---------------------------------------------------------------------------
 # 1. COLOR PALETTE (dark-mode-first: bright on dark backgrounds)
@@ -44,7 +43,7 @@ class BackgroundsCustom:
 
 class TextStylesCustom:
     """Reusable text compositions for titles, labels, and emphasis."""
-    # Titles
+    # Titles — 4-level hierarchy: 96pt → 64pt → 48pt → 32pt (floor)
     course_title = Style.create(
         ColorsCustom.primary + Text.weights.bold_weight + Text.sizes.Huge_size,
         "course_title",
@@ -54,15 +53,15 @@ class TextStylesCustom:
         "page_title",
     )
     section_title = Style.create(
-        ColorsCustom.primary + Text.weights.bold_weight + Text.sizes.huge_size,
+        ColorsCustom.accent + Text.weights.bold_weight + Text.sizes.LARGE_size,
         "section_title",
     )
     section_subtitle = Style.create(
-        ColorsCustom.accent + Text.weights.bold_weight + Text.sizes.Large_size,
+        ColorsCustom.highlight + Text.weights.bold_weight + Text.sizes.Large_size,
         "section_subtitle",
     )
     subsection_title = Style.create(
-        ColorsCustom.accent + Text.weights.bold_weight + Text.sizes.large_size,
+        ColorsCustom.success + Text.weights.bold_weight + Text.sizes.large_size,
         "subsection_title",
     )
 

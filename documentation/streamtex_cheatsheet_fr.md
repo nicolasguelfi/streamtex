@@ -48,7 +48,7 @@ with st_block(s.center_txt):
 # Bloc avec liste
 with st_block(s.center_txt):
     with st_list(
-        list_type=l.ordered,
+        list_type=lt.ordered,
         li_style=bs.content) as l:
         with l.item(): st_write("Premier élément")
         with l.item(): st_write("Deuxième élément")
@@ -247,7 +247,7 @@ def build():
     with st_block(bs.center_txt):
         st_write(bs.green_title, "Documentation")
         st_space(size=3)
-        with st_list(l.ordered, bs.content) as l:
+        with st_list(lt.ordered, bs.content) as l:
             with l.item(): st_write("Premier point")
             with l.item(): st_write("Deuxième point")
 
@@ -281,7 +281,7 @@ def build():
     # Contenu principal
     with st_block(s.center_txt):
         with st_list(
-            list_type=l.ordered,
+            list_type=lt.ordered,
             li_style=bs.content) as l:
             with l.item(): st_write("Section 1")
             with l.item(): st_write("Section 2")

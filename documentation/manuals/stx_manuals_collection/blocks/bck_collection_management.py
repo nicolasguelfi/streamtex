@@ -1,22 +1,17 @@
 """Collection management and programmatic configuration."""
 
-import streamlit as st
-from streamtex import *
-from streamtex.styles import Style
-from streamtex.enums import Tags as t
-from streamtex.collection import CollectionConfig, ProjectMeta
 from custom.styles import Styles as s
-from pathlib import Path
+
+from streamtex import *
+from streamtex.enums import Tags as t
+from streamtex.styles import Style
 
 
 class BlockStyles:
     """Styles for collection management demo."""
 
     heading = s.project.titles.main_title + s.center_txt
-    section = Style(
-        "font-size:1.8rem;font-weight:bold;color:#7AB8F5;",
-        "section_title"
-    )
+    section = s.project.titles.section_title
     code_box = Style(
         "background:rgba(40,40,40,0.8);padding:16px;border-radius:8px;overflow:auto;",
         "code_box",

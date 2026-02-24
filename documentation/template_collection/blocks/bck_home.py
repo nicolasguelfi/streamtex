@@ -43,7 +43,7 @@ def build():
     ]
 
     gap_style = Style("gap:24px;", "home_grid_gap")
-    with st_grid(cols=2, grid_style=gap_style):
+    with st_grid(cols="repeat(auto-fit, minmax(350px, 1fr))", grid_style=gap_style):
         for proj in projects:
             with st_block(bs.card):
                 st_write(s.Large + s.text.weights.bold_weight, proj["title"])

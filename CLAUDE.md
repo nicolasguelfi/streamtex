@@ -40,7 +40,7 @@ See `documentation/coding_standards.md` for the full reference. Key rules:
 - `streamtex/export.py` — st_html: raw HTML bridge (inline or iframe with auto font injection)
 
 ### Organization & Navigation
-- `streamtex/book.py` — Book orchestration (st_book with paginated/continuous modes, page_width: int default 100)
+- `streamtex/book.py` — Book orchestration (st_book with paginated/continuous modes, page_width: int default 90)
 - `streamtex/toc.py` — Table of Contents registry (auto-numbering, anchoring)
 - `streamtex/marker.py` — Navigation markers (slide-like navigation with PageUp/PageDown)
 - `streamtex/collection.py` — Collection system (st_collection, CollectionConfig, ProjectMeta)
@@ -56,6 +56,20 @@ See `documentation/coding_standards.md` for the full reference. Key rules:
 - `streamtex/space.py` — Vertical/horizontal spacing (st_space, st_br)
 - `streamtex/overlay.py` — Absolute positioning layers (st_overlay)
 - `streamtex/zoom.py` — Width% and Zoom% sidebar inputs, pure CSS (no JavaScript)
+
+### Diagram Rendering
+- `streamtex/mermaid.py` — Mermaid diagrams (st_mermaid with pan/zoom, fit modes: contain/width/none)
+- `streamtex/plantuml.py` — PlantUML diagrams via HTTP server (st_plantuml with pan/zoom)
+- `streamtex/tikz.py` — TikZ diagrams via LaTeX pipeline (st_tikz, pan/zoom when height is explicit)
+
+### Bibliography
+- `streamtex/bib.py` — Bibliography system (BibEntry, BibConfig, BibFormat, CitationStyle, BibRegistry, cite, st_cite, st_bibliography, st_refs, load_bib/bibtex/json/ris/csl_json, parse_bibtex_string, parse_ris_string, export_bibtex, generate_bib_stubs)
+
+### Google Sheets
+- `streamtex/gsheet.py` — Google Sheets integration (GSheetConfig, GSheetSource, GSheetError, AuthMode, load_gsheet, load_gsheet_df, set_gsheet_config, get_gsheet_config)
+
+### Block Inspector
+- `streamtex/inspector.py` — Live code editor in sidebar (InspectorConfig, FileCategoryRegistry, SourceFile, discover_sources, render_edit_button, render_inspector_panel)
 
 ### Export
 - `streamtex/export.py` — HTML export system (ExportConfig, HtmlExportBuffer, st_export context manager, st_html raw HTML bridge)

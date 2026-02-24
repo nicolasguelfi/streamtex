@@ -1,4 +1,5 @@
-from streamtex.styles import Style, Text, Container, StxStyles
+from streamtex.styles import StxStyles, Style, Text
+
 
 class ColorsCustom:
     """Custom colors defined multiple times."""
@@ -15,7 +16,23 @@ class ColorsCustom:
 
 
 class TitleStyles:
-    """Title styl4es"""
+    """Title styles — 4-level hierarchy with floor at large (32pt)."""
+    main_title = Style.create(
+        ColorsCustom.lilac + Text.weights.bold_weight + Text.sizes.Huge_size,
+        "main_title"
+    )
+    section_title = Style.create(
+        ColorsCustom.denim_blue + Text.weights.bold_weight + Text.sizes.LARGE_size,
+        "section_title"
+    )
+    section_subtitle = Style.create(
+        ColorsCustom.orange_accent + Text.weights.bold_weight + Text.sizes.Large_size,
+        "section_subtitle"
+    )
+    subsection_title = Style.create(
+        ColorsCustom.dark_green + Text.weights.bold_weight + Text.sizes.large_size,
+        "subsection_title"
+    )
     table_of_contents = Style.create(
         ColorsCustom.lilac + Text.weights.bold_weight + Text.sizes.large_size + Text.alignments.center_align,
         "callout_title"

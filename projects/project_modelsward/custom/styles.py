@@ -1,4 +1,4 @@
-from streamtex.styles import Style, Text, Container, StxStyles
+from streamtex.styles import StxStyles, Style, Text
 
 
 class ColorsCustom:
@@ -68,10 +68,24 @@ class ContainersCustom:
 
 
 class TextStylesCustom:
+    # Standard 4-level hierarchy: 96pt → 64pt → 48pt → 32pt (floor)
+    main_title = Style.create(
+        ColorsCustom.structure + Text.weights.bold_weight + Text.sizes.Huge_size,
+        "main_title"
+    )
     section_title = Style.create(
-        ColorsCustom.structure + Text.weights.bold_weight + Text.sizes.Large_size,
+        ColorsCustom.structure_light + Text.weights.bold_weight + Text.sizes.LARGE_size,
         "section_title"
     )
+    section_subtitle = Style.create(
+        ColorsCustom.orange_accent + Text.weights.bold_weight + Text.sizes.Large_size,
+        "section_subtitle"
+    )
+    subsection_title = Style.create(
+        ColorsCustom.green_pass + Text.weights.bold_weight + Text.sizes.large_size,
+        "subsection_title"
+    )
+    # Beamer-specific titles (kept for existing blocks)
     slide_title = Style.create(
         ColorsCustom.structure + Text.weights.bold_weight + Text.sizes.large_size,
         "slide_title"
@@ -79,10 +93,6 @@ class TextStylesCustom:
     slide_subtitle = Style.create(
         ColorsCustom.structure_light + Text.sizes.big_size,
         "slide_subtitle"
-    )
-    main_title = Style.create(
-        ColorsCustom.structure + Text.weights.bold_weight + Text.sizes.Huge_size,
-        "main_title"
     )
     block_title = Style.create(
         ColorsCustom.structure + Text.weights.bold_weight + Text.sizes.big_size,

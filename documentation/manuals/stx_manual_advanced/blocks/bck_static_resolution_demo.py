@@ -9,18 +9,9 @@ from streamtex.enums import Tags as t
 
 class BlockStyles:
     """Local styles for the static resolution demo block."""
-    heading = Style(
-        "font-size:2.5rem;font-weight:bold;color:#4A90D9;text-align:center;",
-        "sr_heading",
-    )
-    section = Style(
-        "font-size:1.8rem;font-weight:bold;color:#2EC4B6;",
-        "sr_section",
-    )
-    subsection = Style(
-        "font-size:1.4rem;font-weight:bold;color:#4A90D9;",
-        "sr_subsection",
-    )
+    heading = s.project.titles.page_title + s.center_txt
+    section = s.project.titles.section_title
+    subsection = s.project.titles.section_subtitle
     info_box = Style(
         "background:rgba(74,144,217,0.08);padding:16px;border-radius:8px;",
         "sr_info_box",

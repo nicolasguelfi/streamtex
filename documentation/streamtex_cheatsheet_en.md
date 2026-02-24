@@ -376,7 +376,7 @@ st_book(
     bib_sources=None,               # List of .bib/.json/.ris paths
     bib_config=None,                # BibConfig for bibliography
     inspector=None,                 # InspectorConfig for block inspector
-    page_width=100,                 # Page width as % of browser width (default 100)
+    page_width=90,                  # Page width as % of browser width (default 90)
 )
 ```
 

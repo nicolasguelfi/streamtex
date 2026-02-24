@@ -9,28 +9,26 @@ from streamtex.enums import Tags as t
 
 class BlockStyles:
     """Shared header styles."""
-    pass
+    header = Style(
+        "background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); "
+        "padding: 40px 20px; border-radius: 8px;",
+        "training_header"
+    )
+    header_text = Style("color: white;", "training_header_text")
 
 
 def build():
     """Render a standard training course header."""
     st_space("v", 1)
-    
-    # Header style with gradient background
-    header_style = Style(
-        "background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); "
-        "padding: 40px 20px; border-radius: 8px;",
-        "training_header"
-    )
-    
-    with st_block(header_style):
+
+    with st_block(BlockStyles.header):
         st_write(
-            stx.StxStyles.huge + stx.StxStyles.text.colors.white,
+            stx.StxStyles.huge + stx.StxStyles.bold + BlockStyles.header_text,
             "StreamTeX Training Course",
             tag=t.div
         )
         st_write(
-            stx.StxStyles.large + stx.StxStyles.text.colors.white,
+            stx.StxStyles.large + BlockStyles.header_text,
             "A Streamlit-based content rendering framework",
             tag=t.div
         )

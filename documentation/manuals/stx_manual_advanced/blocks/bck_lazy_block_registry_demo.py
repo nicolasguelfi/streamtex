@@ -4,26 +4,18 @@ Demonstrates how LazyBlockRegistry enables enterprise-scale block loading
 from multiple source directories with priority, caching, and attribute access.
 """
 
-from streamtex import st_write, st_block, st_space, Style
-from streamtex.enums import Tags as t
 from custom.styles import Styles as s
-from blocks.helpers import show_code, show_explanation, show_details
+
+from blocks.helpers import show_code, show_details, show_explanation
+from streamtex import Style, st_block, st_space, st_write
+from streamtex.enums import Tags as t
 
 
 class BlockStyles:
     """Local styles for this block."""
-    heading = Style(
-        "font-size:2.5rem;font-weight:bold;color:#4A90D9;text-align:center;",
-        "lbr_heading",
-    )
-    section = Style(
-        "font-size:1.8rem;font-weight:bold;color:#2EC4B6;",
-        "lbr_section",
-    )
-    subsection = Style(
-        "font-size:1.4rem;font-weight:bold;color:#4A90D9;",
-        "lbr_subsection",
-    )
+    heading = s.project.titles.page_title + s.center_txt
+    section = s.project.titles.section_title
+    subsection = s.project.titles.section_subtitle
     info_box = Style(
         "background:rgba(74,144,217,0.08);padding:16px;border-radius:8px;",
         "lbr_info_box",

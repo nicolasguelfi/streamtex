@@ -6,13 +6,15 @@ Usage in blocks:
     st_write(s.project.titles.main_title, "Title")
 """
 
-from streamtex.styles import Style, Text, Container, StxStyles
+from streamtex.styles import Container, StxStyles, Style, Text
 
 
 class ColorsCustom:
     """Project text colors."""
     primary = Style("color: #4A90D9;", "primary")
     accent = Style("color: #2EC4B6;", "accent")
+    highlight = Style("color: #F39C12;", "highlight")
+    success = Style("color: #27AE60;", "success")
     muted = Style("color: #95A5A6;", "muted")
 
 
@@ -23,18 +25,22 @@ class BackgroundsCustom:
 
 
 class TextStylesCustom:
-    """Project title compositions."""
+    """Project title compositions — 4-level hierarchy with floor at large (32pt)."""
     main_title = Style.create(
-        ColorsCustom.primary + Text.weights.bold_weight + Text.sizes.Giant_size,
+        ColorsCustom.primary + Text.weights.bold_weight + Text.sizes.Huge_size,
         "main_title"
     )
     section_title = Style.create(
-        ColorsCustom.primary + Text.weights.bold_weight + Text.sizes.huge_size,
+        ColorsCustom.accent + Text.weights.bold_weight + Text.sizes.LARGE_size,
         "section_title"
     )
     section_subtitle = Style.create(
-        ColorsCustom.accent + Text.weights.bold_weight + Text.sizes.Large_size,
+        ColorsCustom.highlight + Text.weights.bold_weight + Text.sizes.Large_size,
         "section_subtitle"
+    )
+    subsection_title = Style.create(
+        ColorsCustom.success + Text.weights.bold_weight + Text.sizes.large_size,
+        "subsection_title"
     )
 
 

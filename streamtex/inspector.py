@@ -28,6 +28,7 @@ _STX_INSPECTOR_WIDTH = "_stx_inspector_width"
 _STX_INSPECTOR_MODE = "_stx_insp_mode"
 _STX_INSPECTOR_PROJECT_ROOT = "_stx_insp_proj_root"
 _STX_INSPECTOR_PROJECT_FILES = "_stx_insp_proj_files"
+_STX_INSPECTOR_CATEGORY = "_stx_insp_category"
 
 _EXCLUDED_DIRS = {
     ".venv", "__pycache__", ".git", ".claude", "node_modules",
@@ -473,17 +474,24 @@ def inject_inspector_css() -> None:
             top: 4px;
             right: 4px;
             z-index: 50;
-            opacity: 0.15;
+            opacity: 0.4;
             transition: opacity 0.2s;
         }}
         div:has(> .element-container > .stHtml > span.{_STX_EDIT_MARKER_CLASS}) [data-testid="stButton"]:hover {{
-            opacity: 0.8;
+            opacity: 1;
         }}
         div:has(> .element-container > .stHtml > span.{_STX_EDIT_MARKER_CLASS}) [data-testid="stButton"] button {{
-            padding: 2px 8px;
+            padding: 4px 8px;
             min-height: 0;
             font-size: 1.1rem;
             line-height: 1.2;
+            color: #4A90D9;
+            border: 1.5px solid #4A90D9;
+            border-radius: 4px;
+            background: transparent;
+        }}
+        div:has(> .element-container > .stHtml > span.{_STX_EDIT_MARKER_CLASS}) [data-testid="stButton"] button:hover {{
+            background: rgba(74, 144, 217, 0.1);
         }}
         /* Keep ace editor responsive inside sidebar */
         [data-testid="stSidebar"] iframe {{
@@ -769,23 +777,45 @@ def render_inspector_panel(
             cat_name = src.category.name
             cat_sources.setdefault(cat_name, []).append(src)
 
-        # --- Category tabs ---
+        # --- Category selector ---
         tab_names = [*cat_sources]
         if len(tab_names) == 1:
             _render_category_files(cat_sources[tab_names[0]], config, tab_names[0])
         else:
-            tabs = st.tabs(tab_names)
-            for tab, tab_name in zip(tabs, tab_names):
-                with tab:
-                    _render_category_files(cat_sources[tab_name], config, tab_name)
+            # Use segmented_control (not st.tabs) so the active category
+            # persists across full app reruns (e.g. Save & Reload).
+            cat_ctrl_key = "_stx_insp_cat_ctrl"
+            current_cat = st.session_state.get(_STX_INSPECTOR_CATEGORY, tab_names[0])
+            if current_cat not in tab_names:
+                current_cat = tab_names[0]
+            # Clear stale widget key so 'default' is honoured on this render
+            if cat_ctrl_key in st.session_state and st.session_state[cat_ctrl_key] not in tab_names:
+                del st.session_state[cat_ctrl_key]
+            selected_cat = st.segmented_control(
+                "File category",
+                tab_names,
+                default=current_cat,
+                key=cat_ctrl_key,
+                label_visibility="collapsed",
+            )
+            active_cat = selected_cat or current_cat
+            if active_cat != st.session_state.get(_STX_INSPECTOR_CATEGORY):
+                st.session_state[_STX_INSPECTOR_CATEGORY] = active_cat
+            _render_category_files(cat_sources[active_cat], config, active_cat)
 
 
+@st.fragment
 def _render_category_files(
     files: List[SourceFile],
     config: InspectorConfig,
     category_name: str,
 ) -> None:
-    """Render file selector + editor + save/cancel for a list of files."""
+    """Render file selector + editor + save/cancel for a list of files.
+
+    Decorated with ``@st.fragment`` so that changing the file selectbox
+    only reruns this fragment — not the full panel.  This prevents
+    ``st.tabs()`` from resetting to the first tab on every selection.
+    """
     if len(files) == 1:
         _render_file_editor(files[0], config)
     else:

@@ -1,0 +1,18 @@
+digraph {
+    rankdir=LR
+    ranksep=0.4
+    nodesep=0.35
+    node [shape=ellipse, style=filled, fontname="Helvetica"]
+
+    user [label="User Input", fillcolor="#95A5A6", fontcolor="white"]
+    widget [label="st.* Widget", fillcolor="#4A90D9", fontcolor="white"]
+    state [label="Session State", fillcolor="#F39C12", fontcolor="white"]
+    render [label="stx.* Render", fillcolor="#2EC4B6", fontcolor="white"]
+    html [label="HTML Output", fillcolor="#E74C3C", fontcolor="white"]
+
+    user -> widget [label="interacts"]
+    widget -> state [label="updates"]
+    state -> render [label="drives"]
+    render -> html [label="produces"]
+    html -> user [label="displays"]
+}

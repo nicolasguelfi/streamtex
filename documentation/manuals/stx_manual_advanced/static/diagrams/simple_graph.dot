@@ -1,0 +1,10 @@
+digraph {
+    rankdir=LR
+    ranksep=0.4
+    nodesep=0.4
+    A -> B
+    B -> C
+    C -> D
+    D -> A
+    A -> C
+}

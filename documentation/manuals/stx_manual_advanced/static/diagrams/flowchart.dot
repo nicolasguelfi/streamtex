@@ -1,0 +1,20 @@
+digraph {
+    rankdir=LR
+    ranksep=0.5
+    nodesep=0.5
+    node [shape=box, style="rounded,filled", fontname="Helvetica"]
+    edge [fontname="Helvetica"]
+
+    blocks [label="blocks/", fillcolor="#2EC4B6", fontcolor="white"]
+    book [label="book.py", fillcolor="#4A90D9", fontcolor="white"]
+    styles [label="custom/styles.py", fillcolor="#F39C12", fontcolor="white"]
+    streamtex [label="streamtex/", fillcolor="#E74C3C", fontcolor="white"]
+
+    {rank=same; blocks; book}
+
+    book -> blocks [label="st_include", constraint=false]
+    book -> styles [label="imports"]
+    blocks -> streamtex [label="stx.*"]
+    blocks -> styles [label="s.*"]
+    streamtex -> styles [label="inherits"]
+}

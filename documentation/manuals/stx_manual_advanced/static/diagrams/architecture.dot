@@ -1,0 +1,19 @@
+digraph {
+    rankdir=LR
+    ranksep=0.5
+    nodesep=0.3
+    node [shape=record, style=filled, fontname="Helvetica"]
+
+    st_book [label="{st_book|entry point}", fillcolor="#4A90D9", fontcolor="white"]
+    toc [label="{TOC|sidebar nav}", fillcolor="#2EC4B6", fontcolor="white"]
+    marker [label="{Markers|page nav}", fillcolor="#2EC4B6", fontcolor="white"]
+    block [label="{block.build()|content}", fillcolor="#F39C12", fontcolor="white"]
+    style [label="{Style|css compose}", fillcolor="#E74C3C", fontcolor="white"]
+    export [label="{Export|HTML output}", fillcolor="#27AE60", fontcolor="white"]
+
+    st_book -> toc
+    st_book -> marker
+    st_book -> block
+    block -> style
+    st_book -> export
+}

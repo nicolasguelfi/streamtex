@@ -69,7 +69,7 @@ def build():
         st_space("v", 1)
 
         with st_block(s.project.containers.result_box):
-            stx.st_tikz(DIAGRAMS["Function Plot"])
+            stx.st_tikz(DIAGRAMS["Function Plot"], height=800)
         st_space("v", 2)
 
         # --- Section 2: Neural network ---
@@ -98,7 +98,7 @@ def build():
         st_space("v", 1)
 
         with st_block(s.project.containers.result_box):
-            stx.st_tikz(DIAGRAMS["Neural Network"])
+            stx.st_tikz(DIAGRAMS["Neural Network"], height=800)
         st_space("v", 2)
 
         # --- Section 3: Finite automaton (with preamble) ---
@@ -123,7 +123,7 @@ def build():
         st_space("v", 1)
 
         with st_block(s.project.containers.result_box):
-            stx.st_tikz(DIAGRAMS["Finite Automaton"],
+            stx.st_tikz(DIAGRAMS["Finite Automaton"], height=800,
                         preamble=PREAMBLES["Finite Automaton"])
         st_space("v", 2)
 
@@ -142,7 +142,7 @@ def build():
                               [*DIAGRAMS],
                               key="bck_tikz_select")
         with st_block(s.project.containers.result_box):
-            stx.st_tikz(DIAGRAMS[choice], preamble=PREAMBLES.get(choice, ""))
+            stx.st_tikz(DIAGRAMS[choice], height=800, preamble=PREAMBLES.get(choice, ""))
         st_space("v", 2)
 
         show_details(textwrap.dedent("""\

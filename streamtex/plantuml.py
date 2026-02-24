@@ -95,7 +95,7 @@ _PLANTUML_TEMPLATE = """\
   #viewport {
     width: 100%; height: calc(100% - 32px);
     overflow: hidden; cursor: grab;
-    display: flex; justify-content: center; align-items: start;
+    display: flex; justify-content: start; align-items: start;
   }
   #viewport.dragging { cursor: grabbing; }
   #viewport svg { transform-origin: 0 0; }
@@ -120,7 +120,7 @@ _PLANTUML_TEMPLATE = """\
   <button onclick="zoomOut()" title="Zoom out">&minus;</button>
 </div>
 <script>
-  var _s = 1, _tx = 0, _ty = 0;
+  var _s = 1, _tx = 0, _ty = 0, _fitS = 1, _fitTx = 0, _fitTy = 0;
   var _svg = document.querySelector('#viewport svg');
 
   function _apply() {
@@ -129,10 +129,33 @@ _PLANTUML_TEMPLATE = """\
   }
   function zoomIn()    { _s *= 1.2; _apply(); }
   function zoomOut()   { _s /= 1.2; _apply(); }
-  function resetView() { _s = 1; _tx = 0; _ty = 0; _apply(); }
+  function resetView() { _s = _fitS; _tx = _fitTx; _ty = _fitTy; _apply(); }
+
+  /* Auto-fit: scale SVG to fill viewport on load */
+  function _autoFit() {
+    if (!_svg) return;
+    var vp = document.getElementById('viewport');
+    var vw = vp.clientWidth, vh = vp.clientHeight;
+    var sw = _svg.getAttribute('width'), sh = _svg.getAttribute('height');
+    if (!sw || !sh) {
+      var bb = _svg.getBBox();
+      sw = bb.width; sh = bb.height;
+    } else {
+      sw = parseFloat(sw); sh = parseFloat(sh);
+    }
+    if (!sw || !sh) return;
+    var scaleX = vw / sw, scaleY = vh / sh;
+    _fitS = Math.min(scaleX, scaleY);
+    _fitTx = (vw - sw * _fitS) / 2;
+    _fitTy = (vh - sh * _fitS) / 2;
+    _s = _fitS; _tx = _fitTx; _ty = _fitTy;
+    _apply();
+  }
 
   if (_svg) {
     _svg.style.transformOrigin = '0 0';
+    _autoFit();
+
     var vp = document.getElementById('viewport');
     var drag = false, sx = 0, sy = 0;
 

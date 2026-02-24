@@ -1,3 +1,4 @@
+import os
 import streamlit as st
 from streamtex import *
 import streamtex as stx
@@ -15,91 +16,27 @@ class BlockStyles:
     content = s.large
 bs = BlockStyles
 
-# Pre-defined DOT diagrams
-SIMPLE_GRAPH = """
-digraph {
-    rankdir=LR
-    ranksep=0.4
-    nodesep=0.4
-    A -> B
-    B -> C
-    C -> D
-    D -> A
-    A -> C
-}
-"""
 
-FLOWCHART = """
-digraph {
-    rankdir=LR
-    ranksep=0.5
-    nodesep=0.5
-    node [shape=box, style="rounded,filled", fontname="Helvetica"]
-    edge [fontname="Helvetica"]
+# ---------------------------------------------------------------------------
+# Load all diagrams from static files (single source of truth)
+# ---------------------------------------------------------------------------
 
-    blocks [label="blocks/", fillcolor="#2EC4B6", fontcolor="white"]
-    book [label="book.py", fillcolor="#4A90D9", fontcolor="white"]
-    styles [label="custom/styles.py", fillcolor="#F39C12", fontcolor="white"]
-    streamtex [label="streamtex/", fillcolor="#E74C3C", fontcolor="white"]
+# _atomic/ → blocks/ → project root (where static/ lives)
+_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+_STATIC_DIR = os.path.join(_PROJECT_ROOT, "static")
 
-    {rank=same; blocks; book}
 
-    book -> blocks [label="st_include", constraint=false]
-    book -> styles [label="imports"]
-    blocks -> streamtex [label="stx.*"]
-    blocks -> styles [label="s.*"]
-    streamtex -> styles [label="inherits"]
-}
-"""
+def _load(filename: str) -> str:
+    path = os.path.join(_STATIC_DIR, "diagrams", filename)
+    with open(path, encoding="utf-8") as f:
+        return f.read().strip()
 
-ARCHITECTURE = """
-digraph {
-    rankdir=LR
-    ranksep=0.5
-    nodesep=0.3
-    node [shape=record, style=filled, fontname="Helvetica"]
-
-    st_book [label="{st_book|entry point}", fillcolor="#4A90D9", fontcolor="white"]
-    toc [label="{TOC|sidebar nav}", fillcolor="#2EC4B6", fontcolor="white"]
-    marker [label="{Markers|page nav}", fillcolor="#2EC4B6", fontcolor="white"]
-    block [label="{block.build()|content}", fillcolor="#F39C12", fontcolor="white"]
-    style [label="{Style|css compose}", fillcolor="#E74C3C", fontcolor="white"]
-    export [label="{Export|HTML output}", fillcolor="#27AE60", fontcolor="white"]
-
-    st_book -> toc
-    st_book -> marker
-    st_book -> block
-    block -> style
-    st_book -> export
-}
-"""
-
-DATA_FLOW = """
-digraph {
-    rankdir=LR
-    ranksep=0.4
-    nodesep=0.35
-    node [shape=ellipse, style=filled, fontname="Helvetica"]
-
-    user [label="User Input", fillcolor="#95A5A6", fontcolor="white"]
-    widget [label="st.* Widget", fillcolor="#4A90D9", fontcolor="white"]
-    state [label="Session State", fillcolor="#F39C12", fontcolor="white"]
-    render [label="stx.* Render", fillcolor="#2EC4B6", fontcolor="white"]
-    html [label="HTML Output", fillcolor="#E74C3C", fontcolor="white"]
-
-    user -> widget [label="interacts"]
-    widget -> state [label="updates"]
-    state -> render [label="drives"]
-    render -> html [label="produces"]
-    html -> user [label="displays"]
-}
-"""
 
 DIAGRAMS = {
-    "Simple Graph": SIMPLE_GRAPH,
-    "StreamTeX Flowchart": FLOWCHART,
-    "Architecture": ARCHITECTURE,
-    "Data Flow": DATA_FLOW,
+    "Simple Graph": _load("simple_graph.dot"),
+    "StreamTeX Flowchart": _load("flowchart.dot"),
+    "Architecture": _load("architecture.dot"),
+    "Data Flow": _load("data_flow.dot"),
 }
 
 
@@ -129,7 +66,7 @@ def build():
         """))
         st_space("v", 1)
 
-        stx.st_graphviz(SIMPLE_GRAPH)
+        stx.st_graphviz(DIAGRAMS["Simple Graph"])
         st_space("v", 2)
 
         # --- Section 2: Styled flowchart ---
@@ -148,7 +85,7 @@ def build():
         """))
         st_space("v", 1)
 
-        stx.st_graphviz(FLOWCHART, height=600)
+        stx.st_graphviz(DIAGRAMS["StreamTeX Flowchart"], height=600)
         st_space("v", 2)
 
         # --- Section 3: Interactive selection ---
@@ -179,7 +116,7 @@ def build():
         """))
         st_space("v", 1)
 
-        stx.st_graphviz(ARCHITECTURE)
+        stx.st_graphviz(DIAGRAMS["Architecture"])
         st_space("v", 2)
 
         show_details(textwrap.dedent("""\
@@ -187,4 +124,5 @@ def build():
             stx.st_graphviz() supports pan and zoom interaction.
             Combine with st.selectbox() to switch between diagrams.
             Requires: uv add graphviz (Python bindings).
+            Static .dot files can be loaded from the static/diagrams/ folder.
         """))

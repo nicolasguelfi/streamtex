@@ -1,13 +1,14 @@
 # Render.com Infrastructure-as-Code — StreamTeX deployment
 # https://docs.render.com/infrastructure-as-code
 #
-# This file is auto-detected by Render when you connect your GitHub repo.
-# To deploy a different project, change the FOLDER env var below.
+# 4 services: collection hub + 3 sub-projects
+# Free tier: 750 instance-hours/month shared across all services
 #
-# Free tier: 750 instance-hours/month, 100 GB bandwidth
-# Paid: $7/month for always-on instances
+# Local equivalence:
+#   collection → localhost:8501  |  intro → 8502  |  advanced → 8503  |  deploy → 8504
 
 services:
+  # ── Collection Hub (home page) ──────────────────────────────────
   - type: web
     name: streamtex
     runtime: docker
@@ -19,11 +20,81 @@ services:
     envVars:
       - key: FOLDER
         value: documentation/manuals/stx_manuals_collection
+      # Override project_url for each card (STX_URL_<KEY>)
+      - key: STX_URL_TEST_INTRO
+        value: https://streamtex-intro.onrender.com
+      - key: STX_URL_TEST_ADVANCED
+        value: https://streamtex-advanced.onrender.com
+      - key: STX_URL_TEST_DEPLOY
+        value: https://streamtex-deploy.onrender.com
     healthCheckPath: /_stcore/health
     buildFilter:
       paths:
         - streamtex/**
         - documentation/manuals/stx_manuals_collection/**
+        - Dockerfile
+        - pyproject.toml
+        - uv.lock
+
+  # ── Introduction course ─────────────────────────────────────────
+  - type: web
+    name: streamtex-intro
+    runtime: docker
+    repo: https://github.com/nicolasguelfi/streamtex
+    branch: main
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    envVars:
+      - key: FOLDER
+        value: documentation/manuals/stx_manual_intro
+    healthCheckPath: /_stcore/health
+    buildFilter:
+      paths:
+        - streamtex/**
+        - documentation/manuals/stx_manual_intro/**
+        - Dockerfile
+        - pyproject.toml
+        - uv.lock
+
+  # ── Advanced course ─────────────────────────────────────────────
+  - type: web
+    name: streamtex-advanced
+    runtime: docker
+    repo: https://github.com/nicolasguelfi/streamtex
+    branch: main
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    envVars:
+      - key: FOLDER
+        value: documentation/manuals/stx_manual_advanced
+    healthCheckPath: /_stcore/health
+    buildFilter:
+      paths:
+        - streamtex/**
+        - documentation/manuals/stx_manual_advanced/**
+        - Dockerfile
+        - pyproject.toml
+        - uv.lock
+
+  # ── Deployment guide ────────────────────────────────────────────
+  - type: web
+    name: streamtex-deploy
+    runtime: docker
+    repo: https://github.com/nicolasguelfi/streamtex
+    branch: main
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    envVars:
+      - key: FOLDER
+        value: documentation/manuals/stx_manual_deploy
+    healthCheckPath: /_stcore/health
+    buildFilter:
+      paths:
+        - streamtex/**
+        - documentation/manuals/stx_manual_deploy/**
         - Dockerfile
         - pyproject.toml
         - uv.lock

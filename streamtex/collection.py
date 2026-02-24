@@ -92,11 +92,15 @@ class CollectionConfig:
         # Parse projects
         projects_data = data.get("projects", {})
         for project_key, project_data in projects_data.items():
+            # Environment variable override: STX_URL_<KEY> (e.g. STX_URL_TEST_INTRO)
+            env_key = "STX_URL_" + project_key.upper().replace("-", "_")
+            project_url = os.environ.get(env_key, project_data.get("project_url", ""))
+
             project = ProjectMeta(
                 title=project_data.get("title", ""),
                 description=project_data.get("description", ""),
                 cover=project_data.get("cover", ""),
-                project_url=project_data.get("project_url", ""),
+                project_url=project_url,
                 order=project_data.get("order", 0),
             )
             config.projects[project_key] = project

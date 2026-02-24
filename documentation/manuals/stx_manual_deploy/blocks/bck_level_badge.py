@@ -1,4 +1,4 @@
-"""Welcome page — Introduction header + level badge.
+"""Welcome page — Deployment header + level badge.
 
 Renders a project-specific gradient header and level badge.
 Both appear on the same page in paginated mode because they
@@ -14,22 +14,22 @@ from custom.styles import Styles as s
 
 class BlockStyles:
     """Level badge styles."""
-    # Blue-cyan gradient header (Introduction identity)
+    # Green-teal gradient header (Deploy identity)
     header = Style(
-        "background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); "
+        "background: linear-gradient(135deg, #0ba360 0%, #3cba92 100%); "
         "padding: 40px 20px; border-radius: 8px;",
-        "intro_header"
+        "deploy_header"
     )
     level_box = Style(
-        "background: rgba(79, 172, 254, 0.08); "
-        "border-left: 4px solid #4facfe; "
+        "background: rgba(11, 163, 96, 0.08); "
+        "border-left: 4px solid #0ba360; "
         "padding: 20px 24px; border-radius: 0 8px 8px 0;",
-        "intro_level_box"
+        "deploy_level_box"
     )
     level_label = Style(
-        "color: #4facfe; font-weight: bold; font-size: 14pt; "
+        "color: #0ba360; font-weight: bold; font-size: 14pt; "
         "text-transform: uppercase; letter-spacing: 2px;",
-        "intro_level_label"
+        "deploy_level_label"
     )
     description = s.large + s.project.colors.neutral_gray
 
@@ -38,8 +38,8 @@ bs = BlockStyles
 
 
 def build():
-    """Render Introduction header + level badge on the same page."""
-    # --- Introduction gradient header ---
+    """Render Deployment header + level badge on the same page."""
+    # --- Deployment gradient header ---
     st_space("v", 1)
     with st_block(bs.header):
         st_write(
@@ -54,24 +54,25 @@ def build():
         )
     st_space("v", 1)
 
-    # --- Introduction level badge ---
+    # --- Deployment level badge ---
     with st_block(bs.level_box):
-        st_write(bs.level_label, "Introduction Level")
+        st_write(bs.level_label, "Deployment Guide")
         st_space("v", 0.5)
         st_write(
             s.Large + s.text.weights.bold_weight,
-            "A XX Hands-On Guide to the Basic Features",
+            "Deploy StreamTeX Projects to Any Platform",
         )
         st_space("v", 1)
         st_write(
             bs.description,
-            "This course teaches the fundamentals of StreamTeX step by step. "
-            "Each section demonstrates one concept with live examples.",
+            "This manual covers every deployment option for StreamTeX projects: "
+            "from local Docker testing to production cloud hosting. "
+            "Each section includes step-by-step instructions and automation scripts.",
         )
         st_space("v", 1)
         with st_list(list_type="ul"):
-            st_write(s.medium, "Quick Start: install, create a project, write your first block")
-            st_write(s.medium, "Core features: text, styles, grids, lists, images, code")
-            st_write(s.medium, "Navigation: book, TOC, markers, zoom, export")
+            st_write(s.medium, "Local: Docker build and compose for testing")
+            st_write(s.medium, "Cloud: Streamlit Cloud, HuggingFace Spaces, Render.com")
+            st_write(s.medium, "Production: GCP VM + Ansible, CI/CD pipelines")
 
     st_space("v", 2)

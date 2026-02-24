@@ -1,3 +1,4 @@
+Tu peux appliquer la solution, mais avant qu'est-ce que tu me conseilles entre le déploiement sur streamlite cloud ou sur render ?
 
 --------------
 Dans @projects/AI4SE

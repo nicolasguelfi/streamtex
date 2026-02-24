@@ -48,6 +48,7 @@ marker_config = MarkerConfig(
 #   7. GCP VM + Ansible (full control)
 #   8. CI/CD (ties everything together)
 st_book([
+    blocks.bck_level_badge,
     blocks.bck_welcome,
     blocks.bck_preflight,
     blocks.bck_docker_local,

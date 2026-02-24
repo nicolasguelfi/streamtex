@@ -26,19 +26,19 @@ class BlockStyles:
 
     # Card header with icon space
     card_header = Style.create(
-        s.large + s.text.weights.bold_weight + s.text.colors.reset,
+        s.medium + s.text.weights.bold_weight + s.text.colors.reset,
         "card_header"
     )
 
     # Card description text
     card_description = Style.create(
-        s.medium + s.text.colors.reset + "opacity:0.85;",
+        s.text.colors.reset + "font-size:10pt;opacity:0.85;",
         "card_description"
     )
 
     # Project title in card
     project_title = Style.create(
-        s.Large + s.text.weights.bold_weight + s.text.colors.reset,
+        s.big + s.text.weights.bold_weight + s.text.colors.reset,
         "project_title"
     )
 
@@ -70,7 +70,7 @@ def build():
 
             # Icon + title area
             st_write(
-                s.huge + "text-align:center;",
+                s.large + "text-align:center;",
                 "📚"
             )
             st_space("v", 1)
@@ -108,7 +108,7 @@ def build():
 
             # Icon + title area
             st_write(
-                s.huge + "text-align:center;",
+                s.large + "text-align:center;",
                 "⚡"
             )
             st_space("v", 1)
@@ -146,7 +146,7 @@ def build():
 
             # Icon + title area
             st_write(
-                s.huge + "text-align:center;",
+                s.large + "text-align:center;",
                 "🚀"
             )
             st_space("v", 1)

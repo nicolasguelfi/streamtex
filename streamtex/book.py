@@ -11,6 +11,7 @@ import streamlit.components.v1 as components
 from streamlit.delta_generator import DeltaGenerator as Delta
 
 from . import toc as _toc_mod
+from .auth import _password_gate
 from .enums import Tags
 from .export import ExportConfig, generate_export_html, is_export_active, reset_export_buffer
 from .marker import MarkerConfig, inject_marker_navigation, marker_entries, reset_marker_registry
@@ -89,6 +90,8 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
     :param inspector: Optional InspectorConfig to enable the block inspector panel.
     :param page_width: Page width as % of browser width (default 90).
     """
+    # --- Password gate (env-driven, no-op locally) ---
+    _password_gate()
     # --- Bibliography setup ---
     _setup_bibliography(bib_sources, bib_config)
     # --- View mode toggle (sidebar) ---

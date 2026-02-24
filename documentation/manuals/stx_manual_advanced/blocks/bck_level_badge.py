@@ -1,29 +1,25 @@
-"""Welcome page — shared header + Advanced level badge.
+"""Welcome page — Advanced header + level badge.
 
-Uses st_include() to render the shared bck_header_training block,
-then renders the project-specific level badge. Both appear on the
-same page in paginated mode because they are in a single module.
+Renders a project-specific gradient header and level badge.
+Both appear on the same page in paginated mode because they
+are in a single module.
 """
 
-import importlib.util
-from pathlib import Path
-
 from streamtex import *
+import streamtex as stx
 from streamtex.styles import Style
+from streamtex.enums import Tags as t
 from custom.styles import Styles as s
-
-# Load the shared header block (kept as a separate, reusable file)
-_header_path = (
-    Path(__file__).resolve().parent.parent.parent
-    / "stx_manuals_shared-blocks" / "blocks" / "bck_header_training.py"
-)
-_spec = importlib.util.spec_from_file_location("bck_header_training", _header_path)
-_header = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(_header)
 
 
 class BlockStyles:
     """Level badge styles."""
+    # Indigo-purple gradient header (Advanced identity)
+    header = Style(
+        "background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); "
+        "padding: 40px 20px; border-radius: 8px;",
+        "advanced_header"
+    )
     level_box = Style(
         "background: rgba(118, 75, 162, 0.08); "
         "border-left: 4px solid #764ba2; "
@@ -42,9 +38,21 @@ bs = BlockStyles
 
 
 def build():
-    """Render shared header + Advanced level badge on the same page."""
-    # --- Shared gradient header (from shared-blocks) ---
-    st_include(_header)
+    """Render Advanced header + level badge on the same page."""
+    # --- Advanced gradient header ---
+    st_space("v", 1)
+    with st_block(bs.header):
+        st_write(
+            stx.StxStyles.huge + stx.StxStyles.bold + "color:white;",
+            "StreamTeX Training Course",
+            tag=t.div
+        )
+        st_write(
+            stx.StxStyles.large + "color:white;",
+            "A Streamlit-based content rendering framework",
+            tag=t.div
+        )
+    st_space("v", 1)
 
     # --- Advanced level badge ---
     with st_block(bs.level_box):

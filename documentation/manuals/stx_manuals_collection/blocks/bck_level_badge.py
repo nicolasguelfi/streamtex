@@ -9,9 +9,9 @@ from custom.styles import Styles as s
 
 class BlockStyles:
     """Level badge styles."""
-    # Mauve gradient header (collection-specific, not shared)
+    # Orange-amber gradient header (Collection Hub identity)
     header = Style(
-        "background: linear-gradient(135deg, #B47AEA 0%, #8E44AD 100%); "
+        "background: linear-gradient(135deg, #f46b45 0%, #eea849 100%); "
         "padding: 40px 20px; border-radius: 8px;",
         "collection_header"
     )

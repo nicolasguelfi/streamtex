@@ -1,0 +1,51 @@
+# StreamTeX CI — Run tests and lint on push/PR, optionally build Docker image
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Tests & Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+
+      - name: Install Python
+        run: uv python install
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Lint
+        run: uv run ruff check streamtex/
+
+      - name: Run tests
+        run: uv run pytest tests/ -v --tb=short
+
+  docker:
+    name: Docker Build
+    runs-on: ubuntu-latest
+    needs: test
+    # Only build Docker on pushes to main (not on PRs)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t streamtex-ci .
+
+      - name: Verify health check
+        run: |
+          docker run -d --name streamtex-test -p 8501:8501 streamtex-ci
+          sleep 10
+          curl --fail --retry 5 --retry-delay 3 http://localhost:8501/_stcore/health || exit 1
+          docker stop streamtex-test

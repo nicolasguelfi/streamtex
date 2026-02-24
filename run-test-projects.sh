@@ -1,20 +1,22 @@
 #!/usr/bin/env bash
 
 # StreamTeX Test Projects Launcher
-# Paramétrable pour lancer les 3 projets en parallèle
+# Paramétrable pour lancer les projets en parallèle
 # Usage: ./run-test-projects.sh [OPTIONS]
 # Options:
-#   --help           Affiche cette aide
-#   --all            Lance les 3 projets (défaut)
-#   --collection     Lance que le hub collection (port 8501)
-#   --intro          Lance que le projet intro (port 8502)
-#   --advanced       Lance que le projet advanced (port 8503)
-#   --ports P1,P2,P3 Ports personnalisés (défaut: 8501,8502,8503)
-#   --no-intro       Lance collection et advanced
-#   --no-advanced    Lance collection et intro
-#   --no-collection  Lance intro et advanced
-#   --kill           Tue tous les processus Streamlit lancés
-#   --watch          Lance et regarde les logs
+#   --help               Affiche cette aide
+#   --all                Lance les 4 projets (défaut)
+#   --collection         Lance que le hub collection (port 8501)
+#   --intro              Lance que le projet intro (port 8502)
+#   --advanced           Lance que le projet advanced (port 8503)
+#   --deployment         Lance que le guide de déploiement (port 8504)
+#   --ports P1,P2,P3,P4  Ports personnalisés (défaut: 8501,8502,8503,8504)
+#   --no-intro           Exclut le projet intro
+#   --no-advanced        Exclut le projet advanced
+#   --no-collection      Exclut la collection
+#   --no-deployment      Exclut le guide de déploiement
+#   --kill               Tue tous les processus Streamlit lancés
+#   --watch              Lance et regarde les logs
 
 set -e
 
@@ -22,16 +24,19 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 COLLECTION_PROJECT="$SCRIPT_DIR/documentation/manuals/stx_manuals_collection"
 INTRO_PROJECT="$SCRIPT_DIR/documentation/manuals/stx_manual_intro"
 ADVANCED_PROJECT="$SCRIPT_DIR/documentation/manuals/stx_manual_advanced"
+DEPLOYMENT_PROJECT="$SCRIPT_DIR/documentation/manuals/stx_manual_deploy"
 
 # Ports par défaut
 COLLECTION_PORT=8501
 INTRO_PORT=8502
 ADVANCED_PORT=8503
+DEPLOYMENT_PORT=8504
 
 # Flags pour les projets à lancer
 LAUNCH_COLLECTION=true
 LAUNCH_INTRO=true
 LAUNCH_ADVANCED=true
+LAUNCH_DEPLOYMENT=true
 
 WATCH_MODE=false
 
@@ -46,16 +51,18 @@ USAGE:
   ./run-test-projects.sh [OPTIONS]
 
 OPTIONS:
-  --all              Lance les 3 projets (défaut)
+  --all              Lance les 4 projets (défaut)
   --collection       Lance que le hub collection (port 8501)
   --intro            Lance que le projet intro (port 8502)
   --advanced         Lance que le projet advanced (port 8503)
+  --deployment       Lance que le guide de déploiement (port 8504)
 
-  --no-intro         Lance collection et advanced
-  --no-advanced      Lance collection et intro
-  --no-collection    Lance intro et advanced
+  --no-intro         Exclut le projet intro
+  --no-advanced      Exclut le projet advanced
+  --no-collection    Exclut la collection
+  --no-deployment    Exclut le guide de déploiement
 
-  --ports P1,P2,P3   Ports personnalisés (défaut: 8501,8502,8503)
+  --ports P1,P2,P3,P4  Ports personnalisés (défaut: 8501,8502,8503,8504)
   --kill             Tue tous les processus Streamlit lancés
   --watch            Lance et regarde les logs (Ctrl+C pour quitter)
   --help             Affiche cette aide
@@ -67,8 +74,11 @@ EXAMPLES:
   # Lance que le projet intro
   ./run-test-projects.sh --intro
 
+  # Lance que le guide de déploiement
+  ./run-test-projects.sh --deployment
+
   # Lance collection et advanced sur ports 9001, 9003
-  ./run-test-projects.sh --no-intro --ports 9001,_,9003
+  ./run-test-projects.sh --no-intro --no-deployment --ports 9001,_,9003,_
 
   # Tue tous les Streamlit
   ./run-test-projects.sh --kill
@@ -80,6 +90,7 @@ URLs:
   Collection: http://localhost:8501
   Intro:      http://localhost:8502
   Advanced:   http://localhost:8503
+  Deployment: http://localhost:8504
 EOF
             exit 0
             ;;
@@ -87,24 +98,35 @@ EOF
             LAUNCH_COLLECTION=true
             LAUNCH_INTRO=true
             LAUNCH_ADVANCED=true
+            LAUNCH_DEPLOYMENT=true
             shift
             ;;
         --collection)
             LAUNCH_COLLECTION=true
             LAUNCH_INTRO=false
             LAUNCH_ADVANCED=false
+            LAUNCH_DEPLOYMENT=false
             shift
             ;;
         --intro)
             LAUNCH_COLLECTION=false
             LAUNCH_INTRO=true
             LAUNCH_ADVANCED=false
+            LAUNCH_DEPLOYMENT=false
             shift
             ;;
         --advanced)
             LAUNCH_COLLECTION=false
             LAUNCH_INTRO=false
             LAUNCH_ADVANCED=true
+            LAUNCH_DEPLOYMENT=false
+            shift
+            ;;
+        --deployment)
+            LAUNCH_COLLECTION=false
+            LAUNCH_INTRO=false
+            LAUNCH_ADVANCED=false
+            LAUNCH_DEPLOYMENT=true
             shift
             ;;
         --no-intro)
@@ -119,12 +141,17 @@ EOF
             LAUNCH_COLLECTION=false
             shift
             ;;
+        --no-deployment)
+            LAUNCH_DEPLOYMENT=false
+            shift
+            ;;
         --ports)
-            IFS=',' read -r COLLECTION_PORT INTRO_PORT ADVANCED_PORT <<< "$2"
+            IFS=',' read -r COLLECTION_PORT INTRO_PORT ADVANCED_PORT DEPLOYMENT_PORT <<< "$2"
             # Remplacer '_' par le port par défaut
             [ "$COLLECTION_PORT" = "_" ] && COLLECTION_PORT=8501
             [ "$INTRO_PORT" = "_" ] && INTRO_PORT=8502
             [ "$ADVANCED_PORT" = "_" ] && ADVANCED_PORT=8503
+            [ "$DEPLOYMENT_PORT" = "_" ] && DEPLOYMENT_PORT=8504
             shift 2
             ;;
         --kill)
@@ -163,6 +190,7 @@ check_project() {
 [ "$LAUNCH_COLLECTION" = true ] && check_project "$COLLECTION_PROJECT" "collection"
 [ "$LAUNCH_INTRO" = true ] && check_project "$INTRO_PROJECT" "intro"
 [ "$LAUNCH_ADVANCED" = true ] && check_project "$ADVANCED_PROJECT" "advanced"
+[ "$LAUNCH_DEPLOYMENT" = true ] && check_project "$DEPLOYMENT_PROJECT" "deployment"
 
 # Logs
 LOG_DIR="/tmp/streamtex-tests"
@@ -170,6 +198,7 @@ mkdir -p "$LOG_DIR"
 COLLECTION_LOG="$LOG_DIR/collection.log"
 INTRO_LOG="$LOG_DIR/intro.log"
 ADVANCED_LOG="$LOG_DIR/advanced.log"
+DEPLOYMENT_LOG="$LOG_DIR/deployment.log"
 
 # Fonction pour afficher les PID
 print_pids() {
@@ -177,9 +206,10 @@ print_pids() {
     echo "═══════════════════════════════════════════════════════════"
     echo "StreamTeX Test Projects Running"
     echo "═══════════════════════════════════════════════════════════"
-    [ "$LAUNCH_COLLECTION" = true ] && echo "📦 Collection: http://localhost:$COLLECTION_PORT (PID: $(pgrep -f "streamtex_collection" | head -1 || echo '—'))"
-    [ "$LAUNCH_INTRO" = true ] && echo "📚 Intro:      http://localhost:$INTRO_PORT (PID: $(pgrep -f "streamtex_intro" | head -1 || echo '—'))"
-    [ "$LAUNCH_ADVANCED" = true ] && echo "🚀 Advanced:   http://localhost:$ADVANCED_PORT (PID: $(pgrep -f "streamtex_advanced" | head -1 || echo '—'))"
+    [ "$LAUNCH_COLLECTION" = true ] && echo "📦 Collection:  http://localhost:$COLLECTION_PORT (PID: $(pgrep -f "streamtex_collection" | head -1 || echo '—'))"
+    [ "$LAUNCH_INTRO" = true ] && echo "📚 Intro:       http://localhost:$INTRO_PORT (PID: $(pgrep -f "streamtex_intro" | head -1 || echo '—'))"
+    [ "$LAUNCH_ADVANCED" = true ] && echo "🚀 Advanced:    http://localhost:$ADVANCED_PORT (PID: $(pgrep -f "streamtex_advanced" | head -1 || echo '—'))"
+    [ "$LAUNCH_DEPLOYMENT" = true ] && echo "📦 Deployment:  http://localhost:$DEPLOYMENT_PORT (PID: $(pgrep -f "streamtex_deploy" | head -1 || echo '—'))"
     echo ""
     echo "Logs: $LOG_DIR"
     [ "$WATCH_MODE" = false ] && echo "Utilisez --kill pour arrêter tous les processus"
@@ -233,8 +263,8 @@ launch_project() {
 cleanup() {
     echo ""
     echo "🛑 Arrêt des projets..."
-    pkill -f "streamtex_collection\|streamtex_intro\|streamtex_advanced" || true
-    pkill -f "streamlit run.*stx_manuals_collection\|streamlit run.*stx_manual_intro\|streamlit run.*stx_manual_advanced" || true
+    pkill -f "streamtex_collection\|streamtex_intro\|streamtex_advanced\|streamtex_deploy" || true
+    pkill -f "streamlit run.*stx_manuals_collection\|streamlit run.*stx_manual_intro\|streamlit run.*stx_manual_advanced\|streamlit run.*stx_manual_deploy" || true
     sleep 1
     echo "✓ Tous les projets ont été arrêtés"
 }
@@ -259,6 +289,10 @@ if [ "$LAUNCH_ADVANCED" = true ]; then
     launch_project "$ADVANCED_PROJECT" "Advanced" "$ADVANCED_PORT" "$ADVANCED_LOG"
 fi
 
+if [ "$LAUNCH_DEPLOYMENT" = true ]; then
+    launch_project "$DEPLOYMENT_PROJECT" "Deployment" "$DEPLOYMENT_PORT" "$DEPLOYMENT_LOG"
+fi
+
 print_pids
 
 # Attendre si en watch mode
@@ -281,6 +315,10 @@ if [ "$WATCH_MODE" = true ]; then
             echo "⚠️  Advanced est arrêté. Redémarrage..."
             launch_project "$ADVANCED_PROJECT" "Advanced" "$ADVANCED_PORT" "$ADVANCED_LOG"
         fi
+        if [ "$LAUNCH_DEPLOYMENT" = true ] && ! pgrep -f "streamlit run.*stx_manual_deploy" > /dev/null 2>&1; then
+            echo "⚠️  Deployment est arrêté. Redémarrage..."
+            launch_project "$DEPLOYMENT_PROJECT" "Deployment" "$DEPLOYMENT_PORT" "$DEPLOYMENT_LOG"
+        fi
     done
 else
     # Attendre un peu puis montrer les URLs
@@ -288,9 +326,10 @@ else
     echo "✨ Tous les projets sont lancés!"
     echo ""
     echo "Ouvrez dans votre navigateur:"
-    [ "$LAUNCH_COLLECTION" = true ] && echo "  • Collection: http://localhost:$COLLECTION_PORT"
-    [ "$LAUNCH_INTRO" = true ] && echo "  • Intro:      http://localhost:$INTRO_PORT"
-    [ "$LAUNCH_ADVANCED" = true ] && echo "  • Advanced:   http://localhost:$ADVANCED_PORT"
+    [ "$LAUNCH_COLLECTION" = true ] && echo "  • Collection:  http://localhost:$COLLECTION_PORT"
+    [ "$LAUNCH_INTRO" = true ] && echo "  • Intro:       http://localhost:$INTRO_PORT"
+    [ "$LAUNCH_ADVANCED" = true ] && echo "  • Advanced:    http://localhost:$ADVANCED_PORT"
+    [ "$LAUNCH_DEPLOYMENT" = true ] && echo "  • Deployment:  http://localhost:$DEPLOYMENT_PORT"
     echo ""
     echo "Utilisez './run-test-projects.sh --kill' pour arrêter tous les projets"
     echo ""

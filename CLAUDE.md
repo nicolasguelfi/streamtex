@@ -108,6 +108,7 @@ documentation/
   └── manuals/                  # StreamTeX manuals (runnable demo projects)
       ├── stx_manual_intro/      # Phase 1 intro course (lazy-loading demo)
       ├── stx_manual_advanced/   # Phase 1 advanced + multi-source blocks
+      ├── stx_manual_deploy/     # Deployment guide (Docker, Cloud, CI/CD)
       ├── stx_manuals_collection/# Phase 2 collection hub (modern design)
       └── stx_manuals_shared-blocks/ # Cross-project shared block library
 .claude/
@@ -136,6 +137,7 @@ uv sync                                                # Install all dependencie
 # Run individual projects
 uv run streamlit run projects/<your_project>/book.py
 uv run streamlit run documentation/manuals/stx_manual_intro/book.py
+uv run streamlit run documentation/manuals/stx_manual_deploy/book.py
 
 # Run multiple projects simultaneously (with different ports)
 ./run-test-projects.sh --intro --advanced --collection
@@ -168,10 +170,16 @@ uv run pytest tests/ -v
 **Demo project**: `documentation/manuals/stx_manuals_collection`
 
 ## Deployment
-- **Docker**: `docker build --build-arg FOLDER=projects/<your_project> -t streamtex-app .`
-- **Hugging Face Spaces**: Push Docker image to HF Space via git remote
-- **GCP VM**: Ansible playbook in project docs
+See `deploy/README.md` for the full deployment guide and `documentation/manuals/stx_manual_deploy/` for the interactive manual.
+- **Docker local**: `docker build --build-arg FOLDER=projects/<your_project> -t streamtex-app .`
+- **Docker Compose**: `docker compose up --build` (3 demo projects on ports 8501-8503)
+- **Streamlit Cloud**: `./deploy/gen-requirements.sh > requirements.txt` then connect on share.streamlit.io
+- **Hugging Face Spaces**: `./deploy/huggingface.sh <HF_SPACE_URL> [PROJECT_FOLDER]`
+- **Render.com**: `./deploy/render.sh [PROJECT_FOLDER]` (render.yaml at repo root)
+- **GCP VM + Ansible**: `ansible-playbook -i deploy/ansible/inventory.ini deploy/ansible/deploy.yml`
+- **CI/CD**: `.github/workflows/ci.yml` (tests + Docker build on push)
 - **Multiple projects**: Use `--server.port` flag or run-test-projects.sh script
+- **Preflight checks**: `./deploy/preflight.sh [PROJECT_FOLDER]` (run before any deployment)
 
 ## Workflows
 1. **New Block** -> Read coding_standards.md, inspect test projects for patterns (`/designer:block-new`)

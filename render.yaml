@@ -1,0 +1,28 @@
+# Render.com Infrastructure-as-Code — StreamTeX deployment
+# https://docs.render.com/infrastructure-as-code
+#
+# This file is auto-detected by Render when you connect your GitHub repo.
+# To deploy a different project, change the FOLDER env var below.
+#
+# Free tier: 750 instance-hours/month, 100 GB bandwidth
+# Paid: $7/month for always-on instances
+
+services:
+  - type: web
+    name: streamtex
+    runtime: docker
+    repo: https://github.com/YOUR_USER/YOUR_REPO
+    branch: main
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    envVars:
+      - key: FOLDER
+        value: documentation/manuals/stx_manual_intro
+    healthCheckPath: /_stcore/health
+    buildFilter:
+      paths:
+        - streamtex/**
+        - Dockerfile
+        - pyproject.toml
+        - uv.lock

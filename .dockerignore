@@ -1,0 +1,62 @@
+# === Git ===
+.git/
+.gitignore
+.gitattributes
+
+# === Python / uv ===
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+.venv/
+
+# === IDE ===
+.idea/
+.vscode/
+.cursor/
+
+# === Claude Code ===
+.claude/
+
+# === OS ===
+*.DS_Store
+Thumbs.db
+
+# === Tests (not needed in production image) ===
+tests/
+
+# === Documentation (not needed in production image) ===
+# Note: documentation/manuals/ are kept because they can be deployment targets
+documentation/coding_standards.md
+documentation/streamtex_cheatsheet_en.md
+documentation/streamtex_cheatsheet_fr.md
+documentation/export_to_pdf_cli.md
+documentation/architecture_collections_multirepo.md
+documentation/maintenance/
+documentation/template_project/
+documentation/template_collection/
+
+# === Deployment scripts (not needed inside container) ===
+deploy/
+docker-compose.yml
+.dockerignore
+
+# === Generated / large files ===
+html_exports/
+test.html
+big/
+BIG/
+data/models/
+
+# === Secrets ===
+tokens.md
+.env
+.env.*
+
+# === Dev config ===
+ruff.toml
+.python-version
+uvsync.sh
+run-test-projects.sh

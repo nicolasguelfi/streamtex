@@ -1,0 +1,13 @@
+---
+title: ${APP_TITLE}
+emoji: 🚀
+colorFrom: red
+colorTo: red
+sdk: docker
+app_port: 8501
+tags:
+- streamlit
+- streamtex
+pinned: false
+short_description: ${APP_DESCRIPTION}
+---

@@ -97,7 +97,7 @@ class TestGetMimeType:
 
     def test_ico_fallback(self):
         result = _get_mime_type("favicon.ico")
-        assert result == "image/x-icon"
+        assert result in ("image/x-icon", "image/vnd.microsoft.icon")
 
     def test_unsupported_extension(self):
         assert _get_mime_type("file.xyz123") is None

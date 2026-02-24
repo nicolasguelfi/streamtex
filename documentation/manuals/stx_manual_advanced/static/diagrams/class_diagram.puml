@@ -1,0 +1,32 @@
+@startuml
+skinparam classAttributeIconSize 0
+skinparam shadowing false
+
+class Style {
+  +css: str
+  +__add__(other): Style
+  +__sub__(other): Style
+  +add_css(prop, val): Style
+  +remove_css(prop): Style
+}
+
+class ListStyle {
+  +item: Style
+  +marker: Style
+}
+
+class StyleGrid {
+  +columns: list[Style]
+  +gap: str
+}
+
+class StxStyles {
+  +base: Style
+  +heading: Style
+  +code: Style
+}
+
+Style <|-- ListStyle
+Style <|-- StyleGrid
+StxStyles *-- Style : uses
+@enduml

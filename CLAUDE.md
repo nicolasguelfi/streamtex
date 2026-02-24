@@ -40,7 +40,7 @@ See `documentation/coding_standards.md` for the full reference. Key rules:
 - `streamtex/export.py` — st_html: raw HTML bridge (inline or iframe with auto font injection)
 
 ### Organization & Navigation
-- `streamtex/book.py` — Book orchestration (st_book with paginated/continuous modes, page_width param)
+- `streamtex/book.py` — Book orchestration (st_book with paginated/continuous modes, page_width: int default 100)
 - `streamtex/toc.py` — Table of Contents registry (auto-numbering, anchoring)
 - `streamtex/marker.py` — Navigation markers (slide-like navigation with PageUp/PageDown)
 - `streamtex/collection.py` — Collection system (st_collection, CollectionConfig, ProjectMeta)
@@ -55,7 +55,7 @@ See `documentation/coding_standards.md` for the full reference. Key rules:
 - `streamtex/code.py` — Code block rendering with Pygments
 - `streamtex/space.py` — Vertical/horizontal spacing (st_space, st_br)
 - `streamtex/overlay.py` — Absolute positioning layers (st_overlay)
-- `streamtex/zoom.py` — Zoom controls via CSS zoom property (Baseline 2024) — Fit/Fill/% modes, page_width param
+- `streamtex/zoom.py` — Width% and Zoom% sidebar inputs, pure CSS (no JavaScript)
 
 ### Export
 - `streamtex/export.py` — HTML export system (ExportConfig, HtmlExportBuffer, st_export context manager, st_html raw HTML bridge)

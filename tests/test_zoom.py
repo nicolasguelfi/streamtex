@@ -3,178 +3,170 @@
 from unittest.mock import patch, MagicMock, call
 import pytest
 
-from streamtex.zoom import add_zoom_options, inject_zoom_logic
+from streamtex.zoom import add_zoom_options, inject_zoom_logic, _PAGE_WIDTH_KEY, _ZOOM_KEY
 
 
 # ---------------------------------------------------------------------------
-# inject_zoom_logic — CSS injection
+# inject_zoom_logic — CSS values
 # ---------------------------------------------------------------------------
 
 class TestInjectZoomLogicCSS:
-    """Test that CSS is injected with the correct page_width."""
+    """Test that CSS is injected with correct width and zoom values."""
 
-    @patch("streamlit.components.v1.html")
     @patch("streamtex.zoom.st")
-    def test_default_page_width(self, mock_st, mock_comp):
-        """Default page_width uses the constant (100%)."""
-        inject_zoom_logic(100)
+    def test_defaults_100_100(self, mock_st):
+        """Default (100, 100) produces width: 100% and zoom: 1.0."""
+        inject_zoom_logic(100, 100)
         css_call = mock_st.html.call_args[0][0]
         assert "width: 100% !important" in css_call
         assert "max-width: 100% !important" in css_call
+        assert "zoom: 1.0" in css_call
 
-    @patch("streamlit.components.v1.html")
     @patch("streamtex.zoom.st")
-    def test_custom_page_width(self, mock_st, mock_comp):
-        """Custom page_width is reflected in the CSS."""
-        inject_zoom_logic(100, page_width="1224pt")
+    def test_width_80_zoom_150(self, mock_st):
+        """Width 80%, Zoom 150% → width: 80%, zoom: 1.5."""
+        inject_zoom_logic(80, 150)
         css_call = mock_st.html.call_args[0][0]
-        assert "width: 1224pt !important" in css_call
-        assert "max-width: 1224pt !important" in css_call
+        assert "width: 80% !important" in css_call
+        assert "max-width: 80% !important" in css_call
+        assert "zoom: 1.5" in css_call
 
-    @patch("streamlit.components.v1.html")
     @patch("streamtex.zoom.st")
-    def test_custom_page_width_800px(self, mock_st, mock_comp):
-        """Another custom width value."""
-        inject_zoom_logic("Fit", page_width="800px")
+    def test_width_120_zoom_50(self, mock_st):
+        """Width 120%, Zoom 50% → width: 120%, zoom: 0.5."""
+        inject_zoom_logic(120, 50)
         css_call = mock_st.html.call_args[0][0]
-        assert "width: 800px !important" in css_call
+        assert "width: 120% !important" in css_call
+        assert "max-width: 120% !important" in css_call
+        assert "zoom: 0.5" in css_call
+
+    @patch("streamtex.zoom.st")
+    def test_padding_uses_constant(self, mock_st):
+        """Padding should use PAGE_PADDING constant (36pt)."""
+        inject_zoom_logic(100, 100)
+        css_call = mock_st.html.call_args[0][0]
+        assert "padding-left: 36pt !important" in css_call
+        assert "padding-right: 36pt !important" in css_call
+
+    @patch("streamtex.zoom.st")
+    def test_centering_margin_auto(self, mock_st):
+        """Page should be centered with margin: auto."""
+        inject_zoom_logic(80, 100)
+        css_call = mock_st.html.call_args[0][0]
+        assert "margin-left: auto !important" in css_call
+        assert "margin-right: auto !important" in css_call
+
+    @patch("streamtex.zoom.st")
+    def test_single_st_html_call(self, mock_st):
+        """Only one st.html() call (compatible with export guard)."""
+        inject_zoom_logic(100, 100)
+        assert mock_st.html.call_count == 1
 
 
 # ---------------------------------------------------------------------------
-# inject_zoom_logic — Fit mode
+# inject_zoom_logic — No JS
 # ---------------------------------------------------------------------------
 
-class TestInjectZoomLogicFit:
-    """Test Fit mode JS generation."""
+class TestInjectZoomLogicNoJS:
+    """Verify no JavaScript or components usage."""
 
-    @patch("streamlit.components.v1.html")
+    def test_no_components_import(self):
+        """zoom.py should not import streamlit.components."""
+        import streamtex.zoom as zoom_mod
+        import inspect
+        source = inspect.getsource(zoom_mod)
+        assert "components" not in source
+
     @patch("streamtex.zoom.st")
-    def test_fit_uses_min_1(self, mock_st, mock_comp):
-        """Fit mode caps zoom at 1 (Math.min(1, ...))."""
-        inject_zoom_logic("Fit")
-        js_call = mock_comp.call_args[0][0]
-        assert "Math.min(1," in js_call
-
-    @patch("streamlit.components.v1.html")
-    @patch("streamtex.zoom.st")
-    def test_fit_uses_resize_observer(self, mock_st, mock_comp):
-        """Fit mode uses ResizeObserver."""
-        inject_zoom_logic("Fit")
-        js_call = mock_comp.call_args[0][0]
-        assert "ResizeObserver" in js_call
-
-
-# ---------------------------------------------------------------------------
-# inject_zoom_logic — Fill mode
-# ---------------------------------------------------------------------------
-
-class TestInjectZoomLogicFill:
-    """Test Fill mode JS generation."""
-
-    @patch("streamlit.components.v1.html")
-    @patch("streamtex.zoom.st")
-    def test_fill_uses_min_2(self, mock_st, mock_comp):
-        """Fill mode caps zoom at 2 (Math.min(2, ...))."""
-        inject_zoom_logic("Fill")
-        js_call = mock_comp.call_args[0][0]
-        assert "Math.min(2," in js_call
-
-    @patch("streamlit.components.v1.html")
-    @patch("streamtex.zoom.st")
-    def test_fill_uses_resize_observer(self, mock_st, mock_comp):
-        """Fill mode uses ResizeObserver."""
-        inject_zoom_logic("Fill")
-        js_call = mock_comp.call_args[0][0]
-        assert "ResizeObserver" in js_call
-
-    @patch("streamlit.components.v1.html")
-    @patch("streamtex.zoom.st")
-    def test_fill_distinct_from_fit(self, mock_st, mock_comp):
-        """Fill mode should NOT contain Math.min(1, ...) — it uses min(2, ...)."""
-        inject_zoom_logic("Fill")
-        js_call = mock_comp.call_args[0][0]
-        assert "Math.min(1," not in js_call
-        assert "Math.min(2," in js_call
+    def test_no_script_tag(self, mock_st):
+        """Injected CSS should not contain <script> tags."""
+        inject_zoom_logic(100, 100)
+        css_call = mock_st.html.call_args[0][0]
+        assert "<script>" not in css_call
+        assert "<script " not in css_call
 
 
 # ---------------------------------------------------------------------------
-# inject_zoom_logic — Fixed zoom
-# ---------------------------------------------------------------------------
-
-class TestInjectZoomLogicFixed:
-    """Test fixed percentage zoom."""
-
-    @patch("streamlit.components.v1.html")
-    @patch("streamtex.zoom.st")
-    def test_zoom_100(self, mock_st, mock_comp):
-        """100% zoom sets CSS variable to 1.0."""
-        inject_zoom_logic(100)
-        js_call = mock_comp.call_args[0][0]
-        assert "1.0" in js_call
-
-    @patch("streamlit.components.v1.html")
-    @patch("streamtex.zoom.st")
-    def test_zoom_50(self, mock_st, mock_comp):
-        """50% zoom sets CSS variable to 0.5."""
-        inject_zoom_logic(50)
-        js_call = mock_comp.call_args[0][0]
-        assert "0.5" in js_call
-
-    @patch("streamlit.components.v1.html")
-    @patch("streamtex.zoom.st")
-    def test_zoom_200(self, mock_st, mock_comp):
-        """200% zoom sets CSS variable to 2.0."""
-        inject_zoom_logic(200)
-        js_call = mock_comp.call_args[0][0]
-        assert "2.0" in js_call
-
-
-# ---------------------------------------------------------------------------
-# add_zoom_options — sidebar widget
+# add_zoom_options — sidebar widgets
 # ---------------------------------------------------------------------------
 
 class TestAddZoomOptions:
-    """Test that add_zoom_options creates the sidebar widget and propagates page_width."""
+    """Test that add_zoom_options creates sidebar widgets and calls inject_zoom_logic."""
 
     @patch("streamtex.zoom.inject_zoom_logic")
     @patch("streamtex.zoom.st")
-    def test_propagates_page_width(self, mock_st, mock_inject):
-        """page_width is forwarded to inject_zoom_logic."""
-        mock_st.session_state = {"streamtex_zoom": "Fit"}
+    def test_creates_two_number_inputs(self, mock_st, mock_inject):
+        """Should create exactly 2 number_input widgets."""
+        mock_st.session_state = {}
+        col1 = MagicMock()
+        col2 = MagicMock()
         mock_st.sidebar.__enter__ = MagicMock(return_value=None)
         mock_st.sidebar.__exit__ = MagicMock(return_value=False)
-        mock_st.selectbox = MagicMock(return_value="Fit")
-
-        add_zoom_options(page_width="900px")
-
-        mock_inject.assert_called_once_with("Fit", page_width="900px")
-
-    @patch("streamtex.zoom.inject_zoom_logic")
-    @patch("streamtex.zoom.st")
-    def test_default_page_width_none(self, mock_st, mock_inject):
-        """Without page_width, None is passed to inject_zoom_logic."""
-        mock_st.session_state = {"streamtex_zoom": 100}
-        mock_st.sidebar.__enter__ = MagicMock(return_value=None)
-        mock_st.sidebar.__exit__ = MagicMock(return_value=False)
-        mock_st.selectbox = MagicMock(return_value=100)
+        mock_st.columns = MagicMock(return_value=[col1, col2])
+        col1.__enter__ = MagicMock(return_value=None)
+        col1.__exit__ = MagicMock(return_value=False)
+        col2.__enter__ = MagicMock(return_value=None)
+        col2.__exit__ = MagicMock(return_value=False)
 
         add_zoom_options()
 
-        mock_inject.assert_called_once_with(100, page_width=None)
+        assert mock_st.number_input.call_count == 2
 
     @patch("streamtex.zoom.inject_zoom_logic")
     @patch("streamtex.zoom.st")
-    def test_fill_in_zoom_levels(self, mock_st, mock_inject):
-        """Fill should be one of the available zoom levels."""
-        mock_st.session_state = {"streamtex_zoom": "Fill"}
+    def test_default_page_width_80(self, mock_st, mock_inject):
+        """default_page_width=80 initializes session_state to 80."""
+        mock_st.session_state = {}
+        col1 = MagicMock()
+        col2 = MagicMock()
         mock_st.sidebar.__enter__ = MagicMock(return_value=None)
         mock_st.sidebar.__exit__ = MagicMock(return_value=False)
-        mock_st.selectbox = MagicMock(return_value="Fill")
+        mock_st.columns = MagicMock(return_value=[col1, col2])
+        col1.__enter__ = MagicMock(return_value=None)
+        col1.__exit__ = MagicMock(return_value=False)
+        col2.__enter__ = MagicMock(return_value=None)
+        col2.__exit__ = MagicMock(return_value=False)
+
+        add_zoom_options(default_page_width=80)
+
+        assert mock_st.session_state[_PAGE_WIDTH_KEY] == 80
+
+    @patch("streamtex.zoom.inject_zoom_logic")
+    @patch("streamtex.zoom.st")
+    def test_does_not_overwrite_existing_state(self, mock_st, mock_inject):
+        """Existing session_state values should not be overwritten."""
+        mock_st.session_state = {_PAGE_WIDTH_KEY: 60, _ZOOM_KEY: 200}
+        col1 = MagicMock()
+        col2 = MagicMock()
+        mock_st.sidebar.__enter__ = MagicMock(return_value=None)
+        mock_st.sidebar.__exit__ = MagicMock(return_value=False)
+        mock_st.columns = MagicMock(return_value=[col1, col2])
+        col1.__enter__ = MagicMock(return_value=None)
+        col1.__exit__ = MagicMock(return_value=False)
+        col2.__enter__ = MagicMock(return_value=None)
+        col2.__exit__ = MagicMock(return_value=False)
+
+        add_zoom_options(default_page_width=100, default_zoom=100)
+
+        # Values should remain unchanged
+        assert mock_st.session_state[_PAGE_WIDTH_KEY] == 60
+        assert mock_st.session_state[_ZOOM_KEY] == 200
+
+    @patch("streamtex.zoom.inject_zoom_logic")
+    @patch("streamtex.zoom.st")
+    def test_calls_inject_with_session_values(self, mock_st, mock_inject):
+        """inject_zoom_logic is called with the session_state values."""
+        mock_st.session_state = {_PAGE_WIDTH_KEY: 75, _ZOOM_KEY: 125}
+        col1 = MagicMock()
+        col2 = MagicMock()
+        mock_st.sidebar.__enter__ = MagicMock(return_value=None)
+        mock_st.sidebar.__exit__ = MagicMock(return_value=False)
+        mock_st.columns = MagicMock(return_value=[col1, col2])
+        col1.__enter__ = MagicMock(return_value=None)
+        col1.__exit__ = MagicMock(return_value=False)
+        col2.__enter__ = MagicMock(return_value=None)
+        col2.__exit__ = MagicMock(return_value=False)
 
         add_zoom_options()
 
-        # The selectbox should offer Fill as an option
-        selectbox_call = mock_st.selectbox.call_args
-        options = selectbox_call[1].get("options") or selectbox_call[0][1]
-        assert "Fill" in options
-        assert "Fit" in options
+        mock_inject.assert_called_once_with(75, 125)

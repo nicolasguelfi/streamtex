@@ -42,7 +42,7 @@ _MERMAID_TEMPLATE = """\
   #viewport {
     width: 100%; height: calc(100% - 32px);
     overflow: hidden; cursor: grab;
-    display: flex; justify-content: center; align-items: start;
+    position: relative;
   }
   #viewport.dragging { cursor: grabbing; }
   #viewport svg { transform-origin: 0 0; }
@@ -71,6 +71,7 @@ _MERMAID_TEMPLATE = """\
 <script>
   /* ---- Global state ---- */
   var _s = 1, _tx = 0, _ty = 0, _svg = null;
+  var _initS = 1, _initTx = 0, _initTy = 0;
 
   function _apply() {
     if (!_svg) return;
@@ -78,7 +79,7 @@ _MERMAID_TEMPLATE = """\
   }
   function zoomIn()    { _s *= 1.2; _apply(); }
   function zoomOut()   { _s /= 1.2; _apply(); }
-  function resetView() { _s = 1; _tx = 0; _ty = 0; _apply(); }
+  function resetView() { _s = _initS; _tx = _initTx; _ty = _initTy; _apply(); }
 
   /* ---- Render Mermaid then attach pan-zoom ---- */
   mermaid.initialize({ startOnLoad: false, theme: '__THEME__' });
@@ -88,6 +89,31 @@ _MERMAID_TEMPLATE = """\
     _svg.style.transformOrigin = '0 0';
 
     var vp = document.getElementById('viewport');
+    var fitMode = '__FIT__';
+
+    /* ---- Auto-fit on first render ---- */
+    /* Wait two frames so the SVG is fully laid out before measuring. */
+    function _autoFit() {
+      if (fitMode === 'none' || !_svg) return;
+      var bb = _svg.getBBox();
+      var vpW = vp.clientWidth;
+      var vpH = vp.clientHeight;
+      if (bb.width > 0 && bb.height > 0 && vpW > 0 && vpH > 0) {
+        if (fitMode === 'contain') {
+          _s = Math.min(vpW / bb.width, vpH / bb.height);
+          _tx = (vpW - bb.width * _s) / 2;
+          _ty = (vpH - bb.height * _s) / 2;
+        } else if (fitMode === 'width') {
+          _s = vpW / bb.width;
+          _tx = 0;
+          _ty = 0;
+        }
+        _apply();
+        _initS = _s; _initTx = _tx; _initTy = _ty;
+      }
+    }
+    requestAnimationFrame(function() { requestAnimationFrame(_autoFit); });
+
     var drag = false, sx = 0, sy = 0;
 
     /* Wheel zoom centred on cursor */
@@ -129,12 +155,16 @@ _MERMAID_TEMPLATE = """\
 """
 
 
+_VALID_FIT = {"contain", "width", "none"}
+
+
 def st_mermaid(
     code: str,
     *,
     style: Style | None = None,
     light_bg: bool = True,
     height: int = 500,
+    fit: str = "contain",
     **kw,
 ) -> None:
     """Render a Mermaid diagram.
@@ -151,15 +181,24 @@ def st_mermaid(
         theme with a transparent background.
     height : int
         Height in pixels for the diagram iframe.  Defaults to 500.
+    fit : str
+        Initial zoom mode on first render.  ``"contain"`` (default) scales the
+        diagram to fit entirely within the viewport.  ``"width"`` scales to
+        fill the viewport width.  ``"none"`` keeps the natural size (scale 1).
+        Pan-zoom (wheel, drag, +/-/Reset) remains fully functional afterwards.
     **kw
         Reserved for future use.
     """
+    if fit not in _VALID_FIT:
+        raise ValueError(f"fit must be one of {_VALID_FIT!r}, got {fit!r}")
+
     bg = "#fff" if light_bg else "transparent"
     theme = "default" if light_bg else "dark"
     html = (
         _MERMAID_TEMPLATE
         .replace("__BG__", bg)
         .replace("__THEME__", theme)
+        .replace("__FIT__", fit)
         .replace("__CODE__", escape(code))
     )
 

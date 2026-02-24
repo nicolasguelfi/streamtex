@@ -9,7 +9,7 @@ import textwrap
 
 
 class BlockStyles:
-    """Mermaid diagrams demo styles."""
+    """PlantUML diagrams demo styles."""
     heading = s.project.titles.section_title + s.center_txt
     sub = s.project.titles.section_subtitle
 bs = BlockStyles
@@ -31,81 +31,83 @@ def _load(filename: str) -> str:
 
 
 DIAGRAMS = {
-    "Flowchart": _load("flowchart.mmd"),
-    "Sequence Diagram": _load("sequence.mmd"),
-    "Class Diagram": _load("class_diagram.mmd"),
+    "Class Diagram": _load("class_diagram.puml"),
+    "Sequence Diagram": _load("sequence_diagram.puml"),
+    "Use Case Diagram": _load("usecase_diagram.puml"),
 }
 
 
 def build():
     with st_block(s.center_txt):
-        st_write(bs.heading, "Mermaid Diagrams", tag=t.div, toc_lvl="1")
+        st_write(bs.heading, "PlantUML Diagrams", tag=t.div, toc_lvl="1")
         st_space("v", 2)
 
         show_explanation(textwrap.dedent("""\
-            stx.st_mermaid() renders Mermaid diagrams: flowcharts, sequence
-            diagrams, class diagrams, and more. Live rendering uses the
-            streamlit-mermaid component. HTML export generates SVG via mermaid-py.
+            stx.st_plantuml() renders PlantUML diagrams: class diagrams,
+            sequence diagrams, use case diagrams, and more. Rendering uses a
+            PlantUML server (public by default, configurable). No local
+            installation required — only stdlib Python (zlib + urllib).
         """))
         st_space("v", 2)
 
-        # --- Section 1: Flowchart ---
-        st_write(bs.sub, "Flowchart", toc_lvl="+1")
+        # --- Section 1: Class Diagram ---
+        st_write(bs.sub, "Class Diagram", toc_lvl="+1")
         st_space("v", 1)
 
         show_code(textwrap.dedent("""\
-            stx.st_mermaid('''
-                graph TD
-                    A[Start] --> B{Is it working?}
-                    B -->|Yes| C[Great!]
-                    B -->|No| D[Debug]
-                    D --> F[Fix code]
-                    F --> B
+            stx.st_plantuml('''
+            @startuml
+            class Style {
+              +css: str
+              +__add__(other): Style
+            }
+            @enduml
             ''')
         """))
         st_space("v", 1)
 
         with st_block(s.project.containers.result_box):
-            stx.st_mermaid(DIAGRAMS["Flowchart"], height=1000, key="mermaid_flowchart")
+            stx.st_plantuml(DIAGRAMS["Class Diagram"], height=1000, key="plantuml_class")
         st_space("v", 2)
 
-        # --- Section 2: Sequence diagram ---
+        # --- Section 2: Sequence Diagram ---
         st_write(bs.sub, "Sequence Diagram", toc_lvl="+1")
         st_space("v", 1)
 
         show_explanation(textwrap.dedent("""\
             Sequence diagrams show interactions between components over time.
-            Ideal for documenting request/response flows.
+            Ideal for documenting request/response flows and API calls.
         """))
         st_space("v", 1)
 
         show_code(textwrap.dedent("""\
-            stx.st_mermaid('''
-                sequenceDiagram
-                    participant U as User
-                    participant S as Server
-                    U->>S: Request
-                    S->>U: Response
+            stx.st_plantuml('''
+            @startuml
+            actor User
+            participant "st_book()" as Book
+            User -> Book: run app
+            Book --> User: display page
+            @enduml
             ''')
         """))
         st_space("v", 1)
 
         with st_block(s.project.containers.result_box):
-            stx.st_mermaid(DIAGRAMS["Sequence Diagram"], height=1000, key="mermaid_sequence")
+            stx.st_plantuml(DIAGRAMS["Sequence Diagram"], height=1000, key="plantuml_sequence")
         st_space("v", 2)
 
-        # --- Section 3: Class diagram ---
-        st_write(bs.sub, "Class Diagram", toc_lvl="+1")
+        # --- Section 3: Use Case Diagram ---
+        st_write(bs.sub, "Use Case Diagram", toc_lvl="+1")
         st_space("v", 1)
 
         show_explanation(textwrap.dedent("""\
-            Class diagrams visualize the StreamTeX style system:
-            Style composition, inheritance, and block helpers.
+            Use case diagrams visualize system functionality from the
+            user's perspective: actors, use cases, and relationships.
         """))
         st_space("v", 1)
 
         with st_block(s.project.containers.result_box):
-            stx.st_mermaid(DIAGRAMS["Class Diagram"], height=1000, key="mermaid_class")
+            stx.st_plantuml(DIAGRAMS["Use Case Diagram"], height=1000, key="plantuml_usecase")
         st_space("v", 2)
 
         # --- Section 4: Interactive selection ---
@@ -113,22 +115,23 @@ def build():
         st_space("v", 1)
 
         show_code(textwrap.dedent("""\
-            diagrams = {"Flowchart": code1, "Sequence": code2, ...}
+            diagrams = {"Class": code1, "Sequence": code2, ...}
             choice = st.selectbox("Choose a diagram", list(diagrams.keys()))
-            stx.st_mermaid(diagrams[choice], key="my_mermaid")
+            stx.st_plantuml(diagrams[choice], key="my_plantuml")
         """))
         st_space("v", 1)
 
-        choice = st.selectbox("Choose a Mermaid diagram",
+        choice = st.selectbox("Choose a PlantUML diagram",
                               [*DIAGRAMS],
-                              key="bck_mermaid_select")
+                              key="bck_plantuml_select")
         with st_block(s.project.containers.result_box):
-            stx.st_mermaid(DIAGRAMS[choice], height=1000, key="mermaid_interactive")
+            stx.st_plantuml(DIAGRAMS[choice], height=1000, key="plantuml_interactive")
         st_space("v", 2)
 
         show_details(textwrap.dedent("""\
-            Mermaid supports: flowcharts, sequence, class, state, ER, Gantt, pie, and more.
-            stx.st_mermaid() uses streamlit-mermaid for live rendering.
-            HTML export generates SVG via mermaid-py (mermaid.ink service).
-            Static .mmd files can be loaded from the static/diagrams/ folder.
+            PlantUML supports: class, sequence, use case, activity, state,
+            component, deployment, object, and many more diagram types.
+            stx.st_plantuml() uses a PlantUML HTTP server for rendering.
+            The server is configurable (default: public plantuml.com).
+            Static .puml files can be loaded from the static/diagrams/ folder.
         """))

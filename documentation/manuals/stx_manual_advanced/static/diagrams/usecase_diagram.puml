@@ -1,0 +1,21 @@
+@startuml
+skinparam shadowing false
+
+left to right direction
+
+actor Author
+actor Reader
+
+rectangle StreamTeX {
+  Author -- (Write blocks)
+  Author -- (Define styles)
+  Author -- (Configure book)
+  (Write blocks) .> (Use st_write) : includes
+  (Write blocks) .> (Use st_grid) : includes
+  (Define styles) .> (Compose with +/-) : includes
+  Reader -- (View presentation)
+  Reader -- (Navigate pages)
+  Reader -- (Export to HTML)
+  (View presentation) .> (Pan & Zoom) : includes
+}
+@enduml

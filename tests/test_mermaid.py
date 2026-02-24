@@ -115,6 +115,50 @@ class TestLiveRendering:
 
 
 # ---------------------------------------------------------------------------
+# Fit parameter
+# ---------------------------------------------------------------------------
+
+class TestFitParameter:
+    """Tests for the fit parameter (initial zoom mode)."""
+
+    @patch("streamtex.mermaid.components")
+    def test_default_fit_contain(self, mock_components):
+        """Default fit='contain' injects contain auto-fit JS."""
+        st_mermaid(SAMPLE_CODE)
+        html_arg = mock_components.html.call_args[0][0]
+        assert "var fitMode = 'contain'" in html_arg
+        assert "Math.min(vpW / bb.width, vpH / bb.height)" in html_arg
+
+    @patch("streamtex.mermaid.components")
+    def test_fit_width(self, mock_components):
+        """fit='width' injects width-only auto-fit JS."""
+        st_mermaid(SAMPLE_CODE, fit="width")
+        html_arg = mock_components.html.call_args[0][0]
+        assert "var fitMode = 'width'" in html_arg
+
+    @patch("streamtex.mermaid.components")
+    def test_fit_none(self, mock_components):
+        """fit='none' skips auto-fit (natural size)."""
+        st_mermaid(SAMPLE_CODE, fit="none")
+        html_arg = mock_components.html.call_args[0][0]
+        assert "var fitMode = 'none'" in html_arg
+
+    def test_fit_invalid_raises(self):
+        """Invalid fit value raises ValueError."""
+        import pytest
+        with pytest.raises(ValueError, match="fit must be one of"):
+            st_mermaid(SAMPLE_CODE, fit="invalid")
+
+    @patch("streamtex.mermaid.components")
+    def test_reset_restores_initial_fit(self, mock_components):
+        """resetView() restores saved initial values, not hardcoded 1/0/0."""
+        st_mermaid(SAMPLE_CODE)
+        html_arg = mock_components.html.call_args[0][0]
+        assert "_initS = _s; _initTx = _tx; _initTy = _ty" in html_arg
+        assert "_s = _initS; _tx = _initTx; _ty = _initTy" in html_arg
+
+
+# ---------------------------------------------------------------------------
 # Export rendering
 # ---------------------------------------------------------------------------
 

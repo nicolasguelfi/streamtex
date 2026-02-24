@@ -150,6 +150,7 @@ def st_tikz(
     *,
     style: Style | None = None,
     light_bg: bool = True,
+    height: int | None = None,
     preamble: str = "",
 ) -> None:
     """Render a TikZ diagram.
@@ -165,6 +166,9 @@ def st_tikz(
         When True (default), render the SVG on a white background so it
         stays readable on dark-mode pages.  Set to False to let the
         diagram follow the page theme.
+    height : int | None
+        Height in pixels for the display area.  When None (default), the
+        height is auto-calculated from the compiled SVG.
     preamble : str
         Extra LaTeX preamble lines (e.g. ``\\usepackage{pgfplots}``).
     """
@@ -190,6 +194,7 @@ def st_tikz(
             else:
                 css = "padding:8px;text-align:center"
             html = f'<div class="stx-tikz" style="{css}">{svg}</div>'
-            _render(html, height=_extract_svg_height(svg), light_bg=light_bg)
+            h = height if height is not None else _extract_svg_height(svg)
+            _render(html, height=h, light_bg=light_bg)
         elif is_export_active():
             export_append(f'<pre class="stx-tikz">{escape(code)}</pre>')

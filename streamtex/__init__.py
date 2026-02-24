@@ -42,6 +42,7 @@ from .export_widgets import (
 
 # Diagram rendering
 from .mermaid import st_mermaid
+from .plantuml import st_plantuml
 from .tikz import st_tikz
 
 # Utilities

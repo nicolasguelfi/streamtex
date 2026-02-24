@@ -16,8 +16,7 @@ from .toc import reset_toc_registry, toc_entries, TOCConfig
 from .marker import reset_marker_registry, inject_marker_navigation, MarkerConfig, marker_entries
 from .enums import Tags
 from .utils import inject_link_preview_scaffold
-from .zoom import add_zoom_options
-from .constants import PAGE_WIDTH
+from .zoom import add_zoom_options, _PAGE_WIDTH_KEY
 from .export import ExportConfig, reset_export_buffer, generate_export_html, is_export_active
 from .search import start_collector, stop_collector, generate_search_input_html, generate_search_script
 
@@ -75,7 +74,7 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
             monties_color: str = "rgba(211, 47, 47, 0.8)",
             bib_sources=None, bib_config=None,
             inspector=None,
-            page_width: str | None = None,
+            page_width: int = 90,
             *args, **kwargs):
     """Generates a web page e-book from a list of block modules.
 
@@ -87,7 +86,7 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
     :param bib_sources: Optional list of paths to .bib, .json, .ris, or .csl-json files.
     :param bib_config: Optional BibConfig to configure bibliography formatting.
     :param inspector: Optional InspectorConfig to enable the block inspector panel.
-    :param page_width: Custom page width (CSS value, e.g. "1224pt", "800px"). Defaults to PAGE_WIDTH ("100%").
+    :param page_width: Page width as % of browser width (default 90).
     """
     # --- Bibliography setup ---
     _setup_bibliography(bib_sources, bib_config)
@@ -112,10 +111,6 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
     start_time = time.time()
     logger.debug("Starting st_book function...")
 
-    # Initialise the export buffer (no-op if export=False)
-    reset_export_buffer(ExportConfig(enabled=export, page_title=export_title,
-                                     page_width=page_width or PAGE_WIDTH))
-
     # Load default CSS styles
     load_css("default.css")
 
@@ -125,8 +120,13 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
     # Inject bibliography hover preview if enabled
     _inject_bib_preview_if_enabled()
 
-    # Add zoom options to sidebar
-    add_zoom_options(page_width=page_width)
+    # Add zoom options to sidebar (BEFORE export so session_state is populated)
+    add_zoom_options(default_page_width=page_width)
+
+    # Initialise the export buffer (reads effective width from session_state)
+    effective_pw = f"{st.session_state.get(_PAGE_WIDTH_KEY, page_width)}%"
+    reset_export_buffer(ExportConfig(enabled=export, page_title=export_title,
+                                     page_width=effective_pw))
 
     # Inject inspector CSS once + reserve sidebar placeholder
     _inspector_placeholder = None
@@ -854,7 +854,7 @@ def _inject_paginated_nav_js(current_page, total, marker_config,
 
 
 def _paginated_book(module_list, toc_config, marker_config, separator,
-                    export, export_title, monties_color, *args, inspector=None, page_width=None, **kwargs):
+                    export, export_title, monties_color, *args, inspector=None, page_width=100, **kwargs):
     """Paginated rendering — only renders one block per rerun."""
     start_time = time.time()
     logger.debug("Starting st_book (paginated)...")
@@ -867,7 +867,7 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
     load_css("default.css")
     inject_link_preview_scaffold()
     _inject_bib_preview_if_enabled()
-    add_zoom_options(page_width=page_width)
+    add_zoom_options(default_page_width=page_width)
 
     # Inject inspector CSS once + reserve sidebar placeholder
     _inspector_placeholder = None
@@ -906,8 +906,9 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
     _build_paginated_sidebar(cache, current_page, total, toc_config, marker_config)
 
     # --- Prepare registries for current page ---
+    effective_pw = f"{st.session_state.get(_PAGE_WIDTH_KEY, page_width)}%"
     reset_export_buffer(ExportConfig(enabled=export, page_title=export_title,
-                                     page_width=page_width or PAGE_WIDTH))
+                                     page_width=effective_pw))
     reset_toc_registry(toc_config)
     if marker_config is not None:
         reset_marker_registry(marker_config)

@@ -376,7 +376,7 @@ st_book(
     bib_sources=None,               # List of .bib/.json/.ris paths
     bib_config=None,                # BibConfig for bibliography
     inspector=None,                 # InspectorConfig for block inspector
-    page_width=None,                # Page width (CSS value, default: "100%")
+    page_width=100,                 # Page width as % of browser width (default 100)
 )
 ```
 
@@ -603,12 +603,29 @@ graph TD
 # Mermaid with options
 stx.st_mermaid(code, style=my_style, light_bg=True, height=500)
 
+# Mermaid fit modes (initial zoom on first render)
+stx.st_mermaid(code, fit="contain")  # default: fit entire diagram in viewport
+stx.st_mermaid(code, fit="width")    # fill viewport width
+stx.st_mermaid(code, fit="none")     # natural size (scale 1)
+
 # TikZ (requires LaTeX + Ghostscript)
 stx.st_tikz(r"""
 \begin{tikzpicture}
   \draw (0,0) -- (1,1) -- (2,0) -- cycle;
 \end{tikzpicture}
 """, preamble=r"\usepackage{tikz}")
+
+# PlantUML (server-rendered, configurable)
+stx.st_plantuml("""
+@startuml
+Alice -> Bob: Authentication Request
+Bob --> Alice: Authentication Response
+@enduml
+""")
+
+# PlantUML with options
+stx.st_plantuml(code, style=my_style, light_bg=True, height=500,
+                server="https://www.plantuml.com/plantuml")
 ```
 
 ### Audio & Video
@@ -635,17 +652,17 @@ with stx.st_export('<p>Fallback HTML for export</p>'):
 import streamtex as stx
 
 # Zoom is managed automatically by st_book().
-# Available modes: Fit (never exceeds 100%), Fill (scales up to fill width), 50%-200% fixed.
+# Two independent sidebar controls: Width % and Zoom % (pure CSS, no JavaScript).
 
 # If calling manually:
-stx.add_zoom_options()                          # Default page width (100%)
-stx.add_zoom_options(page_width="1224pt")       # Custom fixed page width
+stx.add_zoom_options()                                  # Defaults: width=100%, zoom=100%
+stx.add_zoom_options(default_page_width=80)             # Start at 80% width
+stx.add_zoom_options(default_page_width=80, default_zoom=125)  # 80% width, 125% zoom
 
 # Low-level injection (rarely needed):
-stx.inject_zoom_logic("Fit")                    # Fit: Math.min(1, available/page)
-stx.inject_zoom_logic("Fill")                   # Fill: Math.min(2, available/page)
-stx.inject_zoom_logic(100)                      # Fixed 100%
-stx.inject_zoom_logic("Fit", page_width="800px")  # Custom page width
+stx.inject_zoom_logic(100, 100)      # Width 100%, Zoom 100%
+stx.inject_zoom_logic(80, 150)       # Width 80%, Zoom 150%
+stx.inject_zoom_logic(120, 50)       # Width 120%, Zoom 50%
 ```
 
 ## Bibliography

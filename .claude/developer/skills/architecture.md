@@ -79,7 +79,7 @@ Both `toc.py` and `marker.py` use module-level singleton registries:
 
 ### 6. CSS Zoom (not transform)
 
-`zoom.py` uses the CSS `zoom` property (Baseline 2024, supported by all modern browsers) rather than `transform: scale()`. This avoids layout reflow issues.
+`zoom.py` uses the CSS `zoom` property (Baseline 2024, supported by all modern browsers) rather than `transform: scale()`. Pure CSS — no JavaScript, no ResizeObserver. Two independent sidebar controls: Width % (page width as % of browser) and Zoom % (CSS zoom on content).
 
 ## Module Categories
 

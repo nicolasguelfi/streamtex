@@ -1,0 +1,17 @@
+@startuml
+skinparam shadowing false
+
+actor User
+participant "st_book()" as Book
+participant "st_include()" as Include
+participant "BlockRegistry" as Registry
+
+User -> Book: run app
+Book -> Book: configure pages
+Book -> Include: load block
+Include -> Registry: resolve(name)
+Registry --> Include: block module
+Include -> Include: call build()
+Include --> Book: rendered content
+Book --> User: display page
+@enduml

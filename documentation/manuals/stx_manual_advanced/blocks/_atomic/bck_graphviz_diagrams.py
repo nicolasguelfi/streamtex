@@ -18,6 +18,9 @@ bs = BlockStyles
 # Pre-defined DOT diagrams
 SIMPLE_GRAPH = """
 digraph {
+    rankdir=LR
+    ranksep=0.4
+    nodesep=0.4
     A -> B
     B -> C
     C -> D
@@ -28,16 +31,20 @@ digraph {
 
 FLOWCHART = """
 digraph {
-    rankdir=TB
+    rankdir=LR
+    ranksep=0.5
+    nodesep=0.5
     node [shape=box, style="rounded,filled", fontname="Helvetica"]
     edge [fontname="Helvetica"]
 
-    book [label="book.py", fillcolor="#4A90D9", fontcolor="white"]
     blocks [label="blocks/", fillcolor="#2EC4B6", fontcolor="white"]
+    book [label="book.py", fillcolor="#4A90D9", fontcolor="white"]
     styles [label="custom/styles.py", fillcolor="#F39C12", fontcolor="white"]
     streamtex [label="streamtex/", fillcolor="#E74C3C", fontcolor="white"]
 
-    book -> blocks [label="st_include"]
+    {rank=same; blocks; book}
+
+    book -> blocks [label="st_include", constraint=false]
     book -> styles [label="imports"]
     blocks -> streamtex [label="stx.*"]
     blocks -> styles [label="s.*"]
@@ -48,6 +55,8 @@ digraph {
 ARCHITECTURE = """
 digraph {
     rankdir=LR
+    ranksep=0.5
+    nodesep=0.3
     node [shape=record, style=filled, fontname="Helvetica"]
 
     st_book [label="{st_book|entry point}", fillcolor="#4A90D9", fontcolor="white"]
@@ -67,7 +76,9 @@ digraph {
 
 DATA_FLOW = """
 digraph {
-    rankdir=TB
+    rankdir=LR
+    ranksep=0.4
+    nodesep=0.35
     node [shape=ellipse, style=filled, fontname="Helvetica"]
 
     user [label="User Input", fillcolor="#95A5A6", fontcolor="white"]
@@ -137,7 +148,7 @@ def build():
         """))
         st_space("v", 1)
 
-        stx.st_graphviz(FLOWCHART)
+        stx.st_graphviz(FLOWCHART, height=600)
         st_space("v", 2)
 
         # --- Section 3: Interactive selection ---

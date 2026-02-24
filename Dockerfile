@@ -24,9 +24,10 @@ COPY pyproject.toml uv.lock ./
 COPY streamtex/ ./streamtex/
 RUN uv sync --frozen --no-dev
 
-# Copy the target project
+# Copy the target project and shared blocks (used by LazyBlockRegistry)
 ARG FOLDER="documentation/manuals/stx_manual_intro"
 COPY ${FOLDER}/ ./${FOLDER}/
+COPY documentation/manuals/stx_manuals_shared-blocks/ ./documentation/manuals/stx_manuals_shared-blocks/
 
 WORKDIR /app/${FOLDER}
 

@@ -18,12 +18,12 @@ services:
     dockerContext: .
     envVars:
       - key: FOLDER
-        value: documentation/manuals/stx_manual_intro
+        value: documentation/manuals/stx_manuals_collection
     healthCheckPath: /_stcore/health
     buildFilter:
       paths:
         - streamtex/**
-        - documentation/manuals/stx_manual_intro/**
+        - documentation/manuals/stx_manuals_collection/**
         - Dockerfile
         - pyproject.toml
         - uv.lock

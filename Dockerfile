@@ -20,7 +20,7 @@ RUN apt-get update && apt-get install -y \
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 # Install dependencies (cached layer)
-COPY pyproject.toml uv.lock .python-version ./
+COPY pyproject.toml uv.lock ./
 COPY streamtex/ ./streamtex/
 RUN uv sync --frozen --no-dev
 

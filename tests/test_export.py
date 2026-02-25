@@ -30,7 +30,7 @@ class TestExportConfig:
         assert cfg.enabled is False
         assert cfg.page_title == "StreamTeX Export"
         assert cfg.page_width == "100%"
-        assert cfg.page_padding == "36pt"
+        assert cfg.page_padding == "var(--stx-page-padding, 36pt)"
 
     def test_custom(self):
         cfg = ExportConfig(enabled=True, page_title="My Book", page_width="800px", page_padding="20px")

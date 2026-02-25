@@ -61,6 +61,182 @@ a {
     color: var(--stx-link-color);
 }
 
+/* --- Responsive sizing variables --- */
+/* Desktop defaults (used as fallback values in var() too) */
+:root {
+    /* Font sizes (pt scale) */
+    --stx-GIANT-size: 196pt;
+    --stx-Giant-size: 128pt;
+    --stx-giant-size: 112pt;
+    --stx-Huge-size: 96pt;
+    --stx-huge-size: 80pt;
+    --stx-LARGE-size: 64pt;
+    --stx-Large-size: 48pt;
+    --stx-large-size: 32pt;
+    --stx-big-size: 24pt;
+    --stx-medium-size: 16pt;
+    --stx-little-size: 12pt;
+    --stx-small-size: 8pt;
+    --stx-tiny-size: 4pt;
+
+    /* Paddings (pt scale) */
+    --stx-Giant-padding: 96pt;
+    --stx-giant-padding: 84pt;
+    --stx-Huge-padding: 72pt;
+    --stx-huge-padding: 60pt;
+    --stx-LARGE-padding: 48pt;
+    --stx-Large-padding: 36pt;
+    --stx-large-padding: 24pt;
+    --stx-big-padding: 18pt;
+    --stx-medium-padding: 12pt;
+    --stx-little-padding: 9pt;
+    --stx-small-padding: 6pt;
+    --stx-tiny-padding: 3pt;
+
+    /* Margins (pt scale) */
+    --stx-Giant-margin: 96pt;
+    --stx-giant-margin: 84pt;
+    --stx-Huge-margin: 72pt;
+    --stx-huge-margin: 60pt;
+    --stx-LARGE-margin: 48pt;
+    --stx-Large-margin: 36pt;
+    --stx-large-margin: 24pt;
+    --stx-big-margin: 18pt;
+    --stx-medium-margin: 12pt;
+    --stx-little-margin: 9pt;
+    --stx-small-margin: 6pt;
+    --stx-tiny-margin: 3pt;
+
+    /* Grid gaps */
+    --stx-gap-48: 48px;
+    --stx-gap-32: 32px;
+    --stx-gap-24: 24px;
+    --stx-gap-16: 16px;
+    --stx-gap-12: 12px;
+    --stx-gap-8: 8px;
+
+    /* Page padding */
+    --stx-page-padding: 36pt;
+}
+
+/* Tablet breakpoint (≤1024px) */
+@media (max-width: 1024px) {
+    :root {
+        /* Font sizes — ~65-85% of desktop for large, unchanged for small */
+        --stx-GIANT-size: 128pt;
+        --stx-Giant-size: 84pt;
+        --stx-giant-size: 74pt;
+        --stx-Huge-size: 64pt;
+        --stx-huge-size: 54pt;
+        --stx-LARGE-size: 48pt;
+        --stx-Large-size: 36pt;
+        --stx-large-size: 26pt;
+        --stx-big-size: 20pt;
+        --stx-medium-size: 15pt;
+        --stx-little-size: 12pt;
+        --stx-small-size: 8pt;
+        --stx-tiny-size: 4pt;
+
+        /* Paddings */
+        --stx-Giant-padding: 64pt;
+        --stx-giant-padding: 56pt;
+        --stx-Huge-padding: 48pt;
+        --stx-huge-padding: 40pt;
+        --stx-LARGE-padding: 32pt;
+        --stx-Large-padding: 24pt;
+        --stx-large-padding: 18pt;
+        --stx-big-padding: 14pt;
+        --stx-medium-padding: 10pt;
+        --stx-little-padding: 8pt;
+        --stx-small-padding: 6pt;
+        --stx-tiny-padding: 3pt;
+
+        /* Margins */
+        --stx-Giant-margin: 64pt;
+        --stx-giant-margin: 56pt;
+        --stx-Huge-margin: 48pt;
+        --stx-huge-margin: 40pt;
+        --stx-LARGE-margin: 32pt;
+        --stx-Large-margin: 24pt;
+        --stx-large-margin: 18pt;
+        --stx-big-margin: 14pt;
+        --stx-medium-margin: 10pt;
+        --stx-little-margin: 8pt;
+        --stx-small-margin: 6pt;
+        --stx-tiny-margin: 3pt;
+
+        /* Grid gaps */
+        --stx-gap-48: 32px;
+        --stx-gap-32: 24px;
+        --stx-gap-24: 16px;
+        --stx-gap-16: 12px;
+        --stx-gap-12: 10px;
+        --stx-gap-8: 6px;
+
+        /* Page padding */
+        --stx-page-padding: 24pt;
+    }
+}
+
+/* Mobile breakpoint (≤480px) */
+@media (max-width: 480px) {
+    :root {
+        /* Font sizes — ~44-88% of desktop for large, unchanged for small */
+        --stx-GIANT-size: 80pt;
+        --stx-Giant-size: 56pt;
+        --stx-giant-size: 48pt;
+        --stx-Huge-size: 42pt;
+        --stx-huge-size: 36pt;
+        --stx-LARGE-size: 32pt;
+        --stx-Large-size: 26pt;
+        --stx-large-size: 20pt;
+        --stx-big-size: 17pt;
+        --stx-medium-size: 14pt;
+        --stx-little-size: 11pt;
+        --stx-small-size: 7pt;
+        --stx-tiny-size: 4pt;
+
+        /* Paddings */
+        --stx-Giant-padding: 42pt;
+        --stx-giant-padding: 36pt;
+        --stx-Huge-padding: 32pt;
+        --stx-huge-padding: 26pt;
+        --stx-LARGE-padding: 22pt;
+        --stx-Large-padding: 16pt;
+        --stx-large-padding: 12pt;
+        --stx-big-padding: 10pt;
+        --stx-medium-padding: 8pt;
+        --stx-little-padding: 7pt;
+        --stx-small-padding: 5pt;
+        --stx-tiny-padding: 3pt;
+
+        /* Margins */
+        --stx-Giant-margin: 42pt;
+        --stx-giant-margin: 36pt;
+        --stx-Huge-margin: 32pt;
+        --stx-huge-margin: 26pt;
+        --stx-LARGE-margin: 22pt;
+        --stx-Large-margin: 16pt;
+        --stx-large-margin: 12pt;
+        --stx-big-margin: 10pt;
+        --stx-medium-margin: 8pt;
+        --stx-little-margin: 7pt;
+        --stx-small-margin: 5pt;
+        --stx-tiny-margin: 3pt;
+
+        /* Grid gaps */
+        --stx-gap-48: 24px;
+        --stx-gap-32: 16px;
+        --stx-gap-24: 12px;
+        --stx-gap-16: 8px;
+        --stx-gap-12: 8px;
+        --stx-gap-8: 4px;
+
+        /* Page padding */
+        --stx-page-padding: 12pt;
+    }
+}
+
 /* --- Export widget styles --- */
 
 .stx-table {

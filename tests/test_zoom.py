@@ -42,11 +42,11 @@ class TestInjectZoomLogicCSS:
 
     @patch("streamtex.zoom.st")
     def test_padding_uses_constant(self, mock_st):
-        """Padding should use PAGE_PADDING constant (36pt)."""
+        """Padding should use PAGE_PADDING constant with responsive var()."""
         inject_zoom_logic(100, 100)
         css_call = mock_st.html.call_args[0][0]
-        assert "padding-left: 36pt !important" in css_call
-        assert "padding-right: 36pt !important" in css_call
+        assert "padding-left: var(--stx-page-padding, 36pt) !important" in css_call
+        assert "padding-right: var(--stx-page-padding, 36pt) !important" in css_call
 
     @patch("streamtex.zoom.st")
     def test_centering_margin_auto(self, mock_st):

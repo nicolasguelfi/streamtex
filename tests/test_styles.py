@@ -205,8 +205,8 @@ class TestPredefinedStyles:
         assert "color: Blue;" in str(Colors.blue)
 
     def test_sizes_have_correct_css(self):
-        assert "font-size: 16pt;" in str(Sizes.medium_size)
-        assert "font-size: 48pt;" in str(Sizes.Large_size)
+        assert "--stx-medium-size, 16pt" in str(Sizes.medium_size)
+        assert "--stx-Large-size, 48pt" in str(Sizes.Large_size)
 
     def test_size_factory_int(self):
         s = Sizes.size(20)

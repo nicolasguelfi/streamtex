@@ -1,7 +1,7 @@
 """Centralized constants for StreamTeX."""
 
 PAGE_WIDTH = "100%"
-PAGE_PADDING = "36pt"
+PAGE_PADDING = "var(--stx-page-padding, 36pt)"
 
 # -- Link colours (light / dark mode) --
 LINK_COLOR_LIGHT = "#1155cc"

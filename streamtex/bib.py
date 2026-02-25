@@ -34,7 +34,8 @@ try:
     import streamlit as st
     _cache_bib = st.cache_data(show_spinner=False)
 except Exception:
-    _cache_bib = lambda f: f  # no-op outside Streamlit (tests, CLI)
+    def _cache_bib(f):  # no-op outside Streamlit (tests, CLI)
+        return f
 
 logger = logging.getLogger(__name__)
 

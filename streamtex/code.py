@@ -5,7 +5,8 @@ try:
     import streamlit as st
     _cache_code = st.cache_data(show_spinner=False)
 except Exception:
-    _cache_code = lambda f: f  # no-op outside Streamlit (tests, CLI)
+    def _cache_code(f):  # no-op outside Streamlit (tests, CLI)
+        return f
 
 
 @_cache_code

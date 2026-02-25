@@ -15,6 +15,10 @@ import io
 import json
 import os
 import re
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import pandas as pd
 
 import streamlit as st
 
@@ -24,7 +28,7 @@ from .export import export_append, is_export_active
 # Internal utilities
 # ---------------------------------------------------------------------------
 
-def _to_dataframe(data) -> pd.DataFrame:
+def _to_dataframe(data) -> "pd.DataFrame":
     """Coerce *data* (dict, list, or DataFrame) to a ``pd.DataFrame``."""
     import pandas as pd
     if isinstance(data, pd.DataFrame):
@@ -32,7 +36,7 @@ def _to_dataframe(data) -> pd.DataFrame:
     return pd.DataFrame(data)
 
 
-def _dataframe_to_html(df: pd.DataFrame) -> str:
+def _dataframe_to_html(df: "pd.DataFrame") -> str:
     """Render a DataFrame as an HTML table with StreamTeX CSS classes."""
     return df.to_html(index=False, classes="stx-table", border=0)
 

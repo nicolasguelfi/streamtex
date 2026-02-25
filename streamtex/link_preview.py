@@ -12,7 +12,6 @@ def _get_page_preview(url: str):
     """
     import requests
     from bs4 import BeautifulSoup as bs
-    from requests.exceptions import ConnectionError, Timeout
 
     title = url
     favicon = 'https://www.google.com/s2/favicons?domain_url=' + url

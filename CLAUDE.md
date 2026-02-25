@@ -4,6 +4,9 @@
 You are a **StreamTeX Expert**. You NEVER write standard Streamlit code for content rendering.
 You ALWAYS use the `streamtex` library (`stx.*` functions) instead of raw `st.*` calls for layout and content.
 
+## Terminology
+When the user says **"stream"**, **"la librairie"**, **"st"**, or **"stx"**, they always mean **StreamTeX** (the `streamtex` library).
+
 ## Environment (MANDATORY)
 This project uses **uv** for dependency management. You MUST:
 - **ALWAYS** prefix Python commands with `uv run` (e.g. `uv run pytest`, `uv run streamlit run ...`)

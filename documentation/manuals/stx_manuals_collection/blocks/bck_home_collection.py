@@ -26,19 +26,19 @@ class BlockStyles:
 
     # Card header with icon space
     card_header = Style.create(
-        s.medium + s.text.weights.bold_weight + s.text.colors.reset,
+        s.large + s.text.weights.bold_weight + s.text.colors.white,
         "card_header"
     )
 
     # Card description text
     card_description = Style.create(
-        s.text.colors.reset + "font-size:10pt;opacity:0.85;",
+        s.medium + s.text.colors.white + "opacity:0.85;",
         "card_description"
     )
 
     # Project title in card
     project_title = Style.create(
-        s.big + s.text.weights.bold_weight + s.text.colors.reset,
+        s.large + s.text.weights.bold_weight + s.text.colors.white,
         "project_title"
     )
 
@@ -70,7 +70,7 @@ def build():
 
             # Icon + title area
             st_write(
-                s.large + "text-align:center;",
+                s.huge + "text-align:center;",
                 "📚"
             )
             st_space("v", 1)
@@ -108,7 +108,7 @@ def build():
 
             # Icon + title area
             st_write(
-                s.large + "text-align:center;",
+                s.huge + "text-align:center;",
                 "⚡"
             )
             st_space("v", 1)
@@ -146,7 +146,7 @@ def build():
 
             # Icon + title area
             st_write(
-                s.large + "text-align:center;",
+                s.huge + "text-align:center;",
                 "🚀"
             )
             st_space("v", 1)
@@ -185,7 +185,7 @@ def build():
     st_space("v", 2)
 
     st_write(
-        s.medium + s.text.colors.reset + "opacity:0.6;text-align:center;",
+        s.medium + s.text.colors.white + "opacity:0.6;text-align:center;",
         "StreamTeX Training Collection © 2026 | "
         "Interactive documentation for modern web education"
     )

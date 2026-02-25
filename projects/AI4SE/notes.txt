@@ -62,6 +62,30 @@ tu peux tout faire dans l'ordre que tu as proposé, sauf que tu dois choisir uni
 
 
 -----------------
-
+Je suppose que si plusieurs projets utilisent des blocs communs, le mieux est d'avoir un repo Spécifique pour les blocs communs.
+Donc cela voudrait dire un repos supplémentaire pour les blocs communs de tous les manuels.
+Et si un utilisateur à plusieurs projets qui utilisent des blocs communs, il faudra qu'il ait un repos supplémentaire pour les blocs communs de tous ses projets. qu'en penses-tu ?
 -----------------
 
+Tout d'abord, je ne comprends pas ton explication, si on a choisi un thème Dark pour le projet, je suppose que la POLICE par défaut pour le texte STANDARD est blanche donc je ne vois pas le rapport.
+Il me semble plutôt que pour les cartes des manuels dans le projet collection, c'est un autre style qui est utilisé car sur le reste des projets pour les différents manuels tout le style est correct et les caractères sont bien blancs.
+
+De plus, 
+
+Pour l'instant, ce projet contient la Librairie Stream et tous les projets qui sont écrits à l'aide de la Librairie. À terme je vais vouloir séparer les deux et permettre à tous les utilisateurs d'installer la Librairie à partir d'un fournisseur de Librairie python STANDARD et de me permettre de maintenir la Librairie séparément de tous les projets que j'ai fait qui utilisent la Librairie et qui sont dans le dossier "projets".
+
+En terme de déploiement, j'aimerais pouvoir aussi séparer les déploiement des projets sur render du déploiement de la Librairie et des tous ces manuels utilisateurs.
+
+Pour les différents manuels de la Librairie, serait-il possible d'utiliser la notation pointée plutôt que avec le – :
+par exemple je préfèrerais remplacer :
+https://streamtex-advanced.onrender.com/
+par :
+https://advanced.manual.streamtex.onrender.com/
+
+
+Et après, pour chaque projet, je voudrais pouvoir le déployer indépendamment par exemple exemple :
+
+ai4se.streamtex.onrender.com
+
+pose-moi d'abord toutes les questions nécessaires pour avoir une vue précise des possibilités et des contraintes.
+Prépare-moi un dossier markdown complet de maintenance que tu peux mettre dans Le dossier documentation/maintenance/

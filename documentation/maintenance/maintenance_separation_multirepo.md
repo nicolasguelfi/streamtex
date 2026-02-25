@@ -269,9 +269,25 @@ sx.st_write(style, "Hello StreamTeX!")
 
 ## Documentation
 
+### Online manuals (read & explore)
+
+- [All manuals (hub)](https://streamtex.onrender.com)
 - [Introduction](https://intro-manual-streamtex.onrender.com)
 - [Advanced](https://advanced-manual-streamtex.onrender.com)
 - [Deployment Guide](https://deploy-manual-streamtex.onrender.com)
+
+### Examples (source code)
+
+The manuals are also available as source code — clone and run them locally
+to study the examples:
+
+git clone https://github.com/nicolasguelfi/streamtex-manuals
+cd streamtex-manuals
+uv sync
+uv run streamlit run stx_manual_intro/book.py
+
+See [streamtex-manuals](https://github.com/nicolasguelfi/streamtex-manuals)
+for the full list of example projects.
 ```
 
 #### 4.3.3 Nettoyer le repo pour ne garder que la librairie
@@ -394,6 +410,18 @@ Adopter le **Semantic Versioning** :
 ### 5.1 Objectif
 
 Créer un repo dédié `nicolasguelfi/streamtex-manuals` contenant les manuels et leur infrastructure de déploiement.
+
+### 5.2 Stratégie d'accès aux manuels pour les utilisateurs
+
+Les manuels ne sont **pas inclus dans le package PyPI** (trop lourd, hors périmètre d'une librairie). À la place, les utilisateurs y accèdent de deux manières complémentaires :
+
+| Besoin | Solution | URL |
+|--------|----------|-----|
+| **Lire la documentation** | Hub collection déployé sur Render | `streamtex.onrender.com` |
+| **Étudier/copier les exemples** | Cloner le repo GitHub | `github.com/nicolasguelfi/streamtex-manuals` |
+| **Trouver les liens** | README du package PyPI | `pypi.org/project/streamtex` |
+
+Le README sur PyPI (section 4.3.2) pointe vers les deux ressources : manuels en ligne et repo des exemples.
 
 ### 5.2 Structure du repo streamtex-manuals
 

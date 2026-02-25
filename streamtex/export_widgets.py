@@ -8,13 +8,14 @@ Each helper follows the same pattern:
 No ``st.html()`` calls here — satisfies ``test_export_guard.py``.
 """
 
+from __future__ import annotations
+
 import base64
 import io
 import json
 import os
 import re
 
-import pandas as pd
 import streamlit as st
 
 from .export import export_append, is_export_active
@@ -25,6 +26,7 @@ from .export import export_append, is_export_active
 
 def _to_dataframe(data) -> pd.DataFrame:
     """Coerce *data* (dict, list, or DataFrame) to a ``pd.DataFrame``."""
+    import pandas as pd
     if isinstance(data, pd.DataFrame):
         return data
     return pd.DataFrame(data)

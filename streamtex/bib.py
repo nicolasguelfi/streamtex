@@ -30,6 +30,12 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional
 
+try:
+    import streamlit as st
+    _cache_bib = st.cache_data(show_spinner=False)
+except Exception:
+    _cache_bib = lambda f: f  # no-op outside Streamlit (tests, CLI)
+
 logger = logging.getLogger(__name__)
 
 
@@ -288,6 +294,9 @@ def load_bib(path: str) -> List[BibEntry]:
     Supported extensions: .bib, .json, .ris, .csl-json (and any registered via
     register_bib_parser()).
 
+    The result is cached by Streamlit based on (path, mtime) so that
+    re-renders don't re-parse the same file from disk.
+
     Args:
         path: Path to the bibliography file
 
@@ -303,14 +312,21 @@ def load_bib(path: str) -> List[BibEntry]:
 
     ext = _get_extension(path)
 
-    if ext in _parsers:
-        return _parsers[ext](path)
+    if ext not in _parsers:
+        raise ValueError(
+            f"Unsupported bibliography format: '.{ext}'. "
+            f"Supported: {', '.join(sorted(_parsers.keys()))}. "
+            f"Use register_bib_parser() to add custom formats."
+        )
 
-    raise ValueError(
-        f"Unsupported bibliography format: '.{ext}'. "
-        f"Supported: {', '.join(sorted(_parsers.keys()))}. "
-        f"Use register_bib_parser() to add custom formats."
-    )
+    mtime = os.path.getmtime(path)
+    return _load_bib_cached(path, ext, _mtime=mtime)
+
+
+@_cache_bib
+def _load_bib_cached(path: str, ext: str, _mtime: float = 0) -> List[BibEntry]:
+    """Cached bibliography loading (invalidated when file changes on disk)."""
+    return _parsers[ext](path)
 
 
 def _get_extension(path: str) -> str:

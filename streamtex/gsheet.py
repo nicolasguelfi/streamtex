@@ -25,9 +25,15 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 from urllib.parse import quote
 
-import requests
+try:
+    import streamlit as st
+except ImportError:
+    st = None
 
 logger = logging.getLogger(__name__)
+
+# Default cache TTL for public CSV fetches (seconds).
+_DEFAULT_CACHE_TTL = 300
 
 
 # ---------------------------------------------------------------------------
@@ -201,23 +207,47 @@ def load_gsheet_df(source: GSheetSource, *,
 
 def _load_public_csv(sheet_id: str, tab: str, cell_range: Optional[str],
                      headers: bool) -> List[Dict[str, Any]]:
-    """Load via public CSV export endpoint (no authentication)."""
+    """Load via public CSV export endpoint (no authentication).
+
+    Uses ``@st.cache_data(ttl=_DEFAULT_CACHE_TTL)`` to avoid re-fetching
+    on every Streamlit re-run.
+    """
     url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv"
     if tab:
         url += f"&sheet={quote(tab)}"
     if cell_range:
         url += f"&range={quote(cell_range)}"
 
-    try:
-        resp = requests.get(url, timeout=15)
-        resp.raise_for_status()
-    except Exception as e:
-        raise GSheetError(
-            f"Failed to fetch public sheet {sheet_id}: {e}\n"
-            f"Verify the sheet is shared as 'Anyone with the link'."
-        ) from e
+    return _fetch_public_csv_cached(url, headers)
 
-    return _parse_csv_text(resp.text, headers)
+
+if st is not None:
+    @st.cache_data(ttl=_DEFAULT_CACHE_TTL, show_spinner=False)
+    def _fetch_public_csv_cached(url: str, headers: bool) -> List[Dict[str, Any]]:
+        """Cached HTTP fetch + CSV parsing for public sheets."""
+        import requests
+        try:
+            resp = requests.get(url, timeout=15)
+            resp.raise_for_status()
+        except Exception as e:
+            raise GSheetError(
+                f"Failed to fetch public sheet: {e}\n"
+                f"Verify the sheet is shared as 'Anyone with the link'."
+            ) from e
+        return _parse_csv_text(resp.text, headers)
+else:
+    def _fetch_public_csv_cached(url: str, headers: bool) -> List[Dict[str, Any]]:
+        """Uncached fallback (no Streamlit available)."""
+        import requests
+        try:
+            resp = requests.get(url, timeout=15)
+            resp.raise_for_status()
+        except Exception as e:
+            raise GSheetError(
+                f"Failed to fetch public sheet: {e}\n"
+                f"Verify the sheet is shared as 'Anyone with the link'."
+            ) from e
+        return _parse_csv_text(resp.text, headers)
 
 
 # ---------------------------------------------------------------------------

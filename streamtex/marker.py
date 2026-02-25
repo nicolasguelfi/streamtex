@@ -6,6 +6,7 @@ from typing import Optional
 
 import streamlit.components.v1 as components
 
+from .constants import LINK_ACTIVE_COLOR_DARK
 from .export import _render
 from .toc import TOCRegistry
 
@@ -366,7 +367,7 @@ def inject_marker_navigation() -> None:
         for (var j = 0; j < items.length; j++) {
             var isActive = j === currentIdx;
             items[j].style.background = isActive ? 'rgba(128,128,128,.2)' : 'transparent';
-            items[j].style.borderLeftColor = isActive ? '#4a9eff' : 'transparent';
+            items[j].style.borderLeftColor = isActive ? '__LINK_ACTIVE_COLOR__' : 'transparent';
             items[j].style.fontWeight = isActive ? '600' : 'normal';
         }
         if (items[currentIdx]) items[currentIdx].scrollIntoView({ block: 'nearest' });
@@ -492,7 +493,8 @@ def inject_marker_navigation() -> None:
         .replace('__LABEL_CHARS__', str(config.nav_label_chars))
         .replace('__POPUP_OPEN__', 'true' if config.popup_open else 'false')
         .replace('__POS_CSS__', pos_css)
-        .replace('__SHOW_UI__', show_ui))
+        .replace('__SHOW_UI__', show_ui)
+        .replace('__LINK_ACTIVE_COLOR__', LINK_ACTIVE_COLOR_DARK))
 
     # components.html() creates a real iframe where scripts execute
     # (st.html() strips <script> tags in Streamlit 1.54+)

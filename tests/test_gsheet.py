@@ -174,7 +174,7 @@ class TestLoadGSheet:
             with pytest.raises(ValueError, match="credentials not found"):
                 load_gsheet(src, config=cfg)
 
-    @patch("streamtex.gsheet.requests.get")
+    @patch("requests.get")
     def test_public_mode_calls_csv(self, mock_get):
         mock_resp = MagicMock()
         mock_resp.text = "Name,Score\nAlice,90\n"
@@ -189,7 +189,7 @@ class TestLoadGSheet:
         assert result[0]["Name"] == "Alice"
         mock_get.assert_called_once()
 
-    @patch("streamtex.gsheet.requests.get")
+    @patch("requests.get")
     def test_public_with_tab_and_range(self, mock_get):
         mock_resp = MagicMock()
         mock_resp.text = "A\n1\n"
@@ -210,7 +210,7 @@ class TestLoadGSheet:
 # ===================================================================
 
 class TestLoadPublicCSV:
-    @patch("streamtex.gsheet.requests.get")
+    @patch("requests.get")
     def test_network_error_raises_gsheet_error(self, mock_get):
         import requests
         mock_get.side_effect = requests.ConnectionError("timeout")
@@ -218,7 +218,7 @@ class TestLoadPublicCSV:
         with pytest.raises(GSheetError, match="Failed to fetch"):
             _load_public_csv("123", "Sheet1", None, True)
 
-    @patch("streamtex.gsheet.requests.get")
+    @patch("requests.get")
     def test_http_error_raises_gsheet_error(self, mock_get):
         import requests
         mock_resp = MagicMock()
@@ -234,7 +234,7 @@ class TestLoadPublicCSV:
 # ===================================================================
 
 class TestLoadGSheetDf:
-    @patch("streamtex.gsheet.requests.get")
+    @patch("requests.get")
     def test_returns_dataframe_if_pandas(self, mock_get):
         mock_resp = MagicMock()
         mock_resp.text = "X,Y\n1,2\n3,4\n"

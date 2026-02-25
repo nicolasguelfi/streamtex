@@ -158,6 +158,7 @@ class TestGetImageSrc:
         fake_bytes = b"PNG\x89data"
         fake_b64 = base64.b64encode(fake_bytes).decode("utf-8")
         with patch("os.path.exists", return_value=True), \
+             patch("os.path.getmtime", return_value=1234567890.0), \
              patch.object(img_mod, "__get_mime_type", return_value="image/png"), \
              patch.object(img_mod, "__get_base64_encoded_image", return_value=fake_b64):
             result = img_mod.get_image_src("/valid/photo.png")
@@ -185,6 +186,7 @@ class TestGetImageSrc:
         fake_b64 = base64.b64encode(fake_bytes).decode("utf-8")
         with patch("streamtex.image.get_static_sources", return_value=["/static"]), \
              patch("os.path.isfile", return_value=True), \
+             patch("os.path.getmtime", return_value=1234567890.0), \
              patch.object(img_mod, "__get_mime_type", return_value="image/png"), \
              patch.object(img_mod, "__get_base64_encoded_image", return_value=fake_b64):
             result = img_mod.get_image_src("logo.png")

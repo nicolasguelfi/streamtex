@@ -1,23 +1,20 @@
 from .export import _render
 from .styles import StxStyles, Style
 
+try:
+    import streamlit as st
+    _cache_code = st.cache_data(show_spinner=False)
+except Exception:
+    _cache_code = lambda f: f  # no-op outside Streamlit (tests, CLI)
 
-def st_code(
-    style: Style = StxStyles.none,
-    code: str = "",
-    language: str = "python",
-    line_numbers: bool = True,
-    font_size: str = "20pt",
-    line_number_color: str = "#6A9BC5",
-):
-    """Renders syntax-highlighted code via st.html() using Pygments.
 
-    :param style: A Style object for the outer container div.
-    :param code: The source code string to display.
-    :param language: The programming language for syntax highlighting.
-    :param line_numbers: Whether to show line numbers.
-    :param font_size: CSS font size for the code text (default "20pt").
-    :param line_number_color: CSS color for line numbers (default "#6A9BC5").
+@_cache_code
+def _highlight_code(code: str, language: str, line_numbers: bool,
+                    font_size: str) -> str:
+    """Return Pygments-highlighted HTML for the given code.
+
+    The result is cached by Streamlit based on (code, language,
+    line_numbers, font_size) so that re-renders skip Pygments entirely.
     """
     try:
         from pygments import highlight
@@ -37,7 +34,7 @@ def st_code(
             fmt_options["linenos"] = "table"
 
         formatter = HtmlFormatter(**fmt_options)
-        highlighted = highlight(code, lexer, formatter)
+        return highlight(code, lexer, formatter)
 
     except ImportError:
         # Fallback: plain <pre> with optional line numbers
@@ -50,11 +47,31 @@ def st_code(
             body = "\n".join(numbered)
         else:
             body = code
-        highlighted = (
+        return (
             f'<pre style="font-family: monospace; background-color: #272822; '
             f'color: #F8F8F2; padding: 12pt; border-radius: 6px; '
             f'overflow-x: auto; margin: 0; font-size: {font_size};">{body}</pre>'
         )
+
+
+def st_code(
+    style: Style = StxStyles.none,
+    code: str = "",
+    language: str = "python",
+    line_numbers: bool = True,
+    font_size: str = "20pt",
+    line_number_color: str = "#6A9BC5",
+):
+    """Renders syntax-highlighted code via st.html() using Pygments.
+
+    :param style: A Style object for the outer container div.
+    :param code: The source code string to display.
+    :param language: The programming language for syntax highlighting.
+    :param line_numbers: Whether to show line numbers.
+    :param font_size: CSS font size for the code text (default "20pt").
+    :param line_number_color: CSS color for line numbers (default "#6A9BC5").
+    """
+    highlighted = _highlight_code(code, language, line_numbers, font_size)
 
     line_no_css = ""
     if line_numbers and line_number_color:

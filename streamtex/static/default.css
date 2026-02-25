@@ -46,9 +46,19 @@ div[data-testid="stBidiComponentRegular"] > * {
     gap: 0;
 }
 
-/* Changes the default link underlining color*/
+/* Link colours — mirrored in constants.py (single source of truth) */
+:root {
+    --stx-link-color: #1155cc;
+    --stx-link-active-color: #1155cc;
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --stx-link-color: #3E9DF3;
+        --stx-link-active-color: #42D0F3;
+    }
+}
 a {
-    color: #1155cc;
+    color: var(--stx-link-color);
 }
 
 /* --- Export widget styles --- */

@@ -89,3 +89,6 @@ ai4se.streamtex.onrender.com
 
 pose-moi d'abord toutes les questions nécessaires pour avoir une vue précise des possibilités et des contraintes.
 Prépare-moi un dossier markdown complet de maintenance que tu peux mettre dans Le dossier documentation/maintenance/
+
+
+Peux-tu maintenant parcourir tous les projets, soit ceux qui sont dans les documentation avec les manuels utilisateurs, soit ceux qui sont dans le dossier projet pour voir si ils doivent être mise à jour suite à toutes les modifications que tu viens de faire

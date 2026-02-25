@@ -252,19 +252,24 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
     logger.debug("st_book function completed in %.2f seconds.", duration)
 
 
-def load_css(file_name: str):
-    """Loads a CSS file and injects it into the StreamTeX app."""
+@st.cache_resource
+def _read_css(file_name: str) -> str:
+    """Read a CSS file from the streamtex.static package (cached in memory)."""
     try:
         with resources.open_text('streamtex.static', file_name) as f:
-            st.html(f'<style>{f.read()}</style>')
+            return f.read()
     except (FileNotFoundError, ModuleNotFoundError, TypeError) as e:
         logger.debug("[StreamTeX] CSS resource fallback for '%s': %s", file_name, e)
         current_dir = os.path.dirname(__file__)
         static_dir = os.path.join(current_dir, 'static')
         css_file_path = os.path.join(static_dir, file_name)
-        # Read the CSS file
         with open(css_file_path, 'r') as f:
-            st.html(f'<style>{f.read()}</style>')
+            return f.read()
+
+
+def load_css(file_name: str):
+    """Loads a CSS file and injects it into the StreamTeX app."""
+    st.html(f'<style>{_read_css(file_name)}</style>')
 
 
 def build_ToC_sidebar_placeholder(has_markers=False, has_search=False):
@@ -520,11 +525,14 @@ def _build_paginated_sidebar(cache, current_page, total, toc_config, marker_conf
             page_idx = entry.get("page_idx", 0)
             title_esc = entry["title"]
             if page_idx == current_page:
-                link = f'<a href="#{entry["key_anchor"]}">{title_esc}</a>'
+                link = (
+                    f'<a href="#{entry["key_anchor"]}" '
+                    f'style="color:var(--stx-link-active-color);">{title_esc}</a>'
+                )
             else:
                 link = (
-                    f'<a href="#stx-goto-{page_idx}" class="stx-page-link" '
-                    f'style="opacity:.6;">{title_esc}</a>'
+                    f'<a href="#stx-goto-{page_idx}" class="stx-page-link">'
+                    f'{title_esc}</a>'
                 )
             block_attr = f' data-stx-block="{page_idx}"' if show_search else ''
             toc_parts.append(
@@ -547,11 +555,14 @@ def _build_paginated_sidebar(cache, current_page, total, toc_config, marker_conf
                 idx = entry["index"] + 1
                 page_idx = entry.get("page_idx", 0)
                 if page_idx == current_page:
-                    link = f'<a href="#{entry["anchor"]}">{idx}. {entry["label"]}</a>'
+                    link = (
+                        f'<a href="#{entry["anchor"]}" '
+                        f'style="color:var(--stx-link-active-color);">{idx}. {entry["label"]}</a>'
+                    )
                 else:
                     link = (
-                        f'<a href="#stx-goto-{page_idx}" class="stx-page-link" '
-                        f'style="opacity:.6;">{idx}. {entry["label"]}</a>'
+                        f'<a href="#stx-goto-{page_idx}" class="stx-page-link">'
+                        f'{idx}. {entry["label"]}</a>'
                     )
                 block_attr = f' data-stx-block="{page_idx}"' if show_search else ''
                 marker_parts.append(

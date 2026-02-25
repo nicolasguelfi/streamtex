@@ -2,10 +2,7 @@
 
 import textwrap
 
-import requests
 import streamlit as st
-from bs4 import BeautifulSoup as bs
-from requests.exceptions import ConnectionError, Timeout
 
 
 def _get_page_preview(url: str):
@@ -13,6 +10,10 @@ def _get_page_preview(url: str):
     Fetches the page title and favicon URL for the given link.
     If the connection is refused or times out, returns defaults preventing display of any preview.
     """
+    import requests
+    from bs4 import BeautifulSoup as bs
+    from requests.exceptions import ConnectionError, Timeout
+
     title = url
     favicon = 'https://www.google.com/s2/favicons?domain_url=' + url
     try:
@@ -36,7 +37,7 @@ def _get_page_preview(url: str):
 
         return title, favicon, True
 
-    except (ConnectionError, Timeout):
+    except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
         return title, favicon, False
 
     except Exception:

@@ -11,13 +11,47 @@ from .utils import generate_key
 # Helper type definition
 CELL_STYLES_TYPE = Union[List[List[Style]], List[Style], Style, StyleGrid]
 
+# Default min-width lookup (based on ~900px Streamlit usable area)
+_RESPONSIVE_MIN_WIDTHS: dict[int, int] = {
+    1: 0, 2: 350, 3: 280, 4: 220, 5: 180, 6: 150,
+}
+
+
+def responsive_cols(cols: int, min_width: str | int | None = None) -> str:
+    """Generate a responsive CSS grid-template-columns value.
+
+    Args:
+        cols: Target number of columns (>= 1).
+        min_width: Minimum column width. Int is treated as px, str is used as-is.
+                   If None, a sensible default is chosen based on ``cols``.
+
+    Returns:
+        A CSS ``grid-template-columns`` value using ``repeat(auto-fit, minmax(...))``.
+    """
+    if cols < 1:
+        raise ValueError("responsive_cols requires cols >= 1")
+    if cols == 1:
+        return "1fr"
+    if min_width is None:
+        px = _RESPONSIVE_MIN_WIDTHS.get(cols, max(120, int(900 / cols)))
+        min_width_str = f"{px}px"
+    elif isinstance(min_width, int):
+        min_width_str = f"{min_width}px"
+    else:
+        min_width_str = min_width
+    return f"repeat(auto-fit, minmax({min_width_str}, 1fr))"
+
+
 class GridController:
-    def __init__(self, cols: str | int = 2, cell_styles: CELL_STYLES_TYPE = StxStyles.none):
+    def __init__(self, cols: str | int = 2, cell_styles: CELL_STYLES_TYPE = StxStyles.none,
+                 intended_cols: int | None = None):
         self.cell_styles = cell_styles
         self.cell_counter = 0 # Tracks total cells to map styles to flat list/matrix
 
         # Infer column count
-        if isinstance(cols, int):
+        if intended_cols is not None:
+            self.cols = intended_cols
+        elif isinstance(cols, int):
             self.cols = cols
         else:
             self.cols = cols.count(" ")+1
@@ -80,6 +114,8 @@ def st_grid(
     grid_style: Style = StxStyles.none,
     cell_styles: CELL_STYLES_TYPE = StxStyles.none,
     gap: str = None,
+    responsive: bool = False,
+    min_width: str | int | None = None,
 ):
     """
     A context manager representing a grid layout with customizable styles for the grid and individual cells.
@@ -97,6 +133,10 @@ def st_grid(
         - A matrix (list of lists) of `Style` objects.
         - A flat list of `Style` objects.
         - A single `Style` applied to all cells.
+    :param responsive: When True and cols is an int, generates a responsive CSS template
+                       using ``repeat(auto-fit, minmax(..., 1fr))``.
+    :param min_width: Minimum column width for responsive mode. Int → px, str → as-is.
+                      Providing this implicitly enables responsive mode when cols is an int.
 
     ## Notes:
     - Cells are filled from top to bottom, left to right.
@@ -112,10 +152,10 @@ def st_grid(
         ```
 
         ```
-        with st_grid("auto 1fr") as g:
-            # row 1, col 1 will only occupy as much as space as it needs
+        with st_grid(cols=3, responsive=True) as g:
+            # Responsive: wraps to fewer columns on narrow viewports
             with g.cell(): ...
-            # row 1, col 2 will occupy the rest of the available space
+            with g.cell(): ...
             with g.cell(): ...
         ```
     """
@@ -123,12 +163,22 @@ def st_grid(
     # 1. Generate ID
     grid_id = generate_key("css-grid")
 
-    # 2. Convert int cols to str if needed
-    template = cols
-    if isinstance(cols, int):
+    # If min_width is provided on an int cols, activate responsive implicitly
+    if min_width is not None and isinstance(cols, int):
+        responsive = True
+
+    # Track intended column count for GridController
+    intended_cols = cols if isinstance(cols, int) else None
+
+    # 2. Convert cols to CSS template
+    if responsive and isinstance(cols, int):
+        template = responsive_cols(cols, min_width)
+    elif isinstance(cols, int):
         template = " ".join(["1fr"]*cols)
     elif isinstance(cols, str) and not cols.strip():
         raise ValueError("st_grid cols parameter cannot be empty string")
+    else:
+        template = cols
 
     # 2b. Resolve gap value (explicit gap parameter takes priority over grid_style)
     gap_value = gap if gap else "0"
@@ -182,7 +232,7 @@ def st_grid(
         # Marker
         st.html(f'<span class="{grid_id}" style="display:none"></span>')
 
-        controller = GridController(cols, cell_styles)
+        controller = GridController(template, cell_styles, intended_cols=intended_cols)
         yield controller
 
     if is_export_active():

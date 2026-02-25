@@ -42,11 +42,8 @@ class BlockStyles:
         "project_title"
     )
 
-    # Grid gap style
-    grid_with_gap = Style(
-        "gap:24px;",
-        "grid_with_gap"
-    )
+    # Grid gap style — uses library preset
+    grid_with_gap = StxStyles.container.grid.gap_24
 
 
 bs = BlockStyles
@@ -60,7 +57,7 @@ def build():
     # ========================================================================
     st_space("v", 2)
 
-    with st_grid(cols=3, grid_style=bs.grid_with_gap):
+    with st_grid(cols=3, responsive=True, grid_style=bs.grid_with_gap):
 
         # ====================================================================
         # PROJECT 1: Introduction

@@ -45,7 +45,8 @@ Fais-moi des propositions, ne touche pas le code.
 Pour ce diagramme graphviz Styled Flowchart, tu peux mettre le rectangle bleu en dessous du vert Et tu peux doubler la hauteur d'affichage. ça lui donnera le format voulu.
 
 -----------------
-
+peux-tu mettre une règle Claude concernant le déploiement du projet pour faire attention à toutes les modifications qui pourraient créer des erreurs qui seront détecté ruff.
+Tu peux en profiter pour mettre toutes les règles nécessaires pour que les modifications soient faites de façon cohérente par rapport au déploiement, et tu peux mettre aussi des règles liées au déploiement.
 -----------------
 
 -----------------

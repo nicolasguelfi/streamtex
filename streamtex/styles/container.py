@@ -377,6 +377,17 @@ class ListStyles:
     ordered_lowercase = Style("list-style-type: lower-alpha;", "ordered_lowercase")
 
 
+class GridStyles:
+    """Grid gap presets for use with st_grid's grid_style parameter."""
+    gap_0  = Style("gap: 0;",    "grid_gap_0")
+    gap_8  = Style("gap: 8px;",  "grid_gap_8")
+    gap_12 = Style("gap: 12px;", "grid_gap_12")
+    gap_16 = Style("gap: 16px;", "grid_gap_16")
+    gap_24 = Style("gap: 24px;", "grid_gap_24")
+    gap_32 = Style("gap: 32px;", "grid_gap_32")
+    gap_48 = Style("gap: 48px;", "grid_gap_48")
+
+
 class Container:
     sizes = ContainerSizes
     bg_colors = BackgroundColors
@@ -387,3 +398,4 @@ class Container:
     flex = Flex
     lists = ListStyles
     positions = Positions
+    grid = GridStyles

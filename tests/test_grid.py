@@ -5,7 +5,7 @@ from unittest.mock import patch, MagicMock, call
 from contextlib import contextmanager
 
 from streamtex.styles import Style, StyleGrid, StxStyles
-from streamtex.grid import GridController, st_grid, CELL_STYLES_TYPE
+from streamtex.grid import GridController, st_grid, responsive_cols, CELL_STYLES_TYPE
 
 
 # ===========================================================================
@@ -541,3 +541,153 @@ class TestStGridIntegration:
             assert g._resolve_style(1) is styles[0][1]
             assert g._resolve_style(2) is styles[1][0]
             assert g._resolve_style(3) is styles[1][1]
+
+
+# ===========================================================================
+# TestResponsiveCols — responsive_cols() helper function
+# ===========================================================================
+
+class TestResponsiveCols:
+    """Tests for the responsive_cols() helper function."""
+
+    def test_responsive_cols_default_2(self):
+        """Test responsive_cols(2) returns minmax(350px, 1fr)."""
+        result = responsive_cols(2)
+        assert result == "repeat(auto-fit, minmax(350px, 1fr))"
+
+    def test_responsive_cols_default_3(self):
+        """Test responsive_cols(3) returns minmax(280px, 1fr)."""
+        result = responsive_cols(3)
+        assert result == "repeat(auto-fit, minmax(280px, 1fr))"
+
+    def test_responsive_cols_default_4(self):
+        """Test responsive_cols(4) returns minmax(220px, 1fr)."""
+        result = responsive_cols(4)
+        assert result == "repeat(auto-fit, minmax(220px, 1fr))"
+
+    def test_responsive_cols_single_col(self):
+        """Test responsive_cols(1) returns '1fr' (no wrapping needed)."""
+        result = responsive_cols(1)
+        assert result == "1fr"
+
+    def test_responsive_cols_invalid(self):
+        """Test responsive_cols(0) raises ValueError."""
+        with pytest.raises(ValueError, match="responsive_cols requires cols >= 1"):
+            responsive_cols(0)
+
+    def test_responsive_cols_explicit_int(self):
+        """Test responsive_cols with explicit int min_width."""
+        result = responsive_cols(3, min_width=300)
+        assert result == "repeat(auto-fit, minmax(300px, 1fr))"
+
+    def test_responsive_cols_explicit_str(self):
+        """Test responsive_cols with explicit string min_width."""
+        result = responsive_cols(2, min_width="20em")
+        assert result == "repeat(auto-fit, minmax(20em, 1fr))"
+
+    def test_responsive_cols_large_n(self):
+        """Test responsive_cols(10) uses fallback formula max(120, 900//10) = 120."""
+        result = responsive_cols(10)
+        # max(120, int(900/10)) = max(120, 90) = 120
+        assert result == "repeat(auto-fit, minmax(120px, 1fr))"
+
+    def test_responsive_cols_7_uses_formula(self):
+        """Test responsive_cols(7) uses fallback formula max(120, 900//7) = 128."""
+        result = responsive_cols(7)
+        # max(120, int(900/7)) = max(120, 128) = 128
+        assert result == "repeat(auto-fit, minmax(128px, 1fr))"
+
+    def test_responsive_cols_default_5(self):
+        """Test responsive_cols(5) returns minmax(180px, 1fr)."""
+        result = responsive_cols(5)
+        assert result == "repeat(auto-fit, minmax(180px, 1fr))"
+
+    def test_responsive_cols_default_6(self):
+        """Test responsive_cols(6) returns minmax(150px, 1fr)."""
+        result = responsive_cols(6)
+        assert result == "repeat(auto-fit, minmax(150px, 1fr))"
+
+
+# ===========================================================================
+# TestStGrid — Responsive mode tests (appended to existing class scope)
+# ===========================================================================
+
+class TestStGridResponsive:
+    """Tests for st_grid responsive mode."""
+
+    def test_st_grid_responsive_flag(self, mock_streamlit):
+        """Test st_grid with responsive=True generates auto-fit/minmax CSS."""
+        with st_grid(cols=3, responsive=True) as controller:
+            pass
+
+        html_calls = mock_streamlit["html"].call_args_list
+        css_html = html_calls[0][0][0]
+        assert "auto-fit" in css_html
+        assert "minmax(280px, 1fr)" in css_html
+
+    def test_st_grid_responsive_with_min_width(self, mock_streamlit):
+        """Test st_grid responsive with explicit min_width."""
+        with st_grid(cols=3, responsive=True, min_width=400) as controller:
+            pass
+
+        html_calls = mock_streamlit["html"].call_args_list
+        css_html = html_calls[0][0][0]
+        assert "minmax(400px, 1fr)" in css_html
+
+    def test_st_grid_responsive_string_cols_ignored(self, mock_streamlit):
+        """Test responsive flag is ignored when cols is a string."""
+        with st_grid(cols="auto 1fr", responsive=True) as controller:
+            pass
+
+        html_calls = mock_streamlit["html"].call_args_list
+        css_html = html_calls[0][0][0]
+        assert "grid-template-columns: auto 1fr;" in css_html
+
+    def test_st_grid_min_width_implies_responsive(self, mock_streamlit):
+        """Test min_width parameter implicitly activates responsive mode."""
+        with st_grid(cols=3, min_width=250) as controller:
+            pass
+
+        html_calls = mock_streamlit["html"].call_args_list
+        css_html = html_calls[0][0][0]
+        assert "auto-fit" in css_html
+        assert "minmax(250px, 1fr)" in css_html
+
+    def test_st_grid_responsive_controller_cols(self, mock_streamlit):
+        """Test that responsive mode preserves intended_cols on the controller."""
+        with st_grid(cols=4, responsive=True) as controller:
+            assert controller.cols == 4
+
+    def test_st_grid_responsive_export_wrapper(self, mock_streamlit):
+        """Test responsive st_grid export wrapper contains auto-fit template."""
+        with patch("streamtex.grid.is_export_active", return_value=True):
+            with patch("streamtex.grid.export_push_wrapper") as mock_push, \
+                 patch("streamtex.grid.export_pop_wrapper"):
+
+                with st_grid(cols=3, responsive=True) as controller:
+                    pass
+
+                push_call_args = mock_push.call_args[0][0]
+                assert "auto-fit" in push_call_args
+                assert "minmax(280px, 1fr)" in push_call_args
+
+
+# ===========================================================================
+# TestGridController — intended_cols tests
+# ===========================================================================
+
+class TestGridControllerIntendedCols:
+    """Tests for GridController intended_cols parameter."""
+
+    def test_init_with_intended_cols(self):
+        """Test GridController with intended_cols overrides string inference."""
+        controller = GridController(
+            "repeat(auto-fit, minmax(280px, 1fr))",
+            intended_cols=3,
+        )
+        assert controller.cols == 3
+
+    def test_init_intended_cols_none_fallback(self):
+        """Test GridController without intended_cols falls back to space-count."""
+        controller = GridController("1fr 1fr 1fr")
+        assert controller.cols == 3

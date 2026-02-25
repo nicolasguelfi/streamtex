@@ -189,7 +189,7 @@ def _show_home(
     st.divider()
 
     # Create grid of project cards
-    with st_grid(cols=config.cards_per_row) if home_styles else st.container():
+    with st_grid(cols=config.cards_per_row, responsive=True) if home_styles else st.container():
         for project_key, project in config.projects.items():
             _render_project_card(config, project_key, project)
 

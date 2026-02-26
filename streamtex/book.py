@@ -13,6 +13,7 @@ from streamlit.delta_generator import DeltaGenerator as Delta
 from . import toc as _toc_mod
 from .auth import _password_gate
 from .banner import BannerConfig, BannerMode, _render_banner
+from .code import add_wrap_all_option
 from .enums import Tags
 from .export import ExportConfig, generate_export_html, is_export_active, reset_export_buffer
 from .marker import MarkerConfig, inject_marker_navigation, marker_entries, reset_marker_registry
@@ -22,7 +23,6 @@ from .styles import Style
 from .toc import TOCConfig, reset_toc_registry, toc_entries
 from .utils import inject_link_preview_scaffold
 from .write import st_write
-from .code import add_wrap_all_option
 from .zoom import _PAGE_WIDTH_KEY, add_zoom_options
 
 logger = logging.getLogger(__name__)

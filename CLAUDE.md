@@ -32,6 +32,7 @@ See `documentation/coding_standards.md` for the full reference. Key rules:
 - **No hardcoded black/white** — let Streamlit handle themes
 - **Block files** need `BlockStyles` class + `build()` function
 - **Style reuse** — one generic style, reused everywhere
+- **After every code change**, run `uv run ruff check streamtex/` before committing — ruff enforces isort (I001) import ordering which is the most common CI failure
 
 ## Key Components
 

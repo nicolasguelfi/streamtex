@@ -22,6 +22,7 @@ from .styles import Style
 from .toc import TOCConfig, reset_toc_registry, toc_entries
 from .utils import inject_link_preview_scaffold
 from .write import st_write
+from .code import add_wrap_all_option
 from .zoom import _PAGE_WIDTH_KEY, add_zoom_options
 
 logger = logging.getLogger(__name__)
@@ -142,6 +143,7 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
 
     # Add zoom options to sidebar (BEFORE export so session_state is populated)
     add_zoom_options(default_page_width=page_width)
+    add_wrap_all_option()
 
     # Initialise the export buffer (reads effective width from session_state)
     effective_pw = f"{st.session_state.get(_PAGE_WIDTH_KEY, page_width)}%"
@@ -899,6 +901,7 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
     inject_link_preview_scaffold()
     _inject_bib_preview_if_enabled()
     add_zoom_options(default_page_width=page_width)
+    add_wrap_all_option()
 
     # Inject inspector CSS once + reserve sidebar placeholder
     _inspector_placeholder = None

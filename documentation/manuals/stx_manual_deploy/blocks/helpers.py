@@ -34,12 +34,12 @@ class ProjectBlockHelperConfig(BlockHelperConfig):
 set_block_helper_config(ProjectBlockHelperConfig())
 
 
-def show_code(code_string: str, language: str = "python", line_numbers: bool = True, wrap: bool = False):
+def show_code(code_string: str, language: str = "python", line_numbers: bool = True, wrap=None):
     """Show a code block with project styles."""
     return _show_code(code_string, language, line_numbers, wrap=wrap)
 
 
-def show_code_inline(code_string: str, language: str = "python", line_numbers: bool = True, wrap: bool = False):
+def show_code_inline(code_string: str, language: str = "python", line_numbers: bool = True, wrap=None):
     """Show an inline code block with project styles."""
     return _show_code_inline(code_string, language, line_numbers, wrap=wrap)
 

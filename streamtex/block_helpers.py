@@ -78,7 +78,7 @@ def show_code(
     language: str = "python",
     line_numbers: bool = True,
     style: Optional[object] = None,
-    wrap: bool = False,
+    wrap: Optional[bool] = None,
 ) -> None:
     """Display syntax-highlighted code in a styled box.
 
@@ -114,7 +114,7 @@ def show_code_inline(
     language: str = "python",
     line_numbers: bool = True,
     style: Optional[object] = None,
-    wrap: bool = False,
+    wrap: Optional[bool] = None,
 ) -> None:
     """Display code without box wrapper — for use inside containers.
 
@@ -222,7 +222,7 @@ class BlockHelper:
         language: str = "python",
         line_numbers: bool = True,
         style: Optional[object] = None,
-        wrap: bool = False,
+        wrap: Optional[bool] = None,
     ) -> None:
         """Delegate to module-level show_code()."""
         show_code(code_string, language, line_numbers, style, wrap=wrap)
@@ -233,7 +233,7 @@ class BlockHelper:
         language: str = "python",
         line_numbers: bool = True,
         style: Optional[object] = None,
-        wrap: bool = False,
+        wrap: Optional[bool] = None,
     ) -> None:
         """Delegate to module-level show_code_inline()."""
         show_code_inline(code_string, language, line_numbers, style, wrap=wrap)

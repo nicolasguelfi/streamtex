@@ -42,8 +42,8 @@ sts.theme = dark
 toc = TOCConfig(
     numerate_titles=False,
     toc_position=0,
-    title_style=s.project.titles.course_title + s.center_txt,
-    content_style=s.large + s.text.colors.reset,
+    title_style=s.project.titles.section_title + s.center_txt,
+    content_style=s.large,
     search=True,
 )
 

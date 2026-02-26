@@ -89,19 +89,83 @@ class TestStCodeWithPygments:
         assert "--stx-code-size" in html
         assert "18pt" in html  # fallback value in var()
 
-    def test_wrap_false_no_pre_wrap(self):
+    def test_wrap_false_no_checked(self):
         html = _call_st_code(code="x = 1", language="python", wrap=False)
-        assert "pre-wrap" not in html
+        # Checkbox should be present but NOT checked
+        assert '<input type="checkbox"' in html
+        assert "checked" not in html.split('<input type="checkbox"')[1].split("/>")[0]
 
-    def test_wrap_true_adds_pre_wrap(self):
+    def test_wrap_true_has_pre_wrap_css(self):
         html = _call_st_code(code="x = 1", language="python", wrap=True)
         assert "white-space: pre-wrap" in html
         assert "word-break: break-word" in html
         assert "overflow-wrap: break-word" in html
 
-    def test_wrap_default_is_false(self):
+    def test_wrap_default_none_falls_back_to_true(self):
+        # wrap=None (default) falls back to True when no session state
         html = _call_st_code(code="x = 1", language="python")
-        assert "pre-wrap" not in html
+        checkbox = html.split('<input type="checkbox"')[1].split("/>")[0]
+        assert "checked" in checkbox
+
+    def test_wrap_none_reads_session_state_false(self):
+        """When session state has wrap_all=False, wrap=None uses it."""
+        from streamtex.code import _WRAP_ALL_KEY
+        mock_state = {_WRAP_ALL_KEY: False}
+        with patch("streamtex.code.st") as mock_st:
+            mock_st.session_state = mock_state
+            html = _call_st_code(code="x = 1", language="python")
+        checkbox = html.split('<input type="checkbox"')[1].split("/>")[0]
+        assert "checked" not in checkbox
+
+    def test_wrap_none_reads_session_state_true(self):
+        """When session state has wrap_all=True, wrap=None uses it."""
+        from streamtex.code import _WRAP_ALL_KEY
+        mock_state = {_WRAP_ALL_KEY: True}
+        with patch("streamtex.code.st") as mock_st:
+            mock_st.session_state = mock_state
+            html = _call_st_code(code="x = 1", language="python")
+        checkbox = html.split('<input type="checkbox"')[1].split("/>")[0]
+        assert "checked" in checkbox
+
+    def test_wrap_explicit_overrides_session_state(self):
+        """Explicit wrap=False wins over session state True."""
+        from streamtex.code import _WRAP_ALL_KEY
+        mock_state = {_WRAP_ALL_KEY: True}
+        with patch("streamtex.code.st") as mock_st:
+            mock_st.session_state = mock_state
+            html = _call_st_code(code="x = 1", language="python", wrap=False)
+        checkbox = html.split('<input type="checkbox"')[1].split("/>")[0]
+        assert "checked" not in checkbox
+
+    def test_toggle_checkbox_present(self):
+        html = _call_st_code(code="x = 1", language="python")
+        assert '<input type="checkbox"' in html
+
+    def test_toggle_label_present(self):
+        html = _call_st_code(code="x = 1", language="python")
+        assert "<label for=" in html
+        assert ">wrap</label>" in html
+
+    def test_toggle_checked_when_wrap_true(self):
+        html = _call_st_code(code="x = 1", language="python", wrap=True)
+        checkbox = html.split('<input type="checkbox"')[1].split("/>")[0]
+        assert "checked" in checkbox
+
+    def test_toggle_unchecked_when_wrap_false(self):
+        html = _call_st_code(code="x = 1", language="python", wrap=False)
+        checkbox = html.split('<input type="checkbox"')[1].split("/>")[0]
+        assert "checked" not in checkbox
+
+    def test_toggle_unique_ids(self):
+        html1 = _call_st_code(code="x = 1", language="python")
+        html2 = _call_st_code(code="y = 2", language="python")
+        # Extract the uid from id="stx-wrap-..."
+        import re
+        ids1 = re.findall(r'id="(stx-wrap-[^"]+)"', html1)
+        ids2 = re.findall(r'id="(stx-wrap-[^"]+)"', html2)
+        assert ids1, "Should have at least one stx-wrap id"
+        assert ids2, "Should have at least one stx-wrap id"
+        assert ids1[0] != ids2[0], "Two calls should produce different IDs"
 
 
 # ---------------------------------------------------------------------------

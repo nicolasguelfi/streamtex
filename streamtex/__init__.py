@@ -8,7 +8,7 @@ from .styles import Style, ListStyle, StyleGrid, StxStyles, StreamTeX_Styles, th
 # Content rendering
 from .write import st_write
 from .image import st_image, configure_image_path
-from .code import st_code
+from .code import st_code, add_wrap_all_option
 from .container import st_block, st_span
 from .space import st_space, st_br
 from .grid import st_grid, responsive_cols

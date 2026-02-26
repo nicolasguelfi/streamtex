@@ -84,6 +84,25 @@ class TestStCodeWithPygments:
         html = _call_st_code(code="x = 1", language="python")
         assert "#F8F8F2" in html  # monokai foreground color in container CSS
 
+    def test_default_font_size_uses_css_variable(self):
+        html = _call_st_code(code="pass", language="python")
+        assert "--stx-code-size" in html
+        assert "18pt" in html  # fallback value in var()
+
+    def test_wrap_false_no_pre_wrap(self):
+        html = _call_st_code(code="x = 1", language="python", wrap=False)
+        assert "pre-wrap" not in html
+
+    def test_wrap_true_adds_pre_wrap(self):
+        html = _call_st_code(code="x = 1", language="python", wrap=True)
+        assert "white-space: pre-wrap" in html
+        assert "word-break: break-word" in html
+        assert "overflow-wrap: break-word" in html
+
+    def test_wrap_default_is_false(self):
+        html = _call_st_code(code="x = 1", language="python")
+        assert "pre-wrap" not in html
+
 
 # ---------------------------------------------------------------------------
 # Fallback path — Pygments not available (simulated via ImportError)

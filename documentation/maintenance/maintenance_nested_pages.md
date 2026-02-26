@@ -139,9 +139,9 @@ for module in modules:
 
 ---
 
-#### 7. Monties (bannieres prev/next) (lignes 737-768)
+#### 7. Bannieres de navigation (prev/next) (lignes 737-768)
 
-**Aucune modification necessaire.** Les Monties utilisent `page_titles[current_page +/- 1]`, qui est derive de `_get_page_titles`. Le `total` reste `len(module_list)`, ce qui est correct puisque chaque element (simple ou groupe) est une page.
+**Aucune modification necessaire.** Les bannieres de navigation utilisent `page_titles[current_page +/- 1]`, qui est derive de `_get_page_titles`. Le `total` reste `len(module_list)`, ce qui est correct puisque chaque element (simple ou groupe) est une page.
 
 ---
 
@@ -187,7 +187,7 @@ for i, item in enumerate(module_list):
 | `_get_page_titles` | Non | - |
 | `_preseed_toc_registry` | Non | - |
 | `_build_paginated_sidebar` | Non | - |
-| Monties (bannieres) | Non | - |
+| Bannieres de navigation | Non | - |
 | Boutons navigation | Non | - |
 | JS pagination | Non | - |
 | Mode continu | Oui | Faible |

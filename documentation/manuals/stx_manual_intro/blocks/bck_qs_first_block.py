@@ -73,7 +73,8 @@ def build():
         st_book([
             blocks.bck_welcome,
             blocks.bck_hello,      # <-- your new block
-        ], toc_config=toc, paginate=True)
+        ], toc_config=toc, paginate=True,
+           banner=BannerConfig.full())
     """))
     st_space("v", 2)
 

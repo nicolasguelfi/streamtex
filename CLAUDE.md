@@ -44,6 +44,7 @@ See `documentation/coding_standards.md` for the full reference. Key rules:
 
 ### Organization & Navigation
 - `streamtex/book.py` — Book orchestration (st_book with paginated/continuous modes, page_width: int default 90)
+- `streamtex/banner.py` — Configurable paginated navigation banners (BannerMode, BannerConfig, presets: full/compact/hidden)
 - `streamtex/toc.py` — Table of Contents registry (auto-numbering, anchoring)
 - `streamtex/marker.py` — Navigation markers (slide-like navigation with PageUp/PageDown)
 - `streamtex/collection.py` — Collection system (st_collection, CollectionConfig, ProjectMeta)

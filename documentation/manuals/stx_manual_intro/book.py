@@ -3,7 +3,7 @@
 import streamlit as st
 import setup
 import streamtex as stx
-from streamtex import st_book, TOCConfig, MarkerConfig
+from streamtex import st_book, TOCConfig, MarkerConfig, BannerConfig
 from pathlib import Path
 
 from custom.styles import Styles as s
@@ -66,4 +66,5 @@ st_book([
     blocks.bck_zoom_and_responsive,
     blocks.bck_export_and_sharing,
 ], toc_config=toc, marker_config=marker_config, paginate=True,
+   banner=BannerConfig.full(),
    inspector=stx.InspectorConfig(enabled=True))

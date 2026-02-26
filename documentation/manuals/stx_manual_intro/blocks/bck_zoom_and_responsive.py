@@ -67,13 +67,13 @@ def build():
     st_space("v", 1)
 
     with st_block(s.project.containers.code_box):
-        st_code("python", """\
+        st_code(code="""\
 # Zoom is automatically injected by st_book()
 # No need to manually add it to your blocks
 
 # Users control it via sidebar slider
 # Default range: 80% - 120%
-""")
+""", language="python")
     st_space("v", 2)
 
     # Section 3: Responsive Design Pattern

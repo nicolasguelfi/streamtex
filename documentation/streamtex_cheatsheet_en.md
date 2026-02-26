@@ -325,7 +325,7 @@ s.container.lists.ordered_lowercase     # lower-alpha list
 import streamlit as st
 import setup
 import streamtex as stx
-from streamtex import st_book, TOCConfig, MarkerConfig
+from streamtex import st_book, TOCConfig, MarkerConfig, BannerConfig
 from pathlib import Path
 from custom.styles import Styles as s
 from custom.themes import dark
@@ -358,6 +358,7 @@ st_book(
     toc_config=toc,
     marker_config=marker_config,
     paginate=True,
+    banner=BannerConfig.full(),
     inspector=stx.InspectorConfig(enabled=True),
 )
 ```
@@ -373,12 +374,62 @@ st_book(
     export=True,                    # Enable HTML export
     export_title="StreamTeX Export",
     paginate=False,                 # One block per page
+    banner=None,                    # BannerConfig for paginated navigation banners
     bib_sources=None,               # List of .bib/.json/.ris paths
     bib_config=None,                # BibConfig for bibliography
     inspector=None,                 # InspectorConfig for block inspector
     page_width=90,                  # Page width as % of browser width (default 90)
 )
 ```
+
+### BannerConfig — Paginated Navigation Banners
+
+Controls the appearance of navigation banners in paginated mode.
+Three display modes: `FULL` (prominent), `COMPACT` (slim), `HIDDEN` (no visual).
+
+```python
+from streamtex import BannerConfig, BannerMode
+
+# Presets
+banner=BannerConfig.full()                    # Default — large, rounded, with dividers
+banner=BannerConfig.compact()                 # Slim, discreet
+banner=BannerConfig.compact_gray()            # Compact with neutral gray
+banner=BannerConfig.hidden()                  # No visual, navigation preserved
+
+# Custom
+banner=BannerConfig(
+    mode=BannerMode.COMPACT,
+    color="#1a5276",
+    text_color="#ecf0f1",
+    padding="8px 20px",
+    show_arrows=False,
+)
+```
+
+**BannerConfig fields:**
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `mode` | `BannerMode` | `FULL` | Display mode (FULL, COMPACT, HIDDEN) |
+| `color` | `str` | `"rgba(211,47,47,0.8)"` | Background colour (CSS) |
+| `text_color` | `str` | `"white"` | Text colour (CSS) |
+| `font_size` | `str \| None` | auto | Font size (None = auto per mode) |
+| `font_weight` | `str \| None` | auto | Font weight (None = auto per mode) |
+| `padding` | `str \| None` | auto | Padding (None = auto per mode) |
+| `border_radius` | `str \| None` | auto | Border radius (None = auto per mode) |
+| `show_title` | `bool` | `True` | Show target page title |
+| `show_arrows` | `bool` | `True` | Show directional arrows |
+| `show_dividers` | `bool \| None` | auto | Dividers between banner and content |
+
+**Auto values by mode:**
+
+| Field | FULL | COMPACT |
+|-------|------|---------|
+| font_size | 1.3rem | 0.8rem |
+| font_weight | bold | 500 |
+| padding | 18px 24px | 5px 16px |
+| border_radius | 8px | 4px |
+| show_dividers | True | False |
 
 ### InspectorConfig
 
@@ -480,6 +531,36 @@ path = stx.resolve_static("logo.png")   # Searches each source in order
 # st_image() calls resolve_static() internally
 ```
 
+## Code Blocks — `st_code()`
+
+```python
+# Basic code block (responsive font size: desktop 18pt, tablet 14pt, mobile 11pt)
+stx.st_code(style, code="print('hello')", language="python", line_numbers=True)
+
+# With line wrapping (useful for JSON, logs, prose-like code on mobile)
+stx.st_code(style, code='{"key": "long value..."}', language="json", wrap=True)
+
+# Custom font size (overrides responsive default)
+stx.st_code(style, code="print('hello')", font_size="14pt")
+```
+
+**Parameters:**
+- `style` — Style object for the outer container
+- `code` — Source code string
+- `language` — Language for syntax highlighting (default: `"python"`)
+- `line_numbers` — Show line numbers (default: `True`)
+- `font_size` — CSS font size (default: responsive via `--stx-code-size`)
+- `line_number_color` — Color for line numbers (default: `"#6A9BC5"`)
+- `wrap` — When `True`, long lines wrap instead of scrolling horizontally (default: `False`)
+
+**Responsive font size** (via CSS variable `--stx-code-size`):
+
+| Breakpoint | Font size |
+|-----------|-----------|
+| Desktop (default) | 18pt |
+| Tablet (≤1024px) | 14pt |
+| Mobile (≤480px) | 11pt |
+
 ## Block Helpers
 
 ### Config Injection Pattern (Recommended)
@@ -505,8 +586,8 @@ class ProjectBlockHelperConfig(BlockHelperConfig):
 set_block_helper_config(ProjectBlockHelperConfig())
 
 # Convenience wrappers
-def show_code(code_string: str, language: str = "python", line_numbers: bool = True):
-    return _show_code(code_string, language, line_numbers)
+def show_code(code_string: str, language: str = "python", line_numbers: bool = True, wrap: bool = False):
+    return _show_code(code_string, language, line_numbers, wrap=wrap)
 
 def show_explanation(text: str):
     return _show_explanation(text)
@@ -522,6 +603,7 @@ from streamtex import show_code, show_explanation, show_details
 
 show_code("print('hello')")                          # Uses injected config style
 show_code("print('hello')", style=s.custom.style)    # Override with explicit style
+show_code('{"key": "value"}', language="json", wrap=True)  # Wrapping for JSON
 show_explanation("This explains the concept...")
 show_details("Additional details here...")
 ```

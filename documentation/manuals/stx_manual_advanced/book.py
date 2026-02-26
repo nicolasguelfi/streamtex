@@ -3,7 +3,7 @@
 import streamlit as st
 import setup
 import streamtex as stx
-from streamtex import st_book, TOCConfig, MarkerConfig
+from streamtex import st_book, TOCConfig, MarkerConfig, BannerConfig
 from streamtex.bib import BibConfig, BibFormat, CitationStyle
 
 from custom.styles import Styles as s
@@ -111,5 +111,6 @@ st_book([
     # Shared block footer
     shared_blocks.bck_footer_training,
 ], toc_config=toc, marker_config=marker_config, paginate=True,
+   banner=BannerConfig.full(),
    bib_sources=bib_sources, bib_config=bib_config,
    inspector=stx.InspectorConfig(enabled=True))

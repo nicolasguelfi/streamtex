@@ -668,7 +668,7 @@ def generate_book_py(course_dir: Path, shared_blocks_path: Path) -> str:
     lines = [
         'import streamlit as st',
         'import setup',
-        'from streamtex import st_book, TOCConfig, MarkerConfig, LazyBlockRegistry',
+        'from streamtex import st_book, TOCConfig, MarkerConfig, BannerConfig, LazyBlockRegistry',
         'import streamtex.styles as sts',
         'from shared.custom.styles import Styles as s',
         'from shared.custom.themes import dark',
@@ -709,7 +709,8 @@ def generate_book_py(course_dir: Path, shared_blocks_path: Path) -> str:
         '    prev_keys=["PageUp"],',
         ')',
         '',
-        'st_book(module_list, toc_config=toc, marker_config=marker, paginate=True)',
+        'st_book(module_list, toc_config=toc, marker_config=marker, paginate=True,',
+        '        banner=BannerConfig.full())',
     ]
 
     return "\n".join(lines)

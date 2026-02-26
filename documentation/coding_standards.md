@@ -208,6 +208,14 @@ with st_grid(cols=2, grid_style=grid_gap):
 - Titles: `GIANT`(196pt), `Giant`(128pt), `giant`(112pt), `Huge`(96pt), `huge`(80pt)
 - Headers: `LARGE`(64pt), `Large`(48pt), `large`(32pt)
 - Body: `big`(24pt), `medium`(16pt), `little`(12pt/default), `small`(8pt), `tiny`(4pt)
+- Code: responsive via `--stx-code-size` (desktop 18pt, tablet 14pt, mobile 11pt)
+
+### Code Block Rendering (`st_code`)
+- Default font size is responsive via the CSS variable `--stx-code-size` (18pt desktop, 14pt tablet, 11pt mobile)
+- Override with `font_size="14pt"` for specific sizes
+- Use `wrap=True` for prose-like code (JSON, logs) where horizontal alignment doesn't matter
+- Use `wrap=False` (default) for code where columns must align (tables, diffs, ASCII art)
+- `show_code()` and `show_code_inline()` forward the `wrap` parameter to `st_code()`
 
 ## 10. Running the App
 ```bash
@@ -347,8 +355,9 @@ All `show_code()` calls in the project automatically use the injected style.
 
 ```python
 from streamtex import show_code
-show_code("print('hello')")           # Uses injected config style
-show_code("print('hello')", style=s)  # Override with explicit style
+show_code("print('hello')")                             # Uses injected config style
+show_code("print('hello')", style=s)                    # Override with explicit style
+show_code('{"key": "value"}', language="json", wrap=True)  # Wrapping for JSON
 ```
 
 ### Mode 3: OOP Inheritance
@@ -446,3 +455,51 @@ Three files collaborate:
   inject_marker_navigation(). In paginated mode, provides cross-page callbacks.
 - `write.py` — _handle_toc() bridges TOC headings to markers based on
   auto_marker_on_toc and the per-heading marker= parameter.
+
+## 17. Banner Configuration
+
+### Overview
+
+Navigation banners in paginated mode are configured via `BannerConfig`.
+Three modes: `FULL` (default, prominent), `COMPACT` (slim), `HIDDEN` (no visual).
+
+### Recommended setup
+
+Always pass an explicit `banner=` parameter to `st_book()` in paginated projects:
+
+```python
+from streamtex import BannerConfig, st_book
+
+st_book([...], paginate=True, banner=BannerConfig.full())
+```
+
+### Presets
+
+```python
+BannerConfig.full()              # Default — large, rounded, dividers
+BannerConfig.full(color="navy")  # Full with custom colour
+BannerConfig.compact()           # Slim, no dividers
+BannerConfig.compact_gray()      # Compact with neutral gray
+BannerConfig.hidden()            # No visual, keyboard/auto-scroll preserved
+```
+
+### Custom configuration
+
+```python
+BannerConfig(
+    mode=BannerMode.COMPACT,
+    color="#1a5276",
+    text_color="#ecf0f1",
+    padding="8px 20px",
+    show_arrows=False,
+)
+```
+
+Fields set to `None` use mode-specific auto values.
+Explicit values always override auto defaults.
+
+### Architecture
+
+- `banner.py` — BannerMode enum, BannerConfig dataclass, _render_banner()
+- `book.py` — Resolves banner config (banner > monties_color > banner_color),
+  passes BannerConfig to _paginated_book(), calls _render_banner() for top/bottom banners.

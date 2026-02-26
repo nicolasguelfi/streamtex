@@ -117,6 +117,9 @@ a {
 
     /* Page padding */
     --stx-page-padding: 36pt;
+
+    /* Code block font size */
+    --stx-code-size: 18pt;
 }
 
 /* Tablet breakpoint (≤1024px) */
@@ -175,6 +178,9 @@ a {
 
         /* Page padding */
         --stx-page-padding: 24pt;
+
+        /* Code block font size */
+        --stx-code-size: 14pt;
     }
 }
 
@@ -234,6 +240,9 @@ a {
 
         /* Page padding */
         --stx-page-padding: 12pt;
+
+        /* Code block font size */
+        --stx-code-size: 11pt;
     }
 }
 

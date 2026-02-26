@@ -110,7 +110,14 @@ st_image(uri="static/images/logo.png", link="https://...", hover=True)
 ## Code Blocks — `st_code()`
 
 ```python
+# Basic code block (responsive font size: desktop 18pt, tablet 14pt, mobile 11pt)
 st_code(style, code="print('hello')", language="python", line_numbers=True)
+
+# With line wrapping (useful for JSON, logs, prose-like code)
+st_code(style, code='{"key": "long value..."}', language="json", wrap=True)
+
+# Custom font size (overrides responsive default)
+st_code(style, code="print('hello')", font_size="14pt")
 ```
 
 ## Spacing
@@ -170,13 +177,23 @@ show_code_inline("inline code")               # Code without wrapper box
 ## Book Orchestration (`book.py`)
 
 ```python
-from streamtex import st_book, TOCConfig, MarkerConfig
+from streamtex import st_book, TOCConfig, MarkerConfig, BannerConfig
 
 toc = TOCConfig(numerate_titles=False, toc_position=0)
 marker = MarkerConfig(auto_marker_on_toc=1, show_nav_ui=True)
 
 st_book([blocks.bck_01, blocks.bck_02, ...],
-        toc_config=toc, marker_config=marker, paginate=True)
+        toc_config=toc, marker_config=marker, paginate=True,
+        banner=BannerConfig.full())
+```
+
+### Banner Presets
+
+```python
+banner=BannerConfig.full()           # Default — prominent, with dividers
+banner=BannerConfig.compact()        # Slim, no dividers
+banner=BannerConfig.compact_gray()   # Compact with neutral gray
+banner=BannerConfig.hidden()         # No visual, navigation preserved
 ```
 
 ## Export-Aware Widgets

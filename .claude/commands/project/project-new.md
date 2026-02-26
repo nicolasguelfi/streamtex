@@ -34,7 +34,7 @@ Arguments: $ARGUMENTS (project name, e.g. "project_mycoursename")
    ```
 
 4. **Configure each file**:
-   - `book.py`: Import setup, import blocks, configure `st.set_page_config(layout="wide")`, create `TOCConfig`, call `st_book()`
+   - `book.py`: Import setup, import blocks, configure `st.set_page_config(layout="wide")`, create `TOCConfig`, call `st_book()` with explicit `banner=BannerConfig.full()` when `paginate=True`
    - `setup.py`: Standard PATH setup (copy from template)
    - `blocks/__init__.py`: ProjectBlockRegistry lazy loader (copy from template)
    - `blocks/helpers.py`: Block helper config with DI pattern (copy from template)

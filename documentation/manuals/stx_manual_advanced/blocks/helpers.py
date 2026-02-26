@@ -70,14 +70,14 @@ set_block_helper_config(ProjectBlockHelperConfig())
 # ============================================================================
 # Optional convenience wrappers. Use these OR call streamtex functions directly.
 
-def show_code(code_string: str, language: str = "python", line_numbers: bool = True):
+def show_code(code_string: str, language: str = "python", line_numbers: bool = True, wrap: bool = False):
     """Simple wrapper — uses config-injected style automatically."""
-    return _show_code(code_string, language, line_numbers)
+    return _show_code(code_string, language, line_numbers, wrap=wrap)
 
 
-def show_code_inline(code_string: str, language: str = "python", line_numbers: bool = True):
+def show_code_inline(code_string: str, language: str = "python", line_numbers: bool = True, wrap: bool = False):
     """Simple wrapper — uses config-injected style automatically."""
-    return _show_code_inline(code_string, language, line_numbers)
+    return _show_code_inline(code_string, language, line_numbers, wrap=wrap)
 
 
 def show_explanation(text: str):
@@ -108,10 +108,10 @@ class ProjectBlockHelper(BlockHelper):
     """
 
     # Override: Add custom logic before parent call
-    def show_code(self, code_string: str, language: str = "python", line_numbers: bool = True):
+    def show_code(self, code_string: str, language: str = "python", line_numbers: bool = True, wrap: bool = False):
         """Example override: Could add logging, analytics, etc."""
         # Custom logic here if needed
-        return super().show_code(code_string, language, line_numbers)
+        return super().show_code(code_string, language, line_numbers, wrap=wrap)
 
     # New method: Project-specific helper
     def show_advanced_comparison(self, before: str, after: str, label: str = "Comparison"):

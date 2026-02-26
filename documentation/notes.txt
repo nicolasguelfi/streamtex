@@ -1,0 +1,94 @@
+
+
+--------------
+
+Peux-tu vérifier que tous les projets dans le repos utilisent correctement cette  nouvelle fonctionnalité.
+
+Peux-tu vérifier que cette nouvelle fonctionnalité est correctement documentée dans tous les endroits de la documentation et des manuels utilisateurs du projet.
+
+
+--------------
+DONE
+Dans ce projet streamtex
+
+Peux-tu analyser la possibilité de créer plusieurs version des bannières en haut et en bas dans le mode paginé.
+J'ai en tête le style suivant ::
+- Le style actuel bien visible
+- Un style plus discret avec juste un petit bandeau peu épais avec une version avec la même couleur rouge et une version gris clair
+- Un style sans rien du tout
+
+Dans les trois cas, le comportement ne doit pas être changé.
+Dans les deux premiers cas, il faudrait Utiliser un module générique, permettant de définir le mode d'affichage, la couleur, la hauteur, le contenu.
+
+Analyse l'ensemble et fais-moi des propositions. Ne touche pas le code.
+
+
+--------------
+DONE
+Dans ce projet streamtex
+Il y a De nombreux fragments de code dans les différents manuel, utilisateurs d'un document documentation.
+
+J'ai remarqué que lors de l'affichage sur téléphone mobile, les zones d'affichage du code ne sont pas Adaptative à la largeur de l'écran ni à la dimension de l'écran. Et qu'il n'y a pas text wrap Automatique.
+
+Pourrais-tu analyser toute la librairie pour voir quelles sont les mécanismes Concernées ou possible, et fais-moi des propositions pour rendre l'expérience utilisateur plus agréable, que quelque soit le terminal qui est utilisé et quelque soit la dimension.
+
+Ne touche pas le code pour l'instant.
+
+
+--------------
+DONE
+TODO
+Dans ce projet streamtex
+ j'ai remarqué dans tous les projets des manuels utilisateurs de la documentation, la première page qui est affichée n'a pas de nom, n'apparaît pas dans la liste en mode paginé, Et lorsque on navigue à la deuxième page, le retour en arrière affiche le texte "
+
+--------------
+DONE
+TODO
+Dans ce projet streamtex
+
+Peux-tu t'assurer que le modèle de projets "template" Streamtex est bien le plus exhaustif complet pour illustrer tous les éléments génériques Et Configurables De la Librairie. Le but de ce projet template est d'être exhaustif sur les composants et les configurations importantes lorsqu'on crée un nouveau projet, Mais aussi, son but est de pouvoir être réutilisé directement comme point de départ pour la création de tout nouveau projet par les utilisateurs.
+
+Afin d' illustrer un projet simple et un projet complexe Avec une collection de documents et des blocks partagés, peut-être devrions-nous créer deux templates ?
+
+Une autre alternative serait d'utiliser les manuels utilisateurs comme modèle réutilisable. Cela éviterait de devoir maintenir plusieurs templates.
+Nous pourrions écrire un petit script qui génère les deux dossiers pour les template simples et avancer à partir du contenu des projets d'Emmanuel utilisateur. Ainsi, plus la Librairie se développe plus nous allons maintenir les projets de la documentation et nous pourrions nous en servir pour générer les projets modèles ?
+
+Analyse la situation, fais-moi des propositions, ne touche pas le code.
+
+
+--------------
+DONE
+TODO
+Dans ce projet streamtex
+
+
+--------------
+DONE
+TODO
+Dans ce projet streamtex
+
+
+--------------
+DONE
+TODO
+Dans ce projet streamtex
+
+
+--------------
+DONE
+TODO
+Dans ce projet streamtex
+
+
+--------------
+DONE
+TODO
+Dans ce projet streamtex
+
+
+--------------
+DONE
+TODO
+Dans ce projet streamtex
+
+

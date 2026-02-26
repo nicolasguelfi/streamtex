@@ -106,7 +106,7 @@ def build():
     st_space("v", 1)
 
     show_code(textwrap.dedent("""\
-        from streamtex import st_book, TOCConfig, MarkerConfig
+        from streamtex import st_book, TOCConfig, MarkerConfig, BannerConfig
 
         marker_config = MarkerConfig(
             auto_marker_on_toc=1,             # Level-1 TOC headings = markers
@@ -120,6 +120,7 @@ def build():
             [...],
             marker_config=marker_config,
             paginate=True,
+            banner=BannerConfig.full(),        # Navigation banner style
         )
     """))
     st_space("v", 2)

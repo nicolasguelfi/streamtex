@@ -208,6 +208,35 @@ stx.st_html('<svg>...</svg>', height=300, light_bg=True)
 - `light_bg` — Forcer le color-scheme light dans l'iframe (défaut : False)
 - `scrolling` — Activer le défilement dans l'iframe (défaut : False)
 
+## 💻 Blocs de Code — `st_code()`
+
+```python
+# Bloc de code basique (taille responsive : desktop 18pt, tablette 14pt, mobile 11pt)
+stx.st_code(style, code="print('hello')", language="python", line_numbers=True)
+
+# Avec retour à la ligne (utile pour JSON, logs, code prose sur mobile)
+stx.st_code(style, code='{"key": "valeur longue..."}', language="json", wrap=True)
+
+# Taille de police personnalisée (remplace le défaut responsive)
+stx.st_code(style, code="print('hello')", font_size="14pt")
+```
+
+**Paramètres :**
+- `style` — Objet Style pour le conteneur
+- `code` — Chaîne de code source
+- `language` — Langage pour la coloration syntaxique (défaut : `"python"`)
+- `line_numbers` — Afficher les numéros de ligne (défaut : `True`)
+- `font_size` — Taille CSS (défaut : responsive via `--stx-code-size`)
+- `wrap` — Si `True`, les longues lignes reviennent à la ligne au lieu de scroller (défaut : `False`)
+
+**Taille responsive** (via variable CSS `--stx-code-size`) :
+
+| Écran | Taille |
+|-------|--------|
+| Desktop (défaut) | 18pt |
+| Tablette (≤1024px) | 14pt |
+| Mobile (≤480px) | 11pt |
+
 ## 🔧 Utilitaires
 
 ### Espacement
@@ -326,6 +355,55 @@ def build():
 
 - `load_atomic_block(name, __file__)` charge `_atomic/{name}.py` relatif à l'appelant
 - Lève `BlockNotFoundError` / `BlockImportError` en cas d'erreur
+
+## 🚩 Bannières de Navigation — `BannerConfig`
+
+Contrôle l'apparence des bannières en mode paginé.
+Trois modes : `FULL` (visible), `COMPACT` (discret), `HIDDEN` (aucun visuel).
+
+```python
+from streamtex import BannerConfig, BannerMode
+
+# Presets
+banner=BannerConfig.full()                    # Défaut — large, arrondi, séparateurs
+banner=BannerConfig.compact()                 # Fin et discret
+banner=BannerConfig.compact_gray()            # Compact gris neutre
+banner=BannerConfig.hidden()                  # Pas de visuel, navigation préservée
+
+# Personnalisation
+banner=BannerConfig(
+    mode=BannerMode.COMPACT,
+    color="#1a5276",
+    text_color="#ecf0f1",
+    padding="8px 20px",
+    show_arrows=False,
+)
+```
+
+**Champs de BannerConfig :**
+
+| Champ | Type | Défaut | Description |
+|-------|------|--------|-------------|
+| `mode` | `BannerMode` | `FULL` | Mode d'affichage (FULL, COMPACT, HIDDEN) |
+| `color` | `str` | `"rgba(211,47,47,0.8)"` | Couleur de fond (CSS) |
+| `text_color` | `str` | `"white"` | Couleur du texte (CSS) |
+| `font_size` | `str \| None` | auto | Taille de police (None = auto selon mode) |
+| `font_weight` | `str \| None` | auto | Graisse de police (None = auto selon mode) |
+| `padding` | `str \| None` | auto | Padding (None = auto selon mode) |
+| `border_radius` | `str \| None` | auto | Rayon de bordure (None = auto selon mode) |
+| `show_title` | `bool` | `True` | Afficher le titre de la page cible |
+| `show_arrows` | `bool` | `True` | Afficher les flèches directionnelles |
+| `show_dividers` | `bool \| None` | auto | Séparateurs entre bannière et contenu |
+
+**Valeurs auto par mode :**
+
+| Champ | FULL | COMPACT |
+|-------|------|---------|
+| font_size | 1.3rem | 0.8rem |
+| font_weight | bold | 500 |
+| padding | 18px 24px | 5px 16px |
+| border_radius | 8px | 4px |
+| show_dividers | True | False |
 
 ## 📌 Notes Importantes
 

@@ -10,7 +10,7 @@ Run with:
 import streamlit as st
 import setup  # noqa: F401 — configures sys.path
 import streamtex as stx
-from streamtex import st_book, TOCConfig, MarkerConfig
+from streamtex import st_book, TOCConfig, MarkerConfig, BannerConfig
 from pathlib import Path
 
 from shared.custom.styles import Styles as s
@@ -81,4 +81,5 @@ st_book([
     # --- Showcase ---
     blocks.bck_showcase_text_generation_all,
 ], toc_config=toc, marker_config=marker_config, paginate=True,
+   banner=BannerConfig.full(),
    inspector=stx.InspectorConfig(enabled=True))

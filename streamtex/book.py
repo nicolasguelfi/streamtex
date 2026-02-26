@@ -12,6 +12,7 @@ from streamlit.delta_generator import DeltaGenerator as Delta
 
 from . import toc as _toc_mod
 from .auth import _password_gate
+from .banner import BannerConfig, BannerMode, _render_banner
 from .enums import Tags
 from .export import ExportConfig, generate_export_html, is_export_active, reset_export_buffer
 from .marker import MarkerConfig, inject_marker_navigation, marker_entries, reset_marker_registry
@@ -73,23 +74,38 @@ def _inject_bib_preview_if_enabled():
 def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConfig = None, separator=None,
             export: bool = True, export_title: str = "StreamTeX Export",
             paginate: bool = False,
-            monties_color: str = "rgba(211, 47, 47, 0.8)",
+            banner_color: str = "rgba(211, 47, 47, 0.8)",
+            banner: BannerConfig = None,
             bib_sources=None, bib_config=None,
             inspector=None,
             page_width: int = 90,
-            *args, **kwargs):
+            *args, monties_color: str = None, **kwargs):
     """Generates a web page e-book from a list of block modules.
 
     :param separator: Optional module with a build() function, rendered between each block.
     :param export: If True, enables HTML export with a download button in the sidebar.
     :param export_title: Title used for the exported HTML document.
     :param paginate: If True, renders one block at a time for faster widget interactions.
-    :param monties_color: Background color for paginated navigation banners (CSS value).
+    :param banner_color: Background color for paginated navigation banners (CSS value).
+    :param banner: Optional BannerConfig for full banner customisation (overrides banner_color).
     :param bib_sources: Optional list of paths to .bib, .json, .ris, or .csl-json files.
     :param bib_config: Optional BibConfig to configure bibliography formatting.
     :param inspector: Optional InspectorConfig to enable the block inspector panel.
     :param page_width: Page width as % of browser width (default 90).
     """
+    # --- Resolve banner configuration (3 levels) ---
+    if banner is not None:
+        banner_config = banner
+    elif monties_color is not None:
+        import warnings
+        warnings.warn(
+            "monties_color is deprecated, use banner= instead",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        banner_config = BannerConfig(color=monties_color)
+    else:
+        banner_config = BannerConfig(color=banner_color)
     # --- Password gate (env-driven, no-op locally) ---
     _password_gate()
     # --- Bibliography setup ---
@@ -108,7 +124,7 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
 
     if st.session_state[_STX_VIEW_MODE_KEY] == "Paginated":
         _paginated_book(module_list, toc_config, marker_config, separator,
-                        export, export_title, monties_color, *args,
+                        export, export_title, banner_config, *args,
                         inspector=inspector, page_width=page_width, **kwargs)
         return
 
@@ -584,7 +600,7 @@ def _inject_paginated_nav_js(current_page, total, marker_config,
     """Inject JS for cross-page navigation via hidden buttons.
 
     Navigation mechanisms:
-    - Monties: IntersectionObserver on sentinel auto-triggers next page on wheel
+    - Banner: IntersectionObserver on sentinel auto-triggers next page on wheel
     - Marker callbacks: cross-page marker navigation from marker.py widget
     - Sidebar links: click .stx-page-link (rendered via st.markdown) to change page
     - Hidden buttons: JS finds stx_nav_* buttons and clicks them programmatically
@@ -660,7 +676,7 @@ def _inject_paginated_nav_js(current_page, total, marker_config,
 
     /* -- Scroll reset after page navigation --
        Dual mechanism: explicit _stxScrollReset flag (set by navigateToPage)
-       + page-change detection (_stxPrevPage) which covers Monties button
+       + page-change detection (_stxPrevPage) which covers banner button
        clicks that go through on_click Python callbacks directly.         */
     var needsReset = false;
     if (hostWin._stxScrollReset) {
@@ -687,7 +703,7 @@ def _inject_paginated_nav_js(current_page, total, marker_config,
     }
 
     /* =================================================================
-     * MONTIES — banner clicks + auto-trigger zones
+     * BANNER — banner clicks + auto-trigger zones
      *
      * Bottom: IntersectionObserver on sentinel + wheel deltaY > 0
      * Top:    isAtTop() + wheel deltaY < 0  (800ms startup delay)
@@ -696,17 +712,17 @@ def _inject_paginated_nav_js(current_page, total, marker_config,
     var sentinel = null;
     var prevBanner = null;
     var nextBanner = null;
-    var montiesNextActive = false;
-    var montiesNextTimer = null;
-    var montiesPrevTimer = null;
-    var montiesObs = null;
-    var montiesPrevReady = false;
+    var bannerNextActive = false;
+    var bannerNextTimer = null;
+    var bannerPrevTimer = null;
+    var bannerObs = null;
+    var bannerPrevReady = false;
 
     function isAtTop() { return scrollEl.scrollTop < 15; }
 
     /* Delay top auto-trigger to avoid residual momentum after scroll reset */
-    var montiesReadyTimer = setTimeout(function() {
-        montiesPrevReady = true;
+    var bannerReadyTimer = setTimeout(function() {
+        bannerPrevReady = true;
     }, 800);
 
     /* --- Deferred element lookup (DOM may not be ready on cold start) --- */
@@ -728,24 +744,24 @@ def _inject_paginated_nav_js(current_page, total, marker_config,
     function findElements() {
         /* Sentinel — attach IntersectionObserver on first find */
         if (!sentinel && currentPage < totalPages - 1) {
-            sentinel = hostDoc.getElementById('stx-monties-sentinel');
-            if (sentinel && !montiesObs) {
-                montiesObs = new hostWin.IntersectionObserver(function(entries) {
-                    montiesNextActive = entries[0].isIntersecting;
-                    if (!montiesNextActive) {
-                        clearTimeout(montiesNextTimer); montiesNextTimer = null;
+            sentinel = hostDoc.getElementById('stx-banner-sentinel');
+            if (sentinel && !bannerObs) {
+                bannerObs = new hostWin.IntersectionObserver(function(entries) {
+                    bannerNextActive = entries[0].isIntersecting;
+                    if (!bannerNextActive) {
+                        clearTimeout(bannerNextTimer); bannerNextTimer = null;
                     }
                 }, { threshold: 0.1 });
-                montiesObs.observe(sentinel);
+                bannerObs.observe(sentinel);
             }
         }
         /* Banners — attach click handlers on first find */
         if (!prevBanner) {
-            prevBanner = hostDoc.getElementById('stx-monties-prev');
+            prevBanner = hostDoc.getElementById('stx-banner-prev');
             if (prevBanner) prevBanner.addEventListener('click', prevClick);
         }
         if (!nextBanner) {
-            nextBanner = hostDoc.getElementById('stx-monties-next');
+            nextBanner = hostDoc.getElementById('stx-banner-next');
             if (nextBanner) nextBanner.addEventListener('click', nextClick);
         }
     }
@@ -753,15 +769,15 @@ def _inject_paginated_nav_js(current_page, total, marker_config,
     setTimeout(findElements, 300);
     setTimeout(findElements, 1000);
 
-    function montiesWheel(e) {
+    function bannerWheel(e) {
         if (navigating) return;
 
         /* Bottom: scroll down while sentinel visible → next page */
-        if (e.deltaY > 0 && montiesNextActive) {
-            clearTimeout(montiesPrevTimer); montiesPrevTimer = null;
-            if (!montiesNextTimer) {
-                montiesNextTimer = setTimeout(function() {
-                    if (!montiesNextActive || navigating) return;
+        if (e.deltaY > 0 && bannerNextActive) {
+            clearTimeout(bannerPrevTimer); bannerPrevTimer = null;
+            if (!bannerNextTimer) {
+                bannerNextTimer = setTimeout(function() {
+                    if (!bannerNextActive || navigating) return;
                     var np = currentPage + 1;
                     hostWin._stxMarkerStartIdx =
                         pageFirstMarker[np] !== undefined ? pageFirstMarker[np] : 0;
@@ -772,11 +788,11 @@ def _inject_paginated_nav_js(current_page, total, marker_config,
         }
 
         /* Top: scroll up while at top of page → prev page */
-        if (e.deltaY < 0 && montiesPrevReady
+        if (e.deltaY < 0 && bannerPrevReady
                 && currentPage > 0 && isAtTop()) {
-            clearTimeout(montiesNextTimer); montiesNextTimer = null;
-            if (!montiesPrevTimer) {
-                montiesPrevTimer = setTimeout(function() {
+            clearTimeout(bannerNextTimer); bannerNextTimer = null;
+            if (!bannerPrevTimer) {
+                bannerPrevTimer = setTimeout(function() {
                     if (navigating || !isAtTop()) return;
                     var pp = currentPage - 1;
                     hostWin._stxMarkerStartIdx =
@@ -788,12 +804,12 @@ def _inject_paginated_nav_js(current_page, total, marker_config,
         }
 
         /* Not at a boundary: cancel timers */
-        clearTimeout(montiesNextTimer); montiesNextTimer = null;
-        clearTimeout(montiesPrevTimer); montiesPrevTimer = null;
+        clearTimeout(bannerNextTimer); bannerNextTimer = null;
+        clearTimeout(bannerPrevTimer); bannerPrevTimer = null;
     }
 
     /* Wheel listener — handles both top and bottom auto-trigger */
-    hostDoc.addEventListener('wheel', montiesWheel, { passive: true });
+    hostDoc.addEventListener('wheel', bannerWheel, { passive: true });
 
     /* --- Cross-page marker callbacks (used by marker.py widget) --- */
     hostWin._stxMarkerGoToPage = function(page) {
@@ -844,11 +860,11 @@ def _inject_paginated_nav_js(current_page, total, marker_config,
 
     /* --- Cleanup --- */
     hostWin._stxPaginatedCleanup = function() {
-        if (montiesObs) montiesObs.disconnect();
-        hostDoc.removeEventListener('wheel', montiesWheel);
-        clearTimeout(montiesNextTimer);
-        clearTimeout(montiesPrevTimer);
-        clearTimeout(montiesReadyTimer);
+        if (bannerObs) bannerObs.disconnect();
+        hostDoc.removeEventListener('wheel', bannerWheel);
+        clearTimeout(bannerNextTimer);
+        clearTimeout(bannerPrevTimer);
+        clearTimeout(bannerReadyTimer);
         if (prevBanner) prevBanner.removeEventListener('click', prevClick);
         if (nextBanner) nextBanner.removeEventListener('click', nextClick);
         hostDoc.removeEventListener('click', linkClick, true);
@@ -869,7 +885,7 @@ def _inject_paginated_nav_js(current_page, total, marker_config,
 
 
 def _paginated_book(module_list, toc_config, marker_config, separator,
-                    export, export_title, monties_color, *args, inspector=None, page_width=100, **kwargs):
+                    export, export_title, banner_config: BannerConfig, *args, inspector=None, page_width=100, **kwargs):
     """Paginated rendering — only renders one block per rerun."""
     start_time = time.time()
     logger.debug("Starting st_book (paginated)...")
@@ -947,40 +963,34 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
                     "page": entry.get("page_idx", 0),
                 })
 
-    # --- Monties — page titles for navigation labels ---
+    # --- Banner — page titles for navigation labels ---
     page_titles = _get_page_titles(cache, total)
 
-    # Monties — top banner (previous section, clickable via JS)
-    if current_page > 0:
+    # Banner — top (previous section, clickable via JS)
+    if current_page > 0 and banner_config.mode != BannerMode.HIDDEN:
         _prev = page_titles[current_page - 1]
-        st.markdown(
-            f'<div id="stx-monties-prev" style="background:{monties_color};color:white;'
-            f'font-weight:bold;font-size:1.3rem;padding:18px 24px;text-align:center;'
-            f'cursor:pointer;border-radius:8px;user-select:none;">'
-            f'◂&ensp;{_prev}</div>',
-            unsafe_allow_html=True,
-        )
-        st.divider()
+        _render_banner("stx-banner-prev", _prev, "◂", banner_config)
+        css = banner_config._resolve()
+        if css and css["show_dividers"]:
+            st.divider()
 
     # --- Render current block ---
     st_include(module_list[current_page], *args, _inspector_config=inspector, **kwargs)
 
-    # Monties — bottom banner (next section, clickable via JS)
+    # Banner — bottom (next section, clickable via JS)
     if current_page < total - 1:
         _next = page_titles[current_page + 1]
-        st.divider()
-        st.markdown(
-            f'<div id="stx-monties-next" style="background:{monties_color};color:white;'
-            f'font-weight:bold;font-size:1.3rem;padding:18px 24px;text-align:center;'
-            f'cursor:pointer;border-radius:8px;user-select:none;">'
-            f'{_next}&ensp;▸</div>',
-            unsafe_allow_html=True,
-        )
+        if banner_config.mode != BannerMode.HIDDEN:
+            css = banner_config._resolve()
+            if css and css["show_dividers"]:
+                st.divider()
+            _render_banner("stx-banner-next", _next, "▸", banner_config)
         # Buffer zone before auto-trigger sentinel (800px)
         st_space("v", "800px")
-        # Sentinel watched by IntersectionObserver in paginated nav JS
+    # Sentinel always rendered (even in HIDDEN mode) for auto-scroll JS
+    if current_page < total - 1:
         st.markdown(
-            '<div id="stx-monties-sentinel" style="height:1px;"></div>',
+            '<div id="stx-banner-sentinel" style="height:1px;"></div>',
             unsafe_allow_html=True,
         )
 

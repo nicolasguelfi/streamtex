@@ -110,7 +110,7 @@ def build():
         # book.py
         import streamlit as st
         import setup
-        from streamtex import st_book, TOCConfig
+        from streamtex import st_book, TOCConfig, BannerConfig
         import blocks
 
         st.set_page_config(page_title="My Project", layout="wide")
@@ -119,7 +119,8 @@ def build():
 
         st_book([
             blocks.bck_welcome,
-        ], toc_config=toc, paginate=True)
+        ], toc_config=toc, paginate=True,
+           banner=BannerConfig.full())
     """))
     st_space("v", 2)
 

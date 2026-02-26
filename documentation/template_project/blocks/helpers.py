@@ -95,14 +95,14 @@ set_block_helper_config(ProjectBlockHelperConfig())
 # These are optional! You can use them OR call streamtex functions directly.
 # They add nothing, just convenience if you prefer local imports.
 
-def show_code(code_string: str, language: str = "python", line_numbers: bool = True):
+def show_code(code_string: str, language: str = "python", line_numbers: bool = True, wrap: bool = False):
     """Shortcut: uses config-injected style automatically (via _show_code)."""
-    return _show_code(code_string, language, line_numbers)
+    return _show_code(code_string, language, line_numbers, wrap=wrap)
 
 
-def show_code_inline(code_string: str, language: str = "python", line_numbers: bool = True):
+def show_code_inline(code_string: str, language: str = "python", line_numbers: bool = True, wrap: bool = False):
     """Shortcut: uses config-injected style automatically."""
-    return _show_code_inline(code_string, language, line_numbers)
+    return _show_code_inline(code_string, language, line_numbers, wrap=wrap)
 
 
 def show_explanation(text: str):

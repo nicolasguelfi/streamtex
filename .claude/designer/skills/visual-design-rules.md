@@ -46,11 +46,12 @@ show_explanation(textwrap.dedent("""\
 | large (32pt) | `s.large` | Body text, explanations |
 | big (24pt) | `s.big` | Secondary text |
 | medium (16pt) | `s.medium` | Small annotations |
-| Code | 20pt | `st_code()` default |
+| Code | Responsive (18pt) | `st_code()` via `--stx-code-size` variable |
 
 - All body text in slides uses `s.large` (32pt).
 - All label styles (explanation, details, tip, warning) use 32pt.
-- Code blocks render at 20pt via `st_code(font_size="20pt")`.
+- Code blocks use the responsive CSS variable `--stx-code-size` (desktop 18pt, tablet 14pt, mobile 11pt).
+- Use `wrap=True` for JSON/logs where alignment doesn't matter; keep `wrap=False` (default) for aligned code.
 
 ## 4. Canonical Section Structure
 
@@ -120,7 +121,7 @@ with st_block(s.project.containers.bad_callout):
   - `st_list`: list_type=lt.unordered, l_style=none, li_style=none
   - `st_image`: width="100%", height="auto"
   - `st_space`: direction="v", size="1em"
-  - `st_code`: language="python", line_numbers=True, font_size="20pt"
+  - `st_code`: language="python", line_numbers=True, font_size="var(--stx-code-size, 18pt)", wrap=False
 
 ## 8. Block File Structure
 

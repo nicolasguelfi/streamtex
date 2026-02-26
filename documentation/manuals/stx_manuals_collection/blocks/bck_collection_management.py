@@ -67,7 +67,7 @@ def build():
     st_space("v", 1)
 
     with st_block(bs.code_box):
-        st_code("python", """\
+        st_code(code="""\
 from streamtex.collection import CollectionConfig, ProjectMeta
 
 # Create a collection configuration
@@ -85,7 +85,7 @@ config.projects["intro-course"] = ProjectMeta(
     project_url="http://localhost:8502",
     order=1,
 )
-""")
+""", language="python")
 
     st_space("v", 2)
 
@@ -119,7 +119,7 @@ config.projects["intro-course"] = ProjectMeta(
     st_space("v", 1)
 
     with st_block(bs.code_box):
-        st_code("toml", """\
+        st_code(code="""\
 [collection]
 title = "StreamTeX Training Collection"
 description = "Introduction and Advanced courses"
@@ -138,7 +138,7 @@ description = "Master advanced concepts"
 cover = "static/images/covers/advanced.png"
 project_url = "http://localhost:8503"
 order = 2
-""")
+""", language="toml")
 
     st_space("v", 2)
 
@@ -153,7 +153,7 @@ order = 2
     st_space("v", 1)
 
     with st_block(bs.code_box):
-        st_code("python", """\
+        st_code(code="""\
 from streamtex.collection import CollectionConfig
 
 # Load from TOML file
@@ -163,7 +163,7 @@ config = CollectionConfig.from_toml(str(config_path))
 # Use in st_book() or st_collection()
 from streamtex import st_collection
 st_collection(config=config, home_styles=Styles)
-""")
+""", language="python")
 
     st_space("v", 2)
 
@@ -196,7 +196,7 @@ st_collection(config=config, home_styles=Styles)
     st_space("v", 1)
 
     with st_block(bs.code_box):
-        st_code("python", """\
+        st_code(code="""\
 # book.py
 import streamlit as st
 from streamtex import st_collection, CollectionConfig
@@ -214,7 +214,7 @@ config = CollectionConfig.from_toml(str(config_path))
 
 # Display collection with home_styles
 st_collection(config=config, home_styles=s)
-""")
+""", language="python")
 
     st_space("v", 2)
 
@@ -229,7 +229,7 @@ st_collection(config=config, home_styles=s)
     st_space("v", 1)
 
     with st_block(bs.code_box):
-        st_code("python", """\
+        st_code(code="""\
 # Custom collection block
 import streamlit as st
 from streamtex import st_grid, st_block, st_write, st_book
@@ -250,7 +250,7 @@ def build():
                 st_write(s.Large, project.title)
                 st_write(s.medium, project.description)
                 st.link_button("Open", project.project_url)
-""")
+""", language="python")
 
     st_space("v", 2)
 

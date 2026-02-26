@@ -77,7 +77,8 @@ def show_code(
     code_string: str,
     language: str = "python",
     line_numbers: bool = True,
-    style: Optional[object] = None
+    style: Optional[object] = None,
+    wrap: bool = False,
 ) -> None:
     """Display syntax-highlighted code in a styled box.
 
@@ -91,6 +92,7 @@ def show_code(
         language: Programming language for syntax highlighting
         line_numbers: Show line numbers
         style: Optional style override
+        wrap: When True, long lines wrap instead of scrolling horizontally
 
     Example:
         # Simple usage (no style)
@@ -104,14 +106,15 @@ def show_code(
         show_code("print('hello')")  # Uses MyConfig.get_code_style()
     """
     resolved_style = style or _block_helper_config.get_code_style()
-    stx.st_code(resolved_style, code=code_string, language=language, line_numbers=line_numbers)
+    stx.st_code(resolved_style, code=code_string, language=language, line_numbers=line_numbers, wrap=wrap)
 
 
 def show_code_inline(
     code_string: str,
     language: str = "python",
     line_numbers: bool = True,
-    style: Optional[object] = None
+    style: Optional[object] = None,
+    wrap: bool = False,
 ) -> None:
     """Display code without box wrapper — for use inside containers.
 
@@ -125,9 +128,10 @@ def show_code_inline(
         language: Programming language for syntax highlighting
         line_numbers: Show line numbers
         style: Optional style override
+        wrap: When True, long lines wrap instead of scrolling horizontally
     """
     resolved_style = style or _block_helper_config.get_code_inline_style()
-    stx.st_code(resolved_style, code=code_string, language=language, line_numbers=line_numbers)
+    stx.st_code(resolved_style, code=code_string, language=language, line_numbers=line_numbers, wrap=wrap)
 
 
 def show_explanation(text: str, style: Optional[object] = None) -> None:
@@ -217,20 +221,22 @@ class BlockHelper:
         code_string: str,
         language: str = "python",
         line_numbers: bool = True,
-        style: Optional[object] = None
+        style: Optional[object] = None,
+        wrap: bool = False,
     ) -> None:
         """Delegate to module-level show_code()."""
-        show_code(code_string, language, line_numbers, style)
+        show_code(code_string, language, line_numbers, style, wrap=wrap)
 
     def show_code_inline(
         self,
         code_string: str,
         language: str = "python",
         line_numbers: bool = True,
-        style: Optional[object] = None
+        style: Optional[object] = None,
+        wrap: bool = False,
     ) -> None:
         """Delegate to module-level show_code_inline()."""
-        show_code_inline(code_string, language, line_numbers, style)
+        show_code_inline(code_string, language, line_numbers, style, wrap=wrap)
 
     def show_explanation(
         self,

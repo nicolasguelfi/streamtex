@@ -51,8 +51,12 @@ def _highlight_code(code: str, language: str, line_numbers: bool,
         return (
             f'<pre style="font-family: monospace; background-color: #272822; '
             f'color: #F8F8F2; padding: 12pt; border-radius: 6px; '
-            f'overflow-x: auto; margin: 0; font-size: {font_size};">{body}</pre>'
+            f'overflow-x: auto; margin: 0; font-size: {font_size};'
+            f' white-space: pre;">{body}</pre>'
         )
+
+
+_CODE_SIZE_DEFAULT = "var(--stx-code-size, 18pt)"
 
 
 def st_code(
@@ -60,8 +64,9 @@ def st_code(
     code: str = "",
     language: str = "python",
     line_numbers: bool = True,
-    font_size: str = "20pt",
+    font_size: str = _CODE_SIZE_DEFAULT,
     line_number_color: str = "#6A9BC5",
+    wrap: bool = False,
 ):
     """Renders syntax-highlighted code via st.html() using Pygments.
 
@@ -69,8 +74,13 @@ def st_code(
     :param code: The source code string to display.
     :param language: The programming language for syntax highlighting.
     :param line_numbers: Whether to show line numbers.
-    :param font_size: CSS font size for the code text (default "20pt").
+    :param font_size: CSS font size for the code text.
+        Defaults to the responsive CSS variable ``--stx-code-size``
+        (desktop 18pt, tablet 14pt, mobile 11pt).
     :param line_number_color: CSS color for line numbers (default "#6A9BC5").
+    :param wrap: When True, long lines wrap instead of scrolling horizontally.
+        Useful for JSON, logs, or prose-like code.  Keep False (default) for
+        code where horizontal alignment matters (tables, diffs).
     """
     highlighted = _highlight_code(code, language, line_numbers, font_size)
 
@@ -83,9 +93,15 @@ def st_code(
             f"</style>"
         )
 
+    wrap_css = (
+        "white-space: pre-wrap; word-break: break-word; overflow-wrap: break-word;"
+        if wrap
+        else ""
+    )
+
     container_style = (
         f"{style}; text-align: left; overflow-x: auto; "
-        f"color: #F8F8F2; font-size: {font_size};"
+        f"color: #F8F8F2; font-size: {font_size}; {wrap_css}"
     )
     final_html = f'{line_no_css}<div style="{container_style}">{highlighted}</div>'
     _render(final_html)

@@ -107,7 +107,8 @@ class ListController:
 def st_list(
     list_type: ListType = ListTypes.unordered,
     l_style: Style = s.none,
-    li_style: Style = s.none
+    li_style: Style = s.none,
+    align: str = None,
 ):
     """
     A context manager representing a list (ordered or unordered) with optional styles and support for nested lists.
@@ -115,6 +116,9 @@ def st_list(
     :param list_type: The type of list, either ordered (`<ol>`) or unordered (`<ul>`). Defaults to unordered.
     :param l_style: A `Style` object for the entire list. Supports custom list-level styles for `ListStyle`.
     :param li_style: A `Style` object for individual list items. Defaults to `StxStyles.none`.
+    :param align: Optional alignment for list items as a block (e.g. ``"center"``).
+        When set, the list container uses ``align-items: <align>`` so that
+        bullet + text form a centered unit.  Defaults to ``None`` (no change).
 
     Notes:
     - Supports nested lists recursively, with the nesting level affecting the style if `l_style` is a `ListStyle`.
@@ -164,12 +168,14 @@ def st_list(
         list_id = generate_key("ul")
         tag = "ol" if is_ordered else "ul"
 
+        width_css = "width: fit-content; margin-inline: auto;" if align == "center" else "width: 100%;"
+
         css = f"""
         <style>
             div[data-testid="stVerticalBlock"]:has(> .element-container .stHtml span.{list_id}) {{
                 counter-reset: streamtex-counter;
                 gap: 0.2rem;
-                width: 100%;
+                {width_css}
             }}
         </style>
         """
@@ -179,7 +185,8 @@ def st_list(
         if is_export_active():
             export_push_wrapper(f'<{tag} style="{l_style}">')
 
-        with st_block(style=l_style, _export_wrapper=False):
+        _list_base = Style("text-align: left;", "stx-list-base")
+        with st_block(style=_list_base + l_style, _export_wrapper=False):
             st.html(f'<span class="{list_id}" style="display:none"></span>')
             yield ListController(li_style=li_style, bullet_content=bullet_content, is_ordered=is_ordered)
 

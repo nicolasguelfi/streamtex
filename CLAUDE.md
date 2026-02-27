@@ -40,7 +40,7 @@ See `documentation/coding_standards.md` for the full reference. Key rules:
 - `streamtex/write.py` — Text rendering (st_write with tuple support for inline mixed styles)
 - `streamtex/grid.py` — CSS Grid layout (st_grid with responsive columns)
 - `streamtex/container.py` — st_block, st_span context managers
-- `streamtex/list.py` — List rendering (st_list with ul/ol support)
+- `streamtex/list.py` — List rendering (st_list with ul/ol support, align="center" for centered lists)
 - `streamtex/export.py` — st_html: raw HTML bridge (inline or iframe with auto font injection)
 
 ### Organization & Navigation

@@ -81,6 +81,25 @@ with st_block(s.center_txt):
         li_style=bs.content) as l:
         with l.item(): st_write("First item")
         with l.item(): st_write("Second item")
+
+# Centered list (bullet + text centered as a unit)
+with st_block(s.center_txt):
+    with st_list(
+        list_type=lt.unordered,
+        li_style=bs.content,
+        align="center") as l:
+        with l.item(): st_write("Centered item")
+```
+
+### st_list — Full Signature
+
+```python
+st_list(
+    list_type=lt.unordered,             # lt.ordered or lt.unordered
+    l_style=s.none,                     # Style for the list container (ListStyle for custom symbols)
+    li_style=s.none,                    # Style for individual list items
+    align=None,                         # "center" to center list block, None for left (default)
+)
 ```
 
 ### st_write — Full Signature

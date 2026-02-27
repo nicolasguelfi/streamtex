@@ -38,7 +38,7 @@ def build():
         """))
         st_space("v", 1)
 
-        with st_list(list_type=lt.unordered, li_style=bs.list_item) as l:
+        with st_list(list_type=lt.unordered, li_style=bs.list_item, align="center") as l:
             with l.item(): st_write("First unordered item")
             with l.item(): st_write("Second unordered item")
             with l.item(): st_write("Third unordered item")
@@ -61,7 +61,7 @@ def build():
         """))
         st_space("v", 1)
 
-        with st_list(list_type=lt.ordered, li_style=bs.list_item) as l:
+        with st_list(list_type=lt.ordered, li_style=bs.list_item, align="center") as l:
             with l.item(): st_write("Step one")
             with l.item(): st_write("Step two")
             with l.item(): st_write("Step three")
@@ -87,7 +87,7 @@ def build():
         """))
         st_space("v", 1)
 
-        with st_list(list_type=lt.unordered, li_style=bs.list_item) as l:
+        with st_list(list_type=lt.unordered, li_style=bs.list_item, align="center") as l:
             with l.item():
                 st_write("Parent item A")
                 with st_list(list_type=lt.unordered,
@@ -102,12 +102,49 @@ def build():
             with l.item(): st_write("Parent item B")
         st_space("v", 2)
 
-        # ListStyle with custom symbols (g_docs)
-        st_write(bs.sub, "ListStyle with custom symbols", toc_lvl="+1")
+        # ListStyle with custom symbols - centered
+        st_write(bs.sub, "ListStyle with custom symbols - centered", toc_lvl="+1")
         st_space("v", 1)
 
         show_explanation(textwrap.dedent("""\
             Use ListStyle for custom bullet symbols at each nesting level.
+            With align="center", the list block is centered.
+        """))
+        st_space("v", 1)
+
+        show_code(textwrap.dedent("""\
+            with st_list(list_type=lt.unordered,
+                         l_style=s.container.lists.g_docs,
+                         li_style=bs.list_item,
+                         align="center") as l:
+                with l.item(): st_write("Level 1 symbol")
+        """))
+        st_space("v", 1)
+
+        with st_list(list_type=lt.unordered,
+                     l_style=s.container.lists.g_docs,
+                     li_style=bs.list_item,
+                     align="center") as l:
+            with l.item():
+                st_write("Level 1 symbol")
+                with st_list(list_type=lt.unordered,
+                             l_style=s.container.lists.g_docs,
+                             li_style=bs.list_item) as l2:
+                    with l2.item():
+                        st_write("Level 2 symbol")
+                        with st_list(list_type=lt.unordered,
+                                     l_style=s.container.lists.g_docs,
+                                     li_style=bs.list_item) as l3:
+                            with l3.item(): st_write("Level 3 symbol")
+            with l.item(): st_write("Another level 1")
+        st_space("v", 2)
+
+        # ListStyle with custom symbols - aligned left
+        st_write(bs.sub, "ListStyle with custom symbols - aligned left", toc_lvl="+1")
+        st_space("v", 1)
+
+        show_explanation(textwrap.dedent("""\
+            Without align, the list stays left-aligned with normal sub-item indentation.
         """))
         st_space("v", 1)
 
@@ -158,7 +195,8 @@ def build():
 
         with st_list(list_type=lt.ordered,
                      l_style=s.container.lists.ordered_lowercase,
-                     li_style=bs.list_item) as l:
+                     li_style=bs.list_item,
+                     align="center") as l:
             with l.item(): st_write("Item a")
             with l.item(): st_write("Item b")
             with l.item(): st_write("Item c")
@@ -179,7 +217,7 @@ def build():
         """))
         st_space("v", 1)
 
-        with st_list(list_type=lt.unordered, li_style=bs.list_item) as l:
+        with st_list(list_type=lt.unordered, li_style=bs.list_item, align="center") as l:
             with l.item(): st_write("Normal item")
             with l.item(style=s.text.colors.coral):
                 st_write("Highlighted item (coral override)")

@@ -53,7 +53,24 @@ with st_block(s.center_txt):
         with l.item(): st_write("Premier élément")
         with l.item(): st_write("Deuxième élément")
 
+# Liste centrée (puce + texte centrés en bloc)
+with st_block(s.center_txt):
+    with st_list(
+        list_type=lt.unordered,
+        li_style=bs.content,
+        align="center") as l:
+        with l.item(): st_write("Élément centré")
+```
 
+### st_list — Signature Complète
+
+```python
+st_list(
+    list_type=lt.unordered,             # lt.ordered ou lt.unordered
+    l_style=s.none,                     # Style du conteneur liste (ListStyle pour symboles custom)
+    li_style=s.none,                    # Style des items individuels
+    align=None,                         # "center" pour centrer le bloc liste, None pour gauche (défaut)
+)
 ```
 
 ### Images et Médias
@@ -276,7 +293,7 @@ def build():
     with st_block(bs.center_txt):
         st_write(bs.green_title, "Documentation")
         st_space(size=3)
-        with st_list(lt.ordered, bs.content) as l:
+        with st_list(lt.ordered, li_style=bs.content, align="center") as l:
             with l.item(): st_write("Premier point")
             with l.item(): st_write("Deuxième point")
 
@@ -311,7 +328,8 @@ def build():
     with st_block(s.center_txt):
         with st_list(
             list_type=lt.ordered,
-            li_style=bs.content) as l:
+            li_style=bs.content,
+            align="center") as l:
             with l.item(): st_write("Section 1")
             with l.item(): st_write("Section 2")
             with l.item(): st_write("Section 3")

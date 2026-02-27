@@ -499,6 +499,57 @@ class TestListOrderedCounter:
                        "counter(streamtex-counter, decimal)" in controller.bullet_content
 
 
+class TestListAlign:
+    """Tests for the align parameter of st_list."""
+
+    def test_st_list_default_align_none(self, mock_streamlit):
+        """Test that align defaults to None — list uses width: 100%."""
+        with patch("streamtex.list.st_block") as mock_st_block, \
+             patch("streamtex.list.st.html") as mock_html, \
+             patch("streamtex.list.is_export_active", return_value=False):
+
+            mock_st_block.return_value.__enter__ = MagicMock(return_value=None)
+            mock_st_block.return_value.__exit__ = MagicMock(return_value=False)
+
+            with st_list() as controller:
+                pass
+
+            css_call = mock_html.call_args_list[0][0][0]
+            assert "width: 100%" in css_call
+            assert "fit-content" not in css_call
+
+    def test_st_list_align_center(self, mock_streamlit):
+        """Test that align='center' uses fit-content + margin-inline: auto."""
+        with patch("streamtex.list.st_block") as mock_st_block, \
+             patch("streamtex.list.st.html") as mock_html, \
+             patch("streamtex.list.is_export_active", return_value=False):
+
+            mock_st_block.return_value.__enter__ = MagicMock(return_value=None)
+            mock_st_block.return_value.__exit__ = MagicMock(return_value=False)
+
+            with st_list(align="center") as controller:
+                pass
+
+            css_call = mock_html.call_args_list[0][0][0]
+            assert "width: fit-content" in css_call
+            assert "margin-inline: auto" in css_call
+            assert "width: 100%" not in css_call
+
+    def test_st_list_align_does_not_affect_controller(self, mock_streamlit):
+        """Test that align parameter does not change the ListController."""
+        with patch("streamtex.list.st_block") as mock_st_block, \
+             patch("streamtex.list.st.html") as mock_html, \
+             patch("streamtex.list.is_export_active", return_value=False):
+
+            mock_st_block.return_value.__enter__ = MagicMock(return_value=None)
+            mock_st_block.return_value.__exit__ = MagicMock(return_value=False)
+
+            with st_list(align="center") as controller:
+                assert isinstance(controller, ListController)
+                assert controller.bullet_content == "'•'"
+                assert controller.is_ordered is False
+
+
 class TestListCssGeneration:
     """Tests for CSS generation in st_list."""
 

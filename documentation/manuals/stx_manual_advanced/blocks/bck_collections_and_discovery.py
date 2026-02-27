@@ -4,10 +4,11 @@ This block explains the collections system for organizing multiple projects.
 Collections enable project discovery, navigation, and organization.
 """
 
-from streamtex import st_write, st_block, st_space, Style
-from streamtex.enums import Tags as t
 from custom.styles import Styles as s
-from blocks.helpers import show_code, show_explanation, show_details
+
+from blocks.helpers import show_code, show_details, show_explanation
+from streamtex import Style, st_block, st_space, st_write
+from streamtex.enums import Tags as t
 
 
 class BlockStyles:
@@ -41,9 +42,12 @@ Think: Coursera with multiple courses, or a documentation portal with multiple d
 
     with st_block(bs.feature_box):
         st_write(s.large, """
-A **Collection** is a container for multiple StreamTeX projects.
-Each project is a complete application (book, course, documentation).
-The collection provides discovery, navigation, and project management.
+A **Collection** is a hub for organizing and launching multiple StreamTeX projects.
+It provides a centralized entry point where users can discover and access
+different courses, tutorials, or applications.
+
+Each project is a complete, self-contained application (book, course, documentation)
+running on its own port.
 
 Examples:
 - Training platform with multiple courses
@@ -59,55 +63,51 @@ Examples:
     st_write(s.project.titles.section_title, "Collections Components", toc_lvl="+1")
     st_space("v", 1)
 
-    st_write(s.project.titles.feature_title, "1. st_collection() - Main Function")
+    st_write(s.project.titles.feature_title, "1. CollectionConfig - Configuration Class")
+    show_code("""
+from streamtex.collection import CollectionConfig, ProjectMeta
+
+config = CollectionConfig(
+    title="My Learning Hub",
+    description="Curated courses for learning StreamTeX",
+    cards_per_row=3,  # Number of cards per row in the grid
+)
+
+# Add projects to the collection
+config.projects["intro-course"] = ProjectMeta(
+    title="Introduction to StreamTeX",
+    description="Learn the basics",
+    cover="static/images/covers/intro.png",
+    project_url="http://localhost:8502",
+    order=1,
+)
+    """, language="python")
+
+    st_space("v", 1)
+
+    st_write(s.project.titles.feature_title, "2. ProjectMeta - Project Metadata")
+    show_code("""
+from streamtex.collection import ProjectMeta
+
+project = ProjectMeta(
+    title="Advanced Python",          # Project name (displayed on card)
+    description="Deep dive into Python",  # Brief overview
+    cover="static/images/cover.png",  # Path to thumbnail image
+    project_url="http://localhost:8503",  # URL where project runs
+    order=1,                          # Sort order in the collection
+)
+    """, language="python")
+
+    st_space("v", 1)
+
+    st_write(s.project.titles.feature_title, "3. st_collection() - Automatic UI")
     show_code("""
 from streamtex import st_collection, CollectionConfig
 
-config = CollectionConfig(
-    title="My Training Platform",
-    description="Multiple courses in one place",
-    projects=[
-        # List of projects
-    ]
-)
+config = CollectionConfig.from_toml("collection.toml")
 
-st_collection(config)
-    """, language="python")
-
-    st_space("v", 1)
-
-    st_write(s.project.titles.feature_title, "2. CollectionConfig - Configuration Class")
-    show_code("""
-from streamtex import CollectionConfig, ProjectMeta
-
-config = CollectionConfig(
-    title="Learning Hub",
-    description="Organized learning platform",
-    projects=[
-        ProjectMeta(name="Python Basics", path="projects/python"),
-        ProjectMeta(name="Web Development", path="projects/web"),
-    ],
-    theme="light",  # or "dark"
-    show_search=True,  # Enable search across projects
-)
-    """, language="python")
-
-    st_space("v", 1)
-
-    st_write(s.project.titles.feature_title, "3. ProjectMeta - Project Metadata")
-    show_code("""
-from streamtex import ProjectMeta
-
-project = ProjectMeta(
-    name="Advanced Python",
-    path="projects/advanced-python",
-    description="Deep dive into Python",
-    icon="🐍",
-    author="John Doe",
-    version="1.0.0",
-    tags=["python", "advanced", "programming"],
-    color="#3776ab"  # Project accent color
-)
+# Automatic UI: renders title, description, and project cards grid
+st_collection(config=config, home_styles=Styles)
     """, language="python")
 
     st_space("v", 2)
@@ -118,163 +118,176 @@ project = ProjectMeta(
     st_write(s.project.titles.section_title, "Configuration Methods", toc_lvl="+1")
     st_space("v", 1)
 
-    st_write(s.project.titles.feature_title, "Method 1: Programmatic (Python)")
-    show_code("""
-from streamtex import st_collection, CollectionConfig, ProjectMeta
+    st_write(s.project.titles.feature_title, "Method 1: TOML Configuration File (Recommended)")
+    st_space("v", 0.5)
+    st_write(s.medium, "Define your collection declaratively in a TOML file:")
+    st_space("v", 1)
 
-projects = [
-    ProjectMeta(
-        name="Introduction",
-        path="projects/intro",
-        description="Get started with basics"
-    ),
-    ProjectMeta(
-        name="Advanced",
-        path="projects/advanced",
-        description="Deep dive into concepts"
-    ),
-    ProjectMeta(
-        name="Reference",
-        path="projects/reference",
-        description="API and concepts reference"
-    ),
-]
+    show_code("""
+# collection.toml
+[collection]
+title = "StreamTeX Training Collection"
+description = "Introduction, Advanced, and Deployment courses"
+cards_per_row = 3
+
+[projects.intro]
+title = "Introduction to StreamTeX"
+description = "Learn basics: text styling, containers, grids, layouts"
+project_url = "http://localhost:8502"
+order = 1
+
+[projects.advanced]
+title = "Advanced Features"
+description = "Master advanced: shared blocks, multi-source, deployment"
+project_url = "http://localhost:8503"
+order = 2
+
+[projects.deploy]
+title = "Deployment Guide"
+description = "Deploy: Docker, Streamlit Cloud, Render.com, GCP, CI/CD"
+project_url = "http://localhost:8504"
+order = 3
+    """, language="toml")
+
+    st_space("v", 1)
+
+    show_code("""
+# book.py — load from TOML
+from pathlib import Path
+from streamtex.collection import CollectionConfig
+
+config_path = Path(__file__).parent / "collection.toml"
+config = CollectionConfig.from_toml(str(config_path))
+    """, language="python")
+
+    st_space("v", 2)
+
+    st_write(s.project.titles.feature_title, "Method 2: Programmatic (Python)")
+    show_code("""
+from streamtex.collection import CollectionConfig, ProjectMeta
 
 config = CollectionConfig(
     title="StreamTeX Learn",
     description="Complete learning path",
-    projects=projects
+    cards_per_row=2,
 )
 
-st_collection(config)
+config.projects["intro"] = ProjectMeta(
+    title="Introduction",
+    description="Get started with basics",
+    project_url="http://localhost:8502",
+    order=1,
+)
+config.projects["advanced"] = ProjectMeta(
+    title="Advanced",
+    description="Deep dive into concepts",
+    project_url="http://localhost:8503",
+    order=2,
+)
     """, language="python")
-
-    st_space("v", 1)
-
-    st_write(s.project.titles.feature_title, "Method 2: TOML Configuration File")
-    show_code("""
-# collection.toml
-[collection]
-title = "StreamTeX Learn"
-description = "Complete learning path"
-theme = "light"
-
-[[projects]]
-name = "Introduction"
-path = "projects/intro"
-description = "Get started with basics"
-icon = "📚"
-
-[[projects]]
-name = "Advanced"
-path = "projects/advanced"
-description = "Deep dive into concepts"
-icon = "🚀"
-
-# Then in Python:
-from streamtex import CollectionConfig, st_collection
-
-config = CollectionConfig.from_toml("collection.toml")
-st_collection(config)
-    """, language="toml")
 
     st_space("v", 2)
 
     # ========================================================================
-    # FEATURES
+    # DISPLAY OPTIONS
     # ========================================================================
-    st_write(s.project.titles.section_title, "Collection Features", toc_lvl="+1")
+    st_write(s.project.titles.section_title, "Displaying Collections", toc_lvl="+1")
+    st_space("v", 1)
+
+    st_write(s.project.titles.feature_title, "Option 1: st_collection() — Automatic UI")
+    st_space("v", 0.5)
+    st_write(s.medium, "Renders title, description, and a grid of project cards automatically:")
+    st_space("v", 1)
+
+    show_code("""
+from streamtex import st_collection
+from custom.styles import Styles as s
+
+st_collection(config=config, home_styles=s)
+    """, language="python")
+
+    st_space("v", 2)
+
+    st_write(s.project.titles.feature_title, "Option 2: st_book() — Custom Collection UI")
+    st_space("v", 0.5)
+    st_write(s.medium,
+             "For full control over layout and design, build your own collection "
+             "blocks and wire them into st_book():")
+    st_space("v", 1)
+
+    show_code("""
+# book.py — custom collection UI
+from streamtex import st_book
+import blocks
+
+st_book([
+    blocks.bck_home,  # Your custom block with cards + styling
+], paginate=False)
+
+
+# blocks/bck_home.py — custom card layout
+import streamlit as st
+from streamtex import st_grid, st_block, st_write, Style
+from streamtex.collection import CollectionConfig
+
+config = CollectionConfig.from_toml("collection.toml")
+
+def build():
+    with st_grid(cols=config.cards_per_row, grid_style=Style("gap:24px;", "gap")):
+        for key, project in config.projects.items():
+            with st_block(card_style):
+                st_write(s.Large, project.title)
+                st_write(s.medium, project.description)
+                st.link_button("Open", project.project_url)
+    """, language="python")
+
+    st_space("v", 2)
+
+    # ========================================================================
+    # URL OVERRIDES
+    # ========================================================================
+    st_write(s.project.titles.section_title, "Environment Variable URL Overrides", toc_lvl="+1")
+    st_space("v", 1)
+
+    st_write(s.medium,
+             "Project URLs from TOML can be overridden by environment variables. "
+             "This is useful for deployment where URLs differ from localhost:")
+    st_space("v", 1)
+
+    show_code("""
+# Pattern: STX_URL_<PROJECT_KEY_UPPER>
+# For [projects.test-intro], the env var is STX_URL_TEST_INTRO
+
+# Example: set in Render.com, Docker, or .env
+STX_URL_TEST_INTRO=https://intro.onrender.com
+STX_URL_TEST_ADVANCED=https://advanced.onrender.com
+    """, language="bash")
+
+    st_space("v", 2)
+
+    # ========================================================================
+    # PROJECT VS COLLECTION
+    # ========================================================================
+    st_write(s.project.titles.section_title, "Project vs Collection", toc_lvl="+1")
     st_space("v", 1)
 
     st_write(s.large, """
-**Project Discovery**
-- Browse all available projects
-- Filter by tags or categories
-- Search project names and descriptions
+**Single Project** (st_book):
+- One application/course/documentation
+- Self-contained on one port
+- Example: "Python Training Course"
 
-**Navigation**
-- Click to open any project
-- Breadcrumb shows collection → project
-- Back button returns to collection hub
+**Collection** (st_collection or custom st_book):
+- Multiple projects in one hub
+- Project discovery and navigation
+- Each project runs on its own port
+- Example: "Training Platform" with Intro, Advanced, Deploy courses
 
-**Metadata Display**
-- Project icon and description
-- Author and version information
-- Tags for categorization
-- Progress indicators (optional)
-
-**Theme Support**
-- Light/dark mode for collection hub
-- Per-project theming support
-- Consistent design across projects
-
-**Project Organization**
-- Group related projects
-- Feature recommended projects
-- Show project progression path
+**When to use Collections:**
+- Multiple independent projects to manage
+- Need centralized project hub
+- Building platform (multi-course, multi-doc)
     """)
-
-    st_space("v", 2)
-
-    # ========================================================================
-    # PRACTICAL EXAMPLE
-    # ========================================================================
-    st_write(s.project.titles.section_title, "Complete Example: Training Hub", toc_lvl="+1")
-    st_space("v", 1)
-
-    show_explanation("""
-Real-world example: Building a training platform with 3 courses.
-    """)
-
-    show_code("""
-from streamtex import st_collection, CollectionConfig, ProjectMeta
-
-# Define courses
-courses = [
-    ProjectMeta(
-        name="Python Fundamentals",
-        path="projects/python-101",
-        description="Learn Python basics",
-        icon="🐍",
-        author="Alice",
-        version="2.0.0",
-        tags=["python", "beginner"],
-        color="#3776ab"
-    ),
-    ProjectMeta(
-        name="Web Development",
-        path="projects/web-dev",
-        description="Build web applications",
-        icon="🌐",
-        author="Bob",
-        version="1.5.0",
-        tags=["web", "intermediate"],
-        color="#FF7C00"
-    ),
-    ProjectMeta(
-        name="Data Science",
-        path="projects/data-science",
-        description="Data analysis and ML",
-        icon="📊",
-        author="Carol",
-        version="1.0.0",
-        tags=["data", "advanced"],
-        color="#00A080"
-    ),
-]
-
-# Create collection
-hub_config = CollectionConfig(
-    title="Technology Training Hub",
-    description="Comprehensive training platform with multiple courses",
-    projects=courses,
-    theme="dark",
-    show_search=True
-)
-
-# Display collection
-st_collection(hub_config)
-    """, language="python")
 
     st_space("v", 2)
 
@@ -285,85 +298,26 @@ st_collection(hub_config)
     st_space("v", 1)
 
     st_write(s.large, """
-✓ **DO:**
-- Use meaningful project names
-- Provide descriptive descriptions (100+ chars)
-- Assign relevant icons (emoji or Unicode)
-- Group related projects together
-- Use consistent versioning scheme
-- Add helpful tags for discovery
-- Set appropriate access permissions
+**Configuration:**
+- Use TOML for static collections (easier to maintain)
+- Use programmatic CollectionConfig for dynamic collections (loaded from database, API, etc.)
+- Always specify project_url correctly (must match running port)
 
-✗ **DON'T:**
-- Overcrowd with too many projects (>20)
-- Use vague descriptions ("Project 1")
-- Mix different topics in one collection
-- Change project paths after deployment
-- Use broken icon references
-- Add too many tags (3-5 is optimal)
-    """)
+**Content:**
+- Use meaningful project titles and descriptive descriptions
+- Use cover images for visual appeal (recommended size: 300x200px)
+- Set correct order (1, 2, 3...) to control project sequence
 
-    st_space("v", 2)
-
-    # ========================================================================
-    # DEPLOYMENT
-    # ========================================================================
-    st_write(s.project.titles.section_title, "Deploying Collections", toc_lvl="+1")
-    st_space("v", 1)
-
-    show_explanation("""
-Collections can be deployed to cloud platforms like other projects.
-Use the same deployment methods as single projects.
-    """)
-
-    st_write(s.project.titles.feature_title, "Docker Deployment:")
-    show_code("""
-# Build collection container
-docker build --build-arg FOLDER=collection -t my-training-hub .
-
-# Run
-docker run -p 8501:8501 my-training-hub
-    """, language="bash")
-
-    st_space("v", 1)
-
-    st_write(s.project.titles.feature_title, "Hugging Face Spaces:")
-    show_code("""
-# Push to HF Space with collection folder
-git remote add space https://huggingface.co/spaces/username/my-hub
-git push space main
-    """, language="bash")
-
-    st_space("v", 2)
-
-    # ========================================================================
-    # COMPARISON: PROJECT VS COLLECTION
-    # ========================================================================
-    st_write(s.project.titles.section_title, "Project vs Collection", toc_lvl="+1")
-    st_space("v", 1)
-
-    st_write(s.large, """
-**Single Project** (st_book):
-- One application/course/documentation
-- Self-contained
-- Example: "Python Training Course"
-
-**Collection** (st_collection):
-- Multiple projects in one hub
-- Project discovery and navigation
-- Example: "Training Platform" with Python, Web, Data courses
-
-**When to use Collections:**
-- Multiple independent projects to manage
-- Need centralized project hub
-- Want project discovery/search
-- Building platform (multi-course, multi-doc)
+**Deployment:**
+- Test all project URLs before deploying collection
+- Use STX_URL_* environment variables for production URLs
+- Each project must be running on its configured port
     """)
 
     st_space("v", 2)
 
     show_details("""
-Organizing large projects
+Organizing large platforms:
 - Break into logical sub-projects
 - Each gets its own entry in collection
 - Users navigate to relevant content easily

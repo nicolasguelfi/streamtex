@@ -1,12 +1,13 @@
 """StreamTeX Collection - Test Hub with Modern Design."""
 
-import streamlit as st
-import setup
-import streamtex as stx
-from streamtex import st_book, TOCConfig
-from custom.themes import dark
-import streamtex.styles as sts
 import blocks
+import setup  # noqa: F401  (side-effect: adds project dir to sys.path)
+import streamlit as st
+from custom.themes import dark
+
+import streamtex as stx
+import streamtex.styles as sts
+from streamtex import st_book
 
 st.set_page_config(
     page_title="StreamTeX Test Collection",
@@ -15,12 +16,8 @@ st.set_page_config(
 )
 sts.theme = dark
 
-# Display the collection home with modern design and management guide
-toc = TOCConfig(numerate_titles=False, search=True)
-
+# Display the collection home (single page: header + cards)
 st_book([
-    blocks.bck_level_badge,
-    blocks.bck_home_collection,
-    blocks.bck_collection_management,
-], toc_config=toc, paginate=False,
+    blocks.bck_home,
+], paginate=False,
    inspector=stx.InspectorConfig(enabled=True))

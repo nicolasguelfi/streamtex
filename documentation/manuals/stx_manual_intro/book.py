@@ -43,6 +43,9 @@ st_book([
     # Welcome page (gradient header + level badge)
     blocks.bck_level_badge,
 
+    # Library overview (what it is, why, capabilities)
+    blocks.bck_what_is_streamtex,
+
     # Quick Start (local intro blocks)
     blocks.bck_qs_installation,
     blocks.bck_qs_new_project,

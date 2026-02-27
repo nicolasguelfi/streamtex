@@ -4,7 +4,9 @@ digraph {
     nodesep=0.4
     A -> B
     B -> C
+    C -> C
     C -> D
     D -> A
     A -> C
+    C -> C
 }

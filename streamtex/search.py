@@ -75,20 +75,25 @@ def generate_search_input_html(placeholder: str = "Search...") -> str:
 def generate_search_script(block_index: dict[int, str]) -> str:
     """Return <script> HTML for components.html() — runs in iframe, targets parent DOM.
 
-    Uses MutationObserver for reliable DOM-ready detection (React may batch
-    the st.markdown render after the iframe script executes).
+    Uses setInterval retry loop (up to 60s) for reliable DOM-ready detection.
+    Streamlit's rehype-raw plugin is lazily loaded, so data-stx-* attributes
+    may not appear in the DOM for several seconds on slow/cold deployments.
     """
     index_json = json.dumps(block_index, ensure_ascii=False)
     return f"""<script>
 (function() {{
     var hostDoc = parent.document;
     var _stxBlockTexts = {index_json};
+    var _t0 = Date.now();
 
     function setup() {{
         var input = hostDoc.querySelector('[data-stx-search]');
         if (!input) return false;
         if (input._stxSearchBound) return true;
         input._stxSearchBound = true;
+        var elems = hostDoc.querySelectorAll('[data-stx-block]');
+        console.info('[STX Search] setup OK after ' + (Date.now() - _t0) + 'ms, '
+                     + elems.length + ' TOC entries');
         input.addEventListener('input', function() {{
             var query = input.value.toLowerCase().trim();
             var tokens = query ? query.split(/\\s+/) : [];
@@ -110,15 +115,27 @@ def generate_search_script(block_index: dict[int, str]) -> str:
         return true;
     }}
 
-    /* Try immediately, then use MutationObserver for reliable DOM-ready */
+    /* Try immediately, then retry every 500ms for up to 60s.
+       Covers rehype-raw lazy loading on slow/cold Render deployments. */
     if (!setup()) {{
-        var obs = new MutationObserver(function() {{
-            if (setup()) obs.disconnect();
-        }});
-        obs.observe(hostDoc.body || hostDoc.documentElement,
-                    {{ childList: true, subtree: true }});
-        /* Safety: disconnect after 10s to avoid leaks */
-        setTimeout(function() {{ obs.disconnect(); }}, 10000);
+        var _warned = false;
+        var _iv = setInterval(function() {{
+            var elapsed = Date.now() - _t0;
+            if (setup()) {{
+                clearInterval(_iv);
+                return;
+            }}
+            if (!_warned && elapsed > 5000) {{
+                console.warn('[STX Search] still waiting for data-stx-search ('
+                             + elapsed + 'ms)');
+                _warned = true;
+            }}
+            if (elapsed > 60000) {{
+                clearInterval(_iv);
+                console.error('[STX Search] setup failed after 60s '
+                              + '— data-stx-search never appeared');
+            }}
+        }}, 500);
     }}
 }})();
 </script>"""

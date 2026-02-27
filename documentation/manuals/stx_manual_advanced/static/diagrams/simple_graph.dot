@@ -7,5 +7,4 @@ digraph {
     C -> D
     D -> A
     A -> C
-    C -> C
 }

@@ -707,8 +707,8 @@ def _inject_paginated_nav_js(current_page, total, marker_config,
     /* =================================================================
      * BANNER — banner clicks + auto-trigger zones
      *
-     * Bottom: IntersectionObserver on sentinel + wheel deltaY > 0
-     * Top:    isAtTop() + wheel deltaY < 0  (800ms startup delay)
+     * Bottom: IntersectionObserver on sentinel + wheel/touch deltaY > 0
+     * Top:    isAtTop() + wheel/touch deltaY < 0  (800ms startup delay)
      * Banners: click on red banners → navigateToPage
      * ================================================================= */
     var sentinel = null;
@@ -812,6 +812,23 @@ def _inject_paginated_nav_js(current_page, total, marker_config,
 
     /* Wheel listener — handles both top and bottom auto-trigger */
     hostDoc.addEventListener('wheel', bannerWheel, { passive: true });
+
+    /* Touch listener — iOS/mobile fallback (wheel events don't fire
+       for touch scrolling on Safari/iOS).  We track touch start/end
+       positions and synthesise the same logic as bannerWheel.        */
+    var touchStartY = null;
+    hostDoc.addEventListener('touchstart', function(e) {
+        if (e.touches.length === 1) touchStartY = e.touches[0].clientY;
+    }, { passive: true });
+    hostDoc.addEventListener('touchend', function(e) {
+        if (touchStartY === null || navigating) return;
+        var endY = e.changedTouches[0].clientY;
+        var deltaY = touchStartY - endY;   /* positive = swipe up (scroll down) */
+        touchStartY = null;
+        var threshold = 40;                 /* px – ignore tiny taps */
+        if (Math.abs(deltaY) < threshold) return;
+        bannerWheel({ deltaY: deltaY });
+    }, { passive: true });
 
     /* --- Cross-page marker callbacks (used by marker.py widget) --- */
     hostWin._stxMarkerGoToPage = function(page) {
@@ -988,8 +1005,16 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
             if css and css["show_dividers"]:
                 st.divider()
             _render_banner("stx-banner-next", _next, "▸", banner_config)
-        # Buffer zone before auto-trigger sentinel (800px)
-        st_space("v", "800px")
+        # Buffer zone before auto-trigger sentinel
+        # Shorter on narrow viewports (mobile) so users don't scroll forever
+        st.markdown(
+            '<div class="stx-banner-buffer"></div>'
+            "<style>"
+            ".stx-banner-buffer{padding-top:800px}"
+            "@media(max-width:800px){.stx-banner-buffer{padding-top:400px}}"
+            "</style>",
+            unsafe_allow_html=True,
+        )
     # Sentinel always rendered (even in HIDDEN mode) for auto-scroll JS
     if current_page < total - 1:
         st.markdown(

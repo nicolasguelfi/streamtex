@@ -174,9 +174,9 @@ def inject_marker_navigation() -> None:
         return
 
     pos_css = {
-        "bottom-right": "bottom: 24px; right: 24px;",
-        "bottom-center": "bottom: 24px; left: 50%; transform: translateX(-50%);",
-    }.get(config.nav_position, "bottom: 24px; right: 24px;")
+        "bottom-right": "bottom: calc(24px + env(safe-area-inset-bottom, 0px)); right: 24px;",
+        "bottom-center": "bottom: calc(24px + env(safe-area-inset-bottom, 0px)); left: 50%; transform: translateX(-50%);",
+    }.get(config.nav_position, "bottom: calc(24px + env(safe-area-inset-bottom, 0px)); right: 24px;")
 
     show_ui = "block" if config.show_nav_ui else "none"
     scroll_offset = 80
@@ -287,8 +287,20 @@ def inject_marker_navigation() -> None:
     nav.style.cssText = 'position:fixed;__POS_CSS__display:__SHOW_UI__;z-index:999998;font-family:sans-serif;user-select:none;';
     hostDoc.body.appendChild(nav);
 
+    /* --- Responsive style for narrow viewports --- */
+    var mobileStyle = hostDoc.getElementById('stx-marker-responsive');
+    if (mobileStyle) mobileStyle.remove();
+    mobileStyle = hostDoc.createElement('style');
+    mobileStyle.id = 'stx-marker-responsive';
+    mobileStyle.textContent = '@media (max-width: 800px) { ' +
+        '#streamtex-marker-nav .stx-marker-bar { flex-wrap: wrap; justify-content: center; border-radius: 16px; } ' +
+        '#streamtex-marker-nav .stx-marker-label { width: 100% !important; text-align: center; display: block !important; } ' +
+    '}';
+    hostDoc.head.appendChild(mobileStyle);
+
     /* --- Controls bar --- */
     var bar = hostDoc.createElement('div');
+    bar.className = 'stx-marker-bar';
     bar.style.cssText = 'display:flex;align-items:center;gap:8px;background:rgba(40,40,40,.85);color:#eee;border-radius:24px;padding:6px 14px;font-size:13px;backdrop-filter:blur(6px);box-shadow:0 2px 10px rgba(0,0,0,.3);';
     nav.appendChild(bar);
 
@@ -324,6 +336,7 @@ def inject_marker_navigation() -> None:
 
     var labelChars = __LABEL_CHARS__;
     var label = hostDoc.createElement('span');
+    label.className = 'stx-marker-label';
     label.style.cssText = 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;opacity:.8;' +
         (labelChars > 0 ? 'width:' + labelChars + 'ch;display:inline-block;' : 'display:none;');
 
@@ -465,6 +478,8 @@ def inject_marker_navigation() -> None:
         scrollTarget.removeEventListener('scroll', scrollHandler);
         var el = hostDoc.getElementById('streamtex-marker-nav');
         if (el) el.remove();
+        var ms = hostDoc.getElementById('stx-marker-responsive');
+        if (ms) ms.remove();
     };
 
     /* --- Init --- */

@@ -1,4 +1,4 @@
-"""Tests for streamtex.auth — visual S-T-X grid password gate."""
+"""Tests for streamtex.auth — visual grid password gate."""
 
 import os
 from contextlib import contextmanager
@@ -279,3 +279,72 @@ class TestSequence:
                 gate()
                 assert session["_stx_match"] == 2
                 assert "_stx_authenticated" not in session
+
+
+# ---------------------------------------------------------------------------
+# Tests — configurable password (_get_target & custom sequences)
+# ---------------------------------------------------------------------------
+
+def _import_get_target():
+    """Import _get_target helper."""
+    from streamtex.auth import _get_target
+    return _get_target
+
+
+class TestConfigurablePassword:
+    """STX_PASSWORD value defines the target sequence."""
+
+    def test_single_char_password(self):
+        """STX_PASSWORD=a → click A → authenticated."""
+        gate = _import_gate()
+        with patch.dict(os.environ, {"STX_PASSWORD": "a"}):
+            session = _fresh_session()
+            with _patch_gate(session=session, clicked_char="A"):
+                gate()
+                assert session["_stx_authenticated"] is True
+                assert session["_stx_match"] == 1
+
+    def test_custom_sequence(self):
+        """STX_PASSWORD=abc → A→B→C → authenticated on C."""
+        gate = _import_gate()
+        with patch.dict(os.environ, {"STX_PASSWORD": "abc"}):
+            # Simulate A→B already matched, now clicking C
+            session = _fresh_session(_stx_match=2)
+            with _patch_gate(session=session, clicked_char="C"):
+                gate()
+                assert session["_stx_authenticated"] is True
+                assert session["_stx_match"] == 3
+
+    def test_password_case_insensitive(self):
+        """STX_PASSWORD=Abc and STX_PASSWORD=ABC produce the same target."""
+        get_target = _import_get_target()
+        with patch.dict(os.environ, {"STX_PASSWORD": "Abc"}):
+            t1 = get_target()
+        with patch.dict(os.environ, {"STX_PASSWORD": "ABC"}):
+            t2 = get_target()
+        assert t1 == t2 == ("A", "B", "C")
+
+    def test_invalid_chars_filtered(self):
+        """STX_PASSWORD=a!b@c → sequence ("A", "B", "C"), symbols ignored."""
+        get_target = _import_get_target()
+        with patch.dict(os.environ, {"STX_PASSWORD": "a!b@c"}):
+            assert get_target() == ("A", "B", "C")
+
+    def test_all_invalid_chars_uses_default(self):
+        """STX_PASSWORD=!@# → empty after filtering → falls back to default."""
+        get_target = _import_get_target()
+        with patch.dict(os.environ, {"STX_PASSWORD": "!@#"}):
+            assert get_target() == ("S", "T", "X")
+
+    def test_stx_gate_uses_default_target(self):
+        """STX_GATE=1 without STX_PASSWORD → default S-T-X sequence."""
+        get_target = _import_get_target()
+        with patch.dict(os.environ, {"STX_GATE": "1"}):
+            os.environ.pop("STX_PASSWORD", None)
+            assert get_target() == ("S", "T", "X")
+
+    def test_get_target_with_digits(self):
+        """STX_PASSWORD=abc123 → sequence includes digits."""
+        get_target = _import_get_target()
+        with patch.dict(os.environ, {"STX_PASSWORD": "abc123"}):
+            assert get_target() == ("A", "B", "C", "1", "2", "3")

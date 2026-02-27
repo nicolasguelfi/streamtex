@@ -28,7 +28,7 @@ services:
       - key: STX_URL_TEST_DEPLOY
         value: https://streamtex-deploy.onrender.com
       - key: STX_PASSWORD
-        value: a
+        value: changeme    # placeholder — real value set via deploy/sync-password.sh
     healthCheckPath: /_stcore/health
     buildFilter:
       paths:
@@ -51,7 +51,7 @@ services:
       - key: FOLDER
         value: documentation/manuals/stx_manual_intro
       - key: STX_PASSWORD
-        value: a
+        value: changeme    # placeholder — real value set via deploy/sync-password.sh
     healthCheckPath: /_stcore/health
     buildFilter:
       paths:
@@ -74,7 +74,7 @@ services:
       - key: FOLDER
         value: documentation/manuals/stx_manual_advanced
       - key: STX_PASSWORD
-        value: a
+        value: changeme    # placeholder — real value set via deploy/sync-password.sh
     healthCheckPath: /_stcore/health
     buildFilter:
       paths:
@@ -97,7 +97,7 @@ services:
       - key: FOLDER
         value: documentation/manuals/stx_manual_deploy
       - key: STX_PASSWORD
-        value: a
+        value: changeme    # placeholder — real value set via deploy/sync-password.sh
     healthCheckPath: /_stcore/health
     buildFilter:
       paths:

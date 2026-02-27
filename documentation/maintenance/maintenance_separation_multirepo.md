@@ -527,7 +527,7 @@ services:
     dockerContext: .
     envVars:
       - key: FOLDER
-        value: stx_manuals_collection
+        value: changeme_manuals_collection
       - key: STX_URL_TEST_INTRO
         value: https://intro-manual-streamtex.onrender.com
       - key: STX_URL_TEST_ADVANCED
@@ -535,7 +535,7 @@ services:
       - key: STX_URL_TEST_DEPLOY
         value: https://deploy-manual-streamtex.onrender.com
       - key: STX_PASSWORD
-        value: stx
+        value: changeme
     healthCheckPath: /_stcore/health
 
   - type: web
@@ -548,9 +548,9 @@ services:
     dockerContext: .
     envVars:
       - key: FOLDER
-        value: stx_manual_intro
+        value: changeme_manual_intro
       - key: STX_PASSWORD
-        value: stx
+        value: changeme
     healthCheckPath: /_stcore/health
 
   - type: web
@@ -563,9 +563,9 @@ services:
     dockerContext: .
     envVars:
       - key: FOLDER
-        value: stx_manual_advanced
+        value: changeme_manual_advanced
       - key: STX_PASSWORD
-        value: stx
+        value: changeme
     healthCheckPath: /_stcore/health
 
   - type: web
@@ -578,9 +578,9 @@ services:
     dockerContext: .
     envVars:
       - key: FOLDER
-        value: stx_manual_deploy
+        value: changeme_manual_deploy
       - key: STX_PASSWORD
-        value: stx
+        value: changeme
     healthCheckPath: /_stcore/health
 ```
 
@@ -714,7 +714,7 @@ services:
     dockerContext: .
     envVars:
       - key: STX_PASSWORD
-        value: stx
+        value: changeme
     healthCheckPath: /_stcore/health
 ```
 

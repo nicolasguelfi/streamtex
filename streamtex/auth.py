@@ -2,25 +2,33 @@
 
 When ``STX_PASSWORD`` is set, a branded login screen is shown: gradient
 header, 6 activity circles, and a 6x6 grid of A-Z + 0-9 in order.
-The user must click **or type** S -> T -> X in sequence (at any point
-in the stream of clicks).  Each input fills a circle; circles loop
-infinitely.  The sequence is invisible — circles show only colours,
-never the letters typed.
+The user must click **or type** the sequence defined by ``STX_PASSWORD``
+(at any point in the stream of clicks).  Each character is uppercased
+and filtered to grid-valid chars (A-Z, 0-9).  Each input fills a
+circle; circles loop infinitely.  The sequence is invisible — circles
+show only colours, never the letters typed.
+
+Examples: ``STX_PASSWORD=demo`` → click **D → E → M → O**;
+``STX_PASSWORD=hello`` → click **H → E → L → L → O**;
+``STX_PASSWORD=abc123`` → click **A → B → C → 1 → 2 → 3**.
 
 In local dev, the gate is off by default.  Set ``STX_GATE=1`` (without
-``STX_PASSWORD``) to preview it locally.
+``STX_PASSWORD``) to preview it locally with the default sequence S-T-X.
 """
 
 import os
 
 import streamlit as st
 import streamlit.components.v1 as components
+from dotenv import load_dotenv
 
 from .container import st_block
 from .enums import Tags as t
 from .space import st_space
 from .styles import Style
 from .write import st_write
+
+load_dotenv()  # loads .env if present (no-op on Render where env vars are set directly)
 
 # ── Session-state keys ────────────────────────────────────────────────
 
@@ -31,10 +39,26 @@ _NEXT_KEY = "_stx_next"          # int (0-5): next circle slot
 _TOTAL_KEY = "_stx_total"        # int: total clicks (detects wrap)
 _GRID_KEY = "_stx_grid"          # list[36]: ordered chars
 
-_TARGET = ("S", "T", "X")
+_DEFAULT_TARGET = ("S", "T", "X")  # fallback for STX_GATE=1 (local dev)
+_VALID_CHARS = set("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
 
 # Ordered grid: A-Z then 0-9 (36 chars for a 6×6 grid)
 _ORDERED_CHARS = list("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
+
+
+def _get_target() -> tuple[str, ...]:
+    """Derive the target sequence from ``STX_PASSWORD`` env var.
+
+    Each character is uppercased and filtered to grid-valid chars (A-Z, 0-9).
+    Returns ``_DEFAULT_TARGET`` when ``STX_GATE=1`` is used without
+    ``STX_PASSWORD``.
+    """
+    raw = os.environ.get("STX_PASSWORD", "").strip()
+    if raw:
+        target = tuple(c for c in raw.upper() if c in _VALID_CHARS)
+        return target if target else _DEFAULT_TARGET
+    return _DEFAULT_TARGET  # STX_GATE=1 local preview
+
 
 # ══════════════════════════════════════════════════════════════════════
 # LAYOUT TUNABLES — adjust these to fine-tune the gate appearance
@@ -199,9 +223,11 @@ def _render_circles():
 # ── Main gate ─────────────────────────────────────────────────────────
 
 def _password_gate() -> None:
-    """Block rendering until the S-T-X sequence is entered.
+    """Block rendering until the password sequence is entered.
 
-    Called as the very first action inside :func:`st_book`.
+    The target sequence is derived from ``STX_PASSWORD`` via
+    :func:`_get_target`.  Called as the very first action inside
+    :func:`st_book`.
     """
     has_password = bool(os.environ.get("STX_PASSWORD", "").strip())
     force_gate = os.environ.get("STX_GATE", "").strip() == "1"
@@ -266,17 +292,18 @@ def _password_gate() -> None:
         st.session_state[_NEXT_KEY] = (pos + 1) % 6
         st.session_state[_TOTAL_KEY] = total + 1
 
-        # 2. Advance S→T→X match (embedded anywhere in the stream)
+        # 2. Advance sequence match (embedded anywhere in the stream)
+        target = _get_target()
         match = st.session_state[_MATCH_KEY]
-        if match < len(_TARGET) and clicked == _TARGET[match]:
+        if match < len(target) and clicked == target[match]:
             match += 1
-        elif clicked == _TARGET[0]:
-            match = 1  # restart from S
+        elif clicked == target[0]:
+            match = 1  # restart from first char
         else:
             match = 0
         st.session_state[_MATCH_KEY] = match
 
-        if match == len(_TARGET):
+        if match == len(target):
             st.session_state[_AUTH_KEY] = True
 
         st.rerun()

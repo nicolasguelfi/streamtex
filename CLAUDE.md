@@ -181,6 +181,7 @@ See `deploy/README.md` for the full deployment guide and `documentation/manuals/
 - **Streamlit Cloud**: `./deploy/gen-requirements.sh > requirements.txt` then connect on share.streamlit.io
 - **Hugging Face Spaces**: `./deploy/huggingface.sh <HF_SPACE_URL> [PROJECT_FOLDER]`
 - **Render.com**: `./deploy/render.sh [PROJECT_FOLDER]` (render.yaml at repo root). See `deploy/render.md` for password gate & API key docs.
+- **Password sync**: After changing `STX_PASSWORD` in `.env`, remind the user to run `./deploy/sync-password.sh` to push the new value to all Render services
 - **GCP VM + Ansible**: `ansible-playbook -i deploy/ansible/inventory.ini deploy/ansible/deploy.yml`
 - **CI/CD**: `.github/workflows/ci.yml` (tests + Docker build on push)
 - **Multiple projects**: Use `--server.port` flag or run-test-projects.sh script

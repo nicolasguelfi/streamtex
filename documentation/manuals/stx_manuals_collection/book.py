@@ -7,7 +7,7 @@ from custom.themes import dark
 
 import streamtex as stx
 import streamtex.styles as sts
-from streamtex import st_book
+from streamtex import TOCConfig, st_book
 
 st.set_page_config(
     page_title="StreamTeX Test Collection",
@@ -17,7 +17,9 @@ st.set_page_config(
 sts.theme = dark
 
 # Display the collection home (single page: header + cards)
+toc = TOCConfig(numerate_titles=False, toc_position=None, search=True)
+
 st_book([
     blocks.bck_home,
-], paginate=False,
+], toc_config=toc, paginate=False,
    inspector=stx.InspectorConfig(enabled=True))

@@ -75,6 +75,7 @@ def build():
             stx.StxStyles.huge + stx.StxStyles.text.colors.white,
             "StreamTeX Training Course",
             tag=t.div,
+            toc_lvl="1",
         )
         st_write(
             stx.StxStyles.large + stx.StxStyles.text.colors.white,

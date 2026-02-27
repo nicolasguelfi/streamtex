@@ -89,12 +89,16 @@ def generate_search_script(block_index: dict[int, str]) -> str:
     function setup() {{
         var input = hostDoc.querySelector('[data-stx-search]');
         if (!input) return false;
-        if (input._stxSearchBound) return true;
-        input._stxSearchBound = true;
+        /* Replace previous handler so updated index data takes effect.
+           The DOM element may survive across Streamlit reruns, so we
+           cannot rely on a simple bound-once flag. */
+        if (input._stxSearchHandler) {{
+            input.removeEventListener('input', input._stxSearchHandler);
+        }}
         var elems = hostDoc.querySelectorAll('[data-stx-block]');
         console.info('[STX Search] setup OK after ' + (Date.now() - _t0) + 'ms, '
                      + elems.length + ' TOC entries');
-        input.addEventListener('input', function() {{
+        var handler = function() {{
             var query = input.value.toLowerCase().trim();
             var tokens = query ? query.split(/\\s+/) : [];
             var elems = hostDoc.querySelectorAll('[data-stx-block]');
@@ -111,7 +115,9 @@ def generate_search_script(block_index: dict[int, str]) -> str:
                 }}
                 elems[i].style.display = match ? '' : 'none';
             }}
-        }});
+        }};
+        input.addEventListener('input', handler);
+        input._stxSearchHandler = handler;
         return true;
     }}
 

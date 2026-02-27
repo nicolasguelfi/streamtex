@@ -295,6 +295,9 @@ def build_ToC_sidebar_placeholder(has_markers=False, has_search=False):
         # Search input above tabs (always visible regardless of active tab)
         if has_search:
             st.markdown(generate_search_input_html(), unsafe_allow_html=True)
+            if st.button("Refresh search index", key="_stx_refresh_search_cont",
+                         use_container_width=True, type="tertiary"):
+                st.rerun()
             search_js_placeholder = st.empty()
         else:
             search_js_placeholder = None
@@ -505,15 +508,26 @@ def _build_page_cache(module_list, toc_config, marker_config, separator,
     }
 
 
+_STX_REFRESH_SEARCH_KEY = "_stx_refresh_search"
+
+
 def _build_paginated_sidebar(cache, current_page, total, toc_config, marker_config):
-    """Populate the sidebar from cached data (st.markdown for direct DOM access)."""
-    search_index = cache.get("search_index")
+    """Populate the sidebar from cached data (st.markdown for direct DOM access).
+
+    The search JS iframe is normally injected here.  When a "Refresh search
+    index" is pending (``_STX_REFRESH_SEARCH_KEY`` in session state), injection
+    is deferred to ``_paginated_book`` so the index can be updated first.
+    """
     show_search = toc_config is not None and toc_config.search
 
     with st.sidebar:
         # Search input above tabs (always visible regardless of active tab)
         if show_search:
             st.markdown(generate_search_input_html(), unsafe_allow_html=True)
+            if st.button("Refresh search index", key="_stx_refresh_search_pag",
+                         use_container_width=True, type="tertiary"):
+                st.session_state[_STX_REFRESH_SEARCH_KEY] = True
+                st.rerun()
 
         has_markers = marker_config is not None and cache.get("markers")
 
@@ -592,9 +606,12 @@ def _build_paginated_sidebar(cache, current_page, total, toc_config, marker_conf
                 if marker_parts:
                     st.markdown("\n".join(marker_parts), unsafe_allow_html=True)
 
-        # Search JS (above tabs level, invisible iframe)
-        if search_index:
-            components.html(generate_search_script(search_index), height=0)
+        # Search JS — inject now unless a refresh is pending (in that case
+        # _paginated_book injects it after the page renders with updated data).
+        if show_search and not st.session_state.get(_STX_REFRESH_SEARCH_KEY):
+            search_index = cache.get("search_index")
+            if search_index:
+                components.html(generate_search_script(search_index), height=0)
 
 
 def _inject_paginated_nav_js(current_page, total, marker_config,
@@ -956,6 +973,12 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
     # --- Sidebar (from cache) ---
     _build_paginated_sidebar(cache, current_page, total, toc_config, marker_config)
 
+    # --- Search index refresh (current page only) ---
+    _refresh_search = st.session_state.pop(_STX_REFRESH_SEARCH_KEY, False)
+    if _refresh_search:
+        _refresh_collector = start_collector()
+        _refresh_collector.set_block(current_page)
+
     # --- Prepare registries for current page ---
     effective_pw = f"{st.session_state.get(_PAGE_WIDTH_KEY, page_width)}%"
     reset_export_buffer(ExportConfig(enabled=export, page_title=export_title,
@@ -996,6 +1019,19 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
 
     # --- Render current block ---
     st_include(module_list[current_page], *args, _inspector_config=inspector, **kwargs)
+
+    # --- Finalize search index refresh ---
+    if _refresh_search:
+        new_texts = stop_collector()
+        search_index = cache.get("search_index")
+        if search_index is not None and new_texts:
+            search_index.update(new_texts)
+            st.session_state[_STX_CACHE_KEY] = cache
+        # Re-inject search JS with updated index (deferred from sidebar)
+        if cache.get("search_index"):
+            with st.sidebar:
+                components.html(
+                    generate_search_script(cache["search_index"]), height=0)
 
     # Banner — bottom (next section, clickable via JS)
     if current_page < total - 1:

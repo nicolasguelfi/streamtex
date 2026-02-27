@@ -2,8 +2,8 @@
 
 > **Date** : 2026-02-27
 > **Auteur** : Claude Code (assisté par Nicolas Guelfi)
-> **Version** : 1.0
-> **Statut** : Plan initial
+> **Version** : 2.0
+> **Statut** : Plan revise apres analyse des effets de bord
 > **Pré-requis** : Streamlit >= 1.37.0 (installé : 1.54.0)
 
 ---
@@ -17,7 +17,10 @@
 5. [Fichiers impactes](#5-fichiers-impactes)
 6. [Tests](#6-tests)
 7. [Risques et mitigations](#7-risques-et-mitigations)
-8. [Criteres de validation](#8-criteres-de-validation)
+8. [Effets de bord visuels pour l'utilisateur final](#8-effets-de-bord-visuels-pour-lutilisateur-final)
+9. [Contraintes pour les futurs concepteurs de blocs](#9-contraintes-pour-les-futurs-concepteurs-de-blocs)
+10. [Limitations connues](#10-limitations-connues)
+11. [Criteres de validation](#11-criteres-de-validation)
 
 ---
 
@@ -183,9 +186,28 @@ def is_fragment_rerun() -> bool:
 
 #### Etape 2.1 : `streamtex/toc.py` — Guard sur `register_toc_entry()`
 
-**Lignes impactees** : 122-131
+**Lignes impactees** : 55-99 (`register_entry`), 122-131 (`register_toc_entry`)
 
-**Avant** :
+> **CORRECTIF v2.0** : Le type de retour est un **3-tuple** `(key_anchor, section_number, lvl)`,
+> PAS un simple `str`. Le plan v1.0 contenait un bug qui aurait provoque un crash
+> `ValueError: not enough values to unpack` au premier fragment rerun d'un bloc avec `toc_lvl`.
+
+**Prerequis** : Stocker `_section_number` dans chaque entree TOC pour pouvoir le reconstruire
+lors du fragment rerun. Modifier `register_entry()` (l.88-94) pour ajouter un champ :
+
+**Modification de `register_entry()`** (ajout d'un champ dans le dict, l.88-94) :
+```python
+self.get_entries().append({
+    "level": lvl,
+    "title": section_number + label if has_num else label,
+    "key_anchor": key_anchor,
+    "_reg_label": label,
+    "_reg_level": level,
+    "_section_number": section_number if self.config.numerate_titles else "",
+})
+```
+
+**Avant** (`register_toc_entry`, l.122-131) :
 ```python
 def register_toc_entry(label: str, level: str) -> str:
     global toc
@@ -195,25 +217,27 @@ def register_toc_entry(label: str, level: str) -> str:
 
 **Apres** :
 ```python
-def register_toc_entry(label: str, level: str) -> str:
+def register_toc_entry(label: str, level: str) -> tuple[str, str, int]:
     global toc
     assert isinstance(toc, TOCRegistry), "..."
     from .fragment_guard import is_fragment_rerun
     if is_fragment_rerun():
-        # Fragment rerun: return existing anchor without re-registering.
+        # Fragment rerun: return existing entry data without re-registering.
         # The TOC was fully built during the last full rerun.
-        return _find_existing_anchor(label)
+        return _find_existing_toc_entry(label)
     return toc.register_entry(label, level)
 ```
 
 **Fonction helper a ajouter** dans `toc.py` :
 ```python
-def _find_existing_anchor(label: str) -> str:
-    """Find the anchor for an already-registered TOC entry by label.
+def _find_existing_toc_entry(label: str) -> tuple[str, str, int]:
+    """Find the full (key_anchor, section_number, level) for an existing TOC entry.
 
     During a fragment rerun, the TOC entries from the full rerun are
     still in the registry. We look up the matching entry and return
-    its anchor so that the block's HTML rendering is consistent.
+    the same 3-tuple that register_entry() would have returned,
+    so that write.py line 115 can unpack it correctly:
+        key_anchor, section_number, resolved_lvl = register_toc_entry(...)
 
     Falls back to generating a slug from the label if not found
     (defensive, should not happen in normal operation).
@@ -222,13 +246,21 @@ def _find_existing_anchor(label: str) -> str:
     if toc is not None:
         for entry in toc.get_entries():
             if entry.get("_reg_label") == label:
-                return entry.get("key_anchor", "")
+                return (
+                    entry.get("key_anchor", ""),
+                    entry.get("_section_number", ""),
+                    entry.get("level", 1),
+                )
     # Fallback: generate anchor from label (same logic as TOCRegistry)
-    from .utils import slugify
-    return slugify(label)
+    return TOCRegistry.get_key_anchor(label), "", 1
 ```
 
-**Raison** : `st_write(..., toc_lvl="1")` attend une valeur de retour (l'ancre) pour generer l'attribut `id` du HTML. On doit retourner la meme ancre que lors du full rerun pour que le HTML soit identique.
+**Raison** : `write.py:115` decompose le retour en 3 variables :
+```python
+key_anchor, section_number, resolved_lvl = register_toc_entry(label, toc_lvl)
+```
+Le guard DOIT retourner le meme 3-tuple pour que le HTML genere (ancre, numerotation, niveau)
+soit identique a celui du full rerun.
 
 #### Etape 2.2 : `streamtex/marker.py` — Guard sur `register_marker()`
 
@@ -339,6 +371,12 @@ def record_if_active(html: str) -> None:
 ```
 
 **Raison** : L'index de recherche doit rester stable. Le texte du bloc est deja indexe lors du full rerun.
+
+> **Note v2.0 (defense en profondeur)** : Ce guard est techniquement **redondant** car
+> `stop_collector()` est appele a `book.py:218` apres la boucle de blocs, ce qui met
+> `_collector = None`. Lors d'un fragment rerun, `record_if_active()` fait deja un NO-OP
+> naturel car `_collector is None`. Le guard est conserve comme filet de securite au cas
+> ou l'ordre d'execution changerait dans le futur.
 
 ---
 
@@ -486,31 +524,46 @@ Exemple pour TOC :
 def test_register_toc_entry_skipped_during_fragment_rerun(monkeypatch):
     """During fragment rerun, register_toc_entry should not add duplicates."""
     reset_toc_registry()
-    anchor = register_toc_entry("Section A", "1")
+    key_anchor, section_number, lvl = register_toc_entry("Section A", "1")
     assert len(toc_entries()) == 1
 
     # Simulate fragment rerun
     monkeypatch.setattr(
         "streamtex.toc.is_fragment_rerun", lambda: True
     )
-    anchor2 = register_toc_entry("Section A", "1")
-    assert len(toc_entries()) == 1  # No duplicate
-    assert anchor2 == anchor        # Same anchor returned
+    key_anchor2, section_number2, lvl2 = register_toc_entry("Section A", "1")
+    assert len(toc_entries()) == 1         # No duplicate
+    assert key_anchor2 == key_anchor       # Same anchor
+    assert section_number2 == section_number  # Same numbering
+    assert lvl2 == lvl                     # Same level
 ```
 
 #### Etape 4.3 : Test d'integration manuelle
+
+**Tests fonctionnels** :
 
 | Scenario | Verification |
 |----------|-------------|
 | Projet intro (9 blocs), mode continu | Tous les blocs s'affichent normalement au chargement initial |
 | Clic sur un widget dans un bloc (ex: expander) | Seul ce bloc se re-rend (verifier via `print()` temporaire dans `build()`) |
-| TOC sidebar apres clic widget | Pas de doublons, numerotation correcte |
+| TOC sidebar apres clic widget | Pas de doublons, numerotation correcte, ancres fonctionnelles |
 | Navigation markers apres clic widget | Widget flottant inchange, PageUp/PageDown fonctionnel |
 | Recherche texte apres clic widget | Resultats corrects, pas de doublons |
-| Export HTML apres clic widget | Export complet, pas de contenu duplique |
-| Bouton Inspector dans un bloc | Le panel s'ouvre (full rerun declenche) |
+| Export HTML apres clic widget | Export complet, pas de contenu duplique (voir limitation connue L1) |
+| Bouton Inspector dans un bloc | Le panel s'ouvre (full rerun declenche via `scope="app"`) |
 | Changement View mode (Paginated/Continuous) | Full rerun, tout se reconstruit normalement |
 | Changement Zoom/Width sidebar | Full rerun, tout se re-rend normalement |
+
+**Tests visuels (effets de bord)** :
+
+| Scenario | Verification |
+|----------|-------------|
+| Bloc avec diagramme Mermaid + widget | Apres clic widget, le diagramme flash (iframe recree). Etat pan/zoom perdu |
+| Bloc avec diagramme PlantUML + widget | Meme comportement que Mermaid |
+| Bloc avec wizard `st.rerun()` (bck_dynamic_content) | Boutons Previous/Next fonctionnent (fragment rerun suffit pour ce cas) |
+| Scroll position apres clic widget | La position de scroll ne bouge pas |
+| Interactions rapides sur 2 blocs differents | Les deux blocs se re-rendent sequentiellement, pas de crash |
+| Bloc composite (3 sous-blocs) + widget dans un sous-bloc | Les 3 sous-blocs se re-rendent (isolation au niveau composite, pas atomique) |
 
 ---
 
@@ -527,7 +580,7 @@ def test_register_toc_entry_skipped_during_fragment_rerun(monkeypatch):
 
 | Fichier | Modification | Lignes impactees |
 |---------|-------------|-----------------|
-| `streamtex/toc.py` | Guard dans `register_toc_entry()` + helper `_find_existing_anchor()` | l.122-131, +15 lignes |
+| `streamtex/toc.py` | Champ `_section_number` dans entries (l.88-94) + guard dans `register_toc_entry()` (l.122-131) + helper `_find_existing_toc_entry()` retournant un 3-tuple | l.88-94, l.122-131, +20 lignes |
 | `streamtex/marker.py` | Guard dans `register_marker()` + helper `_find_existing_marker_index()` | l.87-93, +12 lignes |
 | `streamtex/export.py` | Guard dans `st_html()`, `export_append()`, `export_push_wrapper()`, `export_pop_wrapper()` | l.145-160, l.224-227, ~12 lignes |
 | `streamtex/search.py` | Guard dans `record_if_active()` | l.55-57, +3 lignes |
@@ -543,8 +596,8 @@ def test_register_toc_entry_skipped_during_fragment_rerun(monkeypatch):
 
 ### Total estime
 
-- **~120 lignes de code ajoutees/modifiees** dans la librairie
-- **~60 lignes de tests**
+- **~130 lignes de code ajoutees/modifiees** dans la librairie (inclut le champ `_section_number` et le 3-tuple)
+- **~70 lignes de tests** (inclut les tests du 3-tuple)
 - **6 fichiers modifies** + **2 fichiers nouveaux**
 
 ---
@@ -609,13 +662,13 @@ def test_streamlit_context_api_available():
     assert callable(get_script_run_ctx)
 ```
 
-### Risque 2 : Ancres TOC inconsistantes lors du fragment rerun
+### Risque 2 : Entrees TOC introuvables lors du fragment rerun
 
-**Description** : Si `_find_existing_anchor(label)` ne trouve pas l'entree (ex: label legerement different entre deux rendus), elle retourne un slug genere qui pourrait differer de l'ancre originale.
+**Description** : Si `_find_existing_toc_entry(label)` ne trouve pas l'entree dans le registre (ex: label different entre deux rendus, entree supprimee), elle retourne un 3-tuple par defaut `(slug, "", 1)` qui pourrait differer de l'ancre originale.
 
-**Probabilite** : Tres faible. Les labels sont des constantes codees en dur dans les blocs (`st_write(style, "Mon Titre", toc_lvl="1")`).
+**Probabilite** : Tres faible. Les labels sont des constantes codees en dur dans les blocs (`st_write(style, "Mon Titre", toc_lvl="1")`). L'analyse des 90+ blocs confirme que tous les `toc_lvl` sont inconditionnels.
 
-**Mitigation** : Le fallback `slugify(label)` utilise la meme logique que `TOCRegistry`, donc le resultat sera identique meme en cas de miss dans le lookup.
+**Mitigation** : Le fallback utilise `TOCRegistry.get_key_anchor(label)` (meme logique de slugification que lors du full rerun), ce qui produit un resultat identique. Si deux entrees ont le meme label, la premiere correspondance est retournee (coherent avec le rendu sequentiel du full rerun).
 
 ### Risque 3 : Performance du guard (appel `is_fragment_rerun()` frequent)
 
@@ -639,24 +692,168 @@ def test_streamlit_context_api_available():
 
 **Probabilite** : Certain.
 
-**Mitigation** : Comportement acceptable. Le gain principal (ne pas re-rendre les N-1 autres blocs du livre) est preserv. L'isolation plus fine (par sous-bloc) serait une optimisation future.
+**Mitigation** : Comportement acceptable. Le gain principal (ne pas re-rendre les N-1 autres blocs du livre) est preserve. L'isolation plus fine (par sous-bloc) serait une optimisation future.
+
+### Risque 6 : Flash visuel des iframes (diagrammes) lors du fragment rerun
+
+> **Ajoute en v2.0**
+
+**Description** : Les diagrammes (Mermaid, PlantUML, TikZ) sont rendus dans des `<iframe>` via `components.html()`. Lors d'un fragment rerun, l'iframe est **detruit puis recree** (comportement natif Streamlit). L'utilisateur voit un flash blanc de 100-500ms et l'etat pan/zoom est perdu.
+
+**Probabilite** : Ne se produit QUE si un bloc contient a la fois un diagramme ET un widget interactif. Aucun bloc actuel n'a ce pattern (les blocs de diagrammes sont purement visuels).
+
+**Impact** : Haute si le pattern existe, mais inexistant dans le codebase actuel.
+
+**Mitigation** :
+- Court terme : accepter (aucun bloc actuel n'est affecte)
+- Moyen terme : option `fragment=False` sur `st_include()` pour exclure certains blocs du wrapping
+- Long terme : sauvegarder l'etat pan/zoom dans `st.session_state` et le restaurer apres le rerun
+
+### Risque 7 : `st.rerun()` dans un fragment declenche un fragment rerun, pas un full rerun
+
+> **Ajoute en v2.0**
+
+**Description** : `bck_dynamic_content.py` utilise `st.rerun()` dans des callbacks de boutons (wizard Previous/Next/Reset). Depuis l'interieur d'un fragment, `st.rerun()` sans argument declenche un **fragment rerun** (pas un full rerun). Le wizard fonctionnerait (il ne modifie que son propre affichage via `st.session_state.bck30_step`), mais un concepteur futur pourrait s'attendre a un full rerun.
+
+**Probabilite** : Le bloc actuel fonctionne correctement. Le risque concerne les futurs blocs.
+
+**Mitigation** : Documenter dans `coding_standards.md` que `st.rerun()` dans un bloc en mode continu declenche un fragment rerun. Utiliser `st.rerun(scope="app")` si un full rerun est necessaire.
+
+### Risque 8 : Layout shift lors du changement de hauteur d'un bloc
+
+> **Ajoute en v2.0**
+
+**Description** : Quand un fragment rerun modifie la hauteur d'un bloc (ex: expander qui s'ouvre), le contenu en dessous se decale verticalement. Si le bloc est au-dessus de la zone visible, le viewport peut sauter brievement.
+
+**Probabilite** : Certain pour les blocs avec expanders/toggles qui changent la hauteur.
+
+**Mitigation** : C'est le comportement identique a aujourd'hui (un expander qui s'ouvre cause deja un shift en full rerun). Pas de degradation supplementaire.
 
 ---
 
-## 8. Criteres de validation
+## 8. Effets de bord visuels pour l'utilisateur final
+
+> **Section ajoutee en v2.0** apres analyse approfondie des effets visuels.
+
+### Aucun probleme
+
+| Aspect | Raison |
+|--------|--------|
+| **Position de scroll** | Preservee nativement par Streamlit lors des fragment reruns. Le fragment ne modifie que son propre conteneur dans le DOM. |
+| **Etat des widgets** (sliders, selectbox, etc.) | Preserves via `st.session_state` avec cles stables. Tous les blocs existants utilisent des cles explicites prefixees (ex: `bck26_counter`). |
+| **Espacements 70px entre blocs** | Rendus hors fragment dans la boucle `st_book()`, jamais re-executes lors d'un fragment rerun. |
+| **TOC sidebar** | Pas de re-rendu, pas de doublons. Le guard empeche les re-enregistrements. |
+| **Conteneur `st.container()` supplementaire** | `st.fragment` cree un div wrapper invisible (pas de border, margin, padding). Aucun impact visuel. |
+
+### Effets mineurs
+
+| Effet | Severite | Detail |
+|-------|----------|--------|
+| **Micro-flash CSS (FOUC theorique)** | Negligeable | `st_block()` genere un nouvel UUID a chaque rerun. L'ancien `<style>` est supprime et le nouveau est injecte. Fenetre sans style : ~16ms (1 frame navigateur). Imperceptible. |
+| **Indicateur de chargement** | Faible | Streamlit affiche un leger "greying out" des elements du fragment pendant le rerun. Pas de spinner explicite. |
+
+### Effets significatifs (contextuels)
+
+| Effet | Severite | Condition de declenchement | Detail |
+|-------|----------|---------------------------|--------|
+| **Flash diagrammes** | Haute | Bloc avec diagramme + widget interactif | L'iframe est detruit/recree. Flash blanc 100-500ms. Etat pan/zoom perdu. **Aucun bloc actuel n'a ce pattern.** |
+| **Perte navigation markers** | Faible | Bloc avec marqueur re-rendu | Le `<div>` marqueur est recree avec le meme anchor ID. Le JS de scroll tracking (debounce 150ms) rattrape le changement automatiquement. |
+| **Reruns multiples rapides** | Faible | Clics rapides sur widgets de blocs differents | Les fragments s'executent sequentiellement (pas de concurrence). Chaque bloc flash/re-rend dans l'ordre. Visuellement saccade mais fonctionnellement correct. |
+
+---
+
+## 9. Contraintes pour les futurs concepteurs de blocs
+
+> **Section ajoutee en v2.0.** A integrer dans `documentation/coding_standards.md` lors de l'implementation.
+
+### Contrainte C1 : Ne pas utiliser `toc_lvl` ou `st_marker()` conditionnellement
+
+**Interdit** :
+```python
+def build():
+    if st.toggle("Show advanced"):
+        st_write(style, "Advanced Section", toc_lvl="2")  # INTERDIT
+```
+
+**Raison** : Lors d'un fragment rerun, `register_toc_entry()` est un NO-OP. L'entree TOC ne serait jamais ajoutee. La section serait rendue visuellement mais absente de la TOC.
+
+**Pattern correct** : Toujours placer les `toc_lvl` et `st_marker()` de facon inconditionnelle, en debut de section. Utiliser les widgets pour controler le contenu *sous* le titre, pas le titre lui-meme.
+
+**Verification** : Tous les 90+ blocs existants respectent deja cette contrainte (toc_lvl est toujours inconditionnel).
+
+### Contrainte C2 : Utiliser `st.rerun(scope="app")` pour un full rerun
+
+**Attention** :
+```python
+def build():
+    if st.button("Reload everything"):
+        st.rerun()             # ← fragment rerun seulement !
+        st.rerun(scope="app")  # ← full rerun (correct)
+```
+
+**Raison** : En mode continu, chaque bloc est enveloppe dans un `st.fragment`. Un appel `st.rerun()` sans argument depuis `build()` declenche un fragment rerun (seul ce bloc est re-execute), pas un full rerun de la page.
+
+**Bloc existant concerne** : `bck_dynamic_content.py` utilise `st.rerun()` pour un wizard. Le wizard fonctionne correctement car il ne modifie que son propre etat (`st.session_state.bck30_step`). Pas de correction requise.
+
+### Contrainte C3 : Citations conditionnelles et bibliographie
+
+**Cas limite** :
+```python
+def build():
+    if st.toggle("Show references"):
+        st_cite("key_2024")  # ← ajoutera la citation au registre, mais st_bibliography()
+                              #   (rendu dans un autre bloc) ne sera pas re-execute.
+```
+
+**Impact** : Le numero de citation apparait dans le texte, mais l'entree correspondante dans la bibliographie n'est visible qu'apres un full rerun (changement de zoom, refresh page, etc.).
+
+**Pattern correct** : Placer `st_cite()` inconditionnellement. Utiliser les widgets pour controler l'affichage du texte *autour* de la citation, pas la citation elle-meme.
+
+---
+
+## 10. Limitations connues
+
+> **Section ajoutee en v2.0.** Ces limitations sont des compromis acceptes.
+
+### L1 : Export HTML reflete le dernier full rerun
+
+Apres des interactions widget (fragment reruns), le bouton "Download HTML" produit le HTML du **dernier full rerun**, pas l'etat visuel courant. Si un widget a change du contenu visible (ex: toggle, selectbox), l'export ne reflecte pas ces changements.
+
+**Contournement** : Changer le zoom, le mode (Paginated/Continuous), ou rafraichir la page pour declencher un full rerun avant d'exporter.
+
+**Raison technique** : Le buffer d'export est guarde pendant les fragment reruns pour eviter la corruption (doublons, stack desynchronisee). Accepter l'export "stale" est le compromis le moins risque.
+
+### L2 : Index de recherche reflete le dernier full rerun — RESOLU
+
+Meme principe que L1. Si un widget montre/cache du contenu dans un bloc, l'index de recherche ne reflete pas le changement visuel.
+
+**Resolution** : Un bouton "Refresh search index" a ete ajoute dans la sidebar (au-dessus des onglets TOC/Markers), en mode pagine et en mode continu. En mode continu, le bouton declenche un `st.rerun()` qui reconstruit l'index. En mode pagine, il supprime egalement le cache (`_stx_page_cache`) pour forcer `_build_page_cache()` a se re-executer.
+
+**Impact reel** : Tres faible. La recherche StreamTeX opere au niveau bloc (montre/cache des blocs entiers par index). Le contenu conditionnel intra-bloc ne change pas la presence du bloc dans les resultats.
+
+### L3 : Blocs composites : isolation au niveau composite, pas atomique
+
+Un bloc composite qui inclut 3 sous-blocs atomiques est un seul fragment. Un widget dans un sous-bloc atomique re-rend les 3 sous-blocs (pas seulement le sous-bloc concerne).
+
+**Impact** : Le gain principal (ne pas re-rendre les N-1 autres blocs du livre) est preserve. Seule l'isolation intra-composite est perdue.
+
+---
+
+## 11. Criteres de validation
 
 ### Criteres fonctionnels (MUST)
 
 - [ ] Chargement initial d'un projet en mode continu : identique a aujourd'hui
 - [ ] TOC sidebar : aucun doublon apres interaction widget dans un bloc
-- [ ] Numerotation TOC : correcte apres interaction widget
+- [ ] Numerotation TOC : correcte apres interaction widget (3-tuple verifie)
 - [ ] Markers : aucun doublon, indices corrects apres interaction widget
 - [ ] Navigation markers (PageUp/PageDown) : fonctionnelle apres interaction widget
 - [ ] Recherche textuelle : resultats corrects, pas de doublons
-- [ ] Export HTML : contenu complet et correct apres interaction widget
-- [ ] Bouton Inspector : ouvre le panel (declenche full rerun)
+- [ ] Export HTML : contenu complet et correct (reflete le dernier full rerun, cf. limitation L1)
+- [ ] Bouton Inspector : ouvre le panel (declenche full rerun via `scope="app"`)
 - [ ] Widgets sidebar (Zoom, Width, View mode) : declenchent full rerun normalement
 - [ ] Tous les 203+ tests existants passent
+- [ ] Wizard Previous/Next/Reset (`bck_dynamic_content`) fonctionne dans le fragment
 
 ### Criteres de performance (SHOULD)
 
@@ -664,8 +861,19 @@ def test_streamlit_context_api_available():
 - [ ] Pas de regression sur le temps de chargement initial
 - [ ] Pas de fuite memoire DOM (verifier DevTools apres 20 interactions)
 
+### Criteres visuels (SHOULD)
+
+- [ ] Scroll position preservee apres interaction widget dans un bloc
+- [ ] Pas de flash visible sur les blocs sans diagramme ni iframe
+- [ ] Espacements entre blocs stables (pas de layout jump)
+
 ### Criteres de compatibilite (MUST)
 
 - [ ] Zero changement dans le code des blocs existants
 - [ ] Mode pagine non impacte (le guard n'intervient que dans la boucle continue)
 - [ ] `uv run ruff check streamtex/` sans erreur
+
+### Documentation a mettre a jour (SHOULD)
+
+- [ ] `documentation/coding_standards.md` : ajouter contraintes C1, C2, C3
+- [ ] `CLAUDE.md` : mentionner le fragment guard dans la section "Key Components"

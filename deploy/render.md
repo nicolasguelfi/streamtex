@@ -117,6 +117,85 @@ Create multiple services, each with a different `FOLDER` env var:
 
 Each service gets its own URL (e.g., `streamtex-intro.onrender.com`).
 
+## Password gate (STX_PASSWORD)
+
+StreamTeX includes a visual password gate (`streamtex/auth.py`). It is controlled by the `STX_PASSWORD` environment variable.
+
+| Scenario | Behaviour |
+|----------|-----------|
+| `STX_PASSWORD` not set or empty | Gate disabled (direct access) |
+| `STX_PASSWORD=a` | Gate active — user clicks **A** in the grid |
+| `STX_PASSWORD=stx` | Gate active — user clicks **S → T → X** in sequence |
+| `STX_GATE=1` (no password) | Gate shown locally for preview (dev only) |
+
+**Changing the password** requires updating **two places**:
+
+1. **`render.yaml`** — the IaC blueprint (source of truth for new deploys):
+   ```yaml
+   envVars:
+     - key: STX_PASSWORD
+       value: a              # Change this
+   ```
+2. **Render API** — for live services (render.yaml alone only takes effect on next deploy):
+   ```bash
+   # List services
+   curl -s -H "Authorization: Bearer $API_KEY" \
+     "https://api.render.com/v1/services?limit=20" | python3 -m json.tool
+
+   # Check current value
+   curl -s -H "Authorization: Bearer $API_KEY" \
+     "https://api.render.com/v1/services/<SERVICE_ID>/env-vars" | python3 -m json.tool
+
+   # Update STX_PASSWORD on a service
+   curl -s -X PUT -H "Authorization: Bearer $API_KEY" \
+     -H "Content-Type: application/json" \
+     -d '[{"key":"STX_PASSWORD","value":"a"}]' \
+     "https://api.render.com/v1/services/<SERVICE_ID>/env-vars"
+   ```
+
+**To disable the gate entirely**: remove the `STX_PASSWORD` entry from `render.yaml` and delete the variable from each service via the API or dashboard.
+
+### Render CLI & API key
+
+The Render CLI is installed via `brew install render`. After `render login`, the API key is stored in:
+
+```
+~/.render/cli.yaml
+```
+
+```yaml
+api:
+    key: rnd_xxxxxxxxxxxxxxxxxxxxxxxxxxxxx    # ← API key for curl commands
+    host: https://api.render.com/v1/
+```
+
+> **Note**: The CLI v2 has bugs in non-interactive (headless) mode.
+> For scripting, prefer the REST API directly with the key from `cli.yaml`.
+
+### Batch update STX_PASSWORD on all services
+
+```bash
+API_KEY=$(grep 'key:' ~/.render/cli.yaml | head -1 | awk '{print $2}')
+
+# List all service IDs
+curl -s -H "Authorization: Bearer $API_KEY" \
+  "https://api.render.com/v1/services?limit=20" \
+  | python3 -c "
+import sys, json
+for s in json.load(sys.stdin):
+    svc = s.get('service', s)
+    print(f\"{svc['id']}  {svc['name']}\")
+"
+
+# Update all services
+for SVC_ID in srv-xxx srv-yyy srv-zzz; do
+  curl -s -X PUT -H "Authorization: Bearer $API_KEY" \
+    -H "Content-Type: application/json" \
+    -d '[{"key":"STX_PASSWORD","value":"a"}]' \
+    "https://api.render.com/v1/services/$SVC_ID/env-vars"
+done
+```
+
 ## Troubleshooting
 
 | Issue | Solution |
@@ -127,3 +206,4 @@ Each service gets its own URL (e.g., `streamtex-intro.onrender.com`).
 | Images not loading | Verify `enableStaticServing = true` in `.streamlit/config.toml` |
 | Slow cold start | Normal for free tier (~30-60s). Docker image size affects this. |
 | Out of free hours | One always-on app uses ~744h/month, which fits in the 750h free quota. Two apps won't fit. |
+| Password unchanged after push | `render.yaml` sets env vars only on new deploys/blueprint sync. Update live services via the Render API or dashboard. See [Password gate](#password-gate-stx_password). |

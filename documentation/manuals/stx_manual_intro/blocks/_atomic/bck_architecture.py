@@ -35,19 +35,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            project/
-            +-- book.py              # Entry point
-            +-- setup.py             # Adds streamtex to sys.path
-            +-- custom/
-            |   +-- styles.py        # Project-specific styles
-            |   +-- themes.py        # Theme overrides
-            +-- blocks/
-                +-- __init__.py      # Auto-discovers bck_*.py files
-                +-- bck_00_welcome.py
-                +-- bck_01_architecture.py
-                +-- ...
-        """), language="text", line_numbers=False)
+        show_code(file="examples/block/folder_structure.txt", language="text", line_numbers=False)
         st_space("v", 2)
 
         # st_book
@@ -69,10 +57,7 @@ def build():
                 book_source = f.read()
             show_code(book_source)
         except Exception:
-            show_code(textwrap.dedent("""\
-                st_book([blocks.bck_01, blocks.bck_02, ...],
-                        toc_config=toc)
-            """))
+            show_code(file="examples/block/book_fallback.py")
         st_space("v", 2)
 
         # st_include
@@ -85,10 +70,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            from blocks import bck_welcome
-            st_include(bck_welcome)
-        """))
+        show_code(file="examples/block/st_include.py")
         st_space("v", 1)
 
         # Live sub-include
@@ -158,10 +140,7 @@ def build():
                 init_source = f.read()
             show_code(init_source)
         except Exception:
-            show_code(textwrap.dedent("""\
-                # blocks/__init__.py uses glob + importlib
-                # to auto-discover all bck_*.py files
-            """))
+            show_code(file="examples/block/init_fallback.py")
         st_space("v", 2)
 
         show_details(textwrap.dedent("""\

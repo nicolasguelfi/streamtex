@@ -1,0 +1,13 @@
+with st_grid(cols=4, cell_styles=bs.cell) as g:
+    with g.cell(): st_write(s.text.colors.red + s.large, "red")
+    with g.cell(): st_write(s.text.colors.blue + s.large, "blue")
+    with g.cell(): st_write(s.text.colors.green + s.large, "green")
+    with g.cell(): st_write(s.text.colors.orange + s.large, "orange")
+    with g.cell(): st_write(s.text.colors.coral + s.large, "coral")
+    with g.cell(): st_write(s.text.colors.dodger_blue + s.large, "dodger_blue")
+    with g.cell(): st_write(s.text.colors.crimson + s.large, "crimson")
+    with g.cell(): st_write(s.text.colors.teal + s.large, "teal")
+    with g.cell(): st_write(s.text.colors.gold + s.large, "gold")
+    with g.cell(): st_write(s.text.colors.lime + s.large, "lime")
+    with g.cell(): st_write(s.text.colors.violet + s.large, "violet")
+    with g.cell(): st_write(s.text.colors.salmon + s.large, "salmon")

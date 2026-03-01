@@ -32,14 +32,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            with st_block(s.container.bg_colors.dark_slate_gray_bg
-                          + s.container.paddings.medium_padding
-                          + s.center_txt):
-                st_write(s.text.colors.white + s.Large, "Inside st_block")
-                st_write(s.text.colors.light_gray + s.large,
-                         "Children stack vertically")
-        """))
+        show_code(file="examples/container/block_basic.py")
         st_space("v", 1)
 
         with st_block(s.container.bg_colors.dark_slate_gray_bg
@@ -61,13 +54,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            with st_span(s.container.bg_colors.dark_slate_blue_bg
-                         + s.container.paddings.medium_padding):
-                st_write(s.text.colors.white + s.large, "Left ")
-                st_write(s.text.colors.light_green + s.large, "Center ")
-                st_write(s.text.colors.light_coral + s.large, "Right")
-        """))
+        show_code(file="examples/container/span_basic.py")
         st_space("v", 1)
 
         with st_span(s.container.bg_colors.dark_slate_blue_bg
@@ -87,17 +74,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            with st_block(bs.demo_border):
-                st_write(s.bold + s.large, "Outer st_block")
-                with st_block(s.container.bg_colors.light_blue_bg
-                              + s.container.paddings.small_padding):
-                    st_write(s.large, "Inner st_block")
-                    with st_span():
-                        st_write(s.large + s.bold, "Span child A  ")
-                        st_write(s.large + s.text.colors.coral,
-                                 "Span child B")
-        """))
+        show_code(file="examples/container/nesting.py")
         st_space("v", 1)
 
         with st_block(bs.demo_border):
@@ -129,13 +106,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            st_write(s.large, "First line of text")
-            st_br()  # Add vertical space
-            st_write(s.large, "Second line of text")
-            st_br()
-            st_write(s.large, "Third line of text")
-        """))
+        show_code(file="examples/container/line_break.py")
         st_space("v", 1)
 
         st_write(s.large, "First line of text")
@@ -164,17 +135,7 @@ def build():
         """)
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            # Simple spacing with st_br
-            st_write(s.large, "Paragraph 1")
-            st_br()
-            st_write(s.large, "Paragraph 2")
-
-            # Explicit spacing with st_space
-            st_write(s.large, "Section 1")
-            st_space("v", 3)  # More space
-            st_write(s.large, "Section 2")
-        """))
+        show_code(file="examples/container/br_vs_space.py")
         st_space("v", 2)
 
         show_details(textwrap.dedent("""\

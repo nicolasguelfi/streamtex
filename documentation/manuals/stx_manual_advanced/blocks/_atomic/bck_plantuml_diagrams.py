@@ -11,6 +11,7 @@ class BlockStyles:
     """PlantUML diagrams demo styles."""
     heading = s.project.titles.section_title + s.center_txt
     sub = s.project.titles.section_subtitle
+    file_label = s.medium + s.italic + s.project.colors.neutral_gray
 bs = BlockStyles
 
 
@@ -38,20 +39,14 @@ def build():
         st_write(bs.sub, "Class Diagram", toc_lvl="+1")
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            stx.st_plantuml('''
-            @startuml
-            class Style {
-              +css: str
-              +__add__(other): Style
-            }
-            @enduml
-            ''')
-        """))
+        show_code(file="examples/diagram/plantuml_class.py")
         st_space("v", 1)
 
         with st_block(s.project.containers.result_box):
             stx.st_plantuml(file=DIAGRAMS["Class Diagram"], height=1000, key="plantuml_class")
+        st_space("v", 1)
+        st_write(bs.file_label, f"Source: {DIAGRAMS['Class Diagram']}")
+        show_code(file=DIAGRAMS["Class Diagram"], language="text")
         st_space("v", 2)
 
         # --- Section 2: Sequence Diagram ---
@@ -64,20 +59,14 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            stx.st_plantuml('''
-            @startuml
-            actor User
-            participant "st_book()" as Book
-            User -> Book: run app
-            Book --> User: display page
-            @enduml
-            ''')
-        """))
+        show_code(file="examples/diagram/plantuml_sequence.py")
         st_space("v", 1)
 
         with st_block(s.project.containers.result_box):
             stx.st_plantuml(file=DIAGRAMS["Sequence Diagram"], height=1000, key="plantuml_sequence")
+        st_space("v", 1)
+        st_write(bs.file_label, f"Source: {DIAGRAMS['Sequence Diagram']}")
+        show_code(file=DIAGRAMS["Sequence Diagram"], language="text")
         st_space("v", 2)
 
         # --- Section 3: Use Case Diagram ---
@@ -92,17 +81,16 @@ def build():
 
         with st_block(s.project.containers.result_box):
             stx.st_plantuml(file=DIAGRAMS["Use Case Diagram"], height=1000, key="plantuml_usecase")
+        st_space("v", 1)
+        st_write(bs.file_label, f"Source: {DIAGRAMS['Use Case Diagram']}")
+        show_code(file=DIAGRAMS["Use Case Diagram"], language="text")
         st_space("v", 2)
 
         # --- Section 4: Interactive selection ---
         st_write(bs.sub, "Interactive Diagram Selection", toc_lvl="+1")
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            diagrams = {"Class": code1, "Sequence": code2, ...}
-            choice = st.selectbox("Choose a diagram", list(diagrams.keys()))
-            stx.st_plantuml(diagrams[choice], key="my_plantuml")
-        """))
+        show_code(file="examples/diagram/plantuml_interactive.py")
         st_space("v", 1)
 
         choice = st.selectbox("Choose a PlantUML diagram",
@@ -110,6 +98,9 @@ def build():
                               key="bck_plantuml_select")
         with st_block(s.project.containers.result_box):
             stx.st_plantuml(file=DIAGRAMS[choice], height=1000, key="plantuml_interactive")
+        st_space("v", 1)
+        st_write(bs.file_label, f"Source: {DIAGRAMS[choice]}")
+        show_code(file=DIAGRAMS[choice], language="text")
         st_space("v", 2)
 
         show_details(textwrap.dedent("""\

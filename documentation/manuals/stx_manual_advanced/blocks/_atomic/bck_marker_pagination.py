@@ -107,12 +107,4 @@ def build():
     """))
     st_space("v", 1)
 
-    show_code(textwrap.dedent("""\
-        # Lifecycle in book.py (simplified)
-        reset_marker_registry(marker_config)  # 1. Init registry
-
-        for block in blocks:                   # 2. Render blocks
-            st_include(block)                  #    (st_write auto-registers markers)
-
-        inject_marker_navigation()             # 3. Emit widget + JS
-    """))
+    show_code(file="examples/nav/marker_lifecycle.py")

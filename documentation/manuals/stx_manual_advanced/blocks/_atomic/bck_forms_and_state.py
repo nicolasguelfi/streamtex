@@ -32,16 +32,7 @@ def build():
         st_write(bs.sub, "Basic Form", toc_lvl="+1")
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            with st.form("profile_form"):
-                name = st.text_input("Name")
-                age = st.number_input("Age", 0, 120, 25)
-                submitted = st.form_submit_button("Submit")
-            if submitted:
-                with st_block(s.project.containers.result_box):
-                    st_write(s.large + s.bold, f"Name: {name}")
-                    st_write(s.large, f"Age: {age}")
-        """))
+        show_code(file="examples/state/basic_form.py")
         st_space("v", 1)
 
         with st.form("bck26_profile_form"):
@@ -59,16 +50,7 @@ def build():
         st_write(bs.sub, "Session State Counter", toc_lvl="+1")
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            if "counter" not in st.session_state:
-                st.session_state.counter = 0
-            if st.button("Increment"):
-                st.session_state.counter += 1
-            count = st.session_state.counter
-            size = min(12 + count * 4, 96)
-            st_write(ns(f"font-size: {size}px;") + s.bold,
-                     f"Count: {count}")
-        """))
+        show_code(file="examples/state/session_counter.py")
         st_space("v", 1)
 
         if "bck26_counter" not in st.session_state:
@@ -86,18 +68,7 @@ def build():
         st_write(bs.sub, "Form with Styled Feedback", toc_lvl="+1")
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            with st.form("validation_form"):
-                password = st.text_input("Password", type="password")
-                submitted = st.form_submit_button("Validate")
-            if submitted:
-                if len(password) >= 8:
-                    with st_block(s.project.containers.good_callout):
-                        st_write(s.large, "Strong password!")
-                else:
-                    with st_block(s.project.containers.bad_callout):
-                        st_write(s.large, "Too short (min 8 chars).")
-        """))
+        show_code(file="examples/state/form_validation.py")
         st_space("v", 1)
 
         with st.form("bck26_validation_form"):
@@ -121,19 +92,7 @@ def build():
         st_write(bs.sub, "Persistent List", toc_lvl="+1")
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            if "items" not in st.session_state:
-                st.session_state.items = []
-            with st.form("add_item_form"):
-                new_item = st.text_input("New item")
-                added = st.form_submit_button("Add")
-            if added and new_item:
-                st.session_state.items.append(new_item)
-            if st.session_state.items:
-                with st_list(list_type=lt.ordered, li_style=s.large) as l:
-                    for item in st.session_state.items:
-                        with l.item(): st_write(item)
-        """))
+        show_code(file="examples/state/persistent_list.py")
         st_space("v", 1)
 
         if "bck26_items" not in st.session_state:

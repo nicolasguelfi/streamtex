@@ -11,6 +11,7 @@ class BlockStyles:
     """Mermaid diagrams demo styles."""
     heading = s.project.titles.section_title + s.center_txt
     sub = s.project.titles.section_subtitle
+    file_label = s.medium + s.italic + s.project.colors.neutral_gray
 bs = BlockStyles
 
 
@@ -37,20 +38,14 @@ def build():
         st_write(bs.sub, "Flowchart", toc_lvl="+1")
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            stx.st_mermaid('''
-                graph TD
-                    A[Start] --> B{Is it working?}
-                    B -->|Yes| C[Great!]
-                    B -->|No| D[Debug]
-                    D --> F[Fix code]
-                    F --> B
-            ''')
-        """))
+        show_code(file="examples/diagram/mermaid_flowchart.py")
         st_space("v", 1)
 
         with st_block(s.project.containers.result_box):
             stx.st_mermaid(file=DIAGRAMS["Flowchart"], height=1000, key="mermaid_flowchart")
+        st_space("v", 1)
+        st_write(bs.file_label, f"Source: {DIAGRAMS['Flowchart']}")
+        show_code(file=DIAGRAMS["Flowchart"], language="text")
         st_space("v", 2)
 
         # --- Section 2: Sequence diagram ---
@@ -63,19 +58,14 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            stx.st_mermaid('''
-                sequenceDiagram
-                    participant U as User
-                    participant S as Server
-                    U->>S: Request
-                    S->>U: Response
-            ''')
-        """))
+        show_code(file="examples/diagram/mermaid_sequence.py")
         st_space("v", 1)
 
         with st_block(s.project.containers.result_box):
             stx.st_mermaid(file=DIAGRAMS["Sequence Diagram"], height=1000, key="mermaid_sequence")
+        st_space("v", 1)
+        st_write(bs.file_label, f"Source: {DIAGRAMS['Sequence Diagram']}")
+        show_code(file=DIAGRAMS["Sequence Diagram"], language="text")
         st_space("v", 2)
 
         # --- Section 3: Class diagram ---
@@ -90,17 +80,16 @@ def build():
 
         with st_block(s.project.containers.result_box):
             stx.st_mermaid(file=DIAGRAMS["Class Diagram"], height=1000, key="mermaid_class")
+        st_space("v", 1)
+        st_write(bs.file_label, f"Source: {DIAGRAMS['Class Diagram']}")
+        show_code(file=DIAGRAMS["Class Diagram"], language="text")
         st_space("v", 2)
 
         # --- Section 4: Interactive selection ---
         st_write(bs.sub, "Interactive Diagram Selection", toc_lvl="+1")
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            diagrams = {"Flowchart": code1, "Sequence": code2, ...}
-            choice = st.selectbox("Choose a diagram", list(diagrams.keys()))
-            stx.st_mermaid(diagrams[choice], key="my_mermaid")
-        """))
+        show_code(file="examples/diagram/mermaid_interactive.py")
         st_space("v", 1)
 
         choice = st.selectbox("Choose a Mermaid diagram",
@@ -108,6 +97,9 @@ def build():
                               key="bck_mermaid_select")
         with st_block(s.project.containers.result_box):
             stx.st_mermaid(file=DIAGRAMS[choice], height=1000, key="mermaid_interactive")
+        st_space("v", 1)
+        st_write(bs.file_label, f"Source: {DIAGRAMS[choice]}")
+        show_code(file=DIAGRAMS[choice], language="text")
         st_space("v", 2)
 
         show_details(textwrap.dedent("""\

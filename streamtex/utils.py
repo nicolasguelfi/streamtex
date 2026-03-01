@@ -5,6 +5,7 @@ Image utilities re-exported from image_utils.py.
 Link preview utilities re-exported from link_preview.py.
 """
 
+import inspect
 import re
 import uuid
 from pathlib import Path
@@ -32,6 +33,35 @@ def strip_html(html_string):
 def generate_key(prefix: str = "block"):
     """Generate a unique key with the given prefix."""
     return f"{prefix}-{uuid.uuid4().hex}"
+
+
+def exec_static(
+    path: str,
+    context: dict | None = None,
+    start_line: int | None = None,
+    end_line: int | None = None,
+) -> None:
+    """Load a Python file via ``resolve_static()`` and execute it.
+
+    If *context* is ``None``, the caller's ``globals + locals`` are used so
+    that names like ``st_write``, ``s``, ``bs`` etc. are available.
+
+    *start_line* / *end_line* allow executing only a slice of the file
+    (1-based, inclusive).
+    """
+    from .blocks import resolve_static
+
+    resolved = resolve_static(path)
+    code = Path(resolved).read_text(encoding="utf-8")
+    if start_line or end_line:
+        lines = code.splitlines()
+        s = (start_line or 1) - 1
+        e = end_line or len(lines)
+        code = "\n".join(lines[s:e])
+    if context is None:
+        frame = inspect.currentframe().f_back
+        context = {**frame.f_globals, **frame.f_locals}
+    exec(code, context)  # noqa: S102
 
 
 def resolve_content(

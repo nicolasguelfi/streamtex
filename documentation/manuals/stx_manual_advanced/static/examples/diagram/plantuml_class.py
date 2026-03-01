@@ -1,0 +1,1 @@
+stx.st_plantuml(file="diagrams/class_diagram.puml", height=1000)

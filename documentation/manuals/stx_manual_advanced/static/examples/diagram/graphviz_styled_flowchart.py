@@ -1,0 +1,1 @@
+stx.st_graphviz(file="diagrams/flowchart.dot", height=600)

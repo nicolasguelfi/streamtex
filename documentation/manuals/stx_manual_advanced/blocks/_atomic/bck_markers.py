@@ -49,18 +49,7 @@ def build():
     """))
     st_space("v", 1)
 
-    show_code(textwrap.dedent("""\
-        from streamtex import st_marker
-
-        # Visible marker — dashed border + label text
-        st_marker("Section Start", visible=True)
-
-        # Invisible marker — zero height, navigation only
-        st_marker("Hidden Waypoint")
-
-        # Auto-generated label when omitted
-        st_marker()  # label = "Marker N"
-    """))
+    show_code(file="examples/nav/marker_manual.py")
     st_space("v", 1)
 
     # Live demo
@@ -85,20 +74,7 @@ def build():
     """))
     st_space("v", 1)
 
-    show_code(textwrap.dedent("""\
-        from streamtex import MarkerConfig, st_book
-
-        # All TOC headings become markers
-        cfg = MarkerConfig(auto_marker_on_toc=True)
-
-        # Only levels 1 and 2 become markers
-        cfg = MarkerConfig(auto_marker_on_toc=2)
-
-        # Disabled (default) — no automatic bridge
-        cfg = MarkerConfig(auto_marker_on_toc=False)
-
-        st_book([...], marker_config=cfg)
-    """))
+    show_code(file="examples/nav/marker_auto_toc.py")
     st_space("v", 2)
 
     # ------------------------------------------------------------------
@@ -115,13 +91,7 @@ def build():
     """))
     st_space("v", 1)
 
-    show_code(textwrap.dedent("""\
-        # Exclude a heading from markers (e.g. appendix)
-        st_write(s.huge, "Appendix", toc_lvl="1", marker=False)
-
-        # Force a heading to become a marker even when auto is off
-        st_write(s.huge, "Important Note", toc_lvl="2", marker=True)
-    """))
+    show_code(file="examples/nav/marker_per_heading.py")
     st_space("v", 2)
 
     show_details(textwrap.dedent("""\

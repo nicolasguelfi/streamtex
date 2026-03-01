@@ -31,16 +31,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            # Export is enabled by default in st_book()
-            st_book([
-                blocks.bck_00_welcome,
-                blocks.bck_01_architecture,
-                # ...
-            ], export_title="My Course")
-
-            # The sidebar shows a "Download HTML" button automatically.
-        """))
+        show_code(file="examples/export/book_default.py")
         st_space("v", 2)
 
         # --- 2. How it works ---
@@ -55,21 +46,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            # Dual rendering pipeline (simplified)
-            #
-            #   stx.st_write(...)
-            #        |
-            #   st_html(html)
-            #        |
-            #   +----+----+
-            #   |         |
-            # st.html() buffer.append()
-            #              |
-            #       generate_full_html()
-            #              |
-            #     self-contained .html file
-        """), language="text")
+        show_code(file="examples/export/dual_rendering.txt", language="text")
         st_space("v", 2)
 
         # --- 3. Customization ---
@@ -82,18 +59,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            from streamtex.export import ExportConfig
-
-            # ExportConfig fields:
-            #   enabled: bool       = False   (st_book sets this to True)
-            #   page_title: str     = "StreamTeX Export"
-            #   page_width: str     = "100%"
-            #   page_padding: str   = "36pt"
-
-            # The simplest way: just set export_title in st_book()
-            st_book([...], export_title="My Document Title")
-        """))
+        show_code(file="examples/export/export_config_basic.py")
         st_space("v", 2)
 
         # --- 4. Disable export ---
@@ -106,12 +72,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            st_book([
-                blocks.bck_00_welcome,
-                # ...
-            ], export=False)  # No download button
-        """))
+        show_code(file="examples/export/disable_export.py")
         st_space("v", 2)
 
         # --- 5. Details ---
@@ -132,21 +93,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            from streamtex.export import ExportConfig
-
-            config = ExportConfig(
-                enabled=True,                    # Enable/disable export
-                page_title="My Document",        # <title> tag
-                page_width="100%",             # Page width in export
-                page_padding="36pt",             # Page padding/margins
-                include_styles=True,             # Include all CSS
-                include_images=True,             # Embed images as base64
-                prettify_html=False,             # Format HTML (slower)
-            )
-
-            st_book([...], export_config=config)
-        """))
+        show_code(file="examples/export/export_config_full.py")
         st_space("v", 2)
 
         # --- 7. CSS customization ---
@@ -159,22 +106,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            from streamtex.export import ExportConfig
-
-            # Print-friendly CSS for exports
-            export_css = \"\"\"
-            @media print {
-                body { font-size: 12pt; line-height: 1.5; }
-                .no-print { display: none; }
-                a { text-decoration: underline; }
-            }
-            \"\"\"
-
-            # Note: Currently, use inline styles in blocks instead
-            # Future: ExportConfig will support custom_css parameter
-            st_book([...])
-        """))
+        show_code(file="examples/export/custom_css.py")
         st_space("v", 2)
 
         # --- 8. Image optimization ---
@@ -188,20 +120,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            # Large images slow down export
-            st_image("huge_photo.png")  # ~5MB when embedded
-
-            # Smaller images are better
-            st_image("icon.png")  # ~50KB when embedded
-
-            # Use image compression:
-            # - JPG for photos (lossy, smaller)
-            # - PNG for graphics (lossless)
-            # - WebP for web (best compression, but less supported)
-
-            # Recommendation: Keep images < 500KB before export
-        """))
+        show_code(file="examples/export/image_optimization.py")
         st_space("v", 2)
 
         # --- 9. File size and performance ---
@@ -238,15 +157,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            # Current (HTML only)
-            st_book([...], export_title="My Document")
-
-            # Future possibility (not yet implemented)
-            # st_book([...],
-            #     export_title="My Document",
-            #     export_formats=["html", "pdf", "markdown"])
-        """))
+        show_code(file="examples/export/multi_format_future.py")
         st_space("v", 2)
 
         show_details(textwrap.dedent("""\

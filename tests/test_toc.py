@@ -1,7 +1,7 @@
 """Tests for the Table of Contents system."""
 
 import pytest
-from streamtex.toc import TOCConfig, TOCRegistry
+from streamtex.toc import NumberingMode, TOCConfig, TOCRegistry
 from streamtex.book import _resolve_sidebar_max_level
 
 
@@ -109,3 +109,47 @@ class TestTOCRegistry:
         reg.register_entry("Title", "-5")
         entries = reg.get_entries()
         assert entries[0]["level"] == 1
+
+
+class TestNumberingMode:
+    def test_default_effective_numbering_is_both(self):
+        config = TOCConfig()
+        assert config.effective_numbering == NumberingMode.BOTH
+
+    def test_numerate_false_gives_none(self):
+        config = TOCConfig(numerate_titles=False)
+        assert config.effective_numbering == NumberingMode.NONE
+
+    def test_numbering_overrides_numerate_titles(self):
+        config = TOCConfig(numerate_titles=True, numbering=NumberingMode.SIDEBAR_ONLY)
+        assert config.effective_numbering == NumberingMode.SIDEBAR_ONLY
+
+    def test_sidebar_only_title_has_number_but_return_empty(self):
+        config = TOCConfig(numbering=NumberingMode.SIDEBAR_ONLY)
+        reg = TOCRegistry(config)
+        key_anchor, section_number, lvl = reg.register_entry("Intro", "1")
+        entries = reg.get_entries()
+        # Sidebar title includes number
+        assert entries[0]["title"] == "1 Intro"
+        # Returned section_number is empty (main content should not show it)
+        assert section_number == ""
+
+    def test_main_only_title_no_number_but_return_present(self):
+        config = TOCConfig(numbering=NumberingMode.MAIN_ONLY)
+        reg = TOCRegistry(config)
+        key_anchor, section_number, lvl = reg.register_entry("Intro", "1")
+        entries = reg.get_entries()
+        # Sidebar title has no number
+        assert entries[0]["title"] == "Intro"
+        # Returned section_number is present (main content should show it)
+        assert section_number == "1 "
+
+    def test_section_number_always_stored(self):
+        for mode in (NumberingMode.NONE, NumberingMode.BOTH,
+                     NumberingMode.SIDEBAR_ONLY, NumberingMode.MAIN_ONLY):
+            config = TOCConfig(numbering=mode)
+            reg = TOCRegistry(config)
+            reg.register_entry("Title", "1")
+            entries = reg.get_entries()
+            assert "section_number" in entries[0]
+            assert entries[0]["section_number"] == "1 "

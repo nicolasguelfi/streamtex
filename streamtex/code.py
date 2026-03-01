@@ -16,11 +16,14 @@ except Exception:
 
 @_cache_code
 def _highlight_code(code: str, language: str, line_numbers: bool,
-                    font_size: str) -> str:
+                    font_size: str, line_start: int = 1) -> str:
     """Return Pygments-highlighted HTML for the given code.
 
     The result is cached by Streamlit based on (code, language,
-    line_numbers, font_size) so that re-renders skip Pygments entirely.
+    line_numbers, font_size, line_start) so that re-renders skip Pygments
+    entirely.
+
+    :param line_start: First line number displayed (Pygments ``linenostart``).
     """
     try:
         from pygments import highlight
@@ -38,6 +41,7 @@ def _highlight_code(code: str, language: str, line_numbers: bool,
         )
         if line_numbers:
             fmt_options["linenos"] = "table"
+            fmt_options["linenostart"] = line_start
 
         formatter = HtmlFormatter(**fmt_options)
         return highlight(code, lexer, formatter)
@@ -47,7 +51,7 @@ def _highlight_code(code: str, language: str, line_numbers: bool,
         lines = code.split("\n")
         if line_numbers:
             numbered = []
-            for i, line in enumerate(lines, 1):
+            for i, line in enumerate(lines, line_start):
                 num = f"{i:>4} "
                 numbered.append(f"{num}{line}")
             body = "\n".join(numbered)
@@ -74,6 +78,9 @@ def st_code(
     wrap: Optional[bool] = None,
     file: str | None = None,
     encoding: str = "utf-8",
+    line_start: int | None = None,
+    start_line: int | None = None,
+    end_line: int | None = None,
 ):
     """Renders syntax-highlighted code via st.html() using Pygments.
 
@@ -93,10 +100,27 @@ def st_code(
         that relative paths search configured static source directories.
         Mutually exclusive with *code*.
     :param encoding: File encoding (only used when *file* is provided).
+    :param line_start: First line number displayed (Pygments ``linenostart``).
+        When ``None`` and ``start_line`` is set, defaults to ``start_line``
+        (absolute numbering).  Set to ``1`` for relative numbering.
+    :param start_line: 1-based first line to extract from content.
+    :param end_line: 1-based last line to extract from content (inclusive).
     """
     from .utils import resolve_content
 
     code = resolve_content(code, file=file, encoding=encoding)
+
+    # Line extraction
+    if start_line or end_line:
+        lines = code.splitlines()
+        s = (start_line or 1) - 1
+        e = end_line or len(lines)
+        code = "\n".join(lines[s:e])
+
+    # line_start default: absolute numbering when start_line is given
+    if line_start is None:
+        line_start = start_line if start_line else 1
+
     # Resolve wrap: explicit > global session state > True
     if wrap is None:
         try:
@@ -104,7 +128,8 @@ def st_code(
         except Exception:
             wrap = True
 
-    highlighted = _highlight_code(code, language, line_numbers, font_size)
+    highlighted = _highlight_code(code, language, line_numbers, font_size,
+                                   line_start)
 
     uid = generate_key("stx-wrap")
 

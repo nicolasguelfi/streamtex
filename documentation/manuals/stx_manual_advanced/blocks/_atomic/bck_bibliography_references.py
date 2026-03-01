@@ -40,22 +40,7 @@ def build():
         st_write(bs.sub, "1. Loading References", toc_lvl="+1")
         st_space("v", 2)
 
-        show_code(textwrap.dedent("""\
-            # In book.py — load references at startup
-            from streamtex.bib import BibConfig, BibFormat, CitationStyle
-            from pathlib import Path
-
-            st_book(
-                module_list,
-                bib_sources=[str(Path(__file__).parent / "static" / "references.bib")],
-                bib_config=BibConfig(
-                    format=BibFormat.APA,
-                    citation_style=CitationStyle.AUTHOR_YEAR,
-                    hover_enabled=True,
-                    hover_show_abstract=True,
-                ),
-            )
-        """))
+        show_code(file="examples/bib/loading_references.py")
         st_space("v", 2)
 
         show_details(textwrap.dedent("""\
@@ -69,27 +54,7 @@ def build():
         st_write(bs.sub, "2. Inline Citations with cite() and st_refs", toc_lvl="+1")
         st_space("v", 2)
 
-        show_code(textwrap.dedent("""\
-            from streamtex.bib import cite
-            from custom.bib_refs import st_refs  # Generated — IDE completion!
-
-            # Option A: cite() with string keys
-            st_write(s.big,
-                "The Transformer architecture ",
-                cite("vaswani2017attention"),
-                " revolutionized NLP."
-            )
-
-            # Option B: st_refs with IDE autocompletion (recommended)
-            st_write(s.big,
-                "The Transformer architecture ",
-                st_refs.vaswani2017attention,    # ← Ctrl+Space completes!
-                " revolutionized NLP."
-            )
-
-            # For multi-key citations, use cite() directly:
-            cite("lecun2015deep", "goodfellow2016deep")  # (LeCun; Goodfellow)
-        """))
+        show_code(file="examples/bib/inline_citations.py")
         st_space("v", 2)
 
         # Live demo — using st_refs
@@ -127,18 +92,7 @@ def build():
         st_write(bs.sub, "3. Citation Styles", toc_lvl="+1")
         st_space("v", 2)
 
-        show_code(textwrap.dedent("""\
-            from streamtex.bib import CitationStyle
-
-            # (Vaswani et al., 2017) — default
-            BibConfig(citation_style=CitationStyle.AUTHOR_YEAR)
-
-            # [1]
-            BibConfig(citation_style=CitationStyle.NUMERIC)
-
-            # ^1 (superscript)
-            BibConfig(citation_style=CitationStyle.SUPERSCRIPT)
-        """))
+        show_code(file="examples/bib/citation_styles.py")
         st_space("v", 3)
 
         # --- Section 4: Import Formats ---
@@ -166,24 +120,7 @@ def build():
 
         st_space("v", 2)
 
-        show_code(textwrap.dedent("""\
-            # Auto-detect by extension
-            from streamtex.bib import load_bib
-            entries = load_bib("references.bib")   # BibTeX
-            entries = load_bib("refs.ris")          # RIS
-            entries = load_bib("refs.json")         # JSON
-
-            # Add a custom parser
-            from streamtex.bib import register_bib_parser
-
-            def parse_yaml(path):
-                import yaml
-                with open(path) as f:
-                    data = yaml.safe_load(f)
-                return [BibEntry(key=d["key"], ...) for d in data]
-
-            register_bib_parser("yaml", parse_yaml)
-        """))
+        show_code(file="examples/bib/import_formats.py")
         st_space("v", 3)
 
         # --- Section 5: Extensible Fields ---
@@ -197,24 +134,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            entry = BibEntry(
-                key="example",
-                title="My Paper",
-                authors=["Smith, J."],
-                year="2024",
-                # Standard fields
-                isbn="978-3-16-148410-0",
-                keywords="AI, deep learning",
-                institution="MIT",
-                # Extra fields preserved automatically from BibTeX
-                extra={"funding": "NSF Grant 12345"},
-            )
-
-            entry.get_field("isbn")       # "978-3-16-148410-0"
-            entry.get_field("funding")    # "NSF Grant 12345" (from extra)
-            entry.get_field("missing", "N/A")  # "N/A"
-        """))
+        show_code(file="examples/bib/extensible_fields.py")
         st_space("v", 3)
 
         # --- Section 6: Registry Info ---
@@ -250,16 +170,7 @@ def build():
         st_write(bs.sub, "7. Rendered Bibliography (APA)", toc_lvl="+1")
         st_space("v", 2)
 
-        show_code(textwrap.dedent("""\
-            from streamtex.bib import st_bibliography
-
-            st_bibliography(
-                title="References",
-                toc_lvl="1",
-                only_cited=True,  # Only show entries cited via cite()
-                format=BibFormat.APA,
-            )
-        """))
+        show_code(file="examples/bib/rendered_bibliography.py")
         st_space("v", 2)
 
         st_bibliography(
@@ -274,12 +185,7 @@ def build():
         st_write(bs.sub, "8. BibTeX Export", toc_lvl="+1")
         st_space("v", 2)
 
-        show_code(textwrap.dedent("""\
-            from streamtex.bib import export_bibtex
-
-            bibtex_str = export_bibtex(only_cited=True)
-            st.download_button("Download .bib", bibtex_str, "references.bib")
-        """))
+        show_code(file="examples/bib/bibtex_export.py")
         st_space("v", 1)
 
         bibtex_str = export_bibtex(only_cited=True)
@@ -305,23 +211,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            # Step 1: Generate typed module from your bibliography file
-            # Run once (or whenever your .bib changes):
-            #   uv run python -m streamtex generate-stubs static/refs.bib -o custom/bib_refs.py
-
-            # Step 2: Import st_refs from the generated module
-            from custom.bib_refs import st_refs  # ← IDE sees all keys!
-
-            st_write(s.big,
-                "According to ", st_refs.vaswani2017attention,   # Ctrl+Space!
-                " the Transformer architecture..."
-            )
-
-            # cite() still works for multi-key and prefix/suffix:
-            cite("lecun2015deep", "goodfellow2016deep")  # (LeCun; Goodfellow)
-            cite("vaswani2017attention", prefix="cf. ", suffix=", p. 42")
-        """))
+        show_code(file="examples/bib/st_refs_autocompletion.py")
         st_space("v", 2)
 
         show_details(textwrap.dedent("""\

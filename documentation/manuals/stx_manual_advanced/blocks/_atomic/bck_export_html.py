@@ -31,16 +31,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            # Export is enabled by default in st_book()
-            st_book([
-                blocks.bck_00_welcome,
-                blocks.bck_01_architecture,
-                # ...
-            ], export_title="My Course")
-
-            # The sidebar shows a "Download HTML" button automatically.
-        """))
+        show_code(file="examples/export/html_export_basic.py")
         st_space("v", 2)
 
         # --- 2. How it works ---
@@ -55,21 +46,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            # Dual rendering pipeline (simplified)
-            #
-            #   stx.st_write(...)
-            #        |
-            #   st_html(html)
-            #        |
-            #   +----+----+
-            #   |         |
-            # st.html() buffer.append()
-            #              |
-            #       generate_full_html()
-            #              |
-            #     self-contained .html file
-        """), language="text")
+        show_code(file="examples/export/html_dual_rendering.txt", language="text")
         st_space("v", 2)
 
         # --- 3. Customization ---
@@ -82,18 +59,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            from streamtex.export import ExportConfig
-
-            # ExportConfig fields:
-            #   enabled: bool       = False   (st_book sets this to True)
-            #   page_title: str     = "StreamTeX Export"
-            #   page_width: str     = "100%"
-            #   page_padding: str   = "36pt"
-
-            # The simplest way: just set export_title in st_book()
-            st_book([...], export_title="My Document Title")
-        """))
+        show_code(file="examples/export/html_export_config.py")
         st_space("v", 2)
 
         # --- 4. Disable export ---
@@ -106,12 +72,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            st_book([
-                blocks.bck_00_welcome,
-                # ...
-            ], export=False)  # No download button
-        """))
+        show_code(file="examples/export/html_export_disable.py")
         st_space("v", 2)
 
         # --- 5. Details ---

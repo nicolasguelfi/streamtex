@@ -1,0 +1,1 @@
+stx.st_graphviz(file="diagrams/simple_graph.dot")

@@ -36,18 +36,7 @@ def build():
         st_write(bs.sub, "st.tabs", toc_lvl="+1")
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            tab1, tab2, tab3 = st.tabs(["Text", "Grid", "List"])
-            with tab1:
-                st_write(s.large, "Rich StreamTeX text inside a tab.")
-            with tab2:
-                with st_grid(cols=2, cell_styles=bs.cell) as g:
-                    with g.cell(): st_write(s.large, "A1")
-                    with g.cell(): st_write(s.large, "B1")
-            with tab3:
-                with st_list(list_type=lt.unordered, li_style=s.large) as l:
-                    with l.item(): st_write("Item one")
-        """))
+        show_code(file="examples/widget/tabs_basic.py")
         st_space("v", 1)
 
         tab1, tab2, tab3 = st.tabs(["Text", "Grid", "List"])
@@ -81,14 +70,7 @@ def build():
         st_write(bs.sub, "st.expander", toc_lvl="+1")
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            with st.expander("Click to expand"):
-                with st_block(s.project.containers.result_box):
-                    st_write(s.large, "Hidden content revealed!")
-                    with st_list(li_style=s.large) as l:
-                        with l.item(): st_write("Detail A")
-                        with l.item(): st_write("Detail B")
-        """))
+        show_code(file="examples/widget/expander_basic.py")
         st_space("v", 1)
 
         with st.expander("Architecture Overview"):
@@ -118,12 +100,7 @@ def build():
         st_write(bs.sub, "st.popover", toc_lvl="+1")
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            with st.popover("Show info card"):
-                with st_block(s.project.containers.result_box):
-                    st_write(s.large + s.bold, "Info Card")
-                    st_write(s.large, "A mini styled card in a popover.")
-        """))
+        show_code(file="examples/widget/popover_basic.py")
         st_space("v", 1)
 
         with st.popover("Show info card"):

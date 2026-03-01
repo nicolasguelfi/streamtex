@@ -1,0 +1,1 @@
+st_write("Hello, StreamTeX!")

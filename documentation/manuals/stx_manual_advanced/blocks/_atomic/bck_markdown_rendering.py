@@ -99,19 +99,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            stx.st_markdown('''
-            # Welcome to StreamTeX
-
-            This is **bold text** and *italic text*.
-
-            - First item
-            - Second item
-              - Nested item
-
-            > This is a blockquote with **rich** formatting.
-            ''')
-        """).strip())
+        show_code(file="examples/markdown/markdown_basic_formatting.py")
         st_space("v", 1)
 
         with st_block(s.project.containers.result_box):
@@ -130,19 +118,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            stx.st_markdown('''
-            | Feature | st_write() | st_markdown() |
-            |---------|-----------|--------------|
-            | Styled text | Native StreamTeX | Markdown syntax |
-            | Tables | st_grid() | Pipe syntax |
-
-            ```python
-            import streamtex as stx
-            stx.st_markdown("# Hello **World**")
-            ```
-            ''')
-        """).strip())
+        show_code(file="examples/markdown/markdown_tables_code.py")
         st_space("v", 1)
 
         with st_block(s.project.containers.result_box):
@@ -161,15 +137,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent(r"""
-            stx.st_markdown('''
-            Inline math: the formula $E = mc^2$ changed physics forever.
-
-            Display math:
-
-            $$\int_0^\infty e^{-x^2}\,dx = \frac{\sqrt{\pi}}{2}$$
-            ''')
-        """).strip())
+        show_code(file="examples/markdown/markdown_latex_math.py")
         st_space("v", 1)
 
         with st_block(s.project.containers.result_box):
@@ -188,13 +156,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            # Wrap Markdown in a styled container
-            stx.st_markdown(
-                "# Styled Section\\n\\nThis content has **custom styling**.",
-                style=my_style,
-            )
-        """).strip())
+        show_code(file="examples/markdown/markdown_styled.py")
         st_space("v", 2)
 
         # --- Section 5: Loading from Files ---
@@ -209,24 +171,14 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            # Load from a .md file in static/
-            stx.st_markdown(file="docs/readme.md")
-
-            # With styling and custom encoding
-            stx.st_markdown(file="docs/notes.md", style=my_style, encoding="utf-8")
-        """).strip())
+        show_code(file="examples/markdown/markdown_file_loading.py")
         st_space("v", 2)
 
         # --- Section 6: Interactive Selection ---
         st_write(bs.sub, "Interactive Selection", toc_lvl="+1")
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            examples = {"Basic": md1, "Tables": md2, "Math": md3, ...}
-            choice = st.selectbox("Choose an example", list(examples.keys()))
-            stx.st_markdown(examples[choice])
-        """))
+        show_code(file="examples/markdown/markdown_interactive_selection.py")
         st_space("v", 1)
 
         choice = st.selectbox(

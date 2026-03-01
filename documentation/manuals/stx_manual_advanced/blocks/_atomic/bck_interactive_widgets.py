@@ -31,14 +31,7 @@ def build():
         st_write(bs.sub, "Buttons & Toggles", toc_lvl="+1")
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            if st.button("Say hello"):
-                st_write(s.large + s.bold, "Hello from StreamTeX!")
-            show = st.toggle("Show styled block")
-            if show:
-                with st_block(s.project.containers.tip_callout):
-                    st_write(s.large, "This block appears when toggled on.")
-        """))
+        show_code(file="examples/widget/buttons_toggles.py")
         st_space("v", 1)
 
         if st.button("Say hello", key="bck25_hello"):
@@ -55,13 +48,7 @@ def build():
         st_write(bs.sub, "Radio & Selectbox", toc_lvl="+1")
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            choice = st.radio("Pick a callout style",
-                              ["Good", "Bad", "Tip", "Note"])
-            callout_map = {"Good": s.project.containers.good_callout, ...}
-            with st_block(callout_map[choice]):
-                st_write(s.large, f"This is a {choice} callout.")
-        """))
+        show_code(file="examples/widget/radio_selectbox.py")
         st_space("v", 1)
 
         choice = st.radio("Pick a callout style",
@@ -81,11 +68,7 @@ def build():
         st_write(bs.sub, "Slider-Driven Styles", toc_lvl="+1")
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            size = st.slider("Font size (px)", 12, 96, 32)
-            dynamic_style = ns(f"font-size: {size}px;")
-            st_write(dynamic_style + s.bold, "Dynamic size text")
-        """))
+        show_code(file="examples/widget/slider_driven_styles.py")
         st_space("v", 1)
 
         size = st.slider("Font size (px)", 12, 96, 32, key="bck25_slider")
@@ -98,12 +81,7 @@ def build():
         st_write(bs.sub, "Text Input Live Preview", toc_lvl="+1")
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            user_text = st.text_input("Type something")
-            if user_text:
-                st_write(s.large + s.italic, user_text)
-                st_write(s.large + s.bold + s.project.colors.primary_blue, user_text)
-        """))
+        show_code(file="examples/widget/text_input_preview.py")
         st_space("v", 1)
 
         user_text = st.text_input("Type something", key="bck25_text",
@@ -123,11 +101,7 @@ def build():
         st_write(bs.sub, "Color Picker", toc_lvl="+1")
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            picked = st.color_picker("Pick a text color", "#E74C3C")
-            color_style = ns(f"color: {picked};")
-            st_write(color_style + s.Large + s.bold, "Colored text!")
-        """))
+        show_code(file="examples/widget/color_picker.py")
         st_space("v", 1)
 
         picked = st.color_picker("Pick a text color", "#E74C3C",

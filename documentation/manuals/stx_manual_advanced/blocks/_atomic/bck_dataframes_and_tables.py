@@ -53,10 +53,7 @@ def build():
         st_write(bs.sub, "st.dataframe (interactive)", toc_lvl="+1")
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            data = {"Name": [...], "Role": [...], "Score": [...]}
-            st.dataframe(data, use_container_width=True)
-        """))
+        show_code(file="examples/data/dataframe_interactive.py")
         st_space("v", 1)
 
         stx.st_dataframe(SAMPLE_DATA, use_container_width=True)
@@ -66,9 +63,7 @@ def build():
         st_write(bs.sub, "st.table (static)", toc_lvl="+1")
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            st.table(data)
-        """))
+        show_code(file="examples/data/table_static.py")
         st_space("v", 1)
 
         stx.st_table(SAMPLE_DATA)
@@ -78,9 +73,7 @@ def build():
         st_write(bs.sub, "st.json (JSON viewer)", toc_lvl="+1")
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            st.json({"project": "StreamTeX", "version": "0.2.0", ...})
-        """))
+        show_code(file="examples/data/json_viewer.py")
         st_space("v", 1)
 
         stx.st_json(SAMPLE_JSON)
@@ -90,16 +83,7 @@ def build():
         st_write(bs.sub, "StreamTeX Styled Grid", toc_lvl="+1")
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            header_style = sg.create("A1:C1", bs.header_cell)
-            data_style = sg.create("A2:C5", bs.data_cell)
-            with st_grid(cols=3, cell_styles=header_style + data_style) as g:
-                for col in ["Name", "Role", "Score"]:
-                    with g.cell(): st_write(col)
-                for i in range(len(data["Name"])):
-                    for col in ["Name", "Role", "Score"]:
-                        with g.cell(): st_write(str(data[col][i]))
-        """))
+        show_code(file="examples/data/styled_grid_table.py")
         st_space("v", 1)
 
         header_style = sg.create("A1:C1", bs.header_cell)

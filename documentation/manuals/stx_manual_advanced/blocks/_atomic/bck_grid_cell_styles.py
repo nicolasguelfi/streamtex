@@ -35,13 +35,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            with st_grid(cols=2,
-                         cell_styles=bs.base_cell
-                                     + s.container.bg_colors.alice_blue_bg) as g:
-                with g.cell(): st_write(s.large, "Same style")
-                with g.cell(): st_write(s.large, "Same style")
-        """))
+        show_code(file="examples/grid/cell_styles_single.py")
         st_space("v", 1)
 
         with st_grid(cols=2,
@@ -65,21 +59,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            header_style = (s.bold + s.large
-                            + s.container.bg_colors.steel_blue_bg
-                            + s.text.colors.white)
-            highlight = s.container.bg_colors.light_yellow_bg
-
-            with st_grid(
-                cols=3,
-                cell_styles=sg.create("A1:C1", header_style + bs.base_cell)
-                            + sg.create("A2:C3", s.large + bs.base_cell)
-                            + sg.create("B2", highlight + bs.base_cell)
-            ) as g:
-                with g.cell(): st_write("Name")
-                ...
-        """))
+        show_code(file="examples/grid/cell_styles_excel.py")
         st_space("v", 1)
 
         header_style = (s.bold + s.large
@@ -116,11 +96,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            sg1 + sg2  # combine (CSS merge)
-            sg1 - sg2  # remove properties
-            sg1 * sg2  # replace (sg2 wins where non-empty)
-        """))
+        show_code(file="examples/grid/cell_styles_operators.py")
         st_space("v", 2)
 
         show_details(textwrap.dedent("""\

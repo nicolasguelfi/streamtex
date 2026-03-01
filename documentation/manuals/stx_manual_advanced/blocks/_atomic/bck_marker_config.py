@@ -87,16 +87,7 @@ def build():
     """))
     st_space("v", 1)
 
-    show_code(textwrap.dedent("""\
-        # Single keys
-        next_keys=["PageDown", "ArrowRight"]
-
-        # With modifiers: Ctrl, Shift, Alt, Meta (Cmd on macOS)
-        next_keys=["PageDown", "Ctrl+ArrowRight"]
-        prev_keys=["PageUp", "Ctrl+ArrowLeft"]
-
-        # Multiple modifiers are NOT chained — use one modifier per entry
-    """))
+    show_code(file="examples/nav/marker_keyboard_modifiers.py")
     st_space("v", 2)
 
     # ------------------------------------------------------------------
@@ -105,24 +96,7 @@ def build():
     st_write(bs.sub, "Complete Example in book.py", toc_lvl="+1")
     st_space("v", 1)
 
-    show_code(textwrap.dedent("""\
-        from streamtex import st_book, TOCConfig, MarkerConfig, BannerConfig
-
-        marker_config = MarkerConfig(
-            auto_marker_on_toc=1,             # Level-1 TOC headings = markers
-            nav_position="bottom-right",       # Widget in bottom-right corner
-            next_keys=["PageDown", "ArrowRight"],
-            prev_keys=["PageUp", "ArrowLeft"],
-            nav_label_chars=40,                # Show up to 40 chars of label
-        )
-
-        st_book(
-            [...],
-            marker_config=marker_config,
-            paginate=True,
-            banner=BannerConfig.full(),        # Navigation banner style
-        )
-    """))
+    show_code(file="examples/nav/marker_config_complete.py")
     st_space("v", 2)
 
     # ------------------------------------------------------------------

@@ -35,10 +35,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            st_write(s.text.colors.red + s.large, "red")
-            st_write(s.text.colors.dodger_blue + s.large, "dodger_blue")
-        """))
+        show_code(file="examples/text/styles_colors.py")
         st_space("v", 1)
 
         with st_grid(cols=4, cell_styles=bs.cell) as g:
@@ -66,12 +63,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            st_write(s.huge, "huge (80pt)")
-            st_write(s.Large, "Large (48pt)")
-            st_write(s.large, "large (32pt)")
-            st_write(s.small, "small (8pt)")
-        """))
+        show_code(file="examples/text/styles_sizes.py")
         st_space("v", 1)
 
         st_write(s.huge, "huge (80pt)")
@@ -85,10 +77,7 @@ def build():
         st_write(s.tiny, "tiny (4pt)")
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            custom_size = s.text.sizes.size(42)
-            st_write(custom_size, "Custom 42pt text")
-        """))
+        show_code(file="examples/text/styles_custom_size.py")
         st_space("v", 1)
 
         custom_size = s.text.sizes.size(42)
@@ -104,11 +93,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            st_write(s.text.fonts.font_arial + s.large, "Arial")
-            st_write(s.text.fonts.font_courier_new + s.large,
-                     "Courier New")
-        """))
+        show_code(file="examples/text/styles_fonts.py")
         st_space("v", 1)
 
         with st_grid(cols=3, cell_styles=bs.cell) as g:
@@ -129,12 +114,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            st_write(s.text.weights.bold_weight + s.large,
-                     "bold_weight")
-            st_write(s.text.weights.light_weight + s.large,
-                     "light_weight")
-        """))
+        show_code(file="examples/text/styles_weights.py")
         st_space("v", 1)
 
         with st_grid(cols=3, cell_styles=bs.cell) as g:
@@ -152,12 +132,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            st_write(s.text.decors.italic_text + s.large,
-                     "italic")
-            st_write(s.text.decors.underline_text + s.large,
-                     "underline")
-        """))
+        show_code(file="examples/text/styles_decorations.py")
         st_space("v", 1)
 
         with st_grid(cols=4, cell_styles=bs.cell) as g:
@@ -176,14 +151,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            with st_block(bs.cell + s.container.sizes.width_full):
-                st_write(s.text.alignments.left_align + s.large,
-                         "left_align", tag=t.div)
-            with st_block(bs.cell + s.container.sizes.width_full):
-                st_write(s.text.alignments.center_align + s.large,
-                         "center_align", tag=t.div)
-        """))
+        show_code(file="examples/text/styles_alignments.py")
         st_space("v", 1)
 
         cell_wide = bs.cell + s.container.sizes.width_full
@@ -214,9 +182,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            st_write(s.text.wrap.nowrap + s.large, "This text will not break...")
-        """))
+        show_code(file="examples/text/styles_nowrap.py")
         st_space("v", 1)
 
         with st_block(bs.cell + ns("max-width: 300px;")):

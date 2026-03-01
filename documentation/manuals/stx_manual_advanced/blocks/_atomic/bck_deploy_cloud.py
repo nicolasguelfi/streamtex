@@ -32,14 +32,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            # General workflow
-            # 1. Build the Docker image locally
-            # 2. Tag it for your registry
-            # 3. Push to the registry
-            # 4. SSH into your VM
-            # 5. Pull and run the image
-        """), language="text")
+        show_code(file="examples/deploy/cloud_workflow.txt", language="text")
         st_space("v", 2)
 
         # --- 2. GCP (Compute Engine) ---
@@ -52,22 +45,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            # Build and tag for GCP Artifact Registry
-            docker build -t streamtex-app .
-            docker tag streamtex-app \\
-                REGION-docker.pkg.dev/PROJECT_ID/REPO/streamtex-app:latest
-
-            # Push to Artifact Registry
-            docker push \\
-                REGION-docker.pkg.dev/PROJECT_ID/REPO/streamtex-app:latest
-
-            # On the GCP VM (after SSH):
-            docker pull \\
-                REGION-docker.pkg.dev/PROJECT_ID/REPO/streamtex-app:latest
-            docker run -d -p 8501:8501 \\
-                REGION-docker.pkg.dev/PROJECT_ID/REPO/streamtex-app:latest
-        """), language="bash")
+        show_code(file="examples/deploy/cloud_gcp.sh", language="bash")
         st_space("v", 2)
 
         # --- 3. AWS (EC2) ---
@@ -80,25 +58,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            # Authenticate with ECR
-            aws ecr get-login-password --region REGION | \\
-                docker login --username AWS --password-stdin \\
-                ACCOUNT_ID.dkr.ecr.REGION.amazonaws.com
-
-            # Build, tag and push
-            docker build -t streamtex-app .
-            docker tag streamtex-app \\
-                ACCOUNT_ID.dkr.ecr.REGION.amazonaws.com/streamtex-app:latest
-            docker push \\
-                ACCOUNT_ID.dkr.ecr.REGION.amazonaws.com/streamtex-app:latest
-
-            # On the EC2 instance (after SSH):
-            docker pull \\
-                ACCOUNT_ID.dkr.ecr.REGION.amazonaws.com/streamtex-app:latest
-            docker run -d -p 8501:8501 \\
-                ACCOUNT_ID.dkr.ecr.REGION.amazonaws.com/streamtex-app:latest
-        """), language="bash")
+        show_code(file="examples/deploy/cloud_aws.sh", language="bash")
         st_space("v", 2)
 
         # --- 4. Essential commands summary ---

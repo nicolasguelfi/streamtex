@@ -11,6 +11,7 @@ class BlockStyles:
     """TikZ diagrams demo styles."""
     heading = s.project.titles.section_title + s.center_txt
     sub = s.project.titles.section_subtitle
+    file_label = s.medium + s.italic + s.project.colors.neutral_gray
 bs = BlockStyles
 
 
@@ -40,20 +41,14 @@ def build():
         st_write(bs.sub, "Function Plot", toc_lvl="+1")
         st_space("v", 1)
 
-        show_code(textwrap.dedent(r"""
-            stx.st_tikz(r'''
-                \begin{tikzpicture}
-                    \draw[->] (-0.5,0) -- (5,0) node[right] {$x$};
-                    \draw[->] (0,-0.5) -- (0,4) node[above] {$y$};
-                    \draw[blue, thick, domain=0:4.5, samples=100]
-                        plot (\x, {0.15*\x*\x});
-                \end{tikzpicture}
-            ''')
-        """).strip())
+        show_code(file="examples/diagram/tikz_function_plot.py")
         st_space("v", 1)
 
         with st_block(s.project.containers.result_box):
             stx.st_tikz(file=DIAGRAMS["Function Plot"], height=800)
+        st_space("v", 1)
+        st_write(bs.file_label, f"Source: {DIAGRAMS['Function Plot']}")
+        show_code(file=DIAGRAMS["Function Plot"], language="latex")
         st_space("v", 2)
 
         # --- Section 2: Neural network ---
@@ -66,23 +61,14 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent(r"""
-            stx.st_tikz(r'''
-                \begin{tikzpicture}[
-                    neuron/.style={circle, draw, minimum size=0.8cm},
-                    input/.style={neuron, fill=blue!20},
-                ]
-                    \node[input] (i1) at (0,2) {$x_1$};
-                    \foreach \i in {1,2,3}
-                        \foreach \h in {1,2,3}
-                            \draw[->] (i\i) -- (h\h);
-                \end{tikzpicture}
-            ''')
-        """).strip())
+        show_code(file="examples/diagram/tikz_neural_network.py")
         st_space("v", 1)
 
         with st_block(s.project.containers.result_box):
             stx.st_tikz(file=DIAGRAMS["Neural Network"], height=800)
+        st_space("v", 1)
+        st_write(bs.file_label, f"Source: {DIAGRAMS['Neural Network']}")
+        show_code(file=DIAGRAMS["Neural Network"], language="latex")
         st_space("v", 2)
 
         # --- Section 3: Finite automaton (with preamble) ---
@@ -95,31 +81,22 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent(r"""
-            stx.st_tikz(
-                r'''\begin{tikzpicture}[..., state/.style={...}]
-                    \node[state, initial] (q0) {$q_0$};
-                    \path (q0) edge [bend left] node [above] {a} (q1);
-                \end{tikzpicture}''',
-                preamble=r"\usetikzlibrary{automata,positioning}"
-            )
-        """).strip())
+        show_code(file="examples/diagram/tikz_finite_automaton.py")
         st_space("v", 1)
 
         with st_block(s.project.containers.result_box):
             stx.st_tikz(file=DIAGRAMS["Finite Automaton"], height=800,
                         preamble=PREAMBLES["Finite Automaton"])
+        st_space("v", 1)
+        st_write(bs.file_label, f"Source: {DIAGRAMS['Finite Automaton']}")
+        show_code(file=DIAGRAMS["Finite Automaton"], language="latex")
         st_space("v", 2)
 
         # --- Section 4: Interactive selection ---
         st_write(bs.sub, "Interactive Diagram Selection", toc_lvl="+1")
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            diagrams = {"Plot": code1, "Network": code2, ...}
-            choice = st.selectbox("Choose a diagram", list(diagrams.keys()))
-            stx.st_tikz(diagrams[choice], preamble=preambles.get(choice, ""))
-        """))
+        show_code(file="examples/diagram/tikz_interactive.py")
         st_space("v", 1)
 
         choice = st.selectbox("Choose a TikZ diagram",
@@ -127,6 +104,9 @@ def build():
                               key="bck_tikz_select")
         with st_block(s.project.containers.result_box):
             stx.st_tikz(file=DIAGRAMS[choice], height=800, preamble=PREAMBLES.get(choice, ""))
+        st_space("v", 1)
+        st_write(bs.file_label, f"Source: {DIAGRAMS[choice]}")
+        show_code(file=DIAGRAMS[choice], language="latex")
         st_space("v", 2)
 
         show_details(textwrap.dedent("""\

@@ -45,10 +45,7 @@ def build():
             st_br()
             st_write(s.large, "not side by side.")
             st_space("v", 1)
-            show_code_inline(textwrap.dedent("""\
-                st_write(s.text.colors.red, "Red ")
-                st_write(s.text.colors.blue, "Blue")
-            """))
+            show_code_inline(file="examples/text/inline_wrong_stacking.py")
             st_space("v", 1)
             st_write(s.text.colors.red + s.large, "Red ")
             st_write(s.text.colors.blue + s.large, "Blue")
@@ -57,11 +54,7 @@ def build():
         with st_block(s.project.containers.good_callout):
             st_write(bs.correct_label, "CORRECT - flows inline:")
             st_space("v", 1)
-            show_code_inline(textwrap.dedent("""\
-                st_write(s.large,
-                         (s.text.colors.red, "Red "),
-                         (s.text.colors.blue, "Blue"))
-            """))
+            show_code_inline(file="examples/text/inline_correct_tuple.py")
             st_space("v", 1)
             st_write(s.large,
                      (s.text.colors.red, "Red "),
@@ -81,14 +74,7 @@ def build():
         st_space("v", 1)
 
         theURL = "https://github.com"
-        show_code(textwrap.dedent("""\
-            theURL = "https://github.com"
-            st_write(s.large,
-                     "Visit the ",
-                     (s.project.colors.primary_blue + s.bold, "StreamTeX"),
-                     " project on ",
-                     (bs.link_style, "GitHub", theURL))
-        """))
+        show_code(file="examples/text/tuple_mixed_styles.py")
         st_space("v", 1)
 
         st_write(s.large,
@@ -108,25 +94,16 @@ def build():
         st_space("v", 1)
 
         theURL = "https://docs.streamlit.io"
-        show_code(textwrap.dedent("""\
-            theURL = "https://docs.streamlit.io"
-            st_write(s.large, "Click here for Streamlit docs", link=theURL)
-        """))
+        show_code(file="examples/text/link_basic.py")
         st_space("v", 1)
 
         st_write(s.large, "Click here for Streamlit docs", link=theURL)
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            st_write(bs.link_style,
-                     "Styled link (no default decoration)",
-                     link=theURL, no_link_decor=True)
-        """))
+        show_code(file="examples/text/link_styled.py")
         st_space("v", 1)
 
-        st_write(bs.link_style,
-                 "Styled link (no default decoration)",
-                 link=theURL, no_link_decor=True)
+        exec_static("examples/text/link_styled.py")
         st_space("v", 1)
 
         show_details(textwrap.dedent("""\

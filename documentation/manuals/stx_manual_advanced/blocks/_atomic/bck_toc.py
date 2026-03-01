@@ -34,15 +34,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            toc = TOCConfig(
-                numerate_titles=False,
-                toc_position=0,
-                title_style=s.project.titles.course_title + s.center_txt,
-                content_style=s.large + s.text.colors.reset,
-                sidebar_max_level=None,  # None = auto (paginated: 1, continuous: 2)
-            )
-        """))
+        show_code(file="examples/nav/toc_config_fields.py")
         st_space("v", 1)
 
         with st_grid(cols=2, cell_styles=bs.cell) as g:
@@ -142,10 +134,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            st_write(s.huge, "Very Long Title...",
-                     toc_lvl="2", label="Short Title")
-        """))
+        show_code(file="examples/nav/toc_label_parameter.py")
         st_space("v", 2)
 
         show_details(textwrap.dedent("""\

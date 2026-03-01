@@ -1,0 +1,6 @@
+# Steps:
+# 1. Go to https://huggingface.co/new-space
+# 2. Name your Space (e.g. "my-streamtex-app")
+# 3. Select "Docker" as the Space SDK
+# 4. Choose visibility (public or private)
+# 5. Click "Create Space"

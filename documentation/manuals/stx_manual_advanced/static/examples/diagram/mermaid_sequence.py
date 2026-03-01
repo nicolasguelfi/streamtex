@@ -1,0 +1,1 @@
+stx.st_mermaid(file="diagrams/sequence.mmd", height=1000)

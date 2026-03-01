@@ -57,13 +57,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            # Build the image
-            docker build -t streamtex-app .
-
-            # Run the container
-            docker run -p 8501:8501 streamtex-app
-        """), language="bash")
+        show_code(file="examples/deploy/docker_build_run.sh", language="bash")
         st_space("v", 2)
 
         # --- 3. Build-arg FOLDER ---
@@ -76,14 +70,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            # Deploy a specific project
-            docker build \\
-                --build-arg FOLDER=projects/my_project \\
-                -t my-project-app .
-
-            docker run -p 8501:8501 my-project-app
-        """), language="bash")
+        show_code(file="examples/deploy/docker_build_arg.sh", language="bash")
         st_space("v", 2)
 
         # --- 4. Environment variables ---

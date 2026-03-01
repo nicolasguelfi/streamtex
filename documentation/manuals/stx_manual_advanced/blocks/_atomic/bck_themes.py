@@ -43,14 +43,7 @@ def build():
                 themes_source = f.read()
             show_code(themes_source)
         except Exception:
-            show_code(textwrap.dedent("""\
-                # custom/themes.py
-                dark = {
-                    "primary_blue": "color: #7AB8F5;",
-                    "section_title": "color: #7AB8F5; font-weight: bold;",
-                    "good_example_bg": "background-color: rgba(...);",
-                }
-            """))
+            show_code(file="examples/theme/theme_fallback.py")
         st_space("v", 2)
 
         # Activating a theme
@@ -63,11 +56,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            import streamtex.styles as sts
-            from custom.themes import dark
-            sts.theme = dark
-        """))
+        show_code(file="examples/theme/theme_activate.py")
         st_space("v", 2)
 
         # Override table
@@ -128,21 +117,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            from streamtex import st_grid, StyleGrid, Style as ns
-
-            # Create a grid with per-cell styling
-            # Cell (1,1) gets border, cell (2,2) gets background
-            cell_styles = StyleGrid()
-            cell_styles[(1, 1)] = ns("border: 2px solid #7AB8F5;")
-            cell_styles[(2, 2)] = ns("background: rgba(122, 184, 245, 0.1);")
-
-            with st_grid(cols="1fr 1fr", cell_styles=cell_styles):
-                with g.cell(): st_write(s.large, "Top-left")
-                with g.cell(): st_write(s.large, "Top-right (with border)")
-                with g.cell(): st_write(s.large, "Bottom-left")
-                with g.cell(): st_write(s.large, "Bottom-right (with bg)")
-        """))
+        show_code(file="examples/theme/stylegrid_per_cell.py")
         st_space("v", 2)
 
         # Theme composition
@@ -157,25 +132,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            # Define a base theme
-            base_theme = {
-                "primary_blue": "color: #4A90D9;",
-                "primary_text": "color: #333333;",
-                "accent_green": "color: #2ECC71;",
-            }
-
-            # Dark variant overrides specific colors
-            dark_theme = {
-                **base_theme,  # Inherit all base colors
-                "primary_blue": "color: #7AB8F5;",  # Lighter blue
-                "primary_text": "color: #E0E0E0;",  # Lighter text
-            }
-
-            # Activate in book.py
-            import streamtex.styles as sts
-            sts.theme = dark_theme
-        """))
+        show_code(file="examples/theme/theme_composition.py")
         st_space("v", 2)
 
         # Theme switching patterns
@@ -188,31 +145,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            import streamlit as st
-            import streamtex.styles as sts
-            from custom.themes import light_theme, dark_theme
-
-            if "theme" not in st.session_state:
-                st.session_state.theme = "dark"
-
-            col1, col2 = st.columns(2)
-            with col1:
-                if st.button("Light Theme"):
-                    st.session_state.theme = "light"
-            with col2:
-                if st.button("Dark Theme"):
-                    st.session_state.theme = "dark"
-
-            # Apply selected theme
-            if st.session_state.theme == "light":
-                sts.theme = light_theme
-            else:
-                sts.theme = dark_theme
-
-            # Now render blocks - they use the active theme
-            st_book(blocks=[...])
-        """))
+        show_code(file="examples/theme/theme_dynamic_switching.py")
         st_space("v", 2)
 
         # Custom theme creation best practices

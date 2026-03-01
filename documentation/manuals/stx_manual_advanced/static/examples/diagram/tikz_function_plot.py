@@ -1,0 +1,1 @@
+stx.st_tikz(file="diagrams/simple_shapes.tex", height=800)

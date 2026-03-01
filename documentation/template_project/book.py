@@ -1,7 +1,7 @@
 import streamlit as st
 import setup
 import streamtex as stx
-from streamtex import st_book, TOCConfig, MarkerConfig, BannerConfig
+from streamtex import st_book, TOCConfig, NumberingMode, MarkerConfig, BannerConfig
 from pathlib import Path
 
 from custom.styles import Styles as s
@@ -24,7 +24,7 @@ sts.theme = dark
 
 # Table of Contents
 toc = TOCConfig(
-    numerate_titles=False,
+    numbering=NumberingMode.SIDEBAR_ONLY,
     toc_position=0,
     title_style=s.project.titles.main_title + s.center_txt + s.text.wrap.nowrap,
     content_style=s.large + s.text.colors.reset,

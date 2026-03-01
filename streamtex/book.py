@@ -20,7 +20,7 @@ from .marker import MarkerConfig, inject_marker_navigation, marker_entries, rese
 from .search import generate_search_input_html, generate_search_script, start_collector, stop_collector
 from .space import st_br, st_space
 from .styles import Style
-from .toc import TOCConfig, reset_toc_registry, toc_entries
+from .toc import NumberingMode, TOCConfig, reset_toc_registry, toc_entries
 from .utils import inject_link_preview_scaffold
 from .write import st_write
 from .zoom import _PAGE_WIDTH_KEY, add_zoom_options
@@ -226,7 +226,7 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
         effective_max_level = _resolve_sidebar_max_level(toc_config, paginated=False)
         populate_toc(toc_sidebar, toc_block, toc_content_style,
                      block_index=block_index, search_js_placeholder=search_js_ph,
-                     max_level=effective_max_level)
+                     max_level=effective_max_level, toc_config=toc_config)
         if markers_sidebar is not None:
             populate_markers_sidebar(markers_sidebar)
 
@@ -314,7 +314,7 @@ def build_ToC_sidebar_placeholder(has_markers=False, has_search=False):
 
 def populate_toc(toc_sidebar: Delta, toc_block: Delta = None, toc_content_style: Style = None,
                  block_index: dict[int, str] = None, search_js_placeholder=None,
-                 max_level: int | None = None):
+                 max_level: int | None = None, toc_config: TOCConfig | None = None):
     toc_entry_list = toc_entries()
     marker_anchors = {m['anchor'] for m in marker_entries()}
     indent_char = "&nbsp;"
@@ -365,9 +365,15 @@ def populate_toc(toc_sidebar: Delta, toc_block: Delta = None, toc_content_style:
 
     if toc_block is not None:
         with toc_block.container():
+            main_num = toc_config is not None and toc_config.effective_numbering in (
+                NumberingMode.BOTH, NumberingMode.MAIN_ONLY
+            )
             for entry in toc_entry_list:
                 indent = indent_char * (entry['level'] - 1) * 2
-                st_write(toc_content_style, f"{indent}{entry['title']}",
+                label = entry.get("_reg_label", entry["title"])
+                if main_num:
+                    label = entry.get("section_number", "") + label
+                st_write(toc_content_style, f"{indent}{label}",
                                 link=f"#{entry['key_anchor']}", hover=False, no_link_decor=True)
                 st_br()
 

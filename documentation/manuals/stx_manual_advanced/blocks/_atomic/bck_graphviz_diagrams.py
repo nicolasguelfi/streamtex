@@ -13,6 +13,7 @@ class BlockStyles:
     heading = s.project.titles.section_title + s.center_txt
     sub = s.project.titles.section_subtitle
     content = s.large
+    file_label = s.medium + s.italic + s.project.colors.neutral_gray
 bs = BlockStyles
 
 
@@ -40,47 +41,33 @@ def build():
         st_write(bs.sub, "Simple Directed Graph", toc_lvl="+1")
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            stx.st_graphviz('''
-                digraph {
-                    A -> B -> C -> D -> A
-                    A -> C
-                }
-            ''')
-        """))
+        show_code(file="examples/diagram/graphviz_simple.py")
         st_space("v", 1)
 
         stx.st_graphviz(file=DIAGRAMS["Simple Graph"])
+        st_space("v", 1)
+        st_write(bs.file_label, f"Source: {DIAGRAMS['Simple Graph']}")
+        show_code(file=DIAGRAMS["Simple Graph"], language="dot")
         st_space("v", 2)
 
         # --- Section 2: Styled flowchart ---
         st_write(bs.sub, "Styled Flowchart", toc_lvl="+1")
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            stx.st_graphviz('''
-                digraph {
-                    node [shape=box, style="rounded,filled"]
-                    book [label="book.py", fillcolor="#4A90D9"]
-                    blocks [label="blocks/", fillcolor="#2EC4B6"]
-                    book -> blocks [label="st_include"]
-                }
-            ''')
-        """))
+        show_code(file="examples/diagram/graphviz_styled_flowchart.py")
         st_space("v", 1)
 
         stx.st_graphviz(file=DIAGRAMS["StreamTeX Flowchart"], height=600)
+        st_space("v", 1)
+        st_write(bs.file_label, f"Source: {DIAGRAMS['StreamTeX Flowchart']}")
+        show_code(file=DIAGRAMS["StreamTeX Flowchart"], language="dot")
         st_space("v", 2)
 
         # --- Section 3: Interactive selection ---
         st_write(bs.sub, "Interactive Diagram Selection", toc_lvl="+1")
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            diagrams = {"Simple Graph": dot1, "Flowchart": dot2, ...}
-            choice = st.selectbox("Choose a diagram", list(diagrams.keys()))
-            stx.st_graphviz(diagrams[choice])
-        """))
+        show_code(file="examples/diagram/graphviz_interactive.py")
         st_space("v", 1)
 
         choice = st.selectbox("Choose a diagram",
@@ -88,6 +75,9 @@ def build():
                               key="bck31_diagram_select")
         with st_block(s.project.containers.result_box):
             stx.st_graphviz(file=DIAGRAMS[choice])
+        st_space("v", 1)
+        st_write(bs.file_label, f"Source: {DIAGRAMS[choice]}")
+        show_code(file=DIAGRAMS[choice], language="dot")
         st_space("v", 2)
 
         # --- Section 4: Self-referential architecture ---
@@ -101,6 +91,9 @@ def build():
         st_space("v", 1)
 
         stx.st_graphviz(file=DIAGRAMS["Architecture"])
+        st_space("v", 1)
+        st_write(bs.file_label, f"Source: {DIAGRAMS['Architecture']}")
+        show_code(file=DIAGRAMS["Architecture"], language="dot")
         st_space("v", 2)
 
         show_details(textwrap.dedent("""\

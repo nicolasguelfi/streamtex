@@ -31,9 +31,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            st_write("Hello, StreamTeX!")
-        """))
+        show_code(file="examples/text/plain_hello.py")
         st_space("v", 1)
 
         st_write(s.large, "Hello, StreamTeX!")
@@ -48,12 +46,10 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            st_write(s.bold + s.Large, "Bold Large Text")
-        """))
+        show_code(file="examples/text/styled_bold_large.py")
         st_space("v", 1)
 
-        st_write(s.bold + s.Large, "Bold Large Text")
+        exec_static("examples/text/styled_bold_large.py")
         st_space("v", 2)
 
         # Tags parameter
@@ -66,10 +62,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            st_write(s.huge, "Section", tag=t.h1)   # semantic heading
-            st_write(s.huge, "Section", tag=t.div)   # styled div
-        """))
+        show_code(file="examples/text/tag_semantic.py")
         st_space("v", 1)
 
         st_write(s.huge, "Section Heading", tag=t.h1)
@@ -94,11 +87,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            st_write(s.Large, "My Title", toc_lvl="1")        # absolute level
-            st_write(s.large, "Sub", toc_lvl="+1")            # relative level
-            st_write(s.large, "Custom Label", toc_lvl="2", label="Short")
-        """))
+        show_code(file="examples/text/toc_registration.py")
         st_space("v", 1)
 
         show_details(textwrap.dedent("""\

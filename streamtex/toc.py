@@ -7,6 +7,15 @@ from .styles import Style
 streamtex_toc_items = "_streamtex_toc_items"
 streamtex_toc_lvl = "_streamtex_toc_lvl"
 
+
+class NumberingMode:
+    """Where hierarchical numbering prefixes appear."""
+    NONE = "none"
+    BOTH = "both"
+    SIDEBAR_ONLY = "sidebar"
+    MAIN_ONLY = "main"
+
+
 @dataclass
 class TOCConfig:
     """
@@ -14,7 +23,11 @@ class TOCConfig:
     """
 
     numerate_titles: bool = True
-    '''A boolean dictating whether to add numering in the ToC titles.'''
+    '''A boolean dictating whether to add numering in the ToC titles.
+    Legacy — kept for backward compatibility. Prefer ``numbering``.'''
+    numbering: str | None = None
+    '''NumberingMode value controlling where numbering appears.
+    When set, overrides ``numerate_titles``.'''
     toc_position: int = -1
     '''-1 means at the end, 0 at the start, None means no ToC'''
     title_style: Style = s.text.titles.title
@@ -28,6 +41,13 @@ class TOCConfig:
     sidebar_max_level: int | None = None
     '''Max TOC hierarchy level shown in sidebar.
     None = mode-dependent default (paginated: 1, continuous: 2).'''
+
+    @property
+    def effective_numbering(self) -> str:
+        """Resolve the active numbering mode."""
+        if self.numbering is not None:
+            return self.numbering
+        return NumberingMode.BOTH if self.numerate_titles else NumberingMode.NONE
 
 
 class TOCRegistry:
@@ -77,23 +97,28 @@ class TOCRegistry:
         if len(self.numbers) > lvl:
             self.numbers = self.numbers[:lvl]
 
-        # Generate numbering if numeration is enabled
+        # Generate numbering prefix
         section_number = ".".join(map(str, self.numbers)) + " "
-        has_num = self.config.numerate_titles
 
-        # Create a simple slug
+        # Determine where numbering should appear
+        mode = self.config.effective_numbering
+        sidebar_needs_num = mode in (NumberingMode.BOTH, NumberingMode.SIDEBAR_ONLY)
+        main_needs_num = mode in (NumberingMode.BOTH, NumberingMode.MAIN_ONLY)
+
+        # Create a simple slug (always includes the number for stable anchors)
         key_anchor = self.get_key_anchor(section_number + label)
 
         # Add the ToC entry to the list
         self.get_entries().append({
             "level": lvl,
-            "title": section_number + label if has_num else label,
+            "title": section_number + label if sidebar_needs_num else label,
+            "section_number": section_number,
             "key_anchor": key_anchor,
             "_reg_label": label,
             "_reg_level": level,
         })
 
-        if not self.config.numerate_titles:
+        if not main_needs_num:
             section_number = ""
 
         return key_anchor, section_number, lvl

@@ -1,0 +1,10 @@
+# Repository root
+Dockerfile           # <- HF builds this
+pyproject.toml
+uv.lock
+streamtex/           # Library
+projects/
+  my_project/
+    book.py
+    blocks/
+    custom/

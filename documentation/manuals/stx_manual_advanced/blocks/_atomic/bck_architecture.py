@@ -35,19 +35,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            project/
-            +-- book.py              # Entry point
-            +-- setup.py             # Adds streamtex to sys.path
-            +-- custom/
-            |   +-- styles.py        # Project-specific styles
-            |   +-- themes.py        # Theme overrides
-            +-- blocks/
-                +-- __init__.py      # Auto-discovers bck_*.py files
-                +-- bck_00_welcome.py
-                +-- bck_01_architecture.py
-                +-- ...
-        """), language="text", line_numbers=False)
+        show_code(file="examples/block/project_folder_structure.txt", language="text", line_numbers=False)
         st_space("v", 2)
 
         # st_book
@@ -85,10 +73,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            from blocks import bck_01_sub_included
-            st_include(bck_01_sub_included)
-        """))
+        show_code(file="examples/block/st_include_usage.py")
         st_space("v", 1)
 
         # Live sub-include

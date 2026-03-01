@@ -23,7 +23,7 @@ from .banner import BannerConfig, BannerMode
 from .book import st_book, st_include, st_toc, load_css
 
 # Table of Contents
-from .toc import reset_toc_registry, toc_entries, TOCConfig
+from .toc import reset_toc_registry, toc_entries, TOCConfig, NumberingMode
 
 # Marker Navigation
 from .marker import st_marker, MarkerConfig
@@ -54,7 +54,7 @@ from .latex import st_latex, st_latex_doc
 from .latex_utils import extract_tikz, extract_math, extract_frames
 
 # Utilities
-from .utils import inject_link_preview_scaffold, resolve_content
+from .utils import exec_static, inject_link_preview_scaffold, resolve_content
 
 # Multi-source block registry and static resolution
 from .blocks import (

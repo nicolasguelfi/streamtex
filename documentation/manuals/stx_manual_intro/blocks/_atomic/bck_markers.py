@@ -33,13 +33,7 @@ def build():
         st_write(bs.sub, "Manual markers", toc_lvl="+1")
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            # Place a visible marker
-            st_marker("Section Start", visible=True)
-
-            # Place an invisible marker (default)
-            st_marker("Hidden Waypoint")
-        """))
+        show_code(file="examples/nav/marker_manual.py")
         st_space("v", 2)
 
         # --- Invisible marker ---
@@ -54,16 +48,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            marker = MarkerConfig(
-                auto_marker_on_toc=1,  # Level 1 headings become markers
-                show_nav_ui=True
-            )
-            st_book([...], marker_config=marker)
-
-            # Exclude a heading from markers
-            st_write(s.huge, "Appendix", toc_lvl="1", marker=False)
-        """))
+        show_code(file="examples/nav/marker_auto_toc.py")
         st_space("v", 2)
 
         # --- Another manual marker ---

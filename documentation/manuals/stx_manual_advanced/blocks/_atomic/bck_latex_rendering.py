@@ -138,17 +138,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent(r"""
-            # Simple equation
-            stx.st_latex(r"E = mc^2")
-
-            # With style wrapping
-            stx.st_latex(r"\int_0^\infty e^{-x^2}\,dx = \frac{\sqrt{\pi}}{2}",
-                         style=my_style)
-
-            # Load from file
-            stx.st_latex(file="formulas/euler.tex")
-        """).strip())
+        show_code(file="examples/latex/latex_simple_math.py")
         st_space("v", 1)
 
         with st_block(s.project.containers.result_box):
@@ -189,17 +179,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent(r"""
-            stx.st_latex_doc(r'''
-                \section{Introduction}
-                This is a \textbf{bold} statement with math: $x^2 + y^2 = z^2$.
-
-                \begin{itemize}
-                  \item First item
-                  \item Second item
-                \end{itemize}
-            ''', height=300)
-        """).strip())
+        show_code(file="examples/latex/latex_doc_fragment.py")
         st_space("v", 1)
 
         with st_block(s.project.containers.result_box):
@@ -226,20 +206,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent(r"""
-            stx.st_latex_doc(r'''
-                \section{Mathematical Content}
-                \subsection{Equations}
-                The Cauchy-Schwarz inequality:
-                $$\left(\sum a_k b_k\right)^2 \leq
-                  \left(\sum a_k^2\right)\left(\sum b_k^2\right)$$
-
-                \begin{quote}
-                \textbf{Theorem.} Let $f$ be continuous on $[a,b]$. Then:
-                $$\int_a^b f(x)\,dx = F(b) - F(a)$$
-                \end{quote}
-            ''', height=600, light_bg=True, hyphenate=False)
-        """).strip())
+        show_code(file="examples/latex/latex_advanced_math.py")
         st_space("v", 1)
 
         with st_block(s.project.containers.result_box):
@@ -264,25 +231,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent(r"""
-            # Fragment: auto-wrapped in \documentclass{article}
-            stx.st_latex_doc(r'''
-                \section{My Section}
-                Content is auto-wrapped in a minimal document.
-            ''', height=200)
-
-            # Full document: passed as-is to LaTeX.js
-            stx.st_latex_doc(r'''
-                \documentclass{article}
-                \begin{document}
-                \section{My Document}
-                This document is rendered without modification.
-                \end{document}
-            ''', height=200)
-
-            # Load from .tex file
-            stx.st_latex_doc(file="docs/paper.tex", height=500)
-        """).strip())
+        show_code(file="examples/latex/latex_full_document.py")
         st_space("v", 1)
 
         with st_block(s.project.containers.result_box):
@@ -296,11 +245,7 @@ def build():
         st_write(bs.sub, "Interactive Document Selection", toc_lvl="+1")
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            examples = {"Simple": code1, "Lists": code2, "Math": code3, ...}
-            choice = st.selectbox("Choose a document", list(examples.keys()))
-            stx.st_latex_doc(examples[choice], height=400)
-        """))
+        show_code(file="examples/latex/latex_interactive_selection.py")
         st_space("v", 1)
 
         choice_doc = st.selectbox(
@@ -323,15 +268,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent(r"""
-            # Mix StreamTeX text, math, and document rendering
-            st_write(s.Large, "Introduction to Linear Algebra")
-            stx.st_latex(r"\mathbf{A}\vec{x} = \vec{b}")
-            stx.st_latex_doc(r'''
-                \section{Matrix Operations}
-                Solving $\mathbf{A}\vec{x} = \vec{b}$ requires...
-            ''', height=200)
-        """).strip())
+        show_code(file="examples/latex/latex_coexistence.py")
         st_space("v", 2)
 
         # === Utilities ===
@@ -345,18 +282,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            from streamtex import extract_tikz, extract_math, extract_frames
-
-            # Extract all TikZ diagrams
-            tikz_blocks = extract_tikz(latex_source)
-
-            # Extract all math formulas ($, $$, \\[, \\()
-            math_exprs = extract_math(latex_source)
-
-            # Extract all Beamer frames
-            frames = extract_frames(beamer_source)
-        """).strip())
+        show_code(file="examples/latex/latex_parsing_utilities.py")
         st_space("v", 2)
 
         show_details(textwrap.dedent("""\

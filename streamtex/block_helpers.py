@@ -8,7 +8,7 @@ Block rendering helpers with 3 usage modes:
 from typing import Optional
 
 import streamtex as stx
-from streamtex import st_block, st_br, st_space, st_write
+from streamtex import st_block, st_markdown, st_space, st_write
 from streamtex.styles import StxStyles
 
 
@@ -74,11 +74,16 @@ def get_block_helper_config() -> BlockHelperConfig:
 
 
 def show_code(
-    code_string: str,
+    code_string: str = "",
     language: str = "python",
     line_numbers: bool = True,
     style: Optional[object] = None,
     wrap: Optional[bool] = None,
+    file: str | None = None,
+    encoding: str = "utf-8",
+    line_start: int | None = None,
+    start_line: int | None = None,
+    end_line: int | None = None,
 ) -> None:
     """Display syntax-highlighted code in a styled box.
 
@@ -88,33 +93,54 @@ def show_code(
     3. None (raw code box)
 
     Args:
-        code_string: Code to display
+        code_string: Code to display (mutually exclusive with *file*)
         language: Programming language for syntax highlighting
         line_numbers: Show line numbers
         style: Optional style override
         wrap: When True, long lines wrap instead of scrolling horizontally
+        file: Path to a source file (resolved via resolve_static)
+        encoding: File encoding (only used with *file*)
+        line_start: First line number displayed (Pygments linenostart)
+        start_line: 1-based first line to extract from content
+        end_line: 1-based last line to extract from content (inclusive)
 
     Example:
         # Simple usage (no style)
         show_code("print('hello')")
 
-        # With explicit style
-        show_code("print('hello')", style=my_style)
+        # From file
+        show_code(file="examples/text/basics_plain.py")
 
         # With config (auto style via BlockHelperConfig)
         set_block_helper_config(MyConfig())
         show_code("print('hello')")  # Uses MyConfig.get_code_style()
     """
     resolved_style = style or _block_helper_config.get_code_style()
-    stx.st_code(resolved_style, code=code_string, language=language, line_numbers=line_numbers, wrap=wrap)
+    stx.st_code(
+        resolved_style,
+        code=code_string,
+        language=language,
+        line_numbers=line_numbers,
+        wrap=wrap,
+        file=file,
+        encoding=encoding,
+        line_start=line_start,
+        start_line=start_line,
+        end_line=end_line,
+    )
 
 
 def show_code_inline(
-    code_string: str,
+    code_string: str = "",
     language: str = "python",
     line_numbers: bool = True,
     style: Optional[object] = None,
     wrap: Optional[bool] = None,
+    file: str | None = None,
+    encoding: str = "utf-8",
+    line_start: int | None = None,
+    start_line: int | None = None,
+    end_line: int | None = None,
 ) -> None:
     """Display code without box wrapper — for use inside containers.
 
@@ -124,21 +150,37 @@ def show_code_inline(
     3. None (raw code)
 
     Args:
-        code_string: Code to display
+        code_string: Code to display (mutually exclusive with *file*)
         language: Programming language for syntax highlighting
         line_numbers: Show line numbers
         style: Optional style override
         wrap: When True, long lines wrap instead of scrolling horizontally
+        file: Path to a source file (resolved via resolve_static)
+        encoding: File encoding (only used with *file*)
+        line_start: First line number displayed (Pygments linenostart)
+        start_line: 1-based first line to extract from content
+        end_line: 1-based last line to extract from content (inclusive)
     """
     resolved_style = style or _block_helper_config.get_code_inline_style()
-    stx.st_code(resolved_style, code=code_string, language=language, line_numbers=line_numbers, wrap=wrap)
+    stx.st_code(
+        resolved_style,
+        code=code_string,
+        language=language,
+        line_numbers=line_numbers,
+        wrap=wrap,
+        file=file,
+        encoding=encoding,
+        line_start=line_start,
+        start_line=start_line,
+        end_line=end_line,
+    )
 
 
 def show_explanation(text: str, style: Optional[object] = None) -> None:
     """Display styled explanation box before an example.
 
-    Pass a multi-line string (use textwrap.dedent). Each non-empty line
-    is rendered on its own line for readability.
+    Pass a multi-line string (use textwrap.dedent) with standard Markdown
+    formatting (bold, italic, lists, links, code spans…).
 
     Style resolution (in order):
     1. Explicit style parameter (if provided)
@@ -146,31 +188,29 @@ def show_explanation(text: str, style: Optional[object] = None) -> None:
     3. None (no box styling)
 
     Args:
-        text: Multi-line explanation text
+        text: Multi-line Markdown explanation text
         style: Optional style override
 
     Example:
         show_explanation(textwrap.dedent('''
-            This is the purpose of the example.
-            It shows how to use the feature.
+            **st_markdown()** renders interpreted Markdown content.
+            Use it for documentation with *formatting*.
         '''))
     """
     resolved_style = style or _block_helper_config.get_explanation_style()
-    lines = [line.strip() for line in text.strip().split("\n") if line.strip()]
+    body = text.strip()
     with st_block(resolved_style):
         st_write(StxStyles.big + StxStyles.bold, "Purpose")  # Label
         st_space("v", 1)
-        for i, line in enumerate(lines):
-            st_write(StxStyles.big, line)
-            if i < len(lines) - 1:
-                st_br()
+        if body:
+            st_markdown(body, style=StxStyles.big)
 
 
 def show_details(text: str, style: Optional[object] = None) -> None:
-    """Display 'Details:' section with summary + expanded text.
+    """Display 'Details:' section with Markdown-formatted content.
 
-    Pass a multi-line string (use textwrap.dedent). The first line becomes
-    the bold summary; subsequent lines are detail text.
+    Pass a multi-line string (use textwrap.dedent) with standard Markdown
+    formatting (bold, italic, lists, links, code spans…).
 
     Style resolution (in order):
     1. Explicit style parameter (if provided)
@@ -178,29 +218,23 @@ def show_details(text: str, style: Optional[object] = None) -> None:
     3. None (no box styling)
 
     Args:
-        text: Multi-line text (first line = summary, rest = details)
+        text: Multi-line Markdown text
         style: Optional style override
 
     Example:
         show_details(textwrap.dedent('''
-            This is the main point.
-            This is an additional detail.
-            Another detail here.
+            **Key point**: this is the main takeaway.
+
+            Additional details with *emphasis* and `code`.
         '''))
     """
     resolved_style = style or _block_helper_config.get_details_style()
-    lines = [line.strip() for line in text.strip().split("\n") if line.strip()]
+    body = text.strip()
     with st_block(resolved_style):
         st_write(StxStyles.big + StxStyles.bold, "Details:")  # Label
         st_space("v", 1)
-        if lines:
-            st_write(StxStyles.big, lines[0])  # Summary
-            if len(lines) > 1:
-                st_space("v", 1)
-                for i, line in enumerate(lines[1:]):
-                    st_write(StxStyles.big, line)
-                    if i < len(lines) - 2:
-                        st_br()
+        if body:
+            st_markdown(body, style=StxStyles.big)
 
 
 class BlockHelper:
@@ -218,25 +252,43 @@ class BlockHelper:
 
     def show_code(
         self,
-        code_string: str,
+        code_string: str = "",
         language: str = "python",
         line_numbers: bool = True,
         style: Optional[object] = None,
         wrap: Optional[bool] = None,
+        file: str | None = None,
+        encoding: str = "utf-8",
+        line_start: int | None = None,
+        start_line: int | None = None,
+        end_line: int | None = None,
     ) -> None:
         """Delegate to module-level show_code()."""
-        show_code(code_string, language, line_numbers, style, wrap=wrap)
+        show_code(
+            code_string, language, line_numbers, style, wrap=wrap,
+            file=file, encoding=encoding, line_start=line_start,
+            start_line=start_line, end_line=end_line,
+        )
 
     def show_code_inline(
         self,
-        code_string: str,
+        code_string: str = "",
         language: str = "python",
         line_numbers: bool = True,
         style: Optional[object] = None,
         wrap: Optional[bool] = None,
+        file: str | None = None,
+        encoding: str = "utf-8",
+        line_start: int | None = None,
+        start_line: int | None = None,
+        end_line: int | None = None,
     ) -> None:
         """Delegate to module-level show_code_inline()."""
-        show_code_inline(code_string, language, line_numbers, style, wrap=wrap)
+        show_code_inline(
+            code_string, language, line_numbers, style, wrap=wrap,
+            file=file, encoding=encoding, line_start=line_start,
+            start_line=start_line, end_line=end_line,
+        )
 
     def show_explanation(
         self,

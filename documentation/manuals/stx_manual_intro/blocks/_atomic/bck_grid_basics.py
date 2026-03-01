@@ -33,12 +33,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            with st_grid(cols=3, cell_styles=bs.cell) as g:
-                with g.cell(): st_write(s.large, "Cell A1")
-                with g.cell(): st_write(s.large, "Cell B1")
-                with g.cell(): st_write(s.large, "Cell C1")
-        """))
+        show_code(file="examples/grid/grid_int_cols.py")
         st_space("v", 1)
 
         with st_grid(cols=3, cell_styles=bs.cell) as g:
@@ -59,11 +54,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            with st_grid(cols="1fr 2fr", cell_styles=bs.cell) as g:
-                with g.cell(): st_write(s.large, "Narrow (1fr)")
-                with g.cell(): st_write(s.large, "Wide (2fr)")
-        """))
+        show_code(file="examples/grid/grid_string_cols.py")
         st_space("v", 1)
 
         with st_grid(cols="1fr 2fr", cell_styles=bs.cell) as g:
@@ -83,13 +74,7 @@ def build():
         st_space("v", 1)
 
         table_style = ns("table-layout: fixed; width: 100%; border-collapse: collapse;")
-        show_code(textwrap.dedent("""\
-            table_style = ns("table-layout: fixed; width: 100%;")
-            with st_grid(cols=2, grid_style=table_style,
-                         cell_styles=bs.cell) as g:
-                with g.cell(): st_write(s.bold + s.large, "Header A")
-                with g.cell(): st_write(s.bold + s.large, "Header B")
-        """))
+        show_code(file="examples/grid/grid_style.py")
         st_space("v", 1)
 
         with st_grid(cols=2, grid_style=table_style, cell_styles=bs.cell) as g:

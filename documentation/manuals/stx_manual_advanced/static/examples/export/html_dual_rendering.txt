@@ -1,0 +1,13 @@
+# Dual rendering pipeline (simplified)
+#
+#   stx.st_write(...)
+#        |
+#   st_html(html)
+#        |
+#   +----+----+
+#   |         |
+# st.html() buffer.append()
+#              |
+#       generate_full_html()
+#              |
+#     self-contained .html file

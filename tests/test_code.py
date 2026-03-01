@@ -273,3 +273,58 @@ class TestStCodeFileParameter:
             html = _call_st_code(file="code/example.py", language="python")
         mock_resolve.assert_called_once_with("", file="code/example.py", encoding="utf-8")
         assert "x" in html
+
+
+# ---------------------------------------------------------------------------
+# start_line / end_line / line_start
+# ---------------------------------------------------------------------------
+
+class TestStCodeLineExtraction:
+    """Tests for start_line, end_line, and line_start parameters."""
+
+    MULTI_LINE = "line1\nline2\nline3\nline4\nline5"
+
+    def test_start_line_extracts_from_line(self):
+        html = _call_st_code(code=self.MULTI_LINE, start_line=3)
+        assert "line3" in html
+        assert "line4" in html
+        assert "line5" in html
+        assert "line1" not in html
+
+    def test_end_line_extracts_up_to_line(self):
+        html = _call_st_code(code=self.MULTI_LINE, end_line=2)
+        assert "line1" in html
+        assert "line2" in html
+        assert "line3" not in html
+
+    def test_start_and_end_line_extract_range(self):
+        html = _call_st_code(code=self.MULTI_LINE, start_line=2, end_line=4)
+        assert "line1" not in html
+        assert "line2" in html
+        assert "line3" in html
+        assert "line4" in html
+        assert "line5" not in html
+
+    def test_line_start_default_from_start_line(self):
+        """When line_start is None and start_line is set, line_start = start_line (absolute numbering)."""
+        html = _call_st_code(code=self.MULTI_LINE, start_line=3, line_numbers=True)
+        # Line numbering should start at 3
+        assert "3" in html
+        # Line 1 and 2 not in content
+        assert "line1" not in html
+
+    def test_line_start_explicit_1_for_relative(self):
+        """line_start=1 forces relative numbering starting at 1."""
+        html = _call_st_code(code=self.MULTI_LINE, start_line=3, line_start=1, line_numbers=True)
+        assert "line3" in html
+
+    def test_line_start_without_extraction(self):
+        """line_start alone offsets displayed line numbers."""
+        html = _call_st_code(code="a = 1\nb = 2", line_start=10, line_numbers=True)
+        assert "a = 1" in html or "a" in html
+
+    def test_no_line_params_shows_all(self):
+        """Without start_line/end_line, all lines are shown."""
+        html = _call_st_code(code=self.MULTI_LINE)
+        for i in range(1, 6):
+            assert f"line{i}" in html

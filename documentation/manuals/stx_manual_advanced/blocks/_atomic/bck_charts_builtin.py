@@ -48,11 +48,7 @@ def build():
         st_write(bs.sub, "Line Chart", toc_lvl="+1")
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            data = {"Series A": [...], "Series B": [...]}
-            with st_block(s.project.containers.result_box):
-                st.line_chart(data)
-        """))
+        show_code(file="examples/data/chart_line.py")
         st_space("v", 1)
 
         with st_block(s.project.containers.result_box):
@@ -63,10 +59,7 @@ def build():
         st_write(bs.sub, "Bar Chart", toc_lvl="+1")
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            data = {"Category": [...], "Value": [...]}
-            st.bar_chart(data, x="Category", y="Value")
-        """))
+        show_code(file="examples/data/chart_bar.py")
         st_space("v", 1)
 
         bar_data = _make_bar_data()
@@ -78,10 +71,7 @@ def build():
         st_write(bs.sub, "Interactive Area Chart", toc_lvl="+1")
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            n_points = st.slider("Number of points", 5, 100, 30)
-            st.area_chart(_make_line_data(n_points))
-        """))
+        show_code(file="examples/data/chart_area_interactive.py")
         st_space("v", 1)
 
         n_points = st.slider("Number of data points", 5, 100, 30,
@@ -94,11 +84,7 @@ def build():
         st_write(bs.sub, "Scatter Chart", toc_lvl="+1")
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            random.seed(0)
-            scatter_data = {"x": [...], "y": [...], "size": [...]}
-            st.scatter_chart(scatter_data, x="x", y="y", size="size")
-        """))
+        show_code(file="examples/data/chart_scatter.py")
         st_space("v", 1)
 
         random.seed(0)
@@ -115,14 +101,7 @@ def build():
         st_write(bs.sub, "Metrics & Chart in Grid", toc_lvl="+1")
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            with st_grid(cols="1fr 2fr", cell_styles=bs.cell) as g:
-                with g.cell():
-                    st.metric("Users", "1,234", "+12%")
-                    st.metric("Revenue", "$5.6K", "+8%")
-                with g.cell():
-                    st.line_chart(data)
-        """))
+        show_code(file="examples/data/chart_metrics_grid.py")
         st_space("v", 1)
 
         with st_grid(cols="1fr 2fr", cell_styles=bs.cell) as g:

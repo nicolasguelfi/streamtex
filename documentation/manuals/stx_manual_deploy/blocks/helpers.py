@@ -1,15 +1,11 @@
-"""Block helpers for stx_manual_deploy — Config injection pattern.
+"""Block helpers for stx_manual_deploy — config injection pattern.
 
-Uses the DI pattern: define styles once, all helpers use them automatically.
+Re-exports library helpers with project-specific style configuration.
 """
 
 from streamtex import (
-    BlockHelperConfig,
-    show_code as _show_code,
-    show_code_inline as _show_code_inline,
-    show_explanation as _show_explanation,
-    show_details as _show_details,
-    set_block_helper_config,
+    BlockHelperConfig, set_block_helper_config,
+    show_code, show_code_inline, show_explanation, show_details,  # noqa: F401
 )
 from custom.styles import Styles as s
 
@@ -30,25 +26,4 @@ class ProjectBlockHelperConfig(BlockHelperConfig):
         return s.project.containers.details_box
 
 
-# Initialize the global config
 set_block_helper_config(ProjectBlockHelperConfig())
-
-
-def show_code(code_string: str, language: str = "python", line_numbers: bool = True, wrap=None):
-    """Show a code block with project styles."""
-    return _show_code(code_string, language, line_numbers, wrap=wrap)
-
-
-def show_code_inline(code_string: str, language: str = "python", line_numbers: bool = True, wrap=None):
-    """Show an inline code block with project styles."""
-    return _show_code_inline(code_string, language, line_numbers, wrap=wrap)
-
-
-def show_explanation(text: str):
-    """Show an explanation callout with project styles."""
-    return _show_explanation(text)
-
-
-def show_details(text: str):
-    """Show a details callout with project styles."""
-    return _show_details(text)

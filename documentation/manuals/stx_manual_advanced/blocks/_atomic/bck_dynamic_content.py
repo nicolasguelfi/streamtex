@@ -45,11 +45,7 @@ def build():
         st_write(bs.sub, "Style Switcher", toc_lvl="+1")
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            presets = {"Bold Blue": s.bold + s.Large + s.project.colors.primary_blue, ...}
-            choice = st.selectbox("Choose a style", list(presets.keys()))
-            st_write(presets[choice], "Sample text with the selected style")
-        """))
+        show_code(file="examples/dynamic/style_switcher.py")
         st_space("v", 1)
 
         choice = st.selectbox("Choose a style preset",
@@ -64,16 +60,7 @@ def build():
         st_write(bs.sub, "Conditional Rendering", toc_lvl="+1")
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            show_a = st.checkbox("Show block A")
-            show_b = st.checkbox("Show block B")
-            if show_a:
-                with st_block(s.project.containers.good_callout):
-                    st_write(s.large, "Block A is visible (Python if)")
-            if show_b:
-                with st_block(s.project.containers.tip_callout):
-                    st_write(s.large, "Block B is visible (Python if)")
-        """))
+        show_code(file="examples/dynamic/conditional_rendering.py")
         st_space("v", 1)
 
         col1, col2 = st.columns(2)
@@ -104,14 +91,7 @@ def build():
         st_write(bs.sub, "Dynamic Grid Builder", toc_lvl="+1")
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            cols = st.slider("Columns", 1, 5, 3)
-            rows = st.slider("Rows", 1, 4, 2)
-            with st_grid(cols=cols, cell_styles=bs.cell) as g:
-                for i in range(cols * rows):
-                    with g.cell():
-                        st_write(s.large, f"Cell {i+1}")
-        """))
+        show_code(file="examples/dynamic/grid_builder.py")
         st_space("v", 1)
 
         c1, c2 = st.columns(2)
@@ -128,18 +108,7 @@ def build():
         st_write(bs.sub, "Progressive Disclosure (Wizard)", toc_lvl="+1")
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            if "step" not in st.session_state:
-                st.session_state.step = 1
-            step = st.session_state.step
-            # Show content for current step
-            if step >= 1:
-                with st_block(...): st_write("Step 1: ...")
-            if step >= 2:
-                with st_block(...): st_write("Step 2: ...")
-            if st.button("Next") and step < 3:
-                st.session_state.step += 1
-        """))
+        show_code(file="examples/dynamic/progressive_wizard.py")
         st_space("v", 1)
 
         if "bck30_step" not in st.session_state:

@@ -34,19 +34,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            with st_overlay(s.container.sizes.width_full) as o:
-                with st_block(s.container.bg_colors.dark_slate_blue_bg
-                              + ns("height: 200px; width: 100%;")):
-                    st_write(s.text.colors.white + s.large,
-                             "Base content area")
-                with o.layer(top=20, left=20):
-                    with st_block(bs.overlay_bg):
-                        st_write(bs.overlay_text, "Top-Left")
-                with o.layer(bottom=20, right=20):
-                    with st_block(bs.overlay_bg):
-                        st_write(bs.overlay_text, "Bottom-Right")
-        """))
+        show_code(file="examples/overlay/overlay_basic.py")
         st_space("v", 1)
 
         with st_overlay(s.container.sizes.width_full) as o:
@@ -93,17 +81,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            with st_overlay(s.container.sizes.width_full) as o:
-                with st_block(s.container.bg_colors.light_blue_bg
-                              + ns("height: 200px; width: 100%;")):
-                    st_write(s.large, "Background")
-
-                # Center overlay
-                with o.layer(top="50%", left="50%"):
-                    with st_block(ns("transform: translate(-50%, -50%);")):
-                        st_write(bs.overlay_text, "Centered")
-        """))
+        show_code(file="examples/overlay/overlay_center.py")
         st_space("v", 2)
 
         # Multiple layers
@@ -118,25 +96,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            with st_overlay(s.container.sizes.width_full) as o:
-                # Base layer
-                with st_block(s.container.bg_colors.dark_blue_bg
-                              + ns("height: 150px;")):
-                    st_write(s.text.colors.white, "Base Content")
-
-                # Layer 1: Top-left
-                with o.layer(top=10, left=10):
-                    st_write(bs.overlay_text, "Layer 1")
-
-                # Layer 2: Top-right
-                with o.layer(top=10, right=10):
-                    st_write(bs.overlay_text, "Layer 2")
-
-                # Layer 3: Bottom-center
-                with o.layer(bottom=10, left="50%"):
-                    st_write(bs.overlay_text, "Layer 3")
-        """))
+        show_code(file="examples/overlay/overlay_multiple_layers.py")
         st_space("v", 2)
 
         # Use case: Badges and labels
@@ -151,21 +111,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            with st_overlay(s.container.sizes.width_full) as o:
-                # Product card
-                with st_block(s.container.bg_colors.light_gray_bg
-                              + ns("height: 200px; width: 100%;")):
-                    st_write(s.large, "Product Image Area")
-
-                # Sale badge (top-right)
-                with o.layer(top=-10, right=-10):
-                    with st_block(ns("background: #FF4444; border-radius: 50%; "
-                                     "width: 60px; height: 60px; "
-                                     "display: flex; align-items: center;")):
-                        st_write(ns("color: white; text-align: center;"),
-                                "SALE\\n50%")
-        """))
+        show_code(file="examples/overlay/overlay_badges.py")
         st_space("v", 2)
 
         # Use case: Tooltips and annotations
@@ -180,18 +126,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            with st_overlay(s.container.sizes.width_full) as o:
-                # Main content
-                with st_block(s.container.bg_colors.light_blue_bg
-                              + ns("height: 100px; padding: 20px;")):
-                    st_write(s.large, "Feature List")
-
-                # Annotation arrows/labels
-                with o.layer(top=30, right=10):
-                    st_write(ns("color: #FF6600; font-size: 12px;"),
-                            "← New feature")
-        """))
+        show_code(file="examples/overlay/overlay_tooltips.py")
         st_space("v", 2)
 
         # Z-index and layering
@@ -206,21 +141,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            # Default: each layer on top of previous
-            with st_overlay(s.container.sizes.width_full) as o:
-                # Base (z-index: auto)
-                with st_block(...): pass
-
-                # Layer 1 (z-index: auto, but defined later)
-                with o.layer(top=20, left=20):
-                    st_write(..., "Layer 1")
-
-                # To control explicitly:
-                with o.layer(top=30, left=30):
-                    with st_block(ns("z-index: 10;")):
-                        st_write(..., "Higher z-index")
-        """))
+        show_code(file="examples/overlay/overlay_zindex.py")
         st_space("v", 2)
 
         # Responsive overlays
@@ -235,19 +156,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            with st_overlay(s.container.sizes.width_full) as o:
-                with st_block(ns("height: 200px; background: #f0f0f0;")):
-                    st_write(s.large, "Container (responsive)")
-
-                # Top-right corner (responsive to container size)
-                with o.layer(top="10%", right="10%"):
-                    st_write(bs.overlay_text, "Responsive")
-
-                # Center (responsive)
-                with o.layer(top="50%", left="50%"):
-                    st_write(ns("color: red;"), "Centered")
-        """))
+        show_code(file="examples/overlay/overlay_responsive.py")
         st_space("v", 2)
 
         # Best practices and limitations

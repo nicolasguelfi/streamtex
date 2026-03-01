@@ -65,27 +65,7 @@ def build():
         st_write(bs.sub, "1. Configuration", toc_lvl="+1")
         st_space("v", 2)
 
-        show_code(textwrap.dedent("""\
-            from streamtex import GSheetConfig, AuthMode, set_gsheet_config
-
-            # Public sheets (no authentication needed)
-            cfg = GSheetConfig(auth_mode=AuthMode.PUBLIC, cache_ttl=600)
-
-            # Service account (server-side, recommended for deploy)
-            cfg = GSheetConfig(
-                auth_mode=AuthMode.SERVICE_ACCOUNT,
-                credentials_path="credentials.json",  # or use env var
-                cache_ttl=300,
-            )
-
-            # OAuth2 fallback (interactive browser auth)
-            cfg = GSheetConfig(
-                auth_mode=AuthMode.OAUTH2,
-                credentials_path="client_secret.json",
-            )
-
-            set_gsheet_config(cfg)
-        """))
+        show_code(file="examples/gsheet/config_auth_modes.py")
         st_space("v", 2)
 
         show_details(textwrap.dedent("""\
@@ -99,24 +79,7 @@ def build():
         st_write(bs.sub, "2. Loading Data", toc_lvl="+1")
         st_space("v", 2)
 
-        show_code(textwrap.dedent("""\
-            from streamtex import GSheetSource, load_gsheet, load_gsheet_df
-
-            # From sheet ID
-            src = GSheetSource(sheet_id="1BxiMk...", tab="Notes", range="A1:E30")
-
-            # From URL
-            src = GSheetSource.from_url(
-                "https://docs.google.com/spreadsheets/d/1BxiMk.../edit",
-                tab="Notes",
-            )
-
-            # Load as list of dicts
-            data = load_gsheet(src)
-
-            # Load as pandas DataFrame
-            df = load_gsheet_df(src)
-        """))
+        show_code(file="examples/gsheet/loading_data.py")
         st_space("v", 3)
 
         # --- Section 3: Live Demo ---
@@ -167,22 +130,7 @@ def build():
         st_write(bs.sub, "4. Pattern: Data in Blocks", toc_lvl="+1")
         st_space("v", 2)
 
-        show_code(textwrap.dedent("""\
-            # blocks/_atomic/bck_grades.py
-            from streamtex import *
-            from streamtex import GSheetSource, load_gsheet_df, GSheetConfig, AuthMode
-            import streamtex as stx
-
-            _src = GSheetSource.from_url(
-                "https://docs.google.com/spreadsheets/d/1BxiMk.../edit",
-                tab="Notes",
-            )
-
-            def build():
-                df = load_gsheet_df(_src, config=GSheetConfig(auth_mode=AuthMode.PUBLIC))
-                stx.st_dataframe(df)
-                stx.st_bar_chart(df, x="Student", y="Grade")
-        """))
+        show_code(file="examples/gsheet/data_in_blocks.py")
         st_space("v", 2)
 
         show_details(textwrap.dedent("""\

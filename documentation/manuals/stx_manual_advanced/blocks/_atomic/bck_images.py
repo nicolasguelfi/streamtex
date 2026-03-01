@@ -34,10 +34,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            theImageURL = "https://picsum.photos/seed/streamtex1/400/250"
-            st_image(uri=theImageURL, alt="Sample landscape image")
-        """))
+        show_code(file="examples/image/image_url.py")
         st_space("v", 1)
 
         st_image(uri=theImageURL, alt="Sample landscape image")
@@ -52,16 +49,10 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            st_image(uri=theImageURL,
-                     width="200px", height="150px",
-                     alt="Resized image")
-        """))
+        show_code(file="examples/image/image_dimensions.py")
         st_space("v", 1)
 
-        st_image(uri=theImageURL,
-                 width="200px", height="150px",
-                 alt="Resized image")
+        exec_static("examples/image/image_dimensions.py")
         st_space("v", 2)
 
         # Styled image
@@ -75,13 +66,7 @@ def build():
 
         bordered_img = (s.container.borders.solid_border
                         + s.container.paddings.tiny_padding)
-        show_code(textwrap.dedent("""\
-            bordered_img = (s.container.borders.solid_border
-                            + s.container.paddings.tiny_padding)
-            st_image(bordered_img,
-                     uri=theImageURL2, width="300px",
-                     alt="Bordered image")
-        """))
+        show_code(file="examples/image/image_styled.py")
         st_space("v", 1)
 
         st_image(bordered_img, uri=theImageURL2,
@@ -98,12 +83,7 @@ def build():
         st_space("v", 1)
 
         theURL = "https://docs.streamlit.io"
-        show_code(textwrap.dedent("""\
-            theURL = "https://docs.streamlit.io"
-            st_image(uri=theImageURL2, width="300px",
-                     link=theURL,
-                     alt="Click to visit Streamlit docs")
-        """))
+        show_code(file="examples/image/image_link.py")
         st_space("v", 1)
 
         st_image(uri=theImageURL2, width="300px",
@@ -120,9 +100,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            configure_image_path("app/static/images")
-        """))
+        show_code(file="examples/image/image_configure_path.py")
         st_space("v", 1)
 
         show_details(textwrap.dedent("""\

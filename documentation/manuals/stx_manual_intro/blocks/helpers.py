@@ -1,27 +1,24 @@
-"""Block helpers for stx_manual_intro — minimal hybrid approach.
+"""Block helpers for stx_manual_intro — config injection pattern.
 
-This module shows the SIMPLE usage pattern:
-- ProjectBlockHelperConfig for dependency injection
-- Convenience wrappers with config injection
-- A few project-specific helpers
+This module defines the project-specific style configuration and
+re-exports the library helpers so that blocks can import from here:
 
-For advanced patterns (OOP, multiple modes), see stx_manual_advanced/blocks/helpers.py
+    from blocks.helpers import show_code, show_explanation, show_details
+
+No wrapper functions needed — the library functions use the global
+config set by set_block_helper_config() at import time.
 """
 
 from streamtex import (
-    BlockHelperConfig,
-    show_code as _show_code,
-    show_code_inline as _show_code_inline,
-    show_explanation as _show_explanation,
-    show_details as _show_details,
-    set_block_helper_config,
+    BlockHelperConfig, set_block_helper_config,
+    show_code, show_code_inline, show_explanation, show_details,  # noqa: F401
+    st_write, st_block, st_space,
 )
-from streamtex import st_write, st_block, st_space
 from custom.styles import Styles as s
 
 
 # ============================================================================
-# DEPENDENCY INJECTION: Config with project-specific styles
+# Style configuration (one-time setup at import)
 # ============================================================================
 
 class ProjectBlockHelperConfig(BlockHelperConfig):
@@ -40,36 +37,11 @@ class ProjectBlockHelperConfig(BlockHelperConfig):
         return s.project.containers.details_box
 
 
-# Initialize config (one-time setup)
 set_block_helper_config(ProjectBlockHelperConfig())
 
 
 # ============================================================================
-# CONVENIENCE WRAPPERS: Use when you want local shortcuts
-# ============================================================================
-
-def show_code(code_string: str, language: str = "python", line_numbers: bool = True, wrap=None):
-    """Convenience wrapper — uses config-injected style."""
-    return _show_code(code_string, language, line_numbers, wrap=wrap)
-
-
-def show_code_inline(code_string: str, language: str = "python", line_numbers: bool = True, wrap=None):
-    """Convenience wrapper — uses config-injected style."""
-    return _show_code_inline(code_string, language, line_numbers, wrap=wrap)
-
-
-def show_explanation(text: str):
-    """Convenience wrapper — uses config-injected style."""
-    return _show_explanation(text)
-
-
-def show_details(text: str):
-    """Convenience wrapper — uses config-injected style."""
-    return _show_details(text)
-
-
-# ============================================================================
-# PROJECT-SPECIFIC HELPERS: Unique to intro project
+# Project-specific helpers (unique to intro project)
 # ============================================================================
 
 def show_intro_welcome(title: str, subtitle: str, description: str):

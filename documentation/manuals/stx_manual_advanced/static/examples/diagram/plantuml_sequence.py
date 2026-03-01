@@ -1,0 +1,1 @@
+stx.st_plantuml(file="diagrams/sequence_diagram.puml", height=1000)

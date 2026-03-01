@@ -30,12 +30,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            with st_list(list_type=lt.unordered,
-                         li_style=bs.list_item) as l:
-                with l.item(): st_write("First unordered item")
-                with l.item(): st_write("Second unordered item")
-        """))
+        show_code(file="examples/list/unordered_basic.py")
         st_space("v", 1)
 
         with st_list(list_type=lt.unordered, li_style=bs.list_item, align="center") as l:
@@ -53,12 +48,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            with st_list(list_type=lt.ordered,
-                         li_style=bs.list_item) as l:
-                with l.item(): st_write("Step one")
-                with l.item(): st_write("Step two")
-        """))
+        show_code(file="examples/list/ordered_basic.py")
         st_space("v", 1)
 
         with st_list(list_type=lt.ordered, li_style=bs.list_item, align="center") as l:
@@ -76,15 +66,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            with st_list(list_type=lt.unordered,
-                         li_style=bs.list_item) as l:
-                with l.item():
-                    st_write("Parent item A")
-                    with st_list(list_type=lt.unordered,
-                                 li_style=bs.list_item) as l2:
-                        with l2.item(): st_write("Child A.1")
-        """))
+        show_code(file="examples/list/nested_lists.py")
         st_space("v", 1)
 
         with st_list(list_type=lt.unordered, li_style=bs.list_item, align="center") as l:
@@ -112,13 +94,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            with st_list(list_type=lt.unordered,
-                         l_style=s.container.lists.g_docs,
-                         li_style=bs.list_item,
-                         align="center") as l:
-                with l.item(): st_write("Level 1 symbol")
-        """))
+        show_code(file="examples/list/custom_symbols_centered.py")
         st_space("v", 1)
 
         with st_list(list_type=lt.unordered,
@@ -148,12 +124,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            with st_list(list_type=lt.unordered,
-                         l_style=s.container.lists.g_docs,
-                         li_style=bs.list_item) as l:
-                with l.item(): st_write("Level 1 symbol")
-        """))
+        show_code(file="examples/list/custom_symbols_left.py")
         st_space("v", 1)
 
         with st_list(list_type=lt.unordered,
@@ -184,13 +155,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            with st_list(list_type=lt.ordered,
-                         l_style=s.container.lists.ordered_lowercase,
-                         li_style=bs.list_item) as l:
-                with l.item(): st_write("Item a")
-                with l.item(): st_write("Item b")
-        """))
+        show_code(file="examples/list/ordered_lowercase.py")
         st_space("v", 1)
 
         with st_list(list_type=lt.ordered,
@@ -211,10 +176,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            with l.item(style=s.text.colors.coral):
-                st_write("Highlighted item (coral override)")
-        """))
+        show_code(file="examples/list/per_item_style.py")
         st_space("v", 1)
 
         with st_list(list_type=lt.unordered, li_style=bs.list_item, align="center") as l:

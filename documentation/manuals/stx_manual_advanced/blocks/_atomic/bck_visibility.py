@@ -75,19 +75,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(textwrap.dedent("""\
-            with st_span():
-                with st_block(bs.demo_box
-                              + s.container.bg_colors.light_blue_bg):
-                    st_write("Box A")
-                with st_block(bs.demo_box
-                              + s.container.bg_colors.light_green_bg
-                              + s.visibility.visible):
-                    st_write("Box B (visible)")
-                with st_block(bs.demo_box
-                              + s.container.bg_colors.light_coral_bg):
-                    st_write("Box C")
-        """))
+        show_code(file="examples/visibility/visibility_modes.py")
         st_space("v", 1)
 
         # Visible

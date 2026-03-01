@@ -117,6 +117,7 @@ module_list = [
 toc = TOCConfig(
     numerate_titles=False,
     toc_position=0,
+    sidebar_max_level=2,
 )
 
 marker = MarkerConfig(

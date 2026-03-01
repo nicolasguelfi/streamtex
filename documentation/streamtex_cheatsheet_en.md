@@ -571,6 +571,13 @@ stx.st_code(style, code="print('hello')", font_size="14pt")
 - `font_size` — CSS font size (default: responsive via `--stx-code-size`)
 - `line_number_color` — Color for line numbers (default: `"#6A9BC5"`)
 - `wrap` — When `True`, long lines wrap instead of scrolling horizontally (default: `False`)
+- `file` — Path to a source file (resolved via `resolve_static()`). Mutually exclusive with `code`
+- `encoding` — File encoding when using `file=` (default: `"utf-8"`)
+
+```python
+# Load code from an external file
+stx.st_code(style, file="code/example.py", language="python")
+```
 
 **Responsive font size** (via CSS variable `--stx-code-size`):
 
@@ -727,6 +734,12 @@ Bob --> Alice: Authentication Response
 # PlantUML with options
 stx.st_plantuml(code, style=my_style, light_bg=True, height=500,
                 server="https://www.plantuml.com/plantuml")
+
+# All diagram functions accept file= for external files
+stx.st_mermaid(file="diagrams/flowchart.mmd", height=500)
+stx.st_tikz(file="diagrams/network.tex", height=800)
+stx.st_plantuml(file="diagrams/class.puml", height=500)
+stx.st_graphviz(file="diagrams/graph.dot")
 ```
 
 ### Audio & Video
@@ -746,6 +759,107 @@ with stx.st_export('<p>Fallback HTML for export</p>'):
 ```
 
 > **Note:** Interactive widgets (`st.button`, `st.slider`, `st.selectbox`) have no static representation and are absent from the export.
+
+## Document Languages — Markdown & LaTeX
+
+### Markdown — `st_markdown()`
+
+```python
+# Render Markdown via Streamlit's native engine
+stx.st_markdown("# Hello **World**")
+
+# Render with StreamTeX styling (wraps in st_block)
+stx.st_markdown("# Styled content", style=my_style)
+
+# Load Markdown from an external file
+stx.st_markdown(file="docs/readme.md")
+```
+
+**Supported syntax:** headings, bold, italic, strikethrough, lists, blockquotes,
+links, pipe tables, fenced code blocks with syntax highlighting,
+inline math (`$...$`), display math (`$$...$$`).
+
+```python
+# Tables (pipe syntax)
+stx.st_markdown("""
+| Feature | Support |
+|---------|---------|
+| Bold    | **yes** |
+| Math    | $x^2$   |
+""")
+
+# Math in Markdown
+stx.st_markdown("Inline $E=mc^2$ and display: $$\\int_0^1 x\\,dx$$")
+```
+
+**Parameters:**
+- `content` — Markdown source string (mutually exclusive with `file`)
+- `style` — Optional StreamTeX Style wrapping the rendered content
+- `file` — Path to a `.md` file (resolved via `resolve_static()`)
+- `encoding` — File encoding when using `file=` (default: `"utf-8"`)
+
+**HTML export:** Uses python-markdown with `tables` and `fenced_code` extensions.
+
+**st_markdown() vs st_write():**
+- `st_markdown()` interprets Markdown syntax into formatted HTML
+- `st_write()` applies StreamTeX styles to plain text (styled spans)
+- Use `st_markdown()` for existing Markdown content (README, docs)
+- Use `st_write()` for StreamTeX-styled inline text with composition
+
+### LaTeX — `st_latex()` & `st_latex_doc()`
+
+```python
+# Math formula (Streamlit native KaTeX — fast, math only)
+stx.st_latex(r"E = mc^2")
+stx.st_latex(r"\int_0^\infty e^{-x^2} dx = \frac{\sqrt{\pi}}{2}", style=my_style)
+
+# Load formula from file
+stx.st_latex(file="formulas/euler.tex")
+
+# Document / fragment via LaTeX.js (CDN, client-side, zero system dependency)
+stx.st_latex_doc(r"""
+\section{Introduction}
+This is a \textbf{bold} statement with math: $x^2 + y^2 = z^2$.
+
+\begin{itemize}
+  \item First item
+  \item Second item
+\end{itemize}
+""", height=400)
+
+# With options
+stx.st_latex_doc(code, style=my_style, light_bg=True, height=600, hyphenate=False)
+
+# Load from file
+stx.st_latex_doc(file="docs/intro.tex", height=500)
+```
+
+**`st_latex()` parameters:**
+- `content` — LaTeX math expression (mutually exclusive with `file`)
+- `style` — Optional StreamTeX Style wrapping
+- `file` — Path to a `.tex` file (resolved via `resolve_static()`)
+- `encoding` — File encoding (default: `"utf-8"`)
+
+**`st_latex_doc()` parameters:**
+- `code` — LaTeX source. Fragments are auto-wrapped in a minimal article document; full documents (with `\documentclass`) are passed as-is
+- `style` — Optional StreamTeX Style wrapping the iframe
+- `light_bg` — White background (default: `True`)
+- `height` — Iframe height in pixels (default: `600`)
+- `hyphenate` — Enable LaTeX.js hyphenation (default: `True`)
+- `file` — Path to a `.tex` file (resolved via `resolve_static()`)
+- `encoding` — File encoding (default: `"utf-8"`)
+
+Zero system dependency — LaTeX.js runs client-side via CDN.
+
+**LaTeX parsing utilities** (reusable in blocks and conversion tools):
+
+```python
+from streamtex import extract_tikz, extract_math, extract_frames
+
+tikz_blocks = extract_tikz(latex_source)   # List of tikzpicture blocks
+math_exprs = extract_math(latex_source)     # List of $, $$, \[, \( formulas
+frames = extract_frames(latex_source)       # List of Beamer frames
+```
 
 ## Zoom Control
 

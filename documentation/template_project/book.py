@@ -28,6 +28,7 @@ toc = TOCConfig(
     toc_position=0,
     title_style=s.project.titles.main_title + s.center_txt + s.text.wrap.nowrap,
     content_style=s.large + s.text.colors.reset,
+    sidebar_max_level=2,
     search=True,
 )
 

@@ -38,6 +38,7 @@ toc = TOCConfig(
     numerate_titles=False,
     toc_position=0,
     title_style=s.project.doc.titles.h2,
+    sidebar_max_level=2,
     search=True,
 )
 

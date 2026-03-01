@@ -153,8 +153,11 @@ def st_json(data, **kw):
         export_append(f'<pre class="stx-json">{escape(formatted)}</pre>')
 
 
-def st_graphviz(dot_source, **kw):
+def st_graphviz(dot_source="", *, file: str | None = None, encoding: str = "utf-8", **kw):
     """Display a Graphviz graph with ``st.graphviz_chart()`` and export SVG."""
+    from .utils import resolve_content
+
+    dot_source = resolve_content(dot_source, file=file, encoding=encoding)
     kw.setdefault("use_container_width", True)
     st.graphviz_chart(dot_source, **kw)
     if is_export_active():

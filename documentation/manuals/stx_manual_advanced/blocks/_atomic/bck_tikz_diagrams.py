@@ -1,4 +1,3 @@
-import os
 import streamlit as st
 from streamtex import *
 import streamtex as stx
@@ -15,25 +14,10 @@ class BlockStyles:
 bs = BlockStyles
 
 
-# ---------------------------------------------------------------------------
-# Load all diagrams from static files (single source of truth)
-# ---------------------------------------------------------------------------
-
-# _atomic/ → blocks/ → project root (where static/ lives)
-_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-_STATIC_DIR = os.path.join(_PROJECT_ROOT, "static")
-
-
-def _load(filename: str) -> str:
-    path = os.path.join(_STATIC_DIR, "diagrams", filename)
-    with open(path, encoding="utf-8") as f:
-        return f.read().strip()
-
-
 DIAGRAMS = {
-    "Function Plot": _load("simple_shapes.tex"),
-    "Neural Network": _load("neural_network.tex"),
-    "Finite Automaton": _load("finite_automaton.tex"),
+    "Function Plot": "diagrams/simple_shapes.tex",
+    "Neural Network": "diagrams/neural_network.tex",
+    "Finite Automaton": "diagrams/finite_automaton.tex",
 }
 
 # Only the automaton needs an extra TikZ library
@@ -69,7 +53,7 @@ def build():
         st_space("v", 1)
 
         with st_block(s.project.containers.result_box):
-            stx.st_tikz(DIAGRAMS["Function Plot"], height=800)
+            stx.st_tikz(file=DIAGRAMS["Function Plot"], height=800)
         st_space("v", 2)
 
         # --- Section 2: Neural network ---
@@ -98,7 +82,7 @@ def build():
         st_space("v", 1)
 
         with st_block(s.project.containers.result_box):
-            stx.st_tikz(DIAGRAMS["Neural Network"], height=800)
+            stx.st_tikz(file=DIAGRAMS["Neural Network"], height=800)
         st_space("v", 2)
 
         # --- Section 3: Finite automaton (with preamble) ---
@@ -123,7 +107,7 @@ def build():
         st_space("v", 1)
 
         with st_block(s.project.containers.result_box):
-            stx.st_tikz(DIAGRAMS["Finite Automaton"], height=800,
+            stx.st_tikz(file=DIAGRAMS["Finite Automaton"], height=800,
                         preamble=PREAMBLES["Finite Automaton"])
         st_space("v", 2)
 
@@ -142,7 +126,7 @@ def build():
                               [*DIAGRAMS],
                               key="bck_tikz_select")
         with st_block(s.project.containers.result_box):
-            stx.st_tikz(DIAGRAMS[choice], height=800, preamble=PREAMBLES.get(choice, ""))
+            stx.st_tikz(file=DIAGRAMS[choice], height=800, preamble=PREAMBLES.get(choice, ""))
         st_space("v", 2)
 
         show_details(textwrap.dedent("""\

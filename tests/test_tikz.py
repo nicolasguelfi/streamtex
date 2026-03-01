@@ -227,3 +227,26 @@ class TestExportRendering:
         """The preamble parameter is forwarded to _compile_tikz."""
         st_tikz(SAMPLE_CODE, preamble=r"\usepackage{pgfplots}")
         mock_compile.assert_called_once_with(SAMPLE_CODE, r"\usepackage{pgfplots}")
+
+
+# ---------------------------------------------------------------------------
+# st_tikz — file= parameter
+# ---------------------------------------------------------------------------
+
+class TestFileParameter:
+    def setup_method(self):
+        export_mod._buffer = None
+        _compile_tikz.clear()
+
+    def teardown_method(self):
+        export_mod._buffer = None
+
+    @patch("streamtex.tikz._render")
+    @patch("streamtex.tikz.st")
+    @patch("streamtex.tikz._compile_tikz", return_value=FAKE_SVG)
+    @patch("streamtex.utils.resolve_content", return_value=SAMPLE_CODE)
+    def test_st_tikz_with_file(self, mock_resolve, mock_compile, mock_st, mock_render):
+        """file= parameter loads code via resolve_content."""
+        st_tikz(file="diagrams/test.tex")
+        mock_resolve.assert_called_once_with("", file="diagrams/test.tex", encoding="utf-8")
+        mock_compile.assert_called_once_with(SAMPLE_CODE, "")

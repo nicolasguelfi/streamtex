@@ -260,3 +260,16 @@ class TestStCodeFallbackNoPygments:
         # Restore the real streamtex.code module after patching sys.modules
         if "streamtex.code" in sys.modules:
             del sys.modules["streamtex.code"]
+
+
+# ---------------------------------------------------------------------------
+# file= parameter
+# ---------------------------------------------------------------------------
+
+class TestStCodeFileParameter:
+    def test_st_code_with_file(self):
+        """file= parameter loads code via resolve_content."""
+        with patch("streamtex.utils.resolve_content", return_value="x = 42") as mock_resolve:
+            html = _call_st_code(file="code/example.py", language="python")
+        mock_resolve.assert_called_once_with("", file="code/example.py", encoding="utf-8")
+        assert "x" in html

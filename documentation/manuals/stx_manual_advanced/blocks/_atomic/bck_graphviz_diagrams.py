@@ -1,4 +1,3 @@
-import os
 import streamlit as st
 from streamtex import *
 import streamtex as stx
@@ -17,26 +16,11 @@ class BlockStyles:
 bs = BlockStyles
 
 
-# ---------------------------------------------------------------------------
-# Load all diagrams from static files (single source of truth)
-# ---------------------------------------------------------------------------
-
-# _atomic/ → blocks/ → project root (where static/ lives)
-_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-_STATIC_DIR = os.path.join(_PROJECT_ROOT, "static")
-
-
-def _load(filename: str) -> str:
-    path = os.path.join(_STATIC_DIR, "diagrams", filename)
-    with open(path, encoding="utf-8") as f:
-        return f.read().strip()
-
-
 DIAGRAMS = {
-    "Simple Graph": _load("simple_graph.dot"),
-    "StreamTeX Flowchart": _load("flowchart.dot"),
-    "Architecture": _load("architecture.dot"),
-    "Data Flow": _load("data_flow.dot"),
+    "Simple Graph": "diagrams/simple_graph.dot",
+    "StreamTeX Flowchart": "diagrams/flowchart.dot",
+    "Architecture": "diagrams/architecture.dot",
+    "Data Flow": "diagrams/data_flow.dot",
 }
 
 
@@ -66,7 +50,7 @@ def build():
         """))
         st_space("v", 1)
 
-        stx.st_graphviz(DIAGRAMS["Simple Graph"])
+        stx.st_graphviz(file=DIAGRAMS["Simple Graph"])
         st_space("v", 2)
 
         # --- Section 2: Styled flowchart ---
@@ -85,7 +69,7 @@ def build():
         """))
         st_space("v", 1)
 
-        stx.st_graphviz(DIAGRAMS["StreamTeX Flowchart"], height=600)
+        stx.st_graphviz(file=DIAGRAMS["StreamTeX Flowchart"], height=600)
         st_space("v", 2)
 
         # --- Section 3: Interactive selection ---
@@ -103,7 +87,7 @@ def build():
                               [*DIAGRAMS],
                               key="bck31_diagram_select")
         with st_block(s.project.containers.result_box):
-            stx.st_graphviz(DIAGRAMS[choice])
+            stx.st_graphviz(file=DIAGRAMS[choice])
         st_space("v", 2)
 
         # --- Section 4: Self-referential architecture ---
@@ -116,7 +100,7 @@ def build():
         """))
         st_space("v", 1)
 
-        stx.st_graphviz(DIAGRAMS["Architecture"])
+        stx.st_graphviz(file=DIAGRAMS["Architecture"])
         st_space("v", 2)
 
         show_details(textwrap.dedent("""\

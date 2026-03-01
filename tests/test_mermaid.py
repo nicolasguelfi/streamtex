@@ -213,3 +213,18 @@ class TestExportRendering:
         html = generate_export_html()
         assert "<script>" not in html
         assert "&lt;script&gt;" in html
+
+
+# ---------------------------------------------------------------------------
+# file= parameter
+# ---------------------------------------------------------------------------
+
+class TestFileParameter:
+    @patch("streamtex.mermaid.components")
+    @patch("streamtex.utils.resolve_content", return_value=SAMPLE_CODE)
+    def test_st_mermaid_with_file(self, mock_resolve, mock_components):
+        """file= parameter loads code via resolve_content."""
+        st_mermaid(file="diagrams/flowchart.mmd")
+        mock_resolve.assert_called_once_with("", file="diagrams/flowchart.mmd", encoding="utf-8")
+        html_arg = mock_components.html.call_args[0][0]
+        assert "graph TD" in html_arg

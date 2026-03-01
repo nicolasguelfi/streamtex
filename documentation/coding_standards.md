@@ -217,6 +217,14 @@ with st_grid(cols=2, grid_style=grid_gap):
 - Use `wrap=False` (default) for code where columns must align (tables, diffs, ASCII art)
 - `show_code()` and `show_code_inline()` forward the `wrap` parameter to `st_code()`
 
+### External File Loading (`file=` parameter)
+- All `st_*` content-rendering functions accept a `file=` parameter for loading from external files
+- `file=` is mutually exclusive with inline content (passing both raises `ValueError`)
+- File paths are resolved via `resolve_static()` — relative paths search configured static source directories
+- `resolve_content(content, file=, encoding=)` is the shared utility (in `streamtex/utils.py`)
+- Supported functions: `st_code`, `st_mermaid`, `st_plantuml`, `st_tikz`, `st_graphviz`, `st_markdown`
+- Example: `stx.st_mermaid(file="diagrams/flowchart.mmd", height=500)`
+
 ## 10. Running the App
 ```bash
 # Single project

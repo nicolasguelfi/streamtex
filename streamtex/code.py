@@ -72,6 +72,8 @@ def st_code(
     font_size: str = _CODE_SIZE_DEFAULT,
     line_number_color: str = "#6A9BC5",
     wrap: Optional[bool] = None,
+    file: str | None = None,
+    encoding: str = "utf-8",
 ):
     """Renders syntax-highlighted code via st.html() using Pygments.
 
@@ -87,7 +89,14 @@ def st_code(
         reads from the global sidebar toggle set by ``add_wrap_all_option()``
         (falls back to ``True``).  Pass ``True`` or ``False`` explicitly to
         override the global setting for a specific block.
+    :param file: Path to a source file.  Resolved via ``resolve_static()`` so
+        that relative paths search configured static source directories.
+        Mutually exclusive with *code*.
+    :param encoding: File encoding (only used when *file* is provided).
     """
+    from .utils import resolve_content
+
+    code = resolve_content(code, file=file, encoding=encoding)
     # Resolve wrap: explicit > global session state > True
     if wrap is None:
         try:

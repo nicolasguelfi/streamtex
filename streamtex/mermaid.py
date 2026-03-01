@@ -159,12 +159,14 @@ _VALID_FIT = {"contain", "width", "none"}
 
 
 def st_mermaid(
-    code: str,
+    code: str = "",
     *,
     style: Style | None = None,
     light_bg: bool = True,
     height: int = 500,
     fit: str = "contain",
+    file: str | None = None,
+    encoding: str = "utf-8",
     **kw,
 ) -> None:
     """Render a Mermaid diagram.
@@ -186,9 +188,18 @@ def st_mermaid(
         diagram to fit entirely within the viewport.  ``"width"`` scales to
         fill the viewport width.  ``"none"`` keeps the natural size (scale 1).
         Pan-zoom (wheel, drag, +/-/Reset) remains fully functional afterwards.
+    file : str | None
+        Path to a ``.mmd`` file.  Resolved via ``resolve_static()`` so that
+        relative paths search configured static source directories.
+        Mutually exclusive with *code*.
+    encoding : str
+        File encoding (only used when *file* is provided).
     **kw
         Reserved for future use.
     """
+    from .utils import resolve_content
+
+    code = resolve_content(code, file=file, encoding=encoding)
     if fit not in _VALID_FIT:
         raise ValueError(f"fit must be one of {_VALID_FIT!r}, got {fit!r}")
 

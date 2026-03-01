@@ -257,12 +257,14 @@ def _extract_svg_height(svg: str) -> int:
 
 
 def st_tikz(
-    code: str,
+    code: str = "",
     *,
     style: Style | None = None,
     light_bg: bool = True,
     height: int | None = None,
     preamble: str = "",
+    file: str | None = None,
+    encoding: str = "utf-8",
 ) -> None:
     """Render a TikZ diagram.
 
@@ -282,7 +284,16 @@ def st_tikz(
         height is auto-calculated from the compiled SVG.
     preamble : str
         Extra LaTeX preamble lines (e.g. ``\\usepackage{pgfplots}``).
+    file : str | None
+        Path to a ``.tex`` file.  Resolved via ``resolve_static()`` so that
+        relative paths search configured static source directories.
+        Mutually exclusive with *code*.
+    encoding : str
+        File encoding (only used when *file* is provided).
     """
+    from .utils import resolve_content
+
+    code = resolve_content(code, file=file, encoding=encoding)
     with st_block(style) if style is not None else nullcontext():
         svg: str | None = None
 

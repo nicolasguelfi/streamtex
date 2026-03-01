@@ -115,7 +115,7 @@ def build():
 
         st.set_page_config(page_title="My Project", layout="wide")
 
-        toc = TOCConfig(numerate_titles=False, toc_position=0)
+        toc = TOCConfig(numerate_titles=False, toc_position=0, sidebar_max_level=2)
 
         st_book([
             blocks.bck_welcome,

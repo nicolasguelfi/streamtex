@@ -40,11 +40,12 @@ sts.theme = dark
 
 # Table of Contents configuration
 toc = TOCConfig(
-    numerate_titles=False,
+    numerate_titles=True,
     toc_position=0,
     title_style=s.project.titles.section_title + s.center_txt,
     content_style=s.large,
     search=True,
+    sidebar_max_level=2,
 )
 
 # Marker configuration for navigation
@@ -102,6 +103,10 @@ st_book([
     blocks.bck_interactive_and_state,
     blocks.bck_data_and_charts,
     blocks.bck_ui_components,
+    # Document languages (Markdown & LaTeX rendering)
+    blocks.bck_document_languages,
+
+    # Diagram rendering engines
     blocks.bck_diagrams_and_viz,
 
     # Data integration and external sources

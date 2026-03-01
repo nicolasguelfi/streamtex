@@ -9,6 +9,7 @@ from .styles import Style, ListStyle, StyleGrid, StxStyles, StreamTeX_Styles, th
 from .write import st_write
 from .image import st_image, configure_image_path
 from .code import st_code, add_wrap_all_option
+from .markdown import st_markdown
 from .container import st_block, st_span
 from .space import st_space, st_br
 from .grid import st_grid, responsive_cols
@@ -48,8 +49,12 @@ from .mermaid import st_mermaid
 from .plantuml import st_plantuml
 from .tikz import st_tikz
 
+# LaTeX rendering
+from .latex import st_latex, st_latex_doc
+from .latex_utils import extract_tikz, extract_math, extract_frames
+
 # Utilities
-from .utils import inject_link_preview_scaffold
+from .utils import inject_link_preview_scaffold, resolve_content
 
 # Multi-source block registry and static resolution
 from .blocks import (

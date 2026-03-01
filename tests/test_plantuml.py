@@ -210,3 +210,18 @@ class TestExportRendering:
         html = generate_export_html()
         assert "<script>" not in html
         assert "&lt;script&gt;" in html
+
+
+# ---------------------------------------------------------------------------
+# file= parameter
+# ---------------------------------------------------------------------------
+
+class TestFileParameter:
+    @patch("streamtex.plantuml._fetch_svg", return_value=FAKE_SVG)
+    @patch("streamtex.plantuml.components")
+    @patch("streamtex.utils.resolve_content", return_value=SAMPLE_CODE)
+    def test_st_plantuml_with_file(self, mock_resolve, mock_components, mock_fetch):
+        """file= parameter loads code via resolve_content."""
+        st_plantuml(file="diagrams/class.puml")
+        mock_resolve.assert_called_once_with("", file="diagrams/class.puml", encoding="utf-8")
+        mock_components.html.assert_called_once()

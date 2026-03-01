@@ -1,4 +1,3 @@
-import os
 import streamlit as st
 from streamtex import *
 import streamtex as stx
@@ -15,25 +14,10 @@ class BlockStyles:
 bs = BlockStyles
 
 
-# ---------------------------------------------------------------------------
-# Load all diagrams from static files (single source of truth)
-# ---------------------------------------------------------------------------
-
-# _atomic/ → blocks/ → project root (where static/ lives)
-_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-_STATIC_DIR = os.path.join(_PROJECT_ROOT, "static")
-
-
-def _load(filename: str) -> str:
-    path = os.path.join(_STATIC_DIR, "diagrams", filename)
-    with open(path, encoding="utf-8") as f:
-        return f.read().strip()
-
-
 DIAGRAMS = {
-    "Class Diagram": _load("class_diagram.puml"),
-    "Sequence Diagram": _load("sequence_diagram.puml"),
-    "Use Case Diagram": _load("usecase_diagram.puml"),
+    "Class Diagram": "diagrams/class_diagram.puml",
+    "Sequence Diagram": "diagrams/sequence_diagram.puml",
+    "Use Case Diagram": "diagrams/usecase_diagram.puml",
 }
 
 
@@ -67,7 +51,7 @@ def build():
         st_space("v", 1)
 
         with st_block(s.project.containers.result_box):
-            stx.st_plantuml(DIAGRAMS["Class Diagram"], height=1000, key="plantuml_class")
+            stx.st_plantuml(file=DIAGRAMS["Class Diagram"], height=1000, key="plantuml_class")
         st_space("v", 2)
 
         # --- Section 2: Sequence Diagram ---
@@ -93,7 +77,7 @@ def build():
         st_space("v", 1)
 
         with st_block(s.project.containers.result_box):
-            stx.st_plantuml(DIAGRAMS["Sequence Diagram"], height=1000, key="plantuml_sequence")
+            stx.st_plantuml(file=DIAGRAMS["Sequence Diagram"], height=1000, key="plantuml_sequence")
         st_space("v", 2)
 
         # --- Section 3: Use Case Diagram ---
@@ -107,7 +91,7 @@ def build():
         st_space("v", 1)
 
         with st_block(s.project.containers.result_box):
-            stx.st_plantuml(DIAGRAMS["Use Case Diagram"], height=1000, key="plantuml_usecase")
+            stx.st_plantuml(file=DIAGRAMS["Use Case Diagram"], height=1000, key="plantuml_usecase")
         st_space("v", 2)
 
         # --- Section 4: Interactive selection ---
@@ -125,7 +109,7 @@ def build():
                               [*DIAGRAMS],
                               key="bck_plantuml_select")
         with st_block(s.project.containers.result_box):
-            stx.st_plantuml(DIAGRAMS[choice], height=1000, key="plantuml_interactive")
+            stx.st_plantuml(file=DIAGRAMS[choice], height=1000, key="plantuml_interactive")
         st_space("v", 2)
 
         show_details(textwrap.dedent("""\

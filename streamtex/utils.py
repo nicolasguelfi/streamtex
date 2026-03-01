@@ -7,6 +7,7 @@ Link preview utilities re-exported from link_preview.py.
 
 import re
 import uuid
+from pathlib import Path
 
 # Re-export image utilities (backward compat for `from .utils import __is_url` etc.)
 from .image_utils import _get_base64_encoded_image as __get_base64_encoded_image  # noqa: F401
@@ -31,3 +32,26 @@ def strip_html(html_string):
 def generate_key(prefix: str = "block"):
     """Generate a unique key with the given prefix."""
     return f"{prefix}-{uuid.uuid4().hex}"
+
+
+def resolve_content(
+    content: str = "",
+    file: str | None = None,
+    encoding: str = "utf-8",
+) -> str:
+    """Resolve textual content from inline string or file.
+
+    When *file* is provided, ``resolve_static()`` is used first so that
+    relative paths are searched across configured static source directories.
+
+    Raises ``ValueError`` if both *content* and *file* are provided.
+    Raises ``FileNotFoundError`` if *file* does not exist.
+    """
+    if file and content:
+        raise ValueError("Provide 'content' or 'file', not both")
+    if file:
+        from .blocks import resolve_static
+
+        resolved = resolve_static(file)
+        return Path(resolved).read_text(encoding=encoding)
+    return content

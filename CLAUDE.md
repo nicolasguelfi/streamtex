@@ -41,6 +41,7 @@ See `documentation/coding_standards.md` for the full reference. Key rules:
 - `streamtex/grid.py` — CSS Grid layout (st_grid with responsive columns)
 - `streamtex/container.py` — st_block, st_span context managers
 - `streamtex/list.py` — List rendering (st_list with ul/ol support, align="center" for centered lists)
+- `streamtex/markdown.py` — Markdown rendering (st_markdown with file= support, Streamlit native engine)
 - `streamtex/export.py` — st_html: raw HTML bridge (inline or iframe with auto font injection)
 
 ### Organization & Navigation
@@ -66,6 +67,8 @@ See `documentation/coding_standards.md` for the full reference. Key rules:
 - `streamtex/mermaid.py` — Mermaid diagrams (st_mermaid with pan/zoom, fit modes: contain/width/none)
 - `streamtex/plantuml.py` — PlantUML diagrams via HTTP server (st_plantuml with pan/zoom)
 - `streamtex/tikz.py` — TikZ diagrams via LaTeX pipeline (st_tikz, pan/zoom when height is explicit)
+- `streamtex/latex.py` — LaTeX rendering (st_latex for math, st_latex_doc for documents via LaTeX.js)
+- `streamtex/latex_utils.py` — LaTeX parsing utilities (extract_tikz, extract_math, extract_frames)
 
 ### Bibliography
 - `streamtex/bib.py` — Bibliography system (BibEntry, BibConfig, BibFormat, CitationStyle, BibRegistry, cite, st_cite, st_bibliography, st_refs, load_bib/bibtex/json/ris/csl_json, parse_bibtex_string, parse_ris_string, export_bibtex, generate_bib_stubs)

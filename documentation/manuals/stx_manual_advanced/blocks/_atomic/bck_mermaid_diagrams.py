@@ -1,4 +1,3 @@
-import os
 import streamlit as st
 from streamtex import *
 import streamtex as stx
@@ -15,25 +14,10 @@ class BlockStyles:
 bs = BlockStyles
 
 
-# ---------------------------------------------------------------------------
-# Load all diagrams from static files (single source of truth)
-# ---------------------------------------------------------------------------
-
-# _atomic/ → blocks/ → project root (where static/ lives)
-_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-_STATIC_DIR = os.path.join(_PROJECT_ROOT, "static")
-
-
-def _load(filename: str) -> str:
-    path = os.path.join(_STATIC_DIR, "diagrams", filename)
-    with open(path, encoding="utf-8") as f:
-        return f.read().strip()
-
-
 DIAGRAMS = {
-    "Flowchart": _load("flowchart.mmd"),
-    "Sequence Diagram": _load("sequence.mmd"),
-    "Class Diagram": _load("class_diagram.mmd"),
+    "Flowchart": "diagrams/flowchart.mmd",
+    "Sequence Diagram": "diagrams/sequence.mmd",
+    "Class Diagram": "diagrams/class_diagram.mmd",
 }
 
 
@@ -66,7 +50,7 @@ def build():
         st_space("v", 1)
 
         with st_block(s.project.containers.result_box):
-            stx.st_mermaid(DIAGRAMS["Flowchart"], height=1000, key="mermaid_flowchart")
+            stx.st_mermaid(file=DIAGRAMS["Flowchart"], height=1000, key="mermaid_flowchart")
         st_space("v", 2)
 
         # --- Section 2: Sequence diagram ---
@@ -91,7 +75,7 @@ def build():
         st_space("v", 1)
 
         with st_block(s.project.containers.result_box):
-            stx.st_mermaid(DIAGRAMS["Sequence Diagram"], height=1000, key="mermaid_sequence")
+            stx.st_mermaid(file=DIAGRAMS["Sequence Diagram"], height=1000, key="mermaid_sequence")
         st_space("v", 2)
 
         # --- Section 3: Class diagram ---
@@ -105,7 +89,7 @@ def build():
         st_space("v", 1)
 
         with st_block(s.project.containers.result_box):
-            stx.st_mermaid(DIAGRAMS["Class Diagram"], height=1000, key="mermaid_class")
+            stx.st_mermaid(file=DIAGRAMS["Class Diagram"], height=1000, key="mermaid_class")
         st_space("v", 2)
 
         # --- Section 4: Interactive selection ---
@@ -123,7 +107,7 @@ def build():
                               [*DIAGRAMS],
                               key="bck_mermaid_select")
         with st_block(s.project.containers.result_box):
-            stx.st_mermaid(DIAGRAMS[choice], height=1000, key="mermaid_interactive")
+            stx.st_mermaid(file=DIAGRAMS[choice], height=1000, key="mermaid_interactive")
         st_space("v", 2)
 
         show_details(textwrap.dedent("""\

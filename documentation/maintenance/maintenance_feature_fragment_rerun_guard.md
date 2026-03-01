@@ -827,9 +827,16 @@ Apres des interactions widget (fragment reruns), le bouton "Download HTML" produ
 
 Meme principe que L1. Si un widget montre/cache du contenu dans un bloc, l'index de recherche ne reflete pas le changement visuel.
 
-**Resolution** : Un bouton "Refresh search index" a ete ajoute dans la sidebar (au-dessus des onglets TOC/Markers), en mode pagine et en mode continu. En mode continu, le bouton declenche un `st.rerun()` qui reconstruit l'index. En mode pagine, il supprime egalement le cache (`_stx_page_cache`) pour forcer `_build_page_cache()` a se re-executer.
+**Resolution** : Un bouton "Refresh search index" a ete ajoute dans la sidebar (au-dessus des onglets TOC/Markers), dans les deux modes :
 
-**Impact reel** : Tres faible. La recherche StreamTeX opere au niveau bloc (montre/cache des blocs entiers par index). Le contenu conditionnel intra-bloc ne change pas la presence du bloc dans les resultats.
+- **Mode continu** : Le bouton declenche un `st.rerun()` qui reconstruit l'index complet (le `TextCollector` est demarre/arrete normalement par la boucle `st_book()`).
+- **Mode pagine** : Le bouton positionne un flag `_stx_refresh_search` dans `st.session_state` puis declenche un `st.rerun()`. Au rerun suivant, un `TextCollector` est demarre avant le rendu de la page courante (`st_include`), capture le texte frais (incluant le contenu dynamique genere par les widgets), puis fusionne le resultat dans l'index cache existant via `search_index.update(new_texts)`. Le cache `_stx_page_cache` n'est PAS supprime (ce qui evite le bug `DuplicateElementKey` cause par le double-rendu des widgets). Le script JS de recherche est ensuite re-injecte dans la sidebar avec l'index mis a jour.
+
+**Correction JS associee** (`search.py`) : Le pattern de liaison du handler de recherche a ete modifie pour remplacer le handler existant (`removeEventListener` + `addEventListener` avec reference `_stxSearchHandler`) au lieu d'utiliser un flag booleen `_stxSearchBound` qui empechait la mise a jour des donnees d'index entre reruns.
+
+**Limitation** : En mode pagine, le refresh ne re-collecte que la **page courante**, pas les autres pages. Les pages non visitees conservent leur index du dernier `_build_page_cache()`.
+
+**Impact reel** : Tres faible. La recherche StreamTeX opere au niveau bloc/page (montre/cache des entrees TOC/Markers entieres). Le contenu conditionnel intra-bloc ne change pas la presence du bloc dans les resultats.
 
 ### L3 : Blocs composites : isolation au niveau composite, pas atomique
 

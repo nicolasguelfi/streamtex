@@ -17,7 +17,7 @@ st.set_page_config(
 sts.theme = dark
 
 # Display the collection home (single page: header + cards)
-toc = TOCConfig(numerate_titles=False, toc_position=None, search=True)
+toc = TOCConfig(numerate_titles=False, toc_position=None, search=True, sidebar_max_level=2)
 
 st_book([
     blocks.bck_home,

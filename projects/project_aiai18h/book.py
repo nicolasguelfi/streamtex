@@ -18,6 +18,7 @@ toc = TOCConfig(
     numerate_titles=False,
     toc_position=0,
     title_style=s.project.titles.title_giant_green_01 + s.center_txt + s.text.wrap.nowrap,
+    sidebar_max_level=2,
     content_style=s.large + s.text.colors.reset)
 
 sts.theme = dark

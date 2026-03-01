@@ -197,12 +197,14 @@ _PLANTUML_TEMPLATE = """\
 
 
 def st_plantuml(
-    code: str,
+    code: str = "",
     *,
     style: Style | None = None,
     light_bg: bool = True,
     height: int = 500,
     server: str = "https://www.plantuml.com/plantuml",
+    file: str | None = None,
+    encoding: str = "utf-8",
     **kw,
 ) -> None:
     """Render a PlantUML diagram.
@@ -220,7 +222,16 @@ def st_plantuml(
         Height in pixels for the diagram iframe.  Defaults to 500.
     server : str
         PlantUML server URL.  Defaults to the public server.
+    file : str | None
+        Path to a ``.puml`` file.  Resolved via ``resolve_static()`` so that
+        relative paths search configured static source directories.
+        Mutually exclusive with *code*.
+    encoding : str
+        File encoding (only used when *file* is provided).
     """
+    from .utils import resolve_content
+
+    code = resolve_content(code, file=file, encoding=encoding)
     bg = "#fff" if light_bg else "transparent"
 
     with st_block(style) if style is not None else nullcontext():

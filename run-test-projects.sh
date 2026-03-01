@@ -321,15 +321,15 @@ if [ "$WATCH_MODE" = true ]; then
         fi
     done
 else
-    # Attendre un peu puis montrer les URLs
+    # Attendre un peu puis ouvrir dans Chrome
     sleep 2
     echo "✨ Tous les projets sont lancés!"
     echo ""
-    echo "Ouvrez dans votre navigateur:"
-    [ "$LAUNCH_COLLECTION" = true ] && echo "  • Collection:  http://localhost:$COLLECTION_PORT"
-    [ "$LAUNCH_INTRO" = true ] && echo "  • Intro:       http://localhost:$INTRO_PORT"
-    [ "$LAUNCH_ADVANCED" = true ] && echo "  • Advanced:    http://localhost:$ADVANCED_PORT"
-    [ "$LAUNCH_DEPLOYMENT" = true ] && echo "  • Deployment:  http://localhost:$DEPLOYMENT_PORT"
+    echo "Ouverture dans Chrome:"
+    [ "$LAUNCH_COLLECTION" = true ] && echo "  • Collection:  http://localhost:$COLLECTION_PORT" && open -a "Google Chrome" "http://localhost:$COLLECTION_PORT"
+    [ "$LAUNCH_INTRO" = true ] && echo "  • Intro:       http://localhost:$INTRO_PORT" && open -a "Google Chrome" "http://localhost:$INTRO_PORT"
+    [ "$LAUNCH_ADVANCED" = true ] && echo "  • Advanced:    http://localhost:$ADVANCED_PORT" && open -a "Google Chrome" "http://localhost:$ADVANCED_PORT"
+    [ "$LAUNCH_DEPLOYMENT" = true ] && echo "  • Deployment:  http://localhost:$DEPLOYMENT_PORT" && open -a "Google Chrome" "http://localhost:$DEPLOYMENT_PORT"
     echo ""
     echo "Utilisez './run-test-projects.sh --kill' pour arrêter tous les projets"
     echo ""

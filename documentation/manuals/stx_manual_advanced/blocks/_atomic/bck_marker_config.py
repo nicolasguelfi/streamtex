@@ -33,6 +33,7 @@ def build():
     show_explanation(textwrap.dedent("""\
         MarkerConfig is a dataclass that controls the marker navigation
         system. Pass it to st_book() via the marker_config= parameter.
+
         All fields have sensible defaults — you only need to set what
         you want to customize.
     """))
@@ -87,7 +88,15 @@ def build():
     """))
     st_space("v", 1)
 
-    show_code(file="examples/nav/marker_keyboard_modifiers.py")
+    show_code("""\
+# Single keys
+next_keys=["PageDown", "ArrowRight"]
+
+# With modifiers: Ctrl, Shift, Alt, Meta (Cmd on macOS)
+next_keys=["PageDown", "Ctrl+ArrowRight"]
+prev_keys=["PageUp", "Ctrl+ArrowLeft"]
+
+# Multiple modifiers are NOT chained — use one modifier per entry""")
     st_space("v", 2)
 
     # ------------------------------------------------------------------

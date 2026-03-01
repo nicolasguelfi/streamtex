@@ -32,7 +32,13 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(file="examples/deploy/cloud_workflow.txt", language="text")
+        show_code("""\
+# General workflow
+# 1. Build the Docker image locally
+# 2. Tag it for your registry
+# 3. Push to the registry
+# 4. SSH into your VM
+# 5. Pull and run the image""", language="text")
         st_space("v", 2)
 
         # --- 2. GCP (Compute Engine) ---
@@ -102,6 +108,8 @@ def build():
         # --- 5. Details ---
         show_details(textwrap.dedent("""\
             Open port 8501 in your cloud firewall rules.
+
             For HTTPS, set up a reverse proxy (nginx) with a TLS certificate.
+
             Cloud costs depend on VM size; a small instance is sufficient for StreamTeX.
         """))

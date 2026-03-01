@@ -71,6 +71,51 @@ class TestContainLink:
         assert "text-decoration: none" in result
 
 
+class TestContainLinkTarget:
+    """Tests for LinkConfig-driven target attribute on links."""
+
+    def setup_method(self):
+        from streamtex.link_config import LinkConfig, set_link_config
+        # Reset to default config before each test
+        set_link_config(LinkConfig())
+
+    def test_external_link_default_blank(self):
+        """Default config: external links get target='_blank'."""
+        result = contain_link("text", "https://example.com")
+        assert 'target="_blank"' in result
+
+    def test_internal_link_no_target(self):
+        """Default config: internal anchors have no target (implicit _self)."""
+        result = contain_link("text", "#section1")
+        assert "target=" not in result
+
+    def test_external_target_self(self):
+        """Config override: external_target='_self' → no target attribute."""
+        from streamtex.link_config import LinkConfig, set_link_config
+        set_link_config(LinkConfig(external_target="_self"))
+        result = contain_link("text", "https://example.com")
+        assert "target=" not in result
+
+    def test_external_target_custom(self):
+        """Config override: external_target='_parent'."""
+        from streamtex.link_config import LinkConfig, set_link_config
+        set_link_config(LinkConfig(external_target="_parent"))
+        result = contain_link("text", "https://example.com")
+        assert 'target="_parent"' in result
+
+    def test_internal_target_blank(self):
+        """Config override: internal_target='_blank' → opens anchors in new tab."""
+        from streamtex.link_config import LinkConfig, set_link_config
+        set_link_config(LinkConfig(internal_target="_blank"))
+        result = contain_link("text", "#section1")
+        assert 'target="_blank"' in result
+
+    def test_no_link_no_target(self):
+        """No link → no target attribute."""
+        result = contain_link("text", "")
+        assert "target=" not in result
+
+
 class TestUrlDetection:
     def test_http_url(self):
         assert is_url("http://example.com") is True

@@ -106,6 +106,6 @@ def build():
         show_details(
             "The Docker Build job only runs on push to main (not on PRs) to save CI minutes. "
             "It builds the image, starts a container, waits 10 seconds, "
-            "then verifies the health endpoint responds. "
+            "then verifies the health endpoint responds.\n\n"
             "To add deployment automation, extend the workflow with push-to-registry steps."
         )

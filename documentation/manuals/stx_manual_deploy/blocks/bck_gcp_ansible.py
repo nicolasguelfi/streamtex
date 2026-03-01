@@ -179,8 +179,8 @@ def build():
         st_space("v", 2)
 
         show_details(
-            "Open port 8501 in GCP firewall rules (VPC Network > Firewall). "
-            "For HTTPS, set up a reverse proxy (nginx/caddy) with Let's Encrypt. "
-            "Cost: e2-micro is ~$5/month. Larger instances for heavier projects. "
+            "Open port 8501 in GCP firewall rules (VPC Network > Firewall).\n\n"
+            "For HTTPS, set up a reverse proxy (nginx/caddy) with Let's Encrypt.\n\n"
+            "Cost: e2-micro is ~$5/month. Larger instances for heavier projects.\n\n"
             "For multiple projects, run each on a different port and use nginx to route."
         )

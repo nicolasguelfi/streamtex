@@ -1,1 +1,0 @@
-st_write(s.bold + s.Large, "Bold Large Text")

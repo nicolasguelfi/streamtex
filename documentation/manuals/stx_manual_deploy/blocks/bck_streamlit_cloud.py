@@ -107,6 +107,6 @@ def build():
         show_details(
             "Streamlit Cloud reads .streamlit/config.toml from the project folder automatically. "
             "Some values are overridden: server.headless is forced to true, "
-            "server.port is managed by the platform. "
+            "server.port is managed by the platform.\n\n"
             "Regenerate requirements.txt if you add new dependencies."
         )

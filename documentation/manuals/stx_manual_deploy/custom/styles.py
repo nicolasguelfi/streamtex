@@ -30,11 +30,11 @@ class BackgroundsCustom:
 class TextStylesCustom:
     """Deployment manual title compositions."""
     course_title = Style.create(
-        ColorsCustom.primary_blue + Text.weights.bold_weight + Text.sizes.Giant_size,
+        ColorsCustom.primary_blue + Text.weights.bold_weight + Text.sizes.huge_size,
         "course_title"
     )
     page_title = Style.create(
-        ColorsCustom.primary_blue + Text.weights.bold_weight + Text.sizes.Huge_size,
+        ColorsCustom.primary_blue + Text.weights.bold_weight + Text.sizes.huge_size,
         "page_title"
     )
     section_title = Style.create(

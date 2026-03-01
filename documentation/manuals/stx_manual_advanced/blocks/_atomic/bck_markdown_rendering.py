@@ -118,7 +118,17 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(file="examples/markdown/markdown_tables_code.py")
+        show_code("""\
+stx.st_markdown('''
+## Feature Comparison
+
+| Feature | st_write() | st_markdown() |
+|---------|-----------|--------------|
+| Styled text | Native StreamTeX | Markdown syntax |
+| Tables | st_grid() | Pipe syntax |
+| Math | No | $...$ and $$...$$ |
+| File loading | No | file= parameter |
+''')""")
         st_space("v", 1)
 
         with st_block(s.project.containers.result_box):
@@ -156,7 +166,12 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(file="examples/markdown/markdown_styled.py")
+        show_code("""\
+# Wrap Markdown in a styled container
+stx.st_markdown(
+    "# Styled Section\\n\\nThis content has **custom styling**.",
+    style=my_style,
+)""")
         st_space("v", 2)
 
         # --- Section 5: Loading from Files ---
@@ -171,14 +186,22 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(file="examples/markdown/markdown_file_loading.py")
+        show_code("""\
+# Load from a .md file in static/
+stx.st_markdown(file="docs/readme.md")
+
+# With styling and custom encoding
+stx.st_markdown(file="docs/notes.md", style=my_style, encoding="utf-8")""")
         st_space("v", 2)
 
         # --- Section 6: Interactive Selection ---
         st_write(bs.sub, "Interactive Selection", toc_lvl="+1")
         st_space("v", 1)
 
-        show_code(file="examples/markdown/markdown_interactive_selection.py")
+        show_code("""\
+examples = {"Basic": md1, "Tables": md2, "Math": md3, ...}
+choice = st.selectbox("Choose an example", list(examples.keys()))
+stx.st_markdown(examples[choice])""")
         st_space("v", 1)
 
         choice = st.selectbox(

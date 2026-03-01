@@ -19,7 +19,7 @@ class SharedStyles(StxStyles):
 
     class titles:
         """Shared title styles — 4-level hierarchy with floor at large (32pt)."""
-        course_title = StxStyles.Huge + StxStyles.bold + _SharedColors.primary_blue
+        course_title = StxStyles.huge + StxStyles.bold + _SharedColors.primary_blue
         section_title = StxStyles.LARGE + StxStyles.bold + _SharedColors.accent_teal
         section_subtitle = StxStyles.Large + StxStyles.bold + _SharedColors.warning_orange
         subsection_title = StxStyles.large + StxStyles.bold + _SharedColors.success_green

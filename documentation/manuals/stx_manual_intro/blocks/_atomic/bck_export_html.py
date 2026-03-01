@@ -26,12 +26,22 @@ def build():
 
         show_explanation(textwrap.dedent("""\
             st_book() enables HTML export by default.
+
             A "Download HTML" button appears in the sidebar.
+
             The exported file is a self-contained HTML document.
         """))
         st_space("v", 1)
 
-        show_code(file="examples/export/book_default.py")
+        show_code("""\
+# Export is enabled by default in st_book()
+st_book([
+    blocks.bck_00_welcome,
+    blocks.bck_01_architecture,
+    # ...
+], export_title="My Course")
+
+# The sidebar shows a "Download HTML" button automatically.""")
         st_space("v", 2)
 
         # --- 2. How it works ---
@@ -41,6 +51,7 @@ def build():
         show_explanation(textwrap.dedent("""\
             Every stx.* content call goes through st_html(),
             which sends HTML to both Streamlit and an export buffer.
+
             Context managers (st_block, st_grid, st_list) push/pop
             wrapper tags so the exported HTML keeps the nesting structure.
         """))
@@ -59,7 +70,17 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(file="examples/export/export_config_basic.py")
+        show_code("""\
+from streamtex.export import ExportConfig
+
+# ExportConfig fields:
+#   enabled: bool       = False   (st_book sets this to True)
+#   page_title: str     = "StreamTeX Export"
+#   page_width: str     = "100%"
+#   page_padding: str   = "36pt"
+
+# The simplest way: just set export_title in st_book()
+st_book([...], export_title="My Document Title")""")
         st_space("v", 2)
 
         # --- 4. Disable export ---
@@ -72,13 +93,19 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(file="examples/export/disable_export.py")
+        show_code("""\
+st_book([
+    blocks.bck_00_welcome,
+    # ...
+], export=False)  # No download button""")
         st_space("v", 2)
 
         # --- 5. Details ---
         show_details(textwrap.dedent("""\
             The exported file embeds all CSS and base64 images.
+
             Interactive features (markers, zoom) are not included.
+
             The HTML is fully self-contained: no external dependencies.
         """))
         st_space("v", 2)
@@ -89,6 +116,7 @@ def build():
 
         show_explanation(textwrap.dedent("""\
             ExportConfig is a dataclass that controls every aspect of HTML export.
+
             Use it for fine-grained control over the exported document.
         """))
         st_space("v", 1)
@@ -102,6 +130,7 @@ def build():
 
         show_explanation(textwrap.dedent("""\
             Add custom CSS rules that only apply to the exported HTML.
+
             Use for print-specific styling or responsive layouts.
         """))
         st_space("v", 1)
@@ -115,7 +144,9 @@ def build():
 
         show_explanation(textwrap.dedent("""\
             All images are embedded as base64 in the exported HTML.
+
             Large images increase file size significantly.
+
             Optimize images before export for smaller files.
         """))
         st_space("v", 1)
@@ -157,11 +188,20 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(file="examples/export/multi_format_future.py")
+        show_code("""\
+# Current (HTML only)
+st_book([...], export_title="My Document")
+
+# Future possibility (not yet implemented)
+# st_book([...],
+#     export_title="My Document",
+#     export_formats=["html", "pdf", "markdown"])""")
         st_space("v", 2)
 
         show_details(textwrap.dedent("""\
             Export is useful for sharing static documents.
+
             For interactive content, keep using Streamlit streaming.
+
             Export works best with text-heavy or diagram-heavy content.
         """))

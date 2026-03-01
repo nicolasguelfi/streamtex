@@ -32,6 +32,7 @@ def build():
 
         show_explanation(textwrap.dedent("""\
             The repository includes a production-ready Dockerfile.
+
             It uses uv for fast dependency installation
             and targets a specific project folder via build-arg.
         """))
@@ -53,11 +54,17 @@ def build():
 
         show_explanation(textwrap.dedent("""\
             Build the Docker image and run it.
+
             The app will be available at http://localhost:8501.
         """))
         st_space("v", 1)
 
-        show_code(file="examples/deploy/docker_build_run.sh", language="bash")
+        show_code("""\
+# Build the image
+docker build -t streamtex-app .
+
+# Run the container
+docker run -p 8501:8501 streamtex-app""", language="bash")
         st_space("v", 2)
 
         # --- 3. Build-arg FOLDER ---
@@ -66,11 +73,18 @@ def build():
 
         show_explanation(textwrap.dedent("""\
             Use --build-arg FOLDER to deploy a specific project.
+
             The default target is documentation/manuals/stx_manual_intro.
         """))
         st_space("v", 1)
 
-        show_code(file="examples/deploy/docker_build_arg.sh", language="bash")
+        show_code("""\
+# Deploy a specific project
+docker build \\
+    --build-arg FOLDER=projects/my_project \\
+    -t my-project-app .
+
+docker run -p 8501:8501 my-project-app""", language="bash")
         st_space("v", 2)
 
         # --- 4. Environment variables ---
@@ -110,6 +124,8 @@ def build():
         # --- 5. Details ---
         show_details(textwrap.dedent("""\
             The container exposes port 8501 with a health check.
+
             uv is installed from the official Docker image (ghcr.io/astral-sh/uv).
+
             Dependencies are installed in a cached layer for fast rebuilds.
         """))

@@ -29,7 +29,9 @@ def build():
 
         show_explanation(textwrap.dedent("""\
             stx.st_mermaid() renders Mermaid diagrams: flowcharts, sequence
-            diagrams, class diagrams, and more. Live rendering uses the
+            diagrams, class diagrams, and more.
+
+            Live rendering uses the
             streamlit-mermaid component. HTML export generates SVG via mermaid-py.
         """))
         st_space("v", 2)
@@ -38,7 +40,7 @@ def build():
         st_write(bs.sub, "Flowchart", toc_lvl="+1")
         st_space("v", 1)
 
-        show_code(file="examples/diagram/mermaid_flowchart.py")
+        show_code('stx.st_mermaid(file="diagrams/flowchart.mmd", height=1000)')
         st_space("v", 1)
 
         with st_block(s.project.containers.result_box):
@@ -54,11 +56,12 @@ def build():
 
         show_explanation(textwrap.dedent("""\
             Sequence diagrams show interactions between components over time.
+
             Ideal for documenting request/response flows.
         """))
         st_space("v", 1)
 
-        show_code(file="examples/diagram/mermaid_sequence.py")
+        show_code('stx.st_mermaid(file="diagrams/sequence.mmd", height=1000)')
         st_space("v", 1)
 
         with st_block(s.project.containers.result_box):
@@ -89,7 +92,15 @@ def build():
         st_write(bs.sub, "Interactive Diagram Selection", toc_lvl="+1")
         st_space("v", 1)
 
-        show_code(file="examples/diagram/mermaid_interactive.py")
+        show_code("""\
+DIAGRAMS = {
+    "Flowchart": "diagrams/flowchart.mmd",
+    "Sequence Diagram": "diagrams/sequence.mmd",
+    "Class Diagram": "diagrams/class_diagram.mmd",
+}
+
+choice = st.selectbox("Choose a Mermaid diagram", [*DIAGRAMS])
+stx.st_mermaid(file=DIAGRAMS[choice], height=1000)""")
         st_space("v", 1)
 
         choice = st.selectbox("Choose a Mermaid diagram",
@@ -104,7 +115,10 @@ def build():
 
         show_details(textwrap.dedent("""\
             Mermaid supports: flowcharts, sequence, class, state, ER, Gantt, pie, and more.
+
             stx.st_mermaid() uses streamlit-mermaid for live rendering.
+
             HTML export generates SVG via mermaid-py (mermaid.ink service).
+
             Static .mmd files can be loaded from the static/diagrams/ folder.
         """))

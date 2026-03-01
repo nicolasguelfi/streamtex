@@ -27,7 +27,9 @@ def build():
 
         show_explanation(textwrap.dedent("""\
             Hugging Face Spaces is a free hosting platform.
+
             It supports Docker-based apps out of the box.
+
             Your StreamTeX project runs as a Docker container.
         """))
         st_space("v", 2)
@@ -38,12 +40,20 @@ def build():
 
         show_explanation(textwrap.dedent("""\
             Go to huggingface.co/new-space and create a new Space.
+
             Choose "Docker" as the SDK.
+
             The Space will build your Dockerfile automatically.
         """))
         st_space("v", 1)
 
-        show_code(file="examples/deploy/hf_create_space.txt", language="text")
+        show_code('''\
+# Steps:
+# 1. Go to https://huggingface.co/new-space
+# 2. Name your Space (e.g. "my-streamtex-app")
+# 3. Select "Docker" as the Space SDK
+# 4. Choose visibility (public or private)
+# 5. Click "Create Space"''', language="text")
         st_space("v", 2)
 
         # --- 3. Push the project ---
@@ -56,7 +66,12 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(file="examples/deploy/hf_push.sh", language="bash")
+        show_code("""\
+# Add HF remote
+git remote add hf https://huggingface.co/spaces/USERNAME/SPACE_NAME
+
+# Push to Hugging Face
+git push hf main""", language="bash")
         st_space("v", 2)
 
         # --- 4. Expected structure ---
@@ -65,11 +80,22 @@ def build():
 
         show_explanation(textwrap.dedent("""\
             The Dockerfile must be at the repository root.
+
             Hugging Face detects it and builds automatically.
         """))
         st_space("v", 1)
 
-        show_code(file="examples/deploy/hf_repo_structure.txt", language="text")
+        show_code("""\
+# Repository root
+Dockerfile           # <- HF builds this
+pyproject.toml
+uv.lock
+streamtex/           # Library
+projects/
+  my_project/
+    book.py
+    blocks/
+    custom/""", language="text")
         st_space("v", 2)
 
         # --- 5. README configuration ---
@@ -82,12 +108,22 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(file="examples/deploy/hf_readme_metadata.yml", language="yaml")
+        show_code("""\
+---
+title: My StreamTeX App
+emoji: 📄
+colorFrom: blue
+colorTo: purple
+sdk: docker
+app_port: 8501
+---""", language="yaml")
         st_space("v", 2)
 
         # --- 6. Details ---
         show_details(textwrap.dedent("""\
             Free tier has limited CPU and RAM (2 vCPU, 16 GB RAM).
+
             Spaces go to sleep after ~15 min of inactivity (free tier).
+
             Upgrade to a paid plan for persistent uptime.
         """))

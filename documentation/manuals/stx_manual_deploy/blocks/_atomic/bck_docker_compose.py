@@ -97,6 +97,6 @@ def build():
 
         show_details(
             "Each service builds its own Docker image with the appropriate FOLDER build-arg. "
-            "All services include health checks and auto-restart (unless-stopped). "
+            "All services include health checks and auto-restart (unless-stopped).\n\n"
             "To add your own project, duplicate a service block and change the FOLDER arg."
         )

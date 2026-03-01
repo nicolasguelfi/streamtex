@@ -138,7 +138,15 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(file="examples/latex/latex_simple_math.py")
+        show_code("""\
+# Simple equation
+stx.st_latex(r"E = mc^2")
+
+# Integral
+stx.st_latex(r"\\int_0^\\infty e^{-x^2}\\,dx = \\frac{\\sqrt{\\pi}}{2}")
+
+# Sum series
+stx.st_latex(r"\\sum_{n=1}^{\\infty} \\frac{1}{n^2} = \\frac{\\pi^2}{6}")""")
         st_space("v", 1)
 
         with st_block(s.project.containers.result_box):
@@ -166,8 +174,8 @@ def build():
             stx.st_latex(MATH_EXAMPLES[choice_math])
         st_space("v", 2)
 
-        # === INTERMEDIATE: Document fragments ===
-        st_write(bs.sub, "Intermediate: Document Fragments", toc_lvl="+1")
+        # === Document fragments ===
+        st_write(bs.sub, "Document Fragments (st_latex_doc)", toc_lvl="+1")
         st_space("v", 1)
 
         show_explanation(textwrap.dedent("""\
@@ -176,85 +184,38 @@ def build():
             from CDN. It runs entirely client-side with zero system
             dependency. Supports sections, lists, math, bold, italic,
             footnotes, quotes, and more.
+
+            - Fragments (no \\\\documentclass) are auto-wrapped in a minimal article
+            - Full documents (with \\\\documentclass) are passed to LaTeX.js as-is
         """))
         st_space("v", 1)
 
-        show_code(file="examples/latex/latex_doc_fragment.py")
+        show_code('''\
+stx.st_latex_doc(r"""
+\\section{Introduction}
+This is a simple LaTeX fragment rendered by \\textbf{LaTeX.js}.
+It supports \\emph{emphasis}, \\texttt{monospace}, and basic formatting.
+""", height=150)''')
         st_space("v", 1)
 
-        with st_block(s.project.containers.result_box):
-            stx.st_latex_doc(DOC_EXAMPLES["Simple text"], height=150)
-        st_space("v", 2)
-
-        with st_block(s.project.containers.result_box):
-            stx.st_latex_doc(DOC_EXAMPLES["Lists and structure"], height=400)
-        st_space("v", 2)
-
-        with st_block(s.project.containers.result_box):
-            stx.st_latex_doc(DOC_EXAMPLES["Simple text"]+"\n"+DOC_EXAMPLES["Lists and structure"], height=600)
-        st_space("v", 2)
-
-
-        # === ADVANCED: Math + theorems + tables + options ===
-        st_write(bs.sub, "Advanced: Math and Theorems", toc_lvl="+1")
-        st_space("v", 1)
-
-        show_explanation(textwrap.dedent("""\
-            LaTeX.js handles complex math environments and theorem-like
-            structures. Here is a richer example combining equations,
-            a theorem, and a list of constants.
-        """))
-        st_space("v", 1)
-
-        show_code(file="examples/latex/latex_advanced_math.py")
-        st_space("v", 1)
-
-        with st_block(s.project.containers.result_box):
-            stx.st_latex_doc(
-                DOC_EXAMPLES["Math and theorems"],
-                height=600,
-                light_bg=True,
-                hyphenate=False,
-            )
-        st_space("v", 2)
-
-        # === Full Document Support ===
-        st_write(bs.sub, "Full Document Support", toc_lvl="+1")
-        st_space("v", 1)
-
-        show_explanation(textwrap.dedent("""\
-            LaTeX fragments (without \\\\documentclass) are automatically
-            wrapped in a minimal article document before rendering.
-            Full documents that already contain \\\\documentclass and
-            \\\\begin{document} are passed to LaTeX.js as-is.
-            This lets you render existing .tex files directly.
-        """))
-        st_space("v", 1)
-
-        show_code(file="examples/latex/latex_full_document.py")
-        st_space("v", 1)
-
-        with st_block(s.project.containers.result_box):
-            stx.st_latex_doc(
-                DOC_EXAMPLES["Full document"],
-                height=200,
-            )
-        st_space("v", 2)
-
-        # === Interactive document selection ===
-        st_write(bs.sub, "Interactive Document Selection", toc_lvl="+1")
-        st_space("v", 1)
-
-        show_code(file="examples/latex/latex_interactive_selection.py")
-        st_space("v", 1)
-
+        # Single interactive selector — renders ONE iframe at a time (perf)
+        doc_heights = {
+            "Simple text": 150,
+            "Lists and structure": 400,
+            "Math and theorems": 600,
+            "Full document": 200,
+        }
         choice_doc = st.selectbox(
-            "Choose a LaTeX document",
+            "Choose a LaTeX document example",
             [*DOC_EXAMPLES],
             key="bck_latex_doc_select",
         )
         with st_block(s.project.containers.result_box):
-            stx.st_latex_doc(DOC_EXAMPLES[choice_doc], height=400)
+            stx.st_latex_doc(
+                DOC_EXAMPLES[choice_doc],
+                height=doc_heights.get(choice_doc, 400),
+                light_bg=True,
+            )
         st_space("v", 2)
 
         # === Coexistence with StreamTeX ===
@@ -268,7 +229,14 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(file="examples/latex/latex_coexistence.py")
+        show_code("""\
+# Mix StreamTeX text, math, and document rendering
+st_write(s.Large, "Introduction to Linear Algebra")
+stx.st_latex(r"\\mathbf{A}\\vec{x} = \\vec{b}")
+stx.st_latex_doc(r'''
+    \\section{Matrix Operations}
+    Solving $\\mathbf{A}\\vec{x} = \\vec{b}$ requires...
+''', height=200)""")
         st_space("v", 2)
 
         # === Utilities ===
@@ -282,7 +250,17 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(file="examples/latex/latex_parsing_utilities.py")
+        show_code("""\
+from streamtex import extract_tikz, extract_math, extract_frames
+
+# Extract all TikZ diagrams
+tikz_blocks = extract_tikz(latex_source)
+
+# Extract all math formulas ($, $$, \\[, \\()
+math_exprs = extract_math(latex_source)
+
+# Extract all Beamer frames
+frames = extract_frames(beamer_source)""")
         st_space("v", 2)
 
         show_details(textwrap.dedent("""\

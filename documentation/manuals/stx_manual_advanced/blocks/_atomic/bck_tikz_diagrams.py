@@ -32,7 +32,9 @@ def build():
 
         show_explanation(textwrap.dedent("""\
             stx.st_tikz() renders TikZ diagrams via a local LaTeX pipeline:
-            pdflatex + dvisvgm. LaTeX is an optional system dependency.
+            pdflatex + dvisvgm.
+
+            LaTeX is an optional system dependency.
             If absent, a warning is shown with the raw source as fallback.
         """))
         st_space("v", 2)
@@ -41,7 +43,7 @@ def build():
         st_write(bs.sub, "Function Plot", toc_lvl="+1")
         st_space("v", 1)
 
-        show_code(file="examples/diagram/tikz_function_plot.py")
+        show_code('stx.st_tikz(file="diagrams/simple_shapes.tex", height=800)')
         st_space("v", 1)
 
         with st_block(s.project.containers.result_box):
@@ -61,7 +63,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(file="examples/diagram/tikz_neural_network.py")
+        show_code('stx.st_tikz(file="diagrams/neural_network.tex", height=800)')
         st_space("v", 1)
 
         with st_block(s.project.containers.result_box):
@@ -81,7 +83,12 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(file="examples/diagram/tikz_finite_automaton.py")
+        show_code("""\
+stx.st_tikz(
+    file="diagrams/finite_automaton.tex",
+    height=800,
+    preamble=r"\\usetikzlibrary{automata,positioning}",
+)""")
         st_space("v", 1)
 
         with st_block(s.project.containers.result_box):
@@ -96,7 +103,16 @@ def build():
         st_write(bs.sub, "Interactive Diagram Selection", toc_lvl="+1")
         st_space("v", 1)
 
-        show_code(file="examples/diagram/tikz_interactive.py")
+        show_code("""\
+DIAGRAMS = {
+    "Function Plot": "diagrams/simple_shapes.tex",
+    "Neural Network": "diagrams/neural_network.tex",
+    "Finite Automaton": "diagrams/finite_automaton.tex",
+}
+PREAMBLES = {"Finite Automaton": r"\\usetikzlibrary{automata,positioning}"}
+
+choice = st.selectbox("Choose a TikZ diagram", [*DIAGRAMS])
+stx.st_tikz(file=DIAGRAMS[choice], height=800, preamble=PREAMBLES.get(choice, ""))""")
         st_space("v", 1)
 
         choice = st.selectbox("Choose a TikZ diagram",
@@ -111,8 +127,12 @@ def build():
 
         show_details(textwrap.dedent("""\
             TikZ requires pdflatex + dvisvgm installed on the system.
+
             If LaTeX is absent, a warning and the raw source are displayed.
+
             Results are cached (st.cache_data) to avoid recompilation.
+
             Use the preamble parameter for extra packages (pgfplots, automata, etc.).
+
             Static .tex files can be loaded from the static/diagrams/ folder.
         """))

@@ -156,8 +156,8 @@ def build():
         st_space("v", 2)
 
         show_details(
-            "Render auto-deploys on every push to main. "
+            "Render auto-deploys on every push to main.\n\n"
             "Free tier: one always-on app fits in 750h/month (31 days x 24h = 744h). "
-            "Two apps won't fit in the free quota. "
+            "Two apps won't fit in the free quota.\n\n"
             "Custom domains get auto-SSL via Let's Encrypt."
         )

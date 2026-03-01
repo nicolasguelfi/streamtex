@@ -28,11 +28,18 @@ def build():
 
         show_explanation(textwrap.dedent("""\
             st_block wraps content in a styled container.
+
             Children stack vertically.
         """))
         st_space("v", 1)
 
-        show_code(file="examples/container/block_basic.py")
+        show_code("""\
+with st_block(s.container.bg_colors.dark_slate_gray_bg
+              + s.container.paddings.medium_padding
+              + s.center_txt):
+    st_write(s.text.colors.white + s.Large, "Inside st_block")
+    st_write(s.text.colors.light_gray + s.large,
+             "Children stack vertically")""")
         st_space("v", 1)
 
         with st_block(s.container.bg_colors.dark_slate_gray_bg
@@ -54,7 +61,12 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(file="examples/container/span_basic.py")
+        show_code("""\
+with st_span(s.container.bg_colors.dark_slate_blue_bg
+             + s.container.paddings.medium_padding):
+    st_write(s.text.colors.white + s.large, "Left ")
+    st_write(s.text.colors.light_green + s.large, "Center ")
+    st_write(s.text.colors.light_coral + s.large, "Right")""")
         st_space("v", 1)
 
         with st_span(s.container.bg_colors.dark_slate_blue_bg
@@ -91,6 +103,7 @@ def build():
 
         show_details(textwrap.dedent("""\
             Use st_block for sections and logical grouping.
+
             Use st_span when you need side-by-side elements within a block.
         """))
         st_space("v", 2)
@@ -101,12 +114,18 @@ def build():
 
         show_explanation(textwrap.dedent("""\
             st_br() adds vertical spacing between elements.
+
             Useful for breaking up visual density without large gaps.
             More subtle than st_space() which can be configured more explicitly.
         """))
         st_space("v", 1)
 
-        show_code(file="examples/container/line_break.py")
+        show_code("""\
+st_write(s.large, "First line of text")
+st_br()  # Add vertical space
+st_write(s.large, "Second line of text")
+st_br()
+st_write(s.large, "Third line of text")""")
         st_space("v", 1)
 
         st_write(s.large, "First line of text")
@@ -135,11 +154,22 @@ def build():
         """)
         st_space("v", 1)
 
-        show_code(file="examples/container/br_vs_space.py")
+        show_code("""\
+# Simple spacing with st_br
+st_write(s.large, "Paragraph 1")
+st_br()
+st_write(s.large, "Paragraph 2")
+
+# Explicit spacing with st_space
+st_write(s.large, "Section 1")
+st_space("v", 3)  # More space
+st_write(s.large, "Section 2")""")
         st_space("v", 2)
 
         show_details(textwrap.dedent("""\
             st_br is simpler for casual spacing.
+
             st_space is better when you need control.
+
             Combine them: st_br between sentences, st_space between sections.
         """))

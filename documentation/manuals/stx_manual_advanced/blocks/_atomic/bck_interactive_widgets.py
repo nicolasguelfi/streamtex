@@ -31,7 +31,15 @@ def build():
         st_write(bs.sub, "Buttons & Toggles", toc_lvl="+1")
         st_space("v", 1)
 
-        show_code(file="examples/widget/buttons_toggles.py")
+        show_code("""\
+if st.button("Say hello", key="bck25_hello"):
+    with st_block(s.project.containers.result_box):
+        st_write(s.large + s.bold + s.project.colors.success_green,
+                 "Hello from StreamTeX!")
+show = st.toggle("Show styled block", key="bck25_toggle")
+if show:
+    with st_block(s.project.containers.tip_callout):
+        st_write(s.large, "This block appears when toggled on.")""")
         st_space("v", 1)
 
         if st.button("Say hello", key="bck25_hello"):
@@ -68,7 +76,11 @@ def build():
         st_write(bs.sub, "Slider-Driven Styles", toc_lvl="+1")
         st_space("v", 1)
 
-        show_code(file="examples/widget/slider_driven_styles.py")
+        show_code("""\
+size = st.slider("Font size (px)", 12, 96, 32, key="bck25_slider")
+dynamic_style = ns(f"font-size: {size}px;")
+with st_block(s.project.containers.result_box):
+    st_write(dynamic_style + s.bold, "Dynamic size text")""")
         st_space("v", 1)
 
         size = st.slider("Font size (px)", 12, 96, 32, key="bck25_slider")
@@ -101,7 +113,12 @@ def build():
         st_write(bs.sub, "Color Picker", toc_lvl="+1")
         st_space("v", 1)
 
-        show_code(file="examples/widget/color_picker.py")
+        show_code("""\
+picked = st.color_picker("Pick a text color", "#E74C3C",
+                         key="bck25_color")
+color_style = ns(f"color: {picked};")
+with st_block(s.project.containers.result_box):
+    st_write(color_style + s.Large + s.bold, "Colored text!")""")
         st_space("v", 1)
 
         picked = st.color_picker("Pick a text color", "#E74C3C",
@@ -113,7 +130,9 @@ def build():
 
         show_details(textwrap.dedent("""\
             Widgets return values that drive what stx.* displays.
+
             Style() objects can be constructed dynamically at runtime
             using f-strings: ns(f"font-size: {val}px;").
+
             Always use st.* for interactivity, stx.* for content.
         """))

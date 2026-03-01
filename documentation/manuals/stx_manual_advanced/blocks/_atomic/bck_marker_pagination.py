@@ -44,6 +44,7 @@ def build():
     show_explanation(textwrap.dedent("""\
         When you press Next at the last marker of a page, the system
         switches to the next page and scrolls to its first marker.
+
         Similarly, pressing Prev at the first marker of a page returns
         to the previous page and scrolls to its last marker.
     """))
@@ -107,4 +108,11 @@ def build():
     """))
     st_space("v", 1)
 
-    show_code(file="examples/nav/marker_lifecycle.py")
+    show_code("""\
+# Lifecycle in book.py (simplified)
+reset_marker_registry(marker_config)  # 1. Init registry
+
+for block in blocks:                   # 2. Render blocks
+    st_include(block)                  #    (st_write auto-registers markers)
+
+inject_marker_navigation()             # 3. Emit widget + JS""")

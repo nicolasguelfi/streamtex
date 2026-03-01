@@ -34,7 +34,9 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(file="examples/image/image_url.py")
+        show_code("""\
+theImageURL = "https://picsum.photos/seed/streamtex1/400/250"
+st_image(uri=theImageURL, alt="Sample landscape image")""")
         st_space("v", 1)
 
         st_image(uri=theImageURL, alt="Sample landscape image")
@@ -49,7 +51,10 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(file="examples/image/image_dimensions.py")
+        show_code("""\
+st_image(uri=theImageURL,
+         width="200px", height="150px",
+         alt="Resized image")""")
         st_space("v", 1)
 
         st_image(uri=theImageURL,
@@ -68,7 +73,12 @@ def build():
 
         bordered_img = (s.container.borders.solid_border
                         + s.container.paddings.tiny_padding)
-        show_code(file="examples/image/image_styled.py")
+        show_code("""\
+bordered_img = (s.container.borders.solid_border
+                + s.container.paddings.tiny_padding)
+st_image(bordered_img,
+         uri=theImageURL2, width="300px",
+         alt="Bordered image")""")
         st_space("v", 1)
 
         st_image(bordered_img, uri=theImageURL2,
@@ -85,7 +95,11 @@ def build():
         st_space("v", 1)
 
         theURL = "https://docs.streamlit.io"
-        show_code(file="examples/image/image_link.py")
+        show_code("""\
+theURL = "https://docs.streamlit.io"
+st_image(uri=theImageURL2, width="300px",
+         link=theURL,
+         alt="Click to visit Streamlit docs")""")
         st_space("v", 1)
 
         st_image(uri=theImageURL2, width="300px",
@@ -102,11 +116,12 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(file="examples/image/configure_path.py")
+        show_code('configure_image_path("app/static/images")')
         st_space("v", 1)
 
         show_details(textwrap.dedent("""\
             Defaults: width="100%", height="auto", link="", hover=True.
+
             Always set the alt parameter for accessibility.
             The alt text is used by screen readers
             and displayed when images fail to load.

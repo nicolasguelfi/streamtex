@@ -341,6 +341,12 @@ Raises `BlockNotFoundError` if not found, `BlockImportError` on import failure.
 
 Block helpers (`show_code`, `show_explanation`, `show_details`) support 3 usage modes.
 
+**Important:** `show_explanation()` and `show_details()` render the body text via
+`st_markdown()`, so standard Markdown formatting works: **bold**, *italic*, `code`,
+lists, links, etc. The text is displayed at `StxStyles.big` font size with
+`p { font-size: inherit; }` to ensure Streamlit's `<p>` elements inherit the
+container size.
+
 ### Mode 1: Config Injection (Recommended)
 
 ```python

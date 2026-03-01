@@ -35,7 +35,12 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(file="examples/grid/cell_single_style.py")
+        show_code("""\
+with st_grid(cols=2,
+             cell_styles=bs.base_cell
+                         + s.container.bg_colors.alice_blue_bg) as g:
+    with g.cell(): st_write(s.large, "Same style")
+    with g.cell(): st_write(s.large, "Same style")""")
         st_space("v", 1)
 
         with st_grid(cols=2,
@@ -96,11 +101,15 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(file="examples/grid/cell_operators.py")
+        show_code("""\
+sg1 + sg2  # combine (CSS merge)
+sg1 - sg2  # remove properties
+sg1 * sg2  # replace (sg2 wins where non-empty)""")
         st_space("v", 2)
 
         show_details(textwrap.dedent("""\
             Use sg.create() for complex grids.
+
             Combine multiple sg.create() calls with +
             to build the full cell style map.
         """))

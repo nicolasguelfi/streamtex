@@ -944,10 +944,14 @@ def _format_apa(entry: BibEntry) -> str:
     if entry.publisher and entry.entry_type in ("book", "incollection"):
         parts.append(f"{entry.publisher}.")
 
-    if entry.doi:
-        parts.append(f'<a href="https://doi.org/{entry.doi}" style="color:#6090d0;">https://doi.org/{entry.doi}</a>')
-    elif entry.url:
-        parts.append(f'<a href="{entry.url}" style="color:#6090d0;">{entry.url}</a>')
+    if entry.doi or entry.url:
+        from .link_config import get_link_config
+        _t = get_link_config().external_target
+        _ta = f' target="{_t}"' if _t and _t != "_self" else ""
+        if entry.doi:
+            parts.append(f'<a href="https://doi.org/{entry.doi}"{_ta} style="color:#6090d0;">https://doi.org/{entry.doi}</a>')
+        else:
+            parts.append(f'<a href="{entry.url}"{_ta} style="color:#6090d0;">{entry.url}</a>')
 
     return " ".join(parts)
 

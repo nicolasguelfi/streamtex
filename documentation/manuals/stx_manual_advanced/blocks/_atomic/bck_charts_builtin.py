@@ -48,7 +48,10 @@ def build():
         st_write(bs.sub, "Line Chart", toc_lvl="+1")
         st_space("v", 1)
 
-        show_code(file="examples/data/chart_line.py")
+        show_code("""\
+data = _make_line_data()
+with st_block(s.project.containers.result_box):
+    stx.st_line_chart(data)""")
         st_space("v", 1)
 
         with st_block(s.project.containers.result_box):
@@ -59,7 +62,10 @@ def build():
         st_write(bs.sub, "Bar Chart", toc_lvl="+1")
         st_space("v", 1)
 
-        show_code(file="examples/data/chart_bar.py")
+        show_code("""\
+bar_data = _make_bar_data()
+with st_block(s.project.containers.result_box):
+    stx.st_bar_chart(bar_data, x="Category", y="Value")""")
         st_space("v", 1)
 
         bar_data = _make_bar_data()
@@ -71,7 +77,11 @@ def build():
         st_write(bs.sub, "Interactive Area Chart", toc_lvl="+1")
         st_space("v", 1)
 
-        show_code(file="examples/data/chart_area_interactive.py")
+        show_code("""\
+n_points = st.slider("Number of data points", 5, 100, 30,
+                     key="bck27_area_slider")
+with st_block(s.project.containers.result_box):
+    stx.st_area_chart(_make_line_data(n_points))""")
         st_space("v", 1)
 
         n_points = st.slider("Number of data points", 5, 100, 30,
@@ -84,7 +94,15 @@ def build():
         st_write(bs.sub, "Scatter Chart", toc_lvl="+1")
         st_space("v", 1)
 
-        show_code(file="examples/data/chart_scatter.py")
+        show_code("""\
+random.seed(0)
+scatter_data = {
+    "x": [random.gauss(0, 1) for _ in range(50)],
+    "y": [random.gauss(0, 1) for _ in range(50)],
+    "size": [random.uniform(10, 60) for _ in range(50)],
+}
+with st_block(s.project.containers.result_box):
+    stx.st_scatter_chart(scatter_data, x="x", y="y", size="size")""")
         st_space("v", 1)
 
         random.seed(0)
@@ -101,7 +119,14 @@ def build():
         st_write(bs.sub, "Metrics & Chart in Grid", toc_lvl="+1")
         st_space("v", 1)
 
-        show_code(file="examples/data/chart_metrics_grid.py")
+        show_code("""\
+with st_grid(cols="1fr 2fr", cell_styles=bs.cell) as g:
+    with g.cell():
+        stx.st_metric("Users", "1,234", "+12%")
+        stx.st_metric("Revenue", "$5.6K", "+8%")
+        stx.st_metric("Uptime", "99.9%", "+0.1%")
+    with g.cell():
+        stx.st_line_chart(_make_line_data())""")
         st_space("v", 1)
 
         with st_grid(cols="1fr 2fr", cell_styles=bs.cell) as g:
@@ -115,7 +140,10 @@ def build():
 
         show_details(textwrap.dedent("""\
             Charts are st.* widgets — correct per the sx/st split.
+
             Wrap charts in st_block() for borders and backgrounds.
+
             Use st_grid() to place charts alongside metrics or text.
+
             Data can be dicts, lists, or pandas DataFrames.
         """))

@@ -30,6 +30,7 @@ def build():
     show_explanation(textwrap.dedent("""\
         StreamTeX requires Python 3.10 or later
         and uses uv as its package manager.
+
         Make sure both are installed before continuing.
     """))
     st_space("v", 1)
@@ -49,6 +50,7 @@ def build():
 
     show_explanation(textwrap.dedent("""\
         Clone the StreamTeX repository from GitHub.
+
         This gives you the library source, templates,
         and example projects.
     """))
@@ -67,6 +69,7 @@ def build():
     show_explanation(textwrap.dedent("""\
         Run uv sync to create a virtual environment
         and install all dependencies automatically.
+
         This reads pyproject.toml and resolves packages.
     """))
     st_space("v", 1)
@@ -95,7 +98,9 @@ def build():
     show_details(textwrap.dedent("""\
         Always prefix commands with uv run.
         This ensures the correct virtual environment
-        and dependencies are used. Never call python,
+        and dependencies are used.
+
+        Never call python,
         pytest, or streamlit directly.
     """))
     st_space("v", 1)

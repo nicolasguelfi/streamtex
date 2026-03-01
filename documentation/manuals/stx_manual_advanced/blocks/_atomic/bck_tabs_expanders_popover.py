@@ -100,7 +100,17 @@ def build():
         st_write(bs.sub, "st.popover", toc_lvl="+1")
         st_space("v", 1)
 
-        show_code(file="examples/widget/popover_basic.py")
+        show_code("""\
+with st.popover("Show info card"):
+    with st_block(s.project.containers.result_box):
+        st_write(s.large + s.bold + s.project.colors.primary_blue,
+                 "StreamTeX Info")
+        st_space("v", 1)
+        st_write(s.large, "Version: 0.2.0")
+        st_br()
+        st_write(s.large, "Python >= 3.10")
+        st_br()
+        st_write(s.large, "Streamlit >= 1.54.0")""")
         st_space("v", 1)
 
         with st.popover("Show info card"):
@@ -151,6 +161,8 @@ def build():
 
         show_details(textwrap.dedent("""\
             st.tabs, st.expander, st.popover are context managers like st_block().
+
             All stx.* functions work inside Streamlit containers.
+
             Nesting is supported: tabs > expander > grid/list.
         """))

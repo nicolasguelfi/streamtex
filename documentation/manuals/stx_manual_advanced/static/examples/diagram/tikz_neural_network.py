@@ -1,1 +1,0 @@
-stx.st_tikz(file="diagrams/neural_network.tex", height=800)

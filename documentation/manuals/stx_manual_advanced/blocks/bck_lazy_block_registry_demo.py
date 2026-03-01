@@ -57,7 +57,9 @@ def build():
 
     show_explanation("""\
 LazyBlockRegistry is a block loader that searches multiple directories
-for block modules. Blocks are imported lazily (on first access) and cached
+for block modules.
+
+Blocks are imported lazily (on first access) and cached
 for subsequent calls. This enables sharing blocks across projects without
 copying files.""")
     st_space("v", 1)
@@ -89,7 +91,9 @@ the top-level streamtex namespace as stx.LazyBlockRegistry.""",
 
     show_explanation("""\
 Create a LazyBlockRegistry by passing a list of directory paths.
+
 Each path is a folder containing bck_*.py block files.
+
 The registry resolves paths to absolute form automatically.""")
     st_space("v", 1)
 
@@ -107,7 +111,9 @@ shared_blocks = stx.LazyBlockRegistry([shared_path])
 
     show_details("""\
 Paths can be relative or absolute.
+
 The constructor calls os.path.abspath() on each path internally.
+
 You can pass multiple directories for multi-source resolution.""")
     st_space("v", 3)
 
@@ -119,6 +125,7 @@ You can pass multiple directories for multi-source resolution.""")
 
     show_explanation("""\
 Access blocks by name using dot notation (attribute access).
+
 The registry searches source directories, imports the module,
 and returns it. The returned module has a build() function
 that st_book() calls to render the block.""")
@@ -155,7 +162,9 @@ caches the module, and returns it.""",
 
     show_details("""\
 If the block is not found in any source directory, an AttributeError is raised.
+
 Special attributes (starting with '_') are excluded to prevent infinite recursion.
+
 The error message includes the list of searched directories for easy debugging.""")
     st_space("v", 3)
 
@@ -167,7 +176,9 @@ The error message includes the list of searched directories for easy debugging."
 
     show_explanation("""\
 When the same block name exists in multiple source directories,
-the first directory in the list wins. This is the priority rule:
+the first directory in the list wins.
+
+This is the priority rule:
 sources are searched in order, and the first match is used.""")
     st_space("v", 1)
 
@@ -206,7 +217,9 @@ override directory without modifying the shared originals.""",
 
     show_explanation("""\
 Once a block is loaded, it is stored in an internal cache dictionary.
+
 Subsequent accesses return the cached module instantly without re-importing.
+
 Blocks that were not found are also tracked to avoid repeated filesystem searches.""")
     st_space("v", 1)
 
@@ -237,7 +250,9 @@ except AttributeError:
 
     show_details("""\
 The cache uses a simple dict: self._cache[block_name] = module.
+
 Not-found blocks use a set: self._not_found for O(1) lookup.
+
 There is no cache invalidation — blocks are loaded once per process lifetime.
 This is by design: Streamlit reruns the script on each interaction,
 but the registry persists across reruns via module-level state.""")
@@ -255,7 +270,9 @@ but the registry persists across reruns via module-level state.""")
 
     show_explanation("""\
 StreamTeX provides two registries for different use cases.
+
 LazyBlockRegistry is for cross-project shared blocks.
+
 ProjectBlockRegistry is for a single project's blocks/ directory.""")
     st_space("v", 1)
 
@@ -335,7 +352,9 @@ attribute access.""",
 
     show_details("""\
 Use ProjectBlockRegistry for your project's own blocks/ directory.
+
 Use LazyBlockRegistry when you need blocks from outside your project.
+
 They work together: local blocks via ProjectBlockRegistry,
 shared blocks via LazyBlockRegistry, combined in st_book().""")
     st_space("v", 3)
@@ -348,7 +367,9 @@ shared blocks via LazyBlockRegistry, combined in st_book().""")
 
     show_explanation("""\
 This very project (stx_manual_advanced) uses both registries.
+
 Local blocks come from blocks/ via ProjectBlockRegistry.
+
 Shared blocks come from stx_manuals_shared-blocks/ via LazyBlockRegistry.""")
     st_space("v", 1)
 
@@ -418,7 +439,9 @@ documentation/manuals/
 
     show_details("""\
 Multiple projects can share the same blocks without duplication.
+
 Update a shared block once, and all projects that reference it get the change.
+
 Each project can also override shared blocks by placing a same-named file
 in a higher-priority source directory.""")
     st_space("v", 3)

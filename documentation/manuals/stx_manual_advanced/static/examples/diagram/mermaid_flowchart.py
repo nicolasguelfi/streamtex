@@ -1,1 +1,0 @@
-stx.st_mermaid(file="diagrams/flowchart.mmd", height=1000)

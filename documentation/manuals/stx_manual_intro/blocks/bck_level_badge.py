@@ -44,7 +44,7 @@ def build():
     with st_block(bs.header):
         st_write(
             stx.StxStyles.huge + stx.StxStyles.bold + "color:white;",
-            "StreamTeX Training Course",
+            "StreamTeX Training Course: Introduction",
             tag=t.div,
             toc_lvl="1",
         )

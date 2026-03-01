@@ -26,7 +26,9 @@ def build():
 
     show_explanation("""
 StreamTeX styles can be combined and modified using operators.
+
 Use + to add styles together, and - to remove properties.
+
 This enables DRY (Don't Repeat Yourself) styling.
     """)
 
@@ -38,7 +40,9 @@ This enables DRY (Don't Repeat Yourself) styling.
 
     show_explanation("""
 Use the + operator to combine two styles into one.
+
 The result is a new style with properties from both.
+
 Order matters: second style can override first style's properties.
     """)
 
@@ -168,6 +172,7 @@ full = advanced + "box-shadow:0 2px 4px rgba(0,0,0,0.1);"
 
     show_explanation("""
 When combining styles, the RIGHTMOST style wins if properties conflict.
+
 Use this to your advantage for predictable overrides.
     """)
 
@@ -251,6 +256,7 @@ with st_block(dark_box):
 
     show_details("""
 Complex style chains
+
 - If you have style_a + style_b + style_c + ...
 - Better: Create intermediate "combo" styles
 - Example: base + theme is clearer than 10-property string

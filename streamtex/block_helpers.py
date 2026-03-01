@@ -7,9 +7,34 @@ Block rendering helpers with 3 usage modes:
 
 from typing import Optional
 
+import streamlit as st
+
 import streamtex as stx
-from streamtex import st_block, st_markdown, st_space, st_write
+from streamtex import st_block, st_space, st_write
 from streamtex.styles import StxStyles
+from streamtex.utils import generate_key
+
+
+def _render_md_body(body: str) -> None:
+    """Render Markdown with StxStyles.big, overriding Streamlit's <p>/<li> font-size.
+
+    Uses the same :has() scoping mechanism as st_block but adds explicit
+    CSS rules for <p> and <li> descendants so that Streamlit's own
+    font-size declarations are overridden.
+    """
+    uid = generate_key("md")
+    big_css = str(StxStyles.big)
+    sel = f"div:has(> .element-container > .stHtml > span.{uid})"
+    st.html(
+        f"<style>"
+        f"{sel} {{ {big_css} }} "
+        f"{sel} p, {sel} li {{ {big_css} }} "
+        f".element-container:has(.stHtml > span.{uid}) {{ width: auto; }}"
+        f"</style>"
+    )
+    with st.container():
+        st.html(f'<span class="{uid}" style="display:none"></span>')
+        st.markdown(body, unsafe_allow_html=True)
 
 
 class BlockHelperConfig:
@@ -203,7 +228,7 @@ def show_explanation(text: str, style: Optional[object] = None) -> None:
         st_write(StxStyles.big + StxStyles.bold, "Purpose")  # Label
         st_space("v", 1)
         if body:
-            st_markdown(body, style=StxStyles.big)
+            _render_md_body(body)
 
 
 def show_details(text: str, style: Optional[object] = None) -> None:
@@ -234,7 +259,7 @@ def show_details(text: str, style: Optional[object] = None) -> None:
         st_write(StxStyles.big + StxStyles.bold, "Details:")  # Label
         st_space("v", 1)
         if body:
-            st_markdown(body, style=StxStyles.big)
+            _render_md_body(body)
 
 
 class BlockHelper:

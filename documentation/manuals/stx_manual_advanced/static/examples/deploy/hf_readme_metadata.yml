@@ -1,8 +1,0 @@
----
-title: My StreamTeX App
-emoji: 📄
-colorFrom: blue
-colorTo: purple
-sdk: docker
-app_port: 8501
----

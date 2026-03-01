@@ -32,6 +32,7 @@ def build():
 
         show_explanation(textwrap.dedent("""\
             Organize static files by type under a static/ directory.
+
             Enable static serving in .streamlit/config.toml.
         """))
         st_space("v", 1)
@@ -49,7 +50,11 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(file="examples/static_assets/local_images.py")
+        show_code("""\
+configure_image_path("app/static/images")
+st_image(uri="sample_gradient.png",
+         width="400px", height="250px",
+         alt="Sample gradient image")""")
         st_space("v", 1)
 
         configure_image_path("app/static/images")
@@ -68,7 +73,11 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(file="examples/static_assets/text_files.py")
+        show_code("""\
+text_path = os.path.join("static", "texts", "sample_lorem.txt")
+with open(text_path) as f:
+    content = f.read()
+stx.st_code(code=content, language="text")""")
         st_space("v", 1)
 
         text_path = os.path.join(_static_dir, "texts", "sample_lorem.txt")
@@ -87,7 +96,13 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(file="examples/static_assets/pdf_embed.py")
+        show_code("""\
+pdf_url = "app/static/pdf/sample_document.pdf"
+st_html(
+    f'<iframe src="{pdf_url}" '
+    f'width="100%" height="400" '
+    f'style="border:none;"></iframe>'
+)""")
         st_space("v", 1)
 
         pdf_url = "app/static/pdf/sample_document.pdf"
@@ -104,11 +119,14 @@ def build():
 
         show_explanation(textwrap.dedent("""\
             Play audio with stx.st_audio() (Streamlit native).
+
             This is an interactive widget, so st.* is correct.
         """))
         st_space("v", 1)
 
-        show_code(file="examples/static_assets/audio_files.py")
+        show_code("""\
+audio_path = os.path.join("static", "sounds", "sample_tone.wav")
+stx.st_audio(audio_path, format="audio/wav")""")
         st_space("v", 1)
 
         audio_path = os.path.join(_static_dir, "sounds", "sample_tone.wav")
@@ -121,11 +139,14 @@ def build():
 
         show_explanation(textwrap.dedent("""\
             Play local video with stx.st_video() (Streamlit native).
+
             Place .mp4, .webm, .ogg files in static/videos/.
         """))
         st_space("v", 1)
 
-        show_code(file="examples/static_assets/video_local.py")
+        show_code("""\
+video_path = os.path.join("static", "videos", "chameleon.mp4")
+stx.st_video(video_path)""")
         st_space("v", 1)
 
         video_path = os.path.join(_static_dir, "videos", "chameleon.mp4")
@@ -142,7 +163,12 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(file="examples/static_assets/video_youtube.py")
+        show_code("""\
+# Read URL from a file
+url_file = os.path.join("static", "videos", "youtube_urls.txt")
+with open(url_file) as f:
+    youtube_url = f.readline().strip()
+stx.st_video(youtube_url)""")
         st_space("v", 1)
 
         url_file = os.path.join(_static_dir, "videos", "youtube_urls.txt")
@@ -161,7 +187,12 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(file="examples/static_assets/data_files_json.py")
+        show_code("""\
+import json
+json_path = os.path.join("static", "various", "sample_data.json")
+with open(json_path) as f:
+    data = json.load(f)
+stx.st_code(code=json.dumps(data, indent=2), language="json")""")
         st_space("v", 1)
 
         json_path = os.path.join(_static_dir, "various", "sample_data.json")
@@ -173,7 +204,10 @@ def build():
 
         show_details(textwrap.dedent("""\
             Static serving requires enableStaticServing = true in config.toml.
+
             Files under static/ are served at the app/static/ URL prefix.
+
             Use st_image() for images (StreamTeX native).
+
             Use stx.st_audio(), stx.st_video() for media (Streamlit interactive widgets).
         """))

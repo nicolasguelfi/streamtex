@@ -44,6 +44,7 @@ def build():
 
     show_explanation(textwrap.dedent("""\
         The template gives you a standard folder layout.
+
         Each folder has a specific role.
     """))
     st_space("v", 1)
@@ -130,7 +131,9 @@ def build():
 
     show_explanation(textwrap.dedent("""\
         Streamlit needs static serving enabled
-        for images and assets. Create or edit
+        for images and assets.
+
+        Create or edit
         .streamlit/config.toml in your project.
     """))
     st_space("v", 1)
@@ -144,6 +147,7 @@ def build():
 
     show_details(textwrap.dedent("""\
         Mandatory files: book.py, setup.py, custom/styles.py, blocks/__init__.py.
+
         The setup.py adds the streamtex library to sys.path
         so imports work correctly from any location.
     """))

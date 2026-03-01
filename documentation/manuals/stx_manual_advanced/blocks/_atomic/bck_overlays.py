@@ -64,7 +64,9 @@ def build():
 
         show_details(textwrap.dedent("""\
             Integer values are treated as pixels.
+
             String values are used as-is (e.g., "50%").
+
             The base content determines the overlay container size.
         """))
         st_space("v", 2)
@@ -77,11 +79,21 @@ def build():
 
         show_explanation(textwrap.dedent("""\
             Use CSS transforms to center overlays.
+
             Combine with percentage positioning for responsive centering.
         """))
         st_space("v", 1)
 
-        show_code(file="examples/overlay/overlay_center.py")
+        show_code("""\
+with st_overlay(s.container.sizes.width_full) as o:
+    with st_block(s.container.bg_colors.light_blue_bg
+                  + ns("height: 200px; width: 100%;")):
+        st_write(s.large, "Background")
+
+    # Center overlay
+    with o.layer(top="50%", left="50%"):
+        with st_block(ns("transform: translate(-50%, -50%);")):
+            st_write(bs.overlay_text, "Centered")""")
         st_space("v", 2)
 
         # Multiple layers
@@ -92,6 +104,7 @@ def build():
 
         show_explanation(textwrap.dedent("""\
             Stack multiple overlay layers on top of each other.
+
             Each layer can have different positioning and content.
         """))
         st_space("v", 1)
@@ -122,11 +135,22 @@ def build():
 
         show_explanation(textwrap.dedent("""\
             Use overlays for static annotations.
+
             For interactive tooltips, consider combining with CSS hover states.
         """))
         st_space("v", 1)
 
-        show_code(file="examples/overlay/overlay_tooltips.py")
+        show_code("""\
+with st_overlay(s.container.sizes.width_full) as o:
+    # Main content
+    with st_block(s.container.bg_colors.light_blue_bg
+                  + ns("height: 100px; padding: 20px;")):
+        st_write(s.large, "Feature List")
+
+    # Annotation arrows/labels
+    with o.layer(top=30, right=10):
+        st_write(ns("color: #FF6600; font-size: 12px;"),
+                "← New feature")""")
         st_space("v", 2)
 
         # Z-index and layering
@@ -137,6 +161,7 @@ def build():
 
         show_explanation(textwrap.dedent("""\
             By default, later overlay layers appear on top.
+
             Use z-index CSS to explicitly control stacking order.
         """))
         st_space("v", 1)
@@ -152,6 +177,7 @@ def build():
 
         show_explanation(textwrap.dedent("""\
             Use percentage values for positioning to make overlays responsive.
+
             Percentages are relative to the base container.
         """))
         st_space("v", 1)
@@ -190,6 +216,8 @@ def build():
 
         show_details(textwrap.dedent("""\
             Overlays are best for simple decorative layering.
+
             For complex interactive layouts, use st_grid or st_block instead.
+
             Remember: overlays don't affect document flow or layout.
         """))

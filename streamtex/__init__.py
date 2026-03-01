@@ -92,5 +92,8 @@ from .bib import (
     st_refs, BibRefs, generate_bib_stubs,
 )
 
+# Link behavior configuration
+from .link_config import LinkConfig, set_link_config, get_link_config
+
 # Block Inspector (opt-in)
 from .inspector import InspectorConfig, FileCategoryRegistry

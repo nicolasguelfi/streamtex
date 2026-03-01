@@ -33,7 +33,11 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(file="examples/grid/grid_int_cols.py")
+        show_code("""\
+with st_grid(cols=3, cell_styles=bs.cell) as g:
+    with g.cell(): st_write(s.large, "Cell A1")
+    with g.cell(): st_write(s.large, "Cell B1")
+    with g.cell(): st_write(s.large, "Cell C1")""")
         st_space("v", 1)
 
         with st_grid(cols=3, cell_styles=bs.cell) as g:
@@ -54,7 +58,10 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(file="examples/grid/grid_string_cols.py")
+        show_code("""\
+with st_grid(cols="1fr 2fr", cell_styles=bs.cell) as g:
+    with g.cell(): st_write(s.large, "Narrow (1fr)")
+    with g.cell(): st_write(s.large, "Wide (2fr)")""")
         st_space("v", 1)
 
         with st_grid(cols="1fr 2fr", cell_styles=bs.cell) as g:
@@ -74,7 +81,14 @@ def build():
         st_space("v", 1)
 
         table_style = ns("table-layout: fixed; width: 100%; border-collapse: collapse;")
-        show_code(file="examples/grid/grid_style.py")
+        show_code("""\
+table_style = ns("table-layout: fixed; width: 100%; border-collapse: collapse;")
+with st_grid(cols=2, grid_style=table_style,
+             cell_styles=bs.cell) as g:
+    with g.cell(): st_write(s.bold + s.large, "Header A")
+    with g.cell(): st_write(s.bold + s.large, "Header B")
+    with g.cell(): st_write(s.large, "Data A1")
+    with g.cell(): st_write(s.large, "Data B1")""")
         st_space("v", 1)
 
         with st_grid(cols=2, grid_style=table_style, cell_styles=bs.cell) as g:
@@ -86,6 +100,8 @@ def build():
 
         show_details(textwrap.dedent("""\
             Defaults: cols=2, grid_style=none, cell_styles=none.
+
             Cells auto-wrap to new rows when cols limit is reached.
+
             Use # row N comments for readability in complex grids.
         """))

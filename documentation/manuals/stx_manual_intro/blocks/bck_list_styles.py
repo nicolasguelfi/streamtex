@@ -26,7 +26,9 @@ def build():
 
     show_explanation("""
 ListStyle lets you customize the appearance of lists (ul/ol).
+
 Control bullet symbols, numbering styles, and nested list behavior.
+
 Compose ListStyles just like other styles.
     """)
 
@@ -38,6 +40,7 @@ Compose ListStyles just like other styles.
 
     show_explanation("""
 StreamTeX provides pre-built list styles for common use cases.
+
 Access them from the custom.styles.Styles class.
     """)
 
@@ -66,6 +69,7 @@ st_list(["point a", "point b"], list_type="ul",
 
     show_explanation("""
 Create a ListStyle to define custom symbols for each nesting level.
+
 Symbols cycle through levels, repeating if needed.
     """)
 
@@ -149,6 +153,7 @@ short_style = ListStyle(symbols=["→", "•"])
 
     show_explanation("""
 Like regular styles, ListStyles can be combined using + and -.
+
 Add symbols or remove/replace them.
     """)
 
@@ -177,6 +182,7 @@ minimal = base - "◦"  # Remove the second symbol
 
     show_explanation("""
 The style parameter in ListStyle applies CSS to the <ul> or <ol> element.
+
 Control spacing, color, margins, etc.
     """)
 
@@ -207,6 +213,7 @@ st_list(items, style=compact_style)
 
     show_explanation("""
 For ordered lists, the list_type="ol" generates numbers automatically.
+
 ListStyle symbols don't affect numbering, but CSS styling does.
     """)
 
@@ -306,6 +313,7 @@ st_list(structure, style=toc_style)
 
     show_details("""
 Complex nested structures
+
 - Test your list_style with expected nesting depth
 - If symbols don't cycle well, add more symbols
 - Consider readability over visual appeal

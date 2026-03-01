@@ -32,7 +32,9 @@ def build():
 
         show_explanation(textwrap.dedent("""\
             stx.st_graphviz() renders DOT language diagrams.
+
             DOT is concise for describing directed graphs.
+
             Charts are interactive (pan/zoom).
         """))
         st_space("v", 2)
@@ -41,7 +43,7 @@ def build():
         st_write(bs.sub, "Simple Directed Graph", toc_lvl="+1")
         st_space("v", 1)
 
-        show_code(file="examples/diagram/graphviz_simple.py")
+        show_code('stx.st_graphviz(file="diagrams/simple_graph.dot")')
         st_space("v", 1)
 
         stx.st_graphviz(file=DIAGRAMS["Simple Graph"])
@@ -54,7 +56,7 @@ def build():
         st_write(bs.sub, "Styled Flowchart", toc_lvl="+1")
         st_space("v", 1)
 
-        show_code(file="examples/diagram/graphviz_styled_flowchart.py")
+        show_code('stx.st_graphviz(file="diagrams/flowchart.dot", height=600)')
         st_space("v", 1)
 
         stx.st_graphviz(file=DIAGRAMS["StreamTeX Flowchart"], height=600)
@@ -67,7 +69,16 @@ def build():
         st_write(bs.sub, "Interactive Diagram Selection", toc_lvl="+1")
         st_space("v", 1)
 
-        show_code(file="examples/diagram/graphviz_interactive.py")
+        show_code("""\
+DIAGRAMS = {
+    "Simple Graph": "diagrams/simple_graph.dot",
+    "StreamTeX Flowchart": "diagrams/flowchart.dot",
+    "Architecture": "diagrams/architecture.dot",
+    "Data Flow": "diagrams/data_flow.dot",
+}
+
+choice = st.selectbox("Choose a diagram", [*DIAGRAMS])
+stx.st_graphviz(file=DIAGRAMS[choice])""")
         st_space("v", 1)
 
         choice = st.selectbox("Choose a diagram",
@@ -98,8 +109,12 @@ def build():
 
         show_details(textwrap.dedent("""\
             DOT language: concise graph description (nodes, edges, attributes).
+
             stx.st_graphviz() supports pan and zoom interaction.
+
             Combine with st.selectbox() to switch between diagrams.
+
             Requires: uv add graphviz (Python bindings).
+
             Static .dot files can be loaded from the static/diagrams/ folder.
         """))

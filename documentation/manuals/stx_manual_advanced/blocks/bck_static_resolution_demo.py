@@ -59,6 +59,7 @@ def build():
     show_explanation("""\
 Static resolution is the mechanism StreamTeX uses to locate image files
 and other static assets (JSON data, fonts, etc.) across multiple directories.
+
 Instead of hardcoding absolute paths, you provide a simple filename or relative
 path, and StreamTeX searches configured directories in priority order to find it.""")
     st_space("v", 1)
@@ -92,7 +93,9 @@ The st_image() function uses it internally for automatic image discovery.""",
     show_explanation("""\
 Before using static resolution, you must configure the list of directories
 to search. This is done once in your project's book.py entry point, before
-any blocks are loaded. The function accepts a list of directory paths
+any blocks are loaded.
+
+The function accepts a list of directory paths
 (relative or absolute) and converts them all to absolute paths internally.""")
     st_space("v", 1)
 
@@ -121,8 +124,11 @@ Always place your local project's static/ directory first.""",
 
     show_details("""\
 Internally, set_static_sources() calls os.path.abspath() on each path.
+
 This means you can pass relative paths and they will be resolved correctly.
+
 The sources are stored in a module-level global list in streamtex/blocks.py.
+
 You can retrieve the current configuration with stx.get_static_sources().""")
     st_space("v", 3)
 
@@ -134,7 +140,9 @@ You can retrieve the current configuration with stx.get_static_sources().""")
 
     show_explanation("""\
 The resolve_static() function takes a relative path (e.g., 'data/trainers.json')
-and searches each configured static source directory in order. It returns the
+and searches each configured static source directory in order.
+
+It returns the
 absolute path of the first match found. If no match is found in any directory,
 it returns the original relative path as a fallback.""")
     st_space("v", 1)
@@ -173,7 +181,9 @@ def resolve_static(relative_path: str) -> str:
 
     show_details("""\
 resolve_static() uses os.path.exists() which works for both files and directories.
+
 The function is deterministic: given the same sources and filename, it always returns the same result.
+
 It does NOT raise an error when a file is not found — it falls back silently.""")
     st_space("v", 3)
 
@@ -185,7 +195,9 @@ It does NOT raise an error when a file is not found — it falls back silently."
 
     show_explanation("""\
 When the same filename exists in multiple static source directories,
-the first directory in the list wins. This is the priority rule and
+the first directory in the list wins.
+
+This is the priority rule and
 it enables a powerful override pattern: projects can replace shared assets
 with their own local versions without modifying the shared directory.""")
     st_space("v", 1)
@@ -235,7 +247,9 @@ the priority order handles it automatically.""",
     show_explanation("""\
 When you call st_image(uri='logo.png'), the image function detects that
 the URI is not a URL, not an absolute path, and not a relative path
-(no leading '.', '..', or '/'). It then uses the static resolution system
+(no leading '.', '..', or '/').
+
+It then uses the static resolution system
 to search configured directories for the file.""")
     st_space("v", 1)
 
@@ -299,7 +313,9 @@ st_image(uri="./local/logo.png")               # Relative path — resolved from
 
     show_explanation("""\
 Static resolution becomes powerful when projects share assets across
-multiple directories. Here are the most common patterns used in
+multiple directories.
+
+Here are the most common patterns used in
 StreamTeX multi-project architectures.""")
     st_space("v", 2)
 
@@ -393,7 +409,9 @@ stx.set_static_sources([
 
     show_explanation("""\
 When a file is not found in any configured static source directory,
-both resolve_static() and st_image() have fallback behaviors. Understanding
+both resolve_static() and st_image() have fallback behaviors.
+
+Understanding
 these fallbacks helps debug missing asset issues.""")
     st_space("v", 1)
 
@@ -452,6 +470,7 @@ st_image(uri="missing.png")
 
     show_details("""\
 To debug missing images, check:
+
 1. Is set_static_sources() called in book.py before blocks are loaded?
 2. Does the file exist in one of the configured directories?
 3. Is the filename spelled correctly (case-sensitive on Linux)?
@@ -466,7 +485,9 @@ To debug missing images, check:
 
     show_explanation("""\
 A well-organized static asset structure makes multi-project
-architectures easier to maintain. Follow these guidelines
+architectures easier to maintain.
+
+Follow these guidelines
 for clean and predictable asset resolution.""")
     st_space("v", 1)
 

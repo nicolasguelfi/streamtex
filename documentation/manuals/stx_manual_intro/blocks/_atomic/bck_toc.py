@@ -34,7 +34,14 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(file="examples/nav/toc_config.py")
+        show_code("""\
+toc = TOCConfig(
+    numbering=NumberingMode.SIDEBAR_ONLY,  # numbers in sidebar only
+    toc_position=0,
+    title_style=s.project.titles.course_title + s.center_txt,
+    content_style=s.large + s.text.colors.reset,
+    sidebar_max_level=None,  # None = auto (paginated: 1, continuous: 2)
+)""")
         st_space("v", 1)
 
         with st_grid(cols=2, cell_styles=bs.cell) as g:
@@ -134,10 +141,13 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(file="examples/nav/toc_label.py")
+        show_code("""\
+st_write(s.huge, "Very Long Title...",
+         toc_lvl="2", label="Short Title")""")
         st_space("v", 2)
 
         show_details(textwrap.dedent("""\
             Use absolute levels for major sections.
+
             Use relative levels (+1, -1) for subsections within a block.
         """))

@@ -29,6 +29,7 @@ def build():
 
     show_explanation(textwrap.dedent("""\
         Create a new file in blocks/ with the bck_ prefix.
+
         Every block needs a BlockStyles class, a bs alias,
         and a build() function.
     """))
@@ -63,6 +64,7 @@ def build():
 
     show_explanation(textwrap.dedent("""\
         Add your new block to the module list in book.py.
+
         The block auto-discovery in blocks/__init__.py
         makes it available as blocks.bck_hello.
     """))
@@ -84,7 +86,9 @@ def build():
 
     show_explanation(textwrap.dedent("""\
         Launch your project with Streamlit.
+
         The browser opens automatically.
+
         Edit any block and the page hot-reloads.
     """))
     st_space("v", 1)
@@ -116,6 +120,7 @@ def build():
     show_details(textwrap.dedent("""\
         Hot-reload is your best friend during development.
         Save a file and Streamlit refreshes automatically.
+
         Use uv run pytest tests/ -v after library changes.
     """))
     st_space("v", 1)

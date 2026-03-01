@@ -42,7 +42,9 @@ Choose the one that fits your needs, from simple to advanced.
 
     show_explanation("""
 The recommended pattern for most projects.
+
 Define your project's styles once in ProjectBlockHelperConfig.
+
 All helpers automatically use your styles globally.
     """)
 
@@ -90,7 +92,9 @@ show_code("print('hello')")  # Uses s.project.containers.code_box
 
     show_explanation("""
 Simple pattern: import and use functions directly.
+
 Works great with Config Injection (Pattern 1).
+
 Can override style per-call if needed.
     """)
 
@@ -137,7 +141,9 @@ Just call the function!
 
     show_explanation("""
 For advanced use cases: override helpers with custom logic.
+
 Subclass BlockHelper or ProjectBlockHelper.
+
 Add custom methods specific to your project.
     """)
 
@@ -192,7 +198,9 @@ helper.show_comparison("old_code()", "new_code()")
 
     show_explanation("""
 For power users: combine all 3 patterns.
+
 Use Config Injection + OOP Inheritance + Function overrides.
+
 Maximum flexibility when you need it.
     """)
 
@@ -240,6 +248,7 @@ show_code("print('world')", style=s.custom.style)
 
     show_details("""
 Comparison of all patterns.
+
 Choose based on your project's needs and complexity level.
     """)
 
@@ -275,6 +284,7 @@ Pattern 4 (Expert)
 
     show_explanation("""
 Guidelines for using block helpers effectively.
+
 Follow these to keep your helpers clean and maintainable.
     """)
 
@@ -344,7 +354,9 @@ Each pattern demonstrated with actual code below:
 
     show_explanation("""
 Block helpers are a flexible system for rendering styled content.
+
 4 patterns available from simple to advanced.
+
 Choose what works for your project.
     """)
 

@@ -37,6 +37,7 @@ def build():
 
         show_explanation(textwrap.dedent("""\
             Content changes dynamically based on user interaction.
+
             Python if/else controls what renders. Styles can be selected at runtime.
         """))
         st_space("v", 2)
@@ -91,7 +92,15 @@ def build():
         st_write(bs.sub, "Dynamic Grid Builder", toc_lvl="+1")
         st_space("v", 1)
 
-        show_code(file="examples/dynamic/grid_builder.py")
+        show_code("""\
+c1, c2 = st.columns(2)
+grid_cols = c1.slider("Columns", 1, 5, 3, key="bck30_cols")
+grid_rows = c2.slider("Rows", 1, 4, 2, key="bck30_rows")
+
+with st_grid(cols=grid_cols, cell_styles=bs.cell) as g:
+    for i in range(grid_cols * grid_rows):
+        with g.cell():
+            st_write(s.large, f"Cell {i + 1}")""")
         st_space("v", 1)
 
         c1, c2 = st.columns(2)
@@ -145,7 +154,10 @@ def build():
 
         show_details(textwrap.dedent("""\
             Python if/else controls what gets rendered (true show/hide).
+
             Styles can be selected dynamically from a dict of presets.
+
             st_grid() can be rebuilt with slider-driven dimensions.
+
             The wizard pattern uses session_state to track progress.
         """))

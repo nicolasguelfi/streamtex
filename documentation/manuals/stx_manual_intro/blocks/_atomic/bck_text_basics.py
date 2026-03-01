@@ -31,7 +31,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(file="examples/text/write_plain.py")
+        show_code('st_write("Hello, StreamTeX!")')
         st_space("v", 1)
 
         st_write(s.large, "Hello, StreamTeX!")
@@ -46,7 +46,7 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(file="examples/text/write_styled.py")
+        show_code('st_write(s.bold + s.Large, "Bold Large Text")')
         st_space("v", 1)
 
         st_write(s.bold + s.Large, "Bold Large Text")
@@ -58,11 +58,14 @@ def build():
 
         show_explanation(textwrap.dedent("""\
             Tags define HTML meaning (h1, div, span).
+
             Styles define appearance (size, color, weight).
         """))
         st_space("v", 1)
 
-        show_code(file="examples/text/write_tag.py")
+        show_code("""\
+st_write(s.huge, "Section", tag=t.h1)   # semantic heading
+st_write(s.huge, "Section", tag=t.div)   # styled div""")
         st_space("v", 1)
 
         st_write(s.huge, "Section Heading", tag=t.h1)
@@ -72,8 +75,11 @@ def build():
 
         show_details(textwrap.dedent("""\
             Default: tag=Tags.span (inline element).
+
             Tags are semantic, styles are visual.
+
             Use tag=t.h1 for accessibility and SEO.
+
             Use tag=t.div for block-level visual styling without semantic meaning.
         """))
         st_space("v", 2)
@@ -87,13 +93,18 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(file="examples/text/write_toc.py")
+        show_code("""\
+st_write(s.Large, "My Title", toc_lvl="1")        # absolute level
+st_write(s.large, "Sub", toc_lvl="+1")            # relative level
+st_write(s.large, "Custom Label", toc_lvl="2", label="Short")""")
         st_space("v", 1)
 
         show_details(textwrap.dedent("""\
             Default: toc_lvl=None (not registered in TOC).
+
             Use absolute levels ("1", "2") or relative ("+1", "-1").
             Absolute levels set the hierarchy directly.
             Relative levels adjust from the current depth.
+
             Default: label="" (auto-generated from text, max 73 chars).
         """))

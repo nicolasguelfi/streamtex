@@ -1,6 +1,0 @@
-# General workflow
-# 1. Build the Docker image locally
-# 2. Tag it for your registry
-# 3. Push to the registry
-# 4. SSH into your VM
-# 5. Pull and run the image

@@ -30,7 +30,9 @@ def build():
 
     show_explanation("""
 The Collections System (Phase 2) enables organizing multiple projects.
+
 Create a hub where users discover, navigate, and access different projects.
+
 Think: Coursera with multiple courses, or a documentation portal with multiple docs.
     """)
 
@@ -318,6 +320,7 @@ STX_URL_TEST_ADVANCED=https://advanced.onrender.com
 
     show_details("""
 Organizing large platforms:
+
 - Break into logical sub-projects
 - Each gets its own entry in collection
 - Users navigate to relevant content easily

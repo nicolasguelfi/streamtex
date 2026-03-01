@@ -60,14 +60,60 @@ Analyse la situation, fais-moi des propositions, ne touche pas le code.
 DONE
 TODO
 Dans ce projet streamtex
+Voici la situation.
 
+Les personnes concernés par ce projet sont différents : 
+
+Le développeur de la Librairie, que nous allons appeler Nicolas
+L'utilisateur de la Librairie que nous allons appeler Bob
+
+Voici la configuration technique de Nicolas:
+macOS
+Installation actuelle du repos comme tu peux constater
+
+Voici les besoins :
+
+- nicolas doit pouvoir :
+Développer la Librairie
+Développer les manuels utilisateurs
+Développer des projets de formation streamtex
+Développer des composants réutilisables pour plusieurs projets streamtex (blocs, styles, statics, ...).
+Développer tous les composants d'intelligence artificielle générative claude utiles pour le développement de la Librairie. C'est à dire tous les fichiers utiles à claude (skills, commandes, agents, .CLAUDE, .MEMORY, ...)
+Développer tous les composants d'intelligence artificielle générative claude utiles pour le développement de la documentation. C'est à dire tous les fichiers utiles à claude (skills, commandes, agents, .CLAUDE, .MEMORY, ...)
+Développer tous les composants d'intelligence artificielle générative claude utiles pour le développement d'un projet streamtex C'est à dire tous les fichiers utiles à claude (skills, commandes, agents, .CLAUDE, .MEMORY, ...)
+
+
+
+Publier la Librairie sur pypy
+Publier la Librairie sur githug
+Publier le projet des manuel utilisateurs sur github
+Publier de manière autonome les composants d'intelligence artificielle générative claude utiles pour:
+- le développement de la librairie
+- le développement des manuels utilisteurs
+- le développement d'un projet streamtex
+Publier des composants streamtex réutilisables sur github
+
+Il faut trouver la meilleure structure entre :
+- les dossiers locaux
+- les repos git locaux ou distants
+
+Pour me permettre d'avoir la meilleure organisation, possible la plus souple et flexible pour toutes mes tâches en tant Nicolas ou en tant que bob sur ma machine.
+
+Il faut que tu analyses le document de maintenance d'une ancienne version que j'avais réalisé à ce sujet: "maintenance_separation_multirepo.md"
+
+Ensutie il faut que tu analyses entièrement toute la base de code actuelle du repo streamtex.
+
+Ensuite, tu dois me proposer un nouveau plan de migration à partir de la situation actuelle vers la situation optimale la plus professionnelle et la plus efficace en terme de productivité pour l'ensemble de tous les besoins décrits ci-dessus.
+
+Tu peux combiner, organisation de dossier, de repos git, de liens symboliques, et de script python, utilitaires.
 
 --------------
 DONE
 TODO
 Dans ce projet streamtex
 
-
+Peux tu faire en sorte d'avoir un paramètre de configuration au niveau du projet streamtex pour définir que le clic sur une url ouvre dans un nouvel onglet et pas dans la même page.
+Analyse d'abord le code existant et fais-moi des propositions. Ne touche pas le code.
 --------------
 DONE
 TODO

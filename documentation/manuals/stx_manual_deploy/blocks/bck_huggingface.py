@@ -117,8 +117,8 @@ def build():
         st_space("v", 2)
 
         show_details(
-            "Free tier: apps may sleep after inactivity. "
+            "Free tier: apps may sleep after inactivity.\n\n"
             "To deploy a different project, change the ARG FOLDER default in the Dockerfile "
-            "or configure build args in the Space settings. "
+            "or configure build args in the Space settings.\n\n"
             "If push is rejected, try: git pull hf main --allow-unrelated-histories"
         )

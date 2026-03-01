@@ -108,7 +108,7 @@ def build():
         st_space("v", 2)
 
         show_details(
-            "The container exposes port 8501 with a built-in health check. "
-            "uv is installed from the official Docker image (ghcr.io/astral-sh/uv). "
+            "The container exposes port 8501 with a built-in health check.\n\n"
+            "uv is installed from the official Docker image (ghcr.io/astral-sh/uv).\n\n"
             "Dependencies are installed in a cached layer for fast rebuilds."
         )

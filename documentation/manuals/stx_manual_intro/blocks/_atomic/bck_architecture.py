@@ -57,7 +57,9 @@ def build():
                 book_source = f.read()
             show_code(book_source)
         except Exception:
-            show_code(file="examples/block/book_fallback.py")
+            show_code("""\
+st_book([blocks.bck_01, blocks.bck_02, ...],
+        toc_config=toc)""")
         st_space("v", 2)
 
         # st_include
@@ -70,7 +72,9 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(file="examples/block/st_include.py")
+        show_code("""\
+from blocks import bck_welcome
+st_include(bck_welcome)""")
         st_space("v", 1)
 
         # Live sub-include
@@ -140,11 +144,14 @@ def build():
                 init_source = f.read()
             show_code(init_source)
         except Exception:
-            show_code(file="examples/block/init_fallback.py")
+            show_code("""\
+# blocks/__init__.py uses glob + importlib
+# to auto-discover all bck_*.py files""")
         st_space("v", 2)
 
         show_details(textwrap.dedent("""\
             One concept per block.
+
             Use st_include for composition
             when blocks share sub-components.
         """))

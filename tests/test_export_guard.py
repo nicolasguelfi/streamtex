@@ -26,6 +26,7 @@ EXPECTED_ST_HTML_COUNTS = {
     "bib_preview.py": 1,    # CSS only (JS via components.html)
     "book.py": 3,           # 1 load_css + 1 populate_toc (no-search branch) + 1 populate_markers
     "inspector.py": 3,      # 1 global CSS + 1 sidebar width CSS + 1 hidden marker (edit button)
+    "block_helpers.py": 2,  # 1 CSS injection + 1 hidden marker (_render_md_body)
 }
 
 STREAMTEX_DIR = Path(__file__).resolve().parent.parent / "streamtex"

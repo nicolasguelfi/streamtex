@@ -30,8 +30,10 @@ def build():
     # ------------------------------------------------------------------
     show_explanation(textwrap.dedent("""\
         Markers are navigation waypoints placed in your content.
+
         They power the floating navigation widget (prev/next buttons,
         popup list) and keyboard shortcuts (PageDown/PageUp by default).
+
         Markers work in both continuous and paginated book modes.
     """))
     st_space("v", 2)
@@ -49,7 +51,17 @@ def build():
     """))
     st_space("v", 1)
 
-    show_code(file="examples/nav/marker_manual.py")
+    show_code('''\
+from streamtex import st_marker
+
+# Visible marker — dashed border + label text
+st_marker("Section Start", visible=True)
+
+# Invisible marker — zero height, navigation only
+st_marker("Hidden Waypoint")
+
+# Auto-generated label when omitted
+st_marker()  # label = "Marker N"''')
     st_space("v", 1)
 
     # Live demo
@@ -91,12 +103,18 @@ def build():
     """))
     st_space("v", 1)
 
-    show_code(file="examples/nav/marker_per_heading.py")
+    show_code("""\
+# Exclude a heading from markers (e.g. appendix)
+st_write(s.huge, "Appendix", toc_lvl="1", marker=False)
+
+# Force a heading to become a marker even when auto is off
+st_write(s.huge, "Important Note", toc_lvl="2", marker=True)""")
     st_space("v", 2)
 
     show_details(textwrap.dedent("""\
         The marker= parameter only applies to headings that have a
         toc_lvl. It has no effect on non-TOC text.
+
         When marker=None (default), the auto_marker_on_toc setting
         decides whether the heading becomes a marker.
     """))

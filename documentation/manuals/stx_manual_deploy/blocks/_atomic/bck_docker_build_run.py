@@ -92,6 +92,6 @@ def build():
         st_space("v", 2)
 
         show_details(
-            "Port mapping: -p HOST_PORT:8501. The container always listens on 8501. "
+            "Port mapping: -p HOST_PORT:8501. The container always listens on 8501.\n\n"
             "Map different host ports to run multiple projects simultaneously."
         )

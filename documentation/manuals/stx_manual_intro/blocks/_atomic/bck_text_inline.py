@@ -30,6 +30,7 @@ def build():
 
         show_explanation(textwrap.dedent("""\
             Multiple st_write() calls stack vertically.
+
             Use tuples for inline flow.
         """))
         st_space("v", 1)
@@ -45,7 +46,9 @@ def build():
             st_br()
             st_write(s.large, "not side by side.")
             st_space("v", 1)
-            show_code_inline(file="examples/text/inline_wrong.py")
+            show_code_inline("""\
+st_write(s.text.colors.red, "Red ")
+st_write(s.text.colors.blue, "Blue")""")
             st_space("v", 1)
             st_write(s.text.colors.red + s.large, "Red ")
             st_write(s.text.colors.blue + s.large, "Blue")
@@ -54,7 +57,10 @@ def build():
         with st_block(s.project.containers.good_callout):
             st_write(bs.correct_label, "CORRECT - flows inline:")
             st_space("v", 1)
-            show_code_inline(file="examples/text/inline_correct.py")
+            show_code_inline("""\
+st_write(s.large,
+         (s.text.colors.red, "Red "),
+         (s.text.colors.blue, "Blue"))""")
             st_space("v", 1)
             st_write(s.large,
                      (s.text.colors.red, "Red "),
@@ -74,7 +80,14 @@ def build():
         st_space("v", 1)
 
         theURL = "https://github.com"
-        show_code(file="examples/text/inline_tuple.py")
+        show_code("""\
+link_style = s.project.colors.primary_blue + s.text.decors.underline_text + s.large
+theURL = "https://github.com"
+st_write(s.large,
+         "Visit the ",
+         (s.project.colors.primary_blue + s.bold, "StreamTeX"),
+         " project on ",
+         (link_style, "GitHub", theURL))""")
         st_space("v", 1)
 
         st_write(s.large,
@@ -94,13 +107,20 @@ def build():
         st_space("v", 1)
 
         theURL = "https://docs.streamlit.io"
-        show_code(file="examples/text/inline_link.py")
+        show_code("""\
+theURL = "https://docs.streamlit.io"
+st_write(s.large, "Click here for Streamlit docs", link=theURL)""")
         st_space("v", 1)
 
         st_write(s.large, "Click here for Streamlit docs", link=theURL)
         st_space("v", 1)
 
-        show_code(file="examples/text/inline_link_styled.py")
+        show_code("""\
+link_style = s.project.colors.primary_blue + s.text.decors.underline_text + s.large
+theURL = "https://docs.streamlit.io"
+st_write(link_style,
+         "Styled link (no default decoration)",
+         link=theURL, no_link_decor=True)""")
         st_space("v", 1)
 
         st_write(bs.link_style,
@@ -110,6 +130,7 @@ def build():
 
         show_details(textwrap.dedent("""\
             Default: link="" (no link), no_link_decor=False, hover=True.
+
             Links default to 12pt font size.
             When surrounding text is larger,
             include font size in the link style to match.

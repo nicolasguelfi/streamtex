@@ -23,7 +23,9 @@ def build():
 
         show_explanation(textwrap.dedent("""\
             st.form() groups inputs (no rerun between entries).
+
             st.session_state persists data across reruns.
+
             StreamTeX content re-renders reading the current state.
         """))
         st_space("v", 2)
@@ -32,7 +34,16 @@ def build():
         st_write(bs.sub, "Basic Form", toc_lvl="+1")
         st_space("v", 1)
 
-        show_code(file="examples/state/basic_form.py")
+        show_code("""\
+with st.form("bck26_profile_form"):
+    name = st.text_input("Name", value="Ada Lovelace")
+    age = st.number_input("Age", 0, 120, 25)
+    submitted = st.form_submit_button("Submit")
+if submitted:
+    with st_block(s.project.containers.result_box):
+        st_write(s.large + s.bold, f"Name: {name}")
+        st_br()
+        st_write(s.large, f"Age: {age}")""")
         st_space("v", 1)
 
         with st.form("bck26_profile_form"):
@@ -50,7 +61,16 @@ def build():
         st_write(bs.sub, "Session State Counter", toc_lvl="+1")
         st_space("v", 1)
 
-        show_code(file="examples/state/session_counter.py")
+        show_code("""\
+if "bck26_counter" not in st.session_state:
+    st.session_state.bck26_counter = 0
+if st.button("Increment", key="bck26_incr"):
+    st.session_state.bck26_counter += 1
+count = st.session_state.bck26_counter
+size = min(12 + count * 4, 96)
+with st_block(s.project.containers.result_box):
+    st_write(ns(f"font-size: {size}px;") + s.bold,
+             f"Count: {count}")""")
         st_space("v", 1)
 
         if "bck26_counter" not in st.session_state:
@@ -112,7 +132,10 @@ def build():
 
         show_details(textwrap.dedent("""\
             st.form() prevents reruns between input changes.
+
             st.session_state persists values across reruns.
+
             StreamTeX content re-renders each time, reading the latest state.
+
             Use unique keys for all widgets to avoid conflicts.
         """))

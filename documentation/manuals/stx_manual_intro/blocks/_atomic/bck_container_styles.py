@@ -68,7 +68,9 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(file="examples/container/styles_paddings.py")
+        show_code("""\
+s.container.paddings.medium_padding   # 12pt
+Paddings.size("10px", "20px")         # factory""")
         st_space("v", 1)
 
         with st_grid(cols=3,
@@ -95,11 +97,14 @@ def build():
 
         show_explanation(textwrap.dedent("""\
             Control spacing outside elements.
+
             Same scale as paddings.
         """))
         st_space("v", 1)
 
-        show_code(file="examples/container/styles_margins.py")
+        show_code("""\
+s.container.margins.large_margin      # 24pt
+Margins.size("auto", "auto")          # factory""")
         st_space("v", 1)
 
         with st_block(s.container.borders.dashed_border):
@@ -120,7 +125,13 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(file="examples/container/styles_borders.py")
+        show_code("""\
+with st_block(s.container.borders.solid_border
+              + s.container.paddings.small_padding):
+    st_write("solid")
+with st_block(s.container.borders.dashed_border
+              + s.container.paddings.small_padding):
+    st_write("dashed")""")
         st_space("v", 1)
 
         with st_grid(cols=3,
@@ -157,7 +168,9 @@ def build():
 
         show_details(textwrap.dedent("""\
             Border factories available.
+
             Borders.size("2px") for custom width.
+
             Borders.color(s.text.colors.red) for custom color.
         """))
         st_space("v", 2)
@@ -171,7 +184,11 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(file="examples/container/styles_flex.py", line_numbers=False)
+        show_code("""\
+s.container.flex.row_flex
+s.container.flex.col_flex
+s.container.flex.center_justify
+s.container.flex.center_align_items""", line_numbers=False)
         st_space("v", 2)
 
         # Layouts
@@ -184,7 +201,9 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(file="examples/container/styles_layouts.py", line_numbers=False)
+        show_code("""\
+s.container.layouts.center    # width:fit + margin:auto
+s.container.layouts.span      # flex row + width:fit""", line_numbers=False)
         st_space("v", 1)
 
         with st_block(s.container.borders.dashed_border):
@@ -204,4 +223,8 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(file="examples/container/styles_sizes.py", line_numbers=False)
+        show_code("""\
+s.container.sizes.width_full   # 100%
+s.container.sizes.width_half   # 50%
+s.container.sizes.width_fit    # fit-content
+s.container.sizes.height_auto  # auto""", line_numbers=False)

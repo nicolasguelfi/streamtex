@@ -630,8 +630,17 @@ from streamtex import show_code, show_explanation, show_details
 show_code("print('hello')")                          # Uses injected config style
 show_code("print('hello')", style=s.custom.style)    # Override with explicit style
 show_code('{"key": "value"}', language="json", wrap=True)  # Wrapping for JSON
-show_explanation("This explains the concept...")
-show_details("Additional details here...")
+
+# show_explanation / show_details render Markdown (bold, italic, lists, links…)
+show_explanation(textwrap.dedent("""\
+    **st_markdown()** renders interpreted Markdown content.
+    Use it for documentation with *formatting* and `code`.
+"""))
+show_details(textwrap.dedent("""\
+    **Key point**: this is the main takeaway.
+
+    Additional details with *emphasis* and `code`.
+"""))
 ```
 
 ### OOP Inheritance (Advanced)
@@ -805,6 +814,7 @@ stx.st_markdown("Inline $E=mc^2$ and display: $$\\int_0^1 x\\,dx$$")
 - `st_write()` applies StreamTeX styles to plain text (styled spans)
 - Use `st_markdown()` for existing Markdown content (README, docs)
 - Use `st_write()` for StreamTeX-styled inline text with composition
+- `show_explanation()` and `show_details()` use `st_markdown()` internally — Markdown works in helper text
 
 ### LaTeX — `st_latex()` & `st_latex_doc()`
 

@@ -10,7 +10,7 @@ import streamtex.styles as sts
 from streamtex import TOCConfig, NumberingMode, st_book
 
 st.set_page_config(
-    page_title="StreamTeX Test Collection",
+    page_title="StreamTeX - Collection",
     layout="wide",
     initial_sidebar_state="collapsed"
 )

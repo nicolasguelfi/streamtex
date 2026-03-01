@@ -23,6 +23,7 @@ def build():
 
         show_explanation(textwrap.dedent("""\
             Markers let you place navigation waypoints anywhere in content.
+
             Use ArrowRight/ArrowLeft to jump between them.
         """))
         st_space("v", 2)
@@ -33,7 +34,12 @@ def build():
         st_write(bs.sub, "Manual markers", toc_lvl="+1")
         st_space("v", 1)
 
-        show_code(file="examples/nav/marker_manual.py")
+        show_code("""\
+# Place a visible marker
+st_marker("Section Start", visible=True)
+
+# Place an invisible marker (default)
+st_marker("Hidden Waypoint")""")
         st_space("v", 2)
 
         # --- Invisible marker ---
@@ -44,11 +50,20 @@ def build():
 
         show_explanation(textwrap.dedent("""\
             With auto_marker_on_toc, TOC headings become markers automatically.
+
             Use marker=False on st_write to exclude a specific heading.
         """))
         st_space("v", 1)
 
-        show_code(file="examples/nav/marker_auto_toc.py")
+        show_code("""\
+marker = MarkerConfig(
+    auto_marker_on_toc=1,  # Level 1 headings become markers
+    show_nav_ui=True
+)
+st_book([...], marker_config=marker)
+
+# Exclude a heading from markers
+st_write(s.huge, "Appendix", toc_lvl="1", marker=False)""")
         st_space("v", 2)
 
         # --- Another manual marker ---
@@ -56,5 +71,6 @@ def build():
 
         show_details(textwrap.dedent("""\
             The nav widget shows your position and total marker count.
+
             Keyboard navigation skips focused inputs for form safety.
         """))

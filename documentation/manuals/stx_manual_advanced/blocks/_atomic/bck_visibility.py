@@ -131,6 +131,7 @@ def build():
 
         show_details(textwrap.dedent("""\
             Use hidden to completely remove an element.
+
             Use invisible to preserve layout spacing
             while hiding content.
         """))

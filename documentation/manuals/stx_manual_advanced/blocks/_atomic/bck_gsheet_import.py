@@ -56,7 +56,9 @@ def build():
 
         show_explanation(textwrap.dedent("""\
             StreamTeX can import data directly from Google Sheets.
+
             Supports public sheets (no auth) and private sheets (service account or OAuth2).
+
             Data integrates seamlessly with stx.st_dataframe, stx.st_table, and all chart widgets.
         """))
         st_space("v", 3)
@@ -70,7 +72,9 @@ def build():
 
         show_details(textwrap.dedent("""\
             Credentials are resolved in order: explicit path > GSHEET_CREDENTIALS env > GOOGLE_APPLICATION_CREDENTIALS env.
+
             For deployed apps, set the GSHEET_CREDENTIALS environment variable.
+
             Cache TTL (seconds): 0 = no cache, None = cache forever, 300 = 5 minutes.
         """))
         st_space("v", 3)
@@ -135,6 +139,8 @@ def build():
 
         show_details(textwrap.dedent("""\
             Define GSheetSource at module level (loaded once per session).
+
             Use @st.cache_data for fine-grained caching if needed.
+
             Data flows through the standard export pipeline: stx.st_dataframe generates both Streamlit widget and HTML fallback.
         """))

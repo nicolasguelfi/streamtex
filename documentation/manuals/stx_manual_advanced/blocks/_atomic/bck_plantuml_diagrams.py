@@ -29,7 +29,9 @@ def build():
 
         show_explanation(textwrap.dedent("""\
             stx.st_plantuml() renders PlantUML diagrams: class diagrams,
-            sequence diagrams, use case diagrams, and more. Rendering uses a
+            sequence diagrams, use case diagrams, and more.
+
+            Rendering uses a
             PlantUML server (public by default, configurable). No local
             installation required — only stdlib Python (zlib + urllib).
         """))
@@ -39,7 +41,7 @@ def build():
         st_write(bs.sub, "Class Diagram", toc_lvl="+1")
         st_space("v", 1)
 
-        show_code(file="examples/diagram/plantuml_class.py")
+        show_code('stx.st_plantuml(file="diagrams/class_diagram.puml", height=1000)')
         st_space("v", 1)
 
         with st_block(s.project.containers.result_box):
@@ -55,11 +57,12 @@ def build():
 
         show_explanation(textwrap.dedent("""\
             Sequence diagrams show interactions between components over time.
+
             Ideal for documenting request/response flows and API calls.
         """))
         st_space("v", 1)
 
-        show_code(file="examples/diagram/plantuml_sequence.py")
+        show_code('stx.st_plantuml(file="diagrams/sequence_diagram.puml", height=1000)')
         st_space("v", 1)
 
         with st_block(s.project.containers.result_box):
@@ -90,7 +93,15 @@ def build():
         st_write(bs.sub, "Interactive Diagram Selection", toc_lvl="+1")
         st_space("v", 1)
 
-        show_code(file="examples/diagram/plantuml_interactive.py")
+        show_code("""\
+DIAGRAMS = {
+    "Class Diagram": "diagrams/class_diagram.puml",
+    "Sequence Diagram": "diagrams/sequence_diagram.puml",
+    "Use Case Diagram": "diagrams/usecase_diagram.puml",
+}
+
+choice = st.selectbox("Choose a PlantUML diagram", [*DIAGRAMS])
+stx.st_plantuml(file=DIAGRAMS[choice], height=1000)""")
         st_space("v", 1)
 
         choice = st.selectbox("Choose a PlantUML diagram",
@@ -106,7 +117,10 @@ def build():
         show_details(textwrap.dedent("""\
             PlantUML supports: class, sequence, use case, activity, state,
             component, deployment, object, and many more diagram types.
+
             stx.st_plantuml() uses a PlantUML HTTP server for rendering.
+
             The server is configurable (default: public plantuml.com).
+
             Static .puml files can be loaded from the static/diagrams/ folder.
         """))

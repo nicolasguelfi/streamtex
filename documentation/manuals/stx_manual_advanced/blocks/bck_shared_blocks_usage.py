@@ -62,7 +62,9 @@ def build():
 
     show_explanation("""\
 Shared blocks are standard StreamTeX block modules (bck_*.py files with
-a build() function) that live outside any single project. They are designed
+a build() function) that live outside any single project.
+
+They are designed
 to be reused across multiple projects without copying files. When you update
 a shared block, every project that references it picks up the change
 automatically.""")
@@ -101,7 +103,9 @@ on disk and how it is loaded.""",
     show_explanation("""\
 A shared-blocks directory mirrors the standard project structure:
 blocks/ for block modules, custom/ for shared styles, and static/
-for shared assets. This consistency means any block can move between
+for shared assets.
+
+This consistency means any block can move between
 a project and the shared library without changes.""")
     st_space("v", 1)
 
@@ -126,10 +130,12 @@ shared-blocks/
 
     show_details("""\
 The shared-blocks directory can live anywhere on disk.
+
 Common locations:
   - A sibling directory next to your projects (documentation/manuals/stx_manuals_shared-blocks/)
   - A separate Git repository cloned alongside your project
   - A monorepo subfolder (libs/stx_manuals_shared-blocks/)
+
 LazyBlockRegistry resolves paths to absolute form, so relative paths work.""")
     st_space("v", 1)
 
@@ -175,7 +181,9 @@ documentation/manuals/
 
     show_explanation("""\
 In your project's book.py, create a LazyBlockRegistry that points to
-the shared-blocks/blocks/ directory. The registry uses lazy-loading:
+the shared-blocks/blocks/ directory.
+
+The registry uses lazy-loading:
 blocks are imported only when first accessed, then cached for all
 subsequent uses.""")
     st_space("v", 1)
@@ -214,8 +222,11 @@ module, and returns it. If not found, an AttributeError is raised.""",
 
     show_details("""\
 LazyBlockRegistry accepts a list of directories, not just one.
+
 When multiple directories are provided, they are searched in order.
+
 The first directory containing a matching bck_*.py file wins (priority order).
+
 See the LazyBlockRegistry block for the full priority and caching documentation.""")
     st_space("v", 3)
 
@@ -231,7 +242,9 @@ See the LazyBlockRegistry block for the full priority and caching documentation.
 
     show_explanation("""\
 The real power of shared blocks appears when you combine them with
-local blocks in a single st_book() call. Local blocks come from your
+local blocks in a single st_book() call.
+
+Local blocks come from your
 project's blocks/ directory (via ProjectBlockRegistry), while shared
 blocks come from LazyBlockRegistry. Both are regular Python modules
 with a build() function, so st_book() treats them identically.""")
@@ -280,7 +293,9 @@ improving code readability and maintainability.""",
 
     show_explanation("""\
 This very project (stx_manual_advanced) uses this exact pattern.
+
 All content blocks are local, but the footer comes from stx_manuals_shared-blocks/.
+
 The relevant extract from book.py:""")
     st_space("v", 1)
 
@@ -318,7 +333,9 @@ st_book([
 
     show_explanation("""\
 Shared blocks often need their own style palette that works independently
-of any project's custom styles. The shared-blocks/custom/styles.py file
+of any project's custom styles.
+
+The shared-blocks/custom/styles.py file
 defines a SharedStyles class that inherits from StxStyles. This
 ensures shared blocks remain self-contained and do not depend on any
 specific project's style definitions.""")
@@ -410,7 +427,9 @@ def build():
 
     show_details("""\
 Notice that the shared block uses stx.StxStyles for text styles
-and defines its own BlockStyles for local layout. It does not import from
+and defines its own BlockStyles for local layout.
+
+It does not import from
 custom.styles, making it fully portable across projects.""")
     st_space("v", 3)
 
@@ -426,7 +445,9 @@ custom.styles, making it fully portable across projects.""")
 
     show_explanation("""\
 When shared blocks reference images or other static assets, those assets
-live in shared-blocks/static/. For the image resolver to find them, you
+live in shared-blocks/static/.
+
+For the image resolver to find them, you
 must configure stx.set_static_sources() in your project's book.py to include
 both the local static/ directory and the shared static/ directory.""")
     st_space("v", 1)
@@ -478,8 +499,11 @@ def build():
 
     show_details("""\
 set_static_sources() must be called before any block's build() runs.
+
 Place it at the top of book.py, after setup but before st_book().
+
 The order of paths matters: first path has highest priority.
+
 See the Static Resolution Demo block for detailed resolution mechanics.""")
     st_space("v", 3)
 
@@ -617,7 +641,8 @@ st_book([
 
     show_explanation("""\
 Follow these guidelines to keep your shared block architecture
-clean, portable, and maintainable across all consuming projects.""")
+clean, portable, and maintainable across all consuming projects.
+""")
     st_space("v", 1)
 
     # Practice 1: Self-contained blocks

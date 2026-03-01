@@ -30,7 +30,11 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(file="examples/list/unordered_basic.py")
+        show_code("""\
+with st_list(list_type=lt.unordered, li_style=bs.list_item, align="center") as l:
+    with l.item(): st_write("First unordered item")
+    with l.item(): st_write("Second unordered item")
+    with l.item(): st_write("Third unordered item")""")
         st_space("v", 1)
 
         with st_list(list_type=lt.unordered, li_style=bs.list_item, align="center") as l:
@@ -48,7 +52,11 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(file="examples/list/ordered_basic.py")
+        show_code("""\
+with st_list(list_type=lt.ordered, li_style=bs.list_item, align="center") as l:
+    with l.item(): st_write("Step one")
+    with l.item(): st_write("Step two")
+    with l.item(): st_write("Step three")""")
         st_space("v", 1)
 
         with st_list(list_type=lt.ordered, li_style=bs.list_item, align="center") as l:
@@ -90,6 +98,7 @@ def build():
 
         show_explanation(textwrap.dedent("""\
             Use ListStyle for custom bullet symbols at each nesting level.
+
             With align="center", the list block is centered.
         """))
         st_space("v", 1)
@@ -124,7 +133,11 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(file="examples/list/custom_symbols_left.py")
+        show_code("""\
+with st_list(list_type=lt.unordered,
+             l_style=s.container.lists.g_docs,
+             li_style=bs.list_item) as l:
+    with l.item(): st_write("Level 1 symbol")""")
         st_space("v", 1)
 
         with st_list(list_type=lt.unordered,
@@ -155,7 +168,12 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(file="examples/list/ordered_lowercase.py")
+        show_code("""\
+with st_list(list_type=lt.ordered,
+             l_style=s.container.lists.ordered_lowercase,
+             li_style=bs.list_item) as l:
+    with l.item(): st_write("Item a")
+    with l.item(): st_write("Item b")""")
         st_space("v", 1)
 
         with st_list(list_type=lt.ordered,
@@ -176,7 +194,12 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(file="examples/list/per_item_style.py")
+        show_code("""\
+with st_list(list_type=lt.unordered, li_style=bs.list_item, align="center") as l:
+    with l.item(): st_write("Normal item")
+    with l.item(style=s.text.colors.coral):
+        st_write("Highlighted item (coral override)")
+    with l.item(): st_write("Normal item")""")
         st_space("v", 1)
 
         with st_list(list_type=lt.unordered, li_style=bs.list_item, align="center") as l:
@@ -188,6 +211,7 @@ def build():
 
         show_details(textwrap.dedent("""\
             Defaults: list_type=lt.unordered, l_style=none, li_style=none.
+
             Set a consistent li_style on the list.
             Override per-item only when needed for emphasis.
         """))

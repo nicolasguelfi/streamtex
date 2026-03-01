@@ -1,0 +1,596 @@
+language,description,url
+abap,ABAP,https://community.sap.com/topics/abap
+abnf,ABNF,http://www.ietf.org/rfc/rfc7405.txt
+actionscript,ActionScript,https://en.wikipedia.org/wiki/ActionScript
+actionscript3,ActionScript 3,https://help.adobe.com/en_US/FlashPlatform/reference/actionscript/3/index.html
+ada,Ada,https://www.adaic.org
+adl,ADL,https://specifications.openehr.org/releases/AM/latest/ADL2.html
+agda,Agda,http://wiki.portal.chalmers.se/agda/pmwiki.php
+aheui,Aheui,http://aheui.github.io/
+alloy,Alloy,http://alloy.mit.edu
+ambienttalk,AmbientTalk,https://code.google.com/p/ambienttalk
+amdgpu,AMDGPU,https://gpuopen.com/amd-isa-documentation
+ampl,Ampl,http://ampl.com/
+androidbp,Soong,https://source.android.com/docs/setup/reference/androidbp
+ansys,ANSYS parametric design language,https://www.ansys.com
+antlr,ANTLR,https://www.antlr.org
+antlr-actionscript,ANTLR With ActionScript Target,https://www.antlr.org
+antlr-cpp,ANTLR With CPP Target,https://www.antlr.org
+antlr-csharp,ANTLR With C# Target,https://www.antlr.org
+antlr-java,ANTLR With Java Target,https://www.antlr.org
+antlr-objc,ANTLR With ObjectiveC Target,https://www.antlr.org
+antlr-perl,ANTLR With Perl Target,https://www.antlr.org
+antlr-python,ANTLR With Python Target,https://www.antlr.org
+antlr-ruby,ANTLR With Ruby Target,https://www.antlr.org
+apacheconf,ApacheConf,https://httpd.apache.org/docs/current/configuring.html
+apl,APL,https://en.m.wikipedia.org/wiki/APL_(programming_language)
+applescript,AppleScript,https://developer.apple.com/library/archive/documentation/AppleScript/Conceptual/AppleScriptLangGuide/introduction/ASLR_intro.html
+arduino,Arduino,https://isocpp.org/
+arrow,Arrow,https://pypi.org/project/py-arrow-lang/
+arturo,Arturo,https://arturo-lang.io/
+asc,ASCII armored,https://www.openpgp.org
+asn1,ASN.1,https://www.itu.int/ITU-T/studygroups/com17/languages/X.680-0207.pdf
+aspectj,AspectJ,http://www.eclipse.org/aspectj/
+aspx-cs,aspx-cs,https://dotnet.microsoft.com/en-us/apps/aspnet
+aspx-vb,aspx-vb,https://dotnet.microsoft.com/en-us/apps/aspnet
+asymptote,Asymptote,http://asymptote.sf.net/
+augeas,Augeas,http://augeas.net
+autohotkey,autohotkey,http://www.autohotkey.com/
+autoit,AutoIt,http://www.autoitscript.com/site/autoit/
+awk,Awk,https://en.wikipedia.org/wiki/AWK
+bare,BARE,https://baremessages.org
+basemake,Base Makefile,https://en.wikipedia.org/wiki/Make_(software)
+bash,Bash,https://en.wikipedia.org/wiki/Unix_shell
+batch,Batchfile,https://en.wikipedia.org/wiki/Batch_file
+bbcbasic,BBC Basic,https://www.bbcbasic.co.uk/bbcbasic.html
+bbcode,BBCode,https://www.bbcode.org/
+bc,BC,https://www.gnu.org/software/bc/
+bdd,Bdd,https://en.wikipedia.org/wiki/Behavior-driven_development
+befunge,Befunge,http://en.wikipedia.org/wiki/Befunge
+berry,Berry,https://berry-lang.github.io
+bibtex,BibTeX,https://texfaq.org/FAQ-BibTeXing
+blitzbasic,BlitzBasic,http://blitzbasic.com
+blitzmax,BlitzMax,http://blitzbasic.com
+blueprint,Blueprint,https://gitlab.gnome.org/jwestman/blueprint-compiler
+bnf,BNF,https://en.wikipedia.org/wiki/Backus%E2%80%93Naur_form
+boa,Boa,https://boa.cs.iastate.edu/docs
+boo,Boo,https://github.com/boo-lang/boo
+boogie,Boogie,https://boogie-docs.readthedocs.io/en/latest/
+bqn,BQN,https://mlochbaum.github.io/BQN/index.html
+brainfuck,Brainfuck,http://www.muppetlabs.com/~breadbox/bf/
+bst,BST,https://texfaq.org/FAQ-BibTeXing
+bugs,BUGS,https://www.mrc-bsu.cam.ac.uk/software/bugs/openbugs
+c,C,https://en.wikipedia.org/wiki/C_(programming_language)
+c-objdump,c-objdump,https://www.gnu.org/software/binutils
+ca65,ca65 assembler,https://cc65.github.io
+cadl,cADL,https://specifications.openehr.org/releases/AM/latest/ADL2.html#_cadl_constraint_adl
+camkes,CAmkES,https://sel4.systems/CAmkES/
+capdl,CapDL,https://ssrg.nicta.com.au/publications/nictaabstracts/Kuz_KLW_10.abstract.pml
+capnp,Cap'n Proto,https://capnproto.org
+carbon,Carbon,https://github.com/carbon-language/carbon-lang
+cbmbas,CBM BASIC V2,https://en.wikipedia.org/wiki/Commodore_BASIC
+cddl,CDDL,https://datatracker.ietf.org/doc/rfc8610/
+ceylon,Ceylon,http://ceylon-lang.org/
+cfc,Coldfusion CFC,https://www.adobe.com/products/coldfusion-family.html
+cfengine3,CFEngine3,http://cfengine.org
+cfm,Coldfusion HTML,https://www.adobe.com/products/coldfusion-family.html
+cfs,cfstatement,https://www.adobe.com/products/coldfusion-family.html
+chaiscript,ChaiScript,http://chaiscript.com/
+chapel,Chapel,https://chapel-lang.org/
+charmci,Charmci,https://isocpp.org/
+cheetah,Cheetah,http://www.cheetahtemplate.org/
+cirru,Cirru,http://cirru.org/
+clay,Clay,http://claylabs.com/clay
+clean,Clean,http://clean.cs.ru.nl/Clean
+clojure,Clojure,http://clojure.org/
+clojurescript,ClojureScript,http://clojure.org/clojurescript
+cmake,CMake,https://cmake.org/documentation/
+cobol,COBOL,https://en.wikipedia.org/wiki/COBOL
+cobolfree,COBOLFree,https://opencobol.add1tocobol.com
+codeql,CodeQL,https://github.com/github/codeql
+coffeescript,CoffeeScript,http://coffeescript.org
+comal,COMAL-80,https://en.wikipedia.org/wiki/COMAL
+common-lisp,Common Lisp,https://lisp-lang.org/
+componentpascal,Component Pascal,https://blackboxframework.org
+console,Bash Session,https://en.wikipedia.org/wiki/Unix_shell
+coq,Coq,http://coq.inria.fr/
+cplint,cplint,https://cplint.eu
+cpp,C++,https://isocpp.org/
+cpp-objdump,cpp-objdump,https://www.gnu.org/software/binutils
+cpsa,CPSA,https://web.cs.wpi.edu/~guttman/cs564/cpsauser.html
+cr,Crystal,https://crystal-lang.org
+crmsh,Crmsh,http://crmsh.github.io/
+croc,Croc,http://jfbillingsley.com/croc
+cryptol,Cryptol,https://www.cryptol.net
+csharp,C#,https://docs.microsoft.com/en-us/dotnet/csharp/
+csound,Csound Orchestra,https://csound.com/
+csound-document,Csound Document,https://csound.com
+csound-score,Csound Score,https://csound.com/
+css,CSS,https://www.w3.org/TR/CSS/#css
+css+django,CSS+Django/Jinja,https://www.djangoproject.com/documentation/templates
+css+genshitext,CSS+Genshi Text,https://genshi.edgewall.org
+css+lasso,CSS+Lasso,https://www.lassosoft.com
+css+mako,CSS+Mako,http://www.makotemplates.org/
+css+mozpreproc,CSS+mozpreproc,https://firefox-source-docs.mozilla.org/build/buildsystem/preprocessor.html
+css+myghty,CSS+Myghty,http://www.myghty.org/
+css+php,CSS+PHP,https://www.php.net
+css+ruby,CSS+Ruby,https://github.com/ruby/erb
+css+smarty,CSS+Smarty,https://www.smarty.net/
+css+ul4,CSS+UL4,https://python.livinglogic.de/UL4.html
+cuda,CUDA,https://developer.nvidia.com/category/zone/cuda-zone
+cypher,Cypher,https://neo4j.com/docs/developer-manual/3.3/cypher/
+cython,Cython,https://cython.org
+d,D,https://dlang.org/
+d-objdump,d-objdump,https://www.gnu.org/software/binutils
+dart,Dart,http://dart.dev/
+dasm16,DASM16,http://0x10c.com/doc/dcpu-16.txt
+dax,Dax,https://learn.microsoft.com/en-us/dax/dax-function-reference
+debcontrol,Debian Control file,https://www.debian.org/doc/debian-policy/ch-controlfields.html
+debian.sources,Debian Sources file,https://manpages.debian.org/bookworm/apt/sources.list.5.en.html#THE_DEB_AND_DEB-SRC_TYPES:_GENERAL_FORMAT
+debsources,Debian Sourcelist,https://wiki.debian.org/SourcesList
+delphi,Delphi,https://www.embarcadero.com/products/delphi
+desktop,Desktop file,https://specifications.freedesktop.org/desktop-entry-spec/desktop-entry-spec-latest.html
+devicetree,Devicetree,https://www.devicetree.org/
+dg,dg,http://pyos.github.io/dg
+diff,Diff,https://en.wikipedia.org/wiki/Diff
+django,Django/Jinja,https://www.djangoproject.com/documentation/templates
+docker,Docker,http://docker.io
+doscon,MSDOS Session,https://en.wikipedia.org/wiki/MS-DOS
+dpatch,Darcs Patch,https://darcs.net
+dtd,DTD,https://en.wikipedia.org/wiki/Document_type_definition
+duel,Duel,http://duelengine.org/
+dylan,Dylan,http://www.opendylan.org/
+dylan-console,Dylan session,http://www.opendylan.org/
+dylan-lid,DylanLID,http://www.opendylan.org/
+earl-grey,Earl Grey,https://github.com/breuleux/earl-grey
+easytrieve,Easytrieve,https://www.broadcom.com/products/mainframe/application-development/easytrieve-report-generator
+ebnf,EBNF,https://en.wikipedia.org/wiki/Extended_Backus%E2%80%93Naur_Form
+ec,eC,https://ec-lang.org
+ecl,ECL,https://hpccsystems.com/training/documentation/ecl-language-reference/html
+eiffel,Eiffel,https://www.eiffel.com
+elixir,Elixir,https://elixir-lang.org
+elm,Elm,https://elm-lang.org/
+elpi,Elpi,http://github.com/LPCIC/elpi
+emacs-lisp,EmacsLisp,https://www.gnu.org/software/emacs
+email,E-mail,https://en.wikipedia.org/wiki/Email#Message_format
+erb,ERB,https://github.com/ruby/erb
+erl,Erlang erl session,https://www.erlang.org/
+erlang,Erlang,https://www.erlang.org/
+evoque,Evoque,https://gizmojo.org/templating
+execline,execline,https://skarnet.org/software/execline
+extempore,xtlang,http://extempore.moso.com.au
+ezhil,Ezhil,http://ezhillang.org
+factor,Factor,http://factorcode.org
+fan,Fantom,https://www.fantom.org
+fancy,Fancy,https://github.com/bakkdoor/fancy
+felix,Felix,http://www.felix-lang.org
+fennel,Fennel,https://fennel-lang.org
+fift,Fift,https://ton-blockchain.github.io/docs/fiftbase.pdf
+fish,Fish,https://fishshell.com
+flatline,Flatline,https://github.com/bigmlcom/flatline
+floscript,FloScript,https://github.com/ioflo/ioflo
+forth,Forth,https://www.forth.com/forth/
+fortran,Fortran,https://fortran-lang.org/
+fortranfixed,FortranFixed,https://fortran-lang.org/
+foxpro,FoxPro,https://learn.microsoft.com/en-us/previous-versions/visualstudio/foxpro
+freefem,Freefem,https://freefem.org/
+fsharp,F#,https://fsharp.org/
+fstar,FStar,https://www.fstar-lang.org/
+func,FunC,https://docs.ton.org/develop/func/overview
+futhark,Futhark,https://futhark-lang.org/
+gap,GAP,https://www.gap-system.org
+gap-console,GAP session,https://www.gap-system.org
+gas,GAS,https://www.gnu.org/software/binutils
+gcode,g-code,https://en.wikipedia.org/wiki/G-code
+gdscript,GDScript,https://www.godotengine.org
+genshi,Genshi,https://genshi.edgewall.org/
+genshitext,Genshi Text,https://genshi.edgewall.org/
+gherkin,Gherkin,https://cucumber.io/docs/gherkin
+gleam,Gleam,https://gleam.run/
+glsl,GLSL,https://www.khronos.org/api/opengl
+gnuplot,Gnuplot,http://gnuplot.info/
+go,Go,https://go.dev/
+golo,Golo,http://golo-lang.org/
+gooddata-cl,GoodData-CL,https://github.com/gooddata/GoodData-CL
+googlesql,GoogleSQL,https://cloud.google.com/bigquery/googlesql
+gosu,Gosu,https://gosu-lang.github.io
+graphql,GraphQL,https://graphql.org
+graphviz,Graphviz,https://www.graphviz.org/doc/info/lang.html
+groff,Groff,https://www.gnu.org/software/groff
+groovy,Groovy,https://groovy-lang.org/
+gsql,GSQL,https://docs.tigergraph.com/dev/gsql-ref
+gst,Gosu Template,https://gosu-lang.github.io
+haml,Haml,https://haml.info
+handlebars,Handlebars,https://handlebarsjs.com/
+hare,Hare,https://harelang.org/
+haskell,Haskell,https://www.haskell.org/
+haxe,Haxe,http://haxe.org/
+haxeml,Hxml,https://haxe.org/manual/compiler-usage-hxml.html
+hexdump,Hexdump,https://en.wikipedia.org/wiki/Hex_dump
+hlsl,HLSL,https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl
+hsail,HSAIL,https://en.wikipedia.org/wiki/Heterogeneous_System_Architecture#HSA_Intermediate_Layer
+hspec,Hspec,https://www.haskell.org/
+html,HTML,https://html.spec.whatwg.org/
+html+cheetah,HTML+Cheetah,http://www.cheetahtemplate.org/
+html+django,HTML+Django/Jinja,https://www.djangoproject.com/documentation/templates
+html+evoque,HTML+Evoque,https://gizmojo.org/templating
+html+genshi,HTML+Genshi,https://genshi.edgewall.org/
+html+handlebars,HTML+Handlebars,https://handlebarsjs.com/
+html+lasso,HTML+Lasso,https://www.lassosoft.com
+html+mako,HTML+Mako,http://www.makotemplates.org/
+html+myghty,HTML+Myghty,http://www.myghty.org/
+html+ng2,HTML + Angular2,https://angular.io/guide/template-syntax
+html+php,HTML+PHP,https://www.php.net
+html+smarty,HTML+Smarty,https://www.smarty.net/
+html+twig,HTML+Twig,https://twig.symfony.com
+html+ul4,HTML+UL4,https://python.livinglogic.de/UL4.html
+html+velocity,HTML+Velocity,https://velocity.apache.org/
+http,HTTP,https://httpwg.org/specs
+hybris,Hybris,https://github.com/evilsocket/hybris
+hylang,Hy,http://hylang.org/
+i6t,Inform 6 template,http://inform7.com/
+icon,Icon,https://www2.cs.arizona.edu/icon
+idl,IDL,https://www.l3harrisgeospatial.com/Software-Technology/IDL
+idris,Idris,https://www.idris-lang.org/
+iex,Elixir iex session,https://elixir-lang.org
+igor,Igor,http://www.wavemetrics.com
+inform6,Inform 6,http://inform-fiction.org/
+inform7,Inform 7,http://inform7.com/
+ini,INI,https://en.wikipedia.org/wiki/INI_file
+io,Io,http://iolanguage.com/
+ioke,Ioke,https://ioke.org/
+irc,IRC logs,https://en.wikipedia.org/wiki/Internet_Relay_Chat
+isabelle,Isabelle,https://isabelle.in.tum.de/
+j,J,http://jsoftware.com/
+jags,JAGS,https://mcmc-jags.sourceforge.io
+janet,Janet,https://janet-lang.org/
+jasmin,Jasmin,http://jasmin.sourceforge.net/
+java,Java,https://www.oracle.com/technetwork/java/
+javascript,JavaScript,https://www.ecma-international.org/publications-and-standards/standards/ecma-262/
+javascript+cheetah,JavaScript+Cheetah,http://www.cheetahtemplate.org/
+javascript+django,JavaScript+Django/Jinja,https://www.djangoproject.com/documentation/templates
+javascript+lasso,JavaScript+Lasso,https://www.lassosoft.com
+javascript+mako,JavaScript+Mako,http://www.makotemplates.org/
+javascript+mozpreproc,Javascript+mozpreproc,https://firefox-source-docs.mozilla.org/build/buildsystem/preprocessor.html
+javascript+myghty,JavaScript+Myghty,http://www.myghty.org/
+javascript+php,JavaScript+PHP,https://www.php.net
+javascript+ruby,JavaScript+Ruby,https://github.com/ruby/erb
+javascript+smarty,JavaScript+Smarty,https://www.smarty.net/
+jcl,JCL,https://en.wikipedia.org/wiki/Job_Control_Language
+jlcon,Julia console,https://julialang.org/
+jmespath,JMESPath,https://jmespath.org
+js+genshitext,JavaScript+Genshi Text,https://genshi.edgewall.org
+js+ul4,Javascript+UL4,https://python.livinglogic.de/UL4.html
+jsgf,JSGF,https://www.w3.org/TR/jsgf/
+jslt,JSLT,https://github.com/schibsted/jslt
+json,JSON,https://www.json.org
+json5,JSON5,https://json5.org
+jsonld,JSON-LD,https://json-ld.org/
+jsonnet,Jsonnet,https://jsonnet.org
+jsp,Java Server Page,https://projects.eclipse.org/projects/ee4j.jsp
+jsx,JSX,https://facebook.github.io/jsx/
+julia,Julia,https://julialang.org/
+juttle,Juttle,http://juttle.github.io/
+k,K,https://code.kx.com
+kal,Kal,http://rzimmerman.github.io/kal
+kconfig,Kconfig,https://www.kernel.org/doc/html/latest/kbuild/kconfig-language.html
+kmsg,Kernel log,https://fr.wikipedia.org/wiki/Dmesg
+koka,Koka,https://koka-lang.github.io/koka/doc/index.html
+kotlin,Kotlin,http://kotlinlang.org/
+kql,Kusto,https://learn.microsoft.com/en-us/azure/data-explorer/kusto/query
+kuin,Kuin,https://github.com/kuina/Kuin
+lasso,Lasso,https://www.lassosoft.com
+ldapconf,LDAP configuration file,https://www.openldap.org/software//man.cgi?query=ldap.conf&sektion=5&apropos=0&manpath=OpenLDAP+2.4-Release
+ldif,LDIF,https://datatracker.ietf.org/doc/html/rfc2849
+lean,Lean,https://leanprover-community.github.io/lean3
+lean4,Lean4,https://github.com/leanprover/lean4
+less,LessCss,http://lesscss.org/
+lighttpd,Lighttpd configuration file,http://lighttpd.net/
+lilypond,LilyPond,https://lilypond.org
+limbo,Limbo,http://www.vitanuova.com/inferno/limbo.html
+liquid,liquid,https://www.rubydoc.info/github/Shopify/liquid
+literate-agda,Literate Agda,https://agda.readthedocs.io/en/latest/tools/literate-programming.html
+literate-cryptol,Literate Cryptol,https://www.cryptol.net
+literate-haskell,Literate Haskell,https://wiki.haskell.org/Literate_programming
+literate-idris,Literate Idris,https://idris2.readthedocs.io/en/latest/reference/literate.html
+livescript,LiveScript,https://livescript.net/
+llvm,LLVM,https://llvm.org/docs/LangRef.html
+llvm-mir,LLVM-MIR,https://llvm.org/docs/MIRLangRef.html
+llvm-mir-body,LLVM-MIR Body,https://llvm.org/docs/MIRLangRef.html
+logos,Logos,https://isocpp.org/
+logtalk,Logtalk,http://logtalk.org/
+lsl,LSL,https://wiki.secondlife.com/wiki/Linden_Scripting_Language
+lua,Lua,https://www.lua.org/
+luau,Luau,https://luau-lang.org/
+macaulay2,Macaulay2,https://macaulay2.com/
+make,Makefile,https://en.wikipedia.org/wiki/Make_(software)
+mako,Mako,http://www.makotemplates.org/
+maple,Maple,https://www.maplesoft.com/products/Maple/
+maql,MAQL,https://help.gooddata.com/doc/enterprise/en/dashboards-and-insights/maql-analytical-query-language
+markdown,Markdown,https://daringfireball.net/projects/markdown/
+mask,Mask,https://github.com/atmajs/MaskJS
+mason,Mason,http://www.masonhq.com/
+mathematica,Mathematica,http://www.wolfram.com/mathematica/
+matlab,Matlab,https://www.mathworks.com/products/matlab.html
+matlabsession,Matlab session,https://www.mathworks.com/products/matlab.html
+maxima,Maxima,http://maxima.sourceforge.net
+mcfunction,MCFunction,https://minecraft.wiki/w/Commands
+mcschema,MCSchema,https://learn.microsoft.com/en-us/minecraft/creator/reference/content/schemasreference/
+meson,Meson,https://mesonbuild.com/
+mime,MIME,https://en.wikipedia.org/wiki/MIME
+minid,MiniD,http://jfbillingsley.com/croc
+miniscript,MiniScript,https://miniscript.org
+mips,MIPS,https://mips.com
+modelica,Modelica,http://www.modelica.org/
+modula2,Modula-2,http://www.modula2.org/
+mojo,Mojo,https://docs.modular.com/mojo/
+monkey,Monkey,https://blitzresearch.itch.io/monkeyx
+monte,Monte,https://monte.readthedocs.io/
+moocode,MOOCode,http://www.moo.mud.org/
+moonscript,MoonScript,http://moonscript.org
+mosel,Mosel,https://www.fico.com/fico-xpress-optimization/docs/latest/mosel/mosel_lang/dhtml/moselreflang.html
+mozhashpreproc,mozhashpreproc,https://firefox-source-docs.mozilla.org/build/buildsystem/preprocessor.html
+mozpercentpreproc,mozpercentpreproc,https://firefox-source-docs.mozilla.org/build/buildsystem/preprocessor.html
+mql,MQL,https://isocpp.org/
+mscgen,Mscgen,http://www.mcternan.me.uk/mscgen/
+mupad,MuPAD,http://www.mupad.com
+mxml,MXML,https://en.wikipedia.org/wiki/MXML
+myghty,Myghty,http://www.myghty.org/
+mysql,MySQL,https://www.mysql.com
+nasm,NASM,https://nasm.us
+ncl,NCL,https://www.ncl.ucar.edu
+nemerle,Nemerle,http://nemerle.org
+nesc,nesC,https://en.wikipedia.org/wiki/C_(programming_language)
+nestedtext,NestedText,https://nestedtext.org
+newlisp,NewLisp,http://www.newlisp.org/
+newspeak,Newspeak,http://newspeaklanguage.org/
+ng2,Angular2,https://angular.io/guide/template-syntax
+nginx,Nginx configuration file,http://nginx.net/
+nimrod,Nimrod,http://nim-lang.org/
+nit,Nit,http://nitlanguage.org
+nixos,Nix,http://nixos.org/nix/
+nodejsrepl,Node.js REPL console session,https://nodejs.org
+notmuch,Notmuch,https://notmuchmail.org/
+nsis,NSIS,http://nsis.sourceforge.net/
+numba_ir,Numba_IR,https://numba.readthedocs.io/en/stable/developer/architecture.html#stage-2-generate-the-numba-ir
+numpy,NumPy,https://numpy.org/
+nusmv,NuSMV,https://nusmv.fbk.eu
+objdump,objdump,https://www.gnu.org/software/binutils
+objdump-nasm,objdump-nasm,https://www.gnu.org/software/binutils
+objective-c,Objective-C,https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/ProgrammingWithObjectiveC/Introduction/Introduction.html
+objective-c++,Objective-C++,https://isocpp.org/
+objective-j,Objective-J,https://www.cappuccino.dev/learn/objective-j.html
+ocaml,OCaml,https://ocaml.org/
+octave,Octave,https://www.gnu.org/software/octave/index
+odin,ODIN,https://github.com/openEHR/odin
+omg-idl,OMG Interface Definition Language,https://www.omg.org/spec/IDL/About-IDL/
+ooc,Ooc,https://ooc-lang.github.io/
+opa,Opa,http://opalang.org
+openedge,OpenEdge ABL,https://www.progress.com/openedge/features/abl
+openscad,OpenSCAD,https://openscad.org/
+org,Org Mode,https://orgmode.org
+output,Text output,
+pacmanconf,PacmanConf,https://www.archlinux.org/pacman/pacman.conf.5.html
+pan,Pan,https://github.com/quattor/pan/
+parasail,ParaSail,http://www.parasail-lang.org
+pawn,Pawn,https://www.compuphase.com/pawn/pawn.htm
+pddl,PDDL,https://en.wikipedia.org/wiki/Planning_Domain_Definition_Language
+peg,PEG,https://bford.info/pub/lang/peg.pdf
+perl,Perl,https://www.perl.org
+perl6,Perl6,https://www.raku.org
+phix,Phix,http://phix.x10.mx
+php,PHP,https://www.php.net/
+pig,Pig,https://pig.apache.org/
+pike,Pike,https://isocpp.org/
+pkgconfig,PkgConfig,http://www.freedesktop.org/wiki/Software/pkg-config/
+plpgsql,PL/pgSQL,https://www.postgresql.org/docs/current/plpgsql.html
+pointless,Pointless,https://ptls.dev
+pony,Pony,https://www.ponylang.io
+portugol,Portugol,https://www.apoioinformatica.inf.br/produtos/visualg/linguagem
+postgres-explain,PostgreSQL EXPLAIN dialect,https://www.postgresql.org/docs/current/using-explain.html
+postgresql,PostgreSQL SQL dialect,https://www.postgresql.org
+postscript,PostScript,https://en.wikipedia.org/wiki/PostScript
+pot,Gettext Catalog,https://www.gnu.org/software/gettext
+pov,POVRay,http://www.povray.org/
+powershell,PowerShell,https://learn.microsoft.com/en-us/powershell
+praat,Praat,http://www.praat.org
+procfile,Procfile,https://devcenter.heroku.com/articles/procfile#procfile-format
+prolog,Prolog,https://en.wikipedia.org/wiki/Prolog
+promela,Promela,https://spinroot.com/spin/whatispin.html
+promql,PromQL,https://prometheus.io/docs/prometheus/latest/querying/basics/
+properties,Properties,https://en.wikipedia.org/wiki/.properties
+protobuf,Protocol Buffer,https://developers.google.com/protocol-buffers/
+prql,PRQL,https://prql-lang.org/
+psql,PostgreSQL console (psql),https://www.postgresql.org
+psysh,PsySH console session for PHP,https://psysh.org/
+ptx,PTX,https://docs.nvidia.com/cuda/parallel-thread-execution/
+pug,Pug,https://pugjs.org
+puppet,Puppet,https://puppet.com/
+pwsh-session,PowerShell Session,https://learn.microsoft.com/en-us/powershell
+py+ul4,Python+UL4,https://python.livinglogic.de/UL4.html
+py2tb,Python 2.x Traceback,https://python.org
+pycon,Python console session,https://python.org
+pypylog,PyPy Log,pypy.org
+pytb,Python Traceback,https://python.org
+python,Python,https://www.python.org
+python2,Python 2.x,https://www.python.org
+q,Q,https://code.kx.com
+qbasic,QBasic,https://en.wikipedia.org/wiki/QBasic
+qlik,Qlik,https://qlik.com
+qml,QML,https://doc.qt.io/qt-6/qmlapplications.html
+qvto,QVTO,https://www.omg.org/spec/QVT/1.1
+racket,Racket,http://racket-lang.org/
+ragel,Ragel,http://www.colm.net/open-source/ragel/
+ragel-c,Ragel in C Host,http://www.colm.net/open-source/ragel/
+ragel-cpp,Ragel in CPP Host,http://www.colm.net/open-source/ragel/
+ragel-d,Ragel in D Host,http://www.colm.net/open-source/ragel/
+ragel-em,Embedded Ragel,http://www.colm.net/open-source/ragel/
+ragel-java,Ragel in Java Host,http://www.colm.net/open-source/ragel/
+ragel-objc,Ragel in Objective C Host,http://www.colm.net/open-source/ragel/
+ragel-ruby,Ragel in Ruby Host,http://www.colm.net/open-source/ragel/
+rbcon,Ruby irb session,https://www.ruby-lang.org
+rconsole,RConsole,https://www.r-project.org
+rd,Rd,http://cran.r-project.org/doc/manuals/R-exts.html
+reasonml,ReasonML,https://reasonml.github.io/
+rebol,REBOL,http://www.rebol.com
+red,Red,https://www.red-lang.org
+redcode,Redcode,https://en.wikipedia.org/wiki/Core_War
+registry,reg,http://en.wikipedia.org/wiki/Windows_Registry#.REG_files
+rego,Rego,https://www.openpolicyagent.org/docs/latest/policy-language/
+resourcebundle,ResourceBundle,https://unicode-org.github.io/icu/userguide/locale/resources.html
+restructuredtext,reStructuredText,https://docutils.sourceforge.io/rst.html
+rexx,Rexx,http://www.rexxinfo.org/
+rhtml,RHTML,https://github.com/ruby/erb
+ride,Ride,https://docs.waves.tech/en/ride
+rita,Rita,https://github.com/zaibacu/rita-dsl
+rng-compact,Relax-NG Compact,http://relaxng.org
+roboconf-graph,Roboconf Graph,https://roboconf.github.io/en/user-guide/graph-definition.html
+roboconf-instances,Roboconf Instances,https://roboconf.github.io
+robotframework,RobotFramework,http://robotframework.org
+rql,RQL,http://www.logilab.org/project/rql
+rsl,RSL,http://en.wikipedia.org/wiki/RAISE
+ruby,Ruby,http://www.ruby-lang.org
+rust,Rust,https://www.rust-lang.org/
+sarl,SARL,http://www.sarl.io
+sas,SAS,https://en.wikipedia.org/wiki/SAS_(software)
+sass,Sass,https://sass-lang.com/
+savi,Savi,https://github.com/savi-lang/savi
+scala,Scala,http://www.scala-lang.org
+scaml,Scaml,https://scalate.github.io/scalate/
+scdoc,scdoc,https://git.sr.ht/~sircmpwn/scdoc
+scheme,Scheme,http://www.scheme-reports.org/
+scilab,Scilab,https://www.scilab.org/
+scss,SCSS,https://sass-lang.com/
+sed,Sed,https://en.wikipedia.org/wiki/Sed
+sgf,SmartGameFormat,https://www.red-bean.com/sgf/
+shen,Shen,http://shenlanguage.org/
+shexc,ShExC,https://shex.io/shex-semantics/#shexc
+sieve,Sieve,https://en.wikipedia.org/wiki/Sieve_(mail_filtering_language)
+silver,Silver,https://github.com/viperproject/silver
+singularity,Singularity,https://www.sylabs.io/guides/3.0/user-guide/definition_files.html
+slash,Slash,https://github.com/arturadib/Slash-A
+slim,Slim,https://slim-template.github.io
+slurm,Slurm,https://en.wikipedia.org/wiki/Unix_shell
+smali,Smali,http://code.google.com/p/smali/
+smalltalk,Smalltalk,http://www.smalltalk.org/
+smarty,Smarty,https://www.smarty.net/
+smithy,Smithy,https://awslabs.github.io/smithy/
+sml,Standard ML,https://en.wikipedia.org/wiki/Standard_ML
+snbt,SNBT,https://minecraft.wiki/w/NBT_format
+snobol,Snobol,https://www.regressive.org/snobol4
+snowball,Snowball,https://snowballstem.org/
+solidity,Solidity,https://soliditylang.org
+sophia,Sophia,https://docs.aeternity.com/aesophia
+sp,SourcePawn,https://github.com/alliedmodders/sourcepawn
+sparql,SPARQL,https://www.w3.org/TR/sparql11-query
+spec,RPMSpec,https://rpm-software-management.github.io/rpm/manual/spec.html
+spice,Spice,https://www.spicelang.com
+splus,S,https://www.r-project.org
+sql,SQL,https://en.wikipedia.org/wiki/SQL
+sql+jinja,SQL+Jinja,https://jinja.palletsprojects.com
+sqlite3,sqlite3con,https://www.sqlite.org
+squidconf,SquidConf,http://www.squid-cache.org/
+srcinfo,Srcinfo,https://wiki.archlinux.org/title/.SRCINFO
+ssp,Scalate Server Page,https://scalate.github.io/scalate/
+stan,Stan,https://mc-stan.org
+stata,Stata,http://www.stata.com/
+supercollider,SuperCollider,http://supercollider.github.io/
+swift,Swift,https://www.swift.org/
+swig,SWIG,https://isocpp.org/
+systemd,Systemd,https://www.freedesktop.org/software/systemd/man/systemd.syntax.html
+systemverilog,systemverilog,https://en.wikipedia.org/wiki/SystemVerilog
+tablegen,TableGen,https://llvm.org/docs/TableGen/ProgRef.html
+tact,Tact,https://tact-lang.org
+tads3,TADS 3,https://www.tads.org
+tal,Tal,https://wiki.xxiivv.com/site/uxntal.html
+tap,TAP,https://testanything.org/
+tasm,TASM,https://en.wikipedia.org/wiki/Turbo_Assembler
+tcl,Tcl,https://www.tcl.tk/about/language.html
+tcsh,Tcsh,https://www.tcsh.org
+tcshcon,Tcsh Session,https://www.tcsh.org
+tea,Tea,https://github.com/teatrove/teatrove
+teal,teal,https://developer.algorand.org/docs/reference/teal/specification/
+teratermmacro,Tera Term macro,https://ttssh2.osdn.jp/
+termcap,Termcap,https://en.wikipedia.org/wiki/Termcap
+terminfo,Terminfo,https://en.wikipedia.org/wiki/Terminfo
+terraform,Terraform,https://www.terraform.io/
+tex,TeX,https://tug.org
+text,Text only,
+thrift,Thrift,https://thrift.apache.org/
+ti,ThingsDB,https://www.thingsdb.net
+tid,tiddler,https://tiddlywiki.com/#TiddlerFiles
+tlb,Tl-b,https://docs.ton.org/#/overviews/TL-B
+tls,TLS Presentation Language,https://www.rfc-editor.org/rfc/rfc8446#section-3
+tnt,Typographic Number Theory,https://github.com/Kenny2github/language-tnt
+todotxt,Todotxt,http://todotxt.com/
+toml,TOML,https://toml.io
+trac-wiki,MoinMoin/Trac Wiki markup,https://moinmo.in
+trafficscript,TrafficScript,https://riverbed.com
+treetop,Treetop,https://cjheath.github.io/treetop
+tsql,Transact-SQL,https://www.tsql.info
+tsx,TSX,https://www.typescriptlang.org/docs/handbook/jsx.html
+turtle,Turtle,https://www.w3.org/TR/turtle
+twig,Twig,https://twig.symfony.com
+typescript,TypeScript,https://www.typescriptlang.org/
+typoscript,TypoScript,http://docs.typo3.org/typo3cms/TyposcriptReference/
+typoscriptcssdata,TypoScriptCssData,http://docs.typo3.org/typo3cms/TyposcriptReference/
+typoscripthtmldata,TypoScriptHtmlData,http://docs.typo3.org/typo3cms/TyposcriptReference/
+typst,Typst,https://typst.app
+ucode,ucode,http://www.unicon.org
+ul4,UL4,https://python.livinglogic.de/UL4.html
+unicon,Unicon,https://www.unicon.org
+unixconfig,Unix/Linux config files,https://en.wikipedia.org/wiki/Configuration_file#Unix_and_Unix-like_operating_systems
+urbiscript,UrbiScript,https://github.com/urbiforge/urbi
+urlencoded,urlencoded,https://en.wikipedia.org/wiki/Percent-encoding
+usd,USD,https://graphics.pixar.com/usd/release/index.html
+vala,Vala,https://vala.dev
+vb.net,VB.net,https://docs.microsoft.com/en-us/dotnet/visual-basic/
+vbscript,VBScript,https://learn.microsoft.com/en-us/previous-versions/t0aew7h6(v=vs.85)
+vcl,VCL,https://www.varnish-software.com/developers/tutorials/varnish-configuration-language-vcl
+vclsnippets,VCLSnippets,https://www.varnish-software.com/developers/tutorials/varnish-configuration-language-vcl
+vctreestatus,VCTreeStatus,
+velocity,Velocity,https://velocity.apache.org/
+verifpal,Verifpal,https://verifpal.com
+verilog,verilog,https://en.wikipedia.org/wiki/Verilog
+vgl,VGL,http://www.thermoscientific.com/samplemanager
+vhdl,vhdl,https://en.wikipedia.org/wiki/VHDL
+vim,VimL,https://www.vim.org
+visualprolog,Visual Prolog,https://www.visual-prolog.com/
+visualprologgrammar,Visual Prolog Grammar,https://www.visual-prolog.com/
+vue,Vue,https://vuejs.org/api/sfc-spec.html
+vyper,Vyper,https://vyper.readthedocs.io
+wast,WebAssembly,https://webassembly.org/
+wdiff,WDiff,https://www.gnu.org/software/wdiff/
+webidl,Web IDL,https://www.w3.org/wiki/Web_IDL
+wgsl,WebGPU Shading Language,https://www.w3.org/TR/WGSL/
+whiley,Whiley,http://whiley.org/
+wikitext,Wikitext,https://www.mediawiki.org/wiki/Wikitext
+wowtoc,World of Warcraft TOC,https://wowpedia.fandom.com/wiki/TOC_format
+wren,Wren,https://wren.io
+x10,X10,http://x10-lang.org/
+xml,XML,https://www.w3.org/XML
+xml+cheetah,XML+Cheetah,http://www.cheetahtemplate.org/
+xml+django,XML+Django/Jinja,https://www.djangoproject.com/documentation/templates
+xml+evoque,XML+Evoque,https://gizmojo.org/templating
+xml+lasso,XML+Lasso,https://www.lassosoft.com
+xml+mako,XML+Mako,http://www.makotemplates.org/
+xml+myghty,XML+Myghty,http://www.myghty.org/
+xml+php,XML+PHP,https://www.php.net
+xml+ruby,XML+Ruby,https://github.com/ruby/erb
+xml+smarty,XML+Smarty,https://www.smarty.net/
+xml+ul4,XML+UL4,https://python.livinglogic.de/UL4.html
+xml+velocity,XML+Velocity,https://velocity.apache.org/
+xorg.conf,Xorg,https://www.x.org/wiki/
+xpp,X++,https://learn.microsoft.com/en-us/dynamics365/fin-ops-core/dev-itpro/dev-ref/xpp-language-reference
+xquery,XQuery,https://www.w3.org/XML/Query/
+xslt,XSLT,https://www.w3.org/TR/xslt-30
+xtend,Xtend,https://www.eclipse.org/xtend/
+xul+mozpreproc,XUL+mozpreproc,https://firefox-source-docs.mozilla.org/build/buildsystem/preprocessor.html
+yaml,YAML,http://yaml.org/
+yaml+jinja,YAML+Jinja,https://jinja.palletsprojects.com
+yang,YANG,https://tools.ietf.org/html/rfc7950/
+yara,YARA,https://virustotal.github.io/yara/
+zeek,Zeek,https://www.zeek.org/
+zephir,Zephir,http://zephir-lang.com/
+zig,Zig,http://www.ziglang.org
+zone,Zone,https://datatracker.ietf.org/doc/html/rfc1035

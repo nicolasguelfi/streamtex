@@ -163,12 +163,22 @@ def inject_link_preview_scaffold():
 
 
 def contain_link(html_content="", link="", no_link_decor=False, hover=True):
-    """Wraps the given HTML content in an anchor tag, optionally adding a hover preview class."""
+    """Wraps the given HTML content in an anchor tag, optionally adding a hover preview class.
+
+    The ``target`` attribute is determined by the global :class:`LinkConfig`:
+    ``external_target`` for http/https links, ``internal_target`` for ``#`` anchors.
+    """
     if not link:
         return html_content
 
+    from .link_config import get_link_config
+
     clean_link = link.strip()
     is_internal = clean_link.startswith("#")
+
+    cfg = get_link_config()
+    target = cfg.internal_target if is_internal else cfg.external_target
+    target_attr = f' target="{target}"' if target and target != "_self" else ""
 
     css_classes = ""
     if hover and not is_internal:
@@ -178,4 +188,4 @@ def contain_link(html_content="", link="", no_link_decor=False, hover=True):
     if no_link_decor:
         style_attr = ' style="text-decoration: none; color: inherit;"'
 
-    return f'<a href="{clean_link}"{css_classes}{style_attr}>{html_content}</a>'
+    return f'<a href="{clean_link}"{target_attr}{css_classes}{style_attr}>{html_content}</a>'

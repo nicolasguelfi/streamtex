@@ -43,7 +43,13 @@ def build():
                 themes_source = f.read()
             show_code(themes_source)
         except Exception:
-            show_code(file="examples/theme/theme_fallback.py")
+            show_code("""\
+# custom/themes.py
+dark = {
+    "primary_blue": "color: #7AB8F5;",
+    "section_title": "color: #7AB8F5; font-weight: bold;",
+    "good_example_bg": "background-color: rgba(...);",
+}""")
         st_space("v", 2)
 
         # Activating a theme
@@ -56,7 +62,10 @@ def build():
         """))
         st_space("v", 1)
 
-        show_code(file="examples/theme/theme_activate.py")
+        show_code("""\
+import streamtex.styles as sts
+from custom.themes import dark
+sts.theme = dark""")
         st_space("v", 2)
 
         # Override table
@@ -101,6 +110,7 @@ def build():
 
         show_details(textwrap.dedent("""\
             Override only what needs dark adaptation.
+
             Most styles work well in both modes
             if you avoid hardcoded black/white.
         """))
@@ -171,6 +181,8 @@ def build():
 
         show_details(textwrap.dedent("""\
             The theme system is optional. Styles work fine without themes.
+
             Themes are powerful when you need dark/light mode or brand customization.
+
             Keep themes focused on color and contrast — not layout or typography.
         """))

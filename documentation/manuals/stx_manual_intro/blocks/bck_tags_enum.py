@@ -18,7 +18,9 @@ def build():
 
     show_explanation("""
 The Tags enum provides semantic HTML tags for proper document structure.
+
 Use tags to mark headings, paragraphs, and inline elements correctly.
+
 Tags also control table of contents generation in StreamTeX.
     """)
 
@@ -30,7 +32,9 @@ Tags also control table of contents generation in StreamTeX.
 
     show_explanation("""
 Use heading tags to structure your document hierarchically.
+
 H1 is the main title, h2-h6 are subsections.
+
 In StreamTeX, heading tags automatically update the table of contents.
     """)
 
@@ -63,7 +67,9 @@ st_write(s.large, "Subsection", tag=t.h3, toc_lvl="+1")
 
     show_explanation("""
 Block tags structure content into paragraphs and sections.
+
 p = paragraph (single block of text)
+
 div = generic container (can hold multiple elements)
     """)
 
@@ -88,7 +94,9 @@ st_write(s.large, "Container content", tag=t.div)
 
     show_explanation("""
 Inline tags mark content within text without line breaks.
+
 span = generic inline container
+
 Used with tuple syntax in st_write() for mixed-style text.
     """)
 
@@ -140,7 +148,9 @@ st_write(s.large,
 
     show_explanation("""
 Tags work with toc_lvl parameter to auto-generate table of contents.
+
 The TOC shows all h1-h6 headings in hierarchical structure.
+
 StreamTeX automatically numbers and links headings.
     """)
 

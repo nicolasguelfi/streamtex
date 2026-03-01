@@ -16,7 +16,7 @@ stx.set_static_sources([str(Path(__file__).parent / "static")])
 
 # Page configuration
 st.set_page_config(
-    page_title="StreamTeX - Deployment Guide",
+    page_title="StreamTeX - Deploy",
     layout="wide",
     initial_sidebar_state="collapsed"
 )

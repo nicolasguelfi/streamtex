@@ -9,6 +9,7 @@ from .claude_cmd import install as claude_install
 from .claude_cmd import list_cmd as claude_list
 from .deploy_cmd import docker as deploy_docker
 from .deploy_cmd import preflight as deploy_preflight
+from .deploy_cmd import render_cmd as deploy_render
 from .project_cmd import new as project_new
 from .project_cmd import validate as project_validate
 from .shortcuts import run_lint, run_test
@@ -93,3 +94,4 @@ def deploy():
 
 deploy.add_command(deploy_preflight)
 deploy.add_command(deploy_docker)
+deploy.add_command(deploy_render)

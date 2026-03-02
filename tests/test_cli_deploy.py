@@ -1,4 +1,4 @@
-"""Tests for stx deploy preflight/docker commands."""
+"""Tests for stx deploy preflight/docker/render commands."""
 
 import os
 import subprocess
@@ -11,9 +11,15 @@ from click.testing import CliRunner
 from streamtex.cli.commands import cli
 from streamtex.cli.deploy_cmd import (
     PreflightCheck,
+    derive_service_name,
+    detect_git_remote,
+    discover_manuals,
     docker_build,
     find_docker,
     generate_dockerfile,
+    generate_render_service,
+    generate_render_yaml,
+    parse_env_vars,
     run_preflight,
 )
 from streamtex.cli.project_cmd import scaffold_project
@@ -432,3 +438,335 @@ def test_deploy_docker_help():
     assert "--port" in result.output
     assert "--tag" in result.output
     assert "--build-only" in result.output
+
+
+# ---------------------------------------------------------------------------
+# Render: detect_git_remote
+# ---------------------------------------------------------------------------
+
+
+def test_detect_git_remote_https(tmp_path):
+    mock_result = MagicMock()
+    mock_result.returncode = 0
+    mock_result.stdout = "https://github.com/user/repo\n"
+
+    with patch("streamtex.cli.deploy_cmd.subprocess.run", return_value=mock_result):
+        url = detect_git_remote(str(tmp_path))
+    assert url == "https://github.com/user/repo"
+
+
+def test_detect_git_remote_ssh_normalized(tmp_path):
+    mock_result = MagicMock()
+    mock_result.returncode = 0
+    mock_result.stdout = "git@github.com:user/repo.git\n"
+
+    with patch("streamtex.cli.deploy_cmd.subprocess.run", return_value=mock_result):
+        url = detect_git_remote(str(tmp_path))
+    assert url == "https://github.com/user/repo"
+
+
+def test_detect_git_remote_strips_dotgit(tmp_path):
+    mock_result = MagicMock()
+    mock_result.returncode = 0
+    mock_result.stdout = "https://github.com/user/repo.git\n"
+
+    with patch("streamtex.cli.deploy_cmd.subprocess.run", return_value=mock_result):
+        url = detect_git_remote(str(tmp_path))
+    assert url == "https://github.com/user/repo"
+
+
+def test_detect_git_remote_none_on_failure(tmp_path):
+    mock_result = MagicMock()
+    mock_result.returncode = 1
+    mock_result.stdout = ""
+
+    with patch("streamtex.cli.deploy_cmd.subprocess.run", return_value=mock_result):
+        url = detect_git_remote(str(tmp_path))
+    assert url is None
+
+
+# ---------------------------------------------------------------------------
+# Render: discover_manuals
+# ---------------------------------------------------------------------------
+
+
+def test_discover_manuals_finds_all(tmp_path):
+    manuals = tmp_path / "manuals"
+    manuals.mkdir()
+    (manuals / "stx_manual_intro").mkdir()
+    (manuals / "stx_manuals_collection").mkdir()
+
+    result = discover_manuals(str(tmp_path))
+    assert len(result) == 2
+    assert "manuals/stx_manuals_collection" in result
+    assert "manuals/stx_manual_intro" in result
+
+
+def test_discover_manuals_excludes_non_matching(tmp_path):
+    manuals = tmp_path / "manuals"
+    manuals.mkdir()
+    (manuals / "stx_manual_intro").mkdir()
+    (manuals / "shared-blocks").mkdir()
+    (manuals / "README.md").write_text("hi")
+
+    result = discover_manuals(str(tmp_path))
+    assert len(result) == 1
+    assert "manuals/stx_manual_intro" in result
+
+
+def test_discover_manuals_no_dir(tmp_path):
+    result = discover_manuals(str(tmp_path))
+    assert result == []
+
+
+def test_discover_manuals_sorted(tmp_path):
+    manuals = tmp_path / "manuals"
+    manuals.mkdir()
+    (manuals / "stx_manual_z").mkdir()
+    (manuals / "stx_manual_a").mkdir()
+    (manuals / "stx_manuals_m").mkdir()
+
+    result = discover_manuals(str(tmp_path))
+    assert result == [
+        "manuals/stx_manual_a",
+        "manuals/stx_manual_z",
+        "manuals/stx_manuals_m",
+    ]
+
+
+# ---------------------------------------------------------------------------
+# Render: derive_service_name
+# ---------------------------------------------------------------------------
+
+
+def test_derive_name_manual():
+    assert derive_service_name("manuals/stx_manual_intro") == "streamtex-intro"
+
+
+def test_derive_name_manuals():
+    assert derive_service_name("manuals/stx_manuals_collection") == "streamtex-collection"
+
+
+def test_derive_name_fallback():
+    assert derive_service_name("manuals/other") == "other"
+
+
+# ---------------------------------------------------------------------------
+# Render: parse_env_vars
+# ---------------------------------------------------------------------------
+
+
+def test_parse_env_valid():
+    result = parse_env_vars(("KEY=val",))
+    assert result == [("KEY", "val")]
+
+
+def test_parse_env_value_with_equals():
+    result = parse_env_vars(("KEY=a=b",))
+    assert result == [("KEY", "a=b")]
+
+
+def test_parse_env_invalid():
+    with pytest.raises(click.BadParameter, match="Invalid format"):
+        parse_env_vars(("NOEQUALS",))
+
+
+# ---------------------------------------------------------------------------
+# Render: generate_render_service
+# ---------------------------------------------------------------------------
+
+
+def test_render_service_basic():
+    svc = generate_render_service(
+        name="my-svc",
+        repo="https://github.com/user/repo",
+        branch="main",
+        plan="free",
+        env_vars=[],
+    )
+    assert "name: my-svc" in svc
+    assert "repo: https://github.com/user/repo" in svc
+    assert "branch: main" in svc
+    assert "plan: free" in svc
+    assert "STX_PASSWORD" in svc
+    assert "buildFilter" not in svc
+
+
+def test_render_service_with_folder():
+    svc = generate_render_service(
+        name="my-svc",
+        repo="https://github.com/user/repo",
+        branch="main",
+        plan="free",
+        env_vars=[],
+        folder="manuals/stx_manual_intro",
+    )
+    assert "key: FOLDER" in svc
+    assert "value: manuals/stx_manual_intro" in svc
+
+
+def test_render_service_build_filter():
+    svc = generate_render_service(
+        name="my-svc",
+        repo="https://github.com/user/repo",
+        branch="main",
+        plan="free",
+        env_vars=[],
+        build_filter=True,
+    )
+    assert "buildFilter:" in svc
+    assert "paths:" in svc
+
+
+def test_render_service_custom_env_overrides_password():
+    svc = generate_render_service(
+        name="my-svc",
+        repo="https://github.com/user/repo",
+        branch="main",
+        plan="free",
+        env_vars=[("STX_PASSWORD", "mysecret")],
+    )
+    # Should have exactly one STX_PASSWORD
+    assert svc.count("STX_PASSWORD") == 1
+    assert "mysecret" in svc
+
+
+# ---------------------------------------------------------------------------
+# Render: generate_render_yaml
+# ---------------------------------------------------------------------------
+
+
+def test_render_yaml_structure():
+    svc1 = "  - type: web\n    name: svc1"
+    svc2 = "  - type: web\n    name: svc2"
+    yaml = generate_render_yaml([svc1, svc2])
+    assert yaml.startswith("services:\n")
+    assert "svc1" in yaml
+    assert "svc2" in yaml
+    assert yaml.endswith("\n")
+
+
+# ---------------------------------------------------------------------------
+# Render: Click command
+# ---------------------------------------------------------------------------
+
+
+def _make_git_project(tmp_path):
+    """Create a project with git remote for render tests."""
+    proj = tmp_path / "my-proj"
+    proj.mkdir()
+    scaffold_project(str(proj), "my-proj")
+    return proj
+
+
+def test_render_command_single(tmp_path):
+    proj = _make_git_project(tmp_path)
+
+    runner = CliRunner()
+    with patch(
+        "streamtex.cli.deploy_cmd.detect_git_remote",
+        return_value="https://github.com/user/repo",
+    ):
+        result = runner.invoke(cli, ["deploy", "render", str(proj)])
+
+    assert result.exit_code == 0, result.output
+    assert "render.yaml written" in result.output
+    assert (proj / "render.yaml").is_file()
+
+    content = (proj / "render.yaml").read_text()
+    assert "services:" in content
+    assert "buildFilter:" in content
+    assert "STX_PASSWORD" in content
+
+
+def test_render_command_multi(tmp_path):
+    proj = _make_git_project(tmp_path)
+    manuals = proj / "manuals"
+    manuals.mkdir()
+    (manuals / "stx_manual_intro").mkdir()
+    (manuals / "stx_manual_advanced").mkdir()
+
+    runner = CliRunner()
+    with patch(
+        "streamtex.cli.deploy_cmd.detect_git_remote",
+        return_value="https://github.com/user/repo",
+    ):
+        result = runner.invoke(cli, ["deploy", "render", str(proj), "--multi"])
+
+    assert result.exit_code == 0, result.output
+    assert "render.yaml written" in result.output
+
+    content = (proj / "render.yaml").read_text()
+    assert "streamtex-intro" in content
+    assert "streamtex-advanced" in content
+    assert "FOLDER" in content
+
+
+def test_render_command_multi_no_manuals(tmp_path):
+    proj = _make_git_project(tmp_path)
+
+    runner = CliRunner()
+    with patch(
+        "streamtex.cli.deploy_cmd.detect_git_remote",
+        return_value="https://github.com/user/repo",
+    ):
+        result = runner.invoke(cli, ["deploy", "render", str(proj), "--multi"])
+
+    assert result.exit_code != 0
+    assert "No manuals/" in result.output
+
+
+def test_render_command_no_remote(tmp_path):
+    proj = _make_git_project(tmp_path)
+
+    runner = CliRunner()
+    with patch(
+        "streamtex.cli.deploy_cmd.detect_git_remote",
+        return_value=None,
+    ):
+        result = runner.invoke(cli, ["deploy", "render", str(proj)])
+
+    assert result.exit_code != 0
+    assert "No git remote" in result.output
+
+
+def test_render_command_generates_dockerfile(tmp_path):
+    proj = _make_git_project(tmp_path)
+    # Ensure no Dockerfile
+    df = proj / "Dockerfile"
+    if df.is_file():
+        df.unlink()
+
+    runner = CliRunner()
+    with patch(
+        "streamtex.cli.deploy_cmd.detect_git_remote",
+        return_value="https://github.com/user/repo",
+    ):
+        result = runner.invoke(cli, ["deploy", "render", str(proj)])
+
+    assert result.exit_code == 0, result.output
+    assert "Dockerfile generated" in result.output
+    assert (proj / "Dockerfile").is_file()
+
+
+# ---------------------------------------------------------------------------
+# Render: Infrastructure
+# ---------------------------------------------------------------------------
+
+
+def test_render_command_help():
+    runner = CliRunner()
+    result = runner.invoke(cli, ["deploy", "render", "--help"])
+    assert result.exit_code == 0
+    assert "--name" in result.output
+    assert "--branch" in result.output
+    assert "--plan" in result.output
+    assert "--env" in result.output
+    assert "--multi" in result.output
+
+
+def test_deploy_group_shows_render():
+    runner = CliRunner()
+    result = runner.invoke(cli, ["deploy", "--help"])
+    assert result.exit_code == 0
+    assert "render" in result.output

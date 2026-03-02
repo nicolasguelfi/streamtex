@@ -26,7 +26,6 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
     "Topic :: Text Processing :: Markup",
     "Topic :: Software Development :: Libraries :: Python Modules",
-    "Framework :: Streamlit",
 ]
 dependencies = [
     "streamlit>=1.54.0",

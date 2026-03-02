@@ -14,9 +14,9 @@
 ├── streamtex-docs/         ← Manuels utilisateur (repo git)
 ├── streamtex-claude/       ← Profils Claude AI (repo git)
 ├── projects/
-│   ├── ai4se-streamtex/    ← Projet AI4SE (repo git)
-│   ├── aiai18h-streamtex/  ← Projet AIAI18H (repo git)
-│   └── modelsward-streamtex/
+│   ├── stx-ai4se/    ← Projet AI4SE (repo git)
+│   ├── stx-aiai18h/  ← Projet AIAI18H (repo git)
+│   └── stx-modelsward/
 └── stx.toml                ← Config workspace
 ```
 
@@ -99,13 +99,13 @@ Commandes disponibles :
 ### Tache C : Developper un projet (ex: AI4SE)
 
 ```
-Ou lancer Claude :  ~/dev/streamtex-dev/projects/ai4se-streamtex/
+Ou lancer Claude :  ~/dev/streamtex-dev/projects/stx-ai4se/
 Profil charge :     presentation (tout le profil project + regles projection live)
 ```
 
 **Workflow** :
 ```bash
-cd ~/dev/streamtex-dev/projects/ai4se-streamtex
+cd ~/dev/streamtex-dev/projects/stx-ai4se
 claude
 ```
 
@@ -212,10 +212,10 @@ git add -A && git commit -m "docs: showcase st_list align parameter"
 Identique au scenario ci-dessus, mais avec le projet :
 ```bash
 # Etape 1 : modifier dans streamtex/
-# Etape 2 : mettre a jour dans projects/ai4se-streamtex/
+# Etape 2 : mettre a jour dans projects/stx-ai4se/
 #   (via le meme Claude ou un deuxieme)
 # Etape 3 : tester
-cd ~/dev/streamtex-dev/projects/ai4se-streamtex
+cd ~/dev/streamtex-dev/projects/stx-ai4se
 uv run streamlit run book.py   # streamtex editable via [tool.uv.sources]
 ```
 
@@ -232,7 +232,7 @@ uv run streamlit run book.py   # streamtex editable via [tool.uv.sources]
 | `streamtex-claude/` | aucun | aucune specifique | Profils Claude + tout le filesystem | Pas d'identite StreamTeX |
 
 **Important** : "tout le filesystem" signifie que Claude lance dans `streamtex/` PEUT lire
-et modifier des fichiers dans `../streamtex-docs/` ou `../projects/ai4se-streamtex/`.
+et modifier des fichiers dans `../streamtex-docs/` ou `../projects/stx-ai4se/`.
 Ce qui change selon l'emplacement c'est le **profil** (commandes slash, skills, identite CLAUDE.md),
 pas l'acces aux fichiers.
 
@@ -253,7 +253,7 @@ claude
 ```bash
 cd ~/dev/streamtex-dev
 stx project new mon-cours --profile project
-cd projects/mon-cours-streamtex
+cd projects/stx-mon-cours
 claude
 # → Le profil 'project' est installe, toutes les commandes disponibles
 ```
@@ -275,9 +275,9 @@ git tag v0.4.0 && git push origin v0.4.0
 ### 4.4 "Je veux deployer un projet sur Render"
 
 ```bash
-cd ~/dev/streamtex-dev/projects/ai4se-streamtex
+cd ~/dev/streamtex-dev/projects/stx-ai4se
 stx deploy preflight .
-stx deploy render . --name ai4se-streamtex
+stx deploy render . --name stx-ai4se
 ```
 
 ### 4.5 "Je veux deployer les manuels sur Render"
@@ -292,7 +292,7 @@ stx deploy render . --multi
 ### 4.6 "Je veux deployer un projet sur HuggingFace"
 
 ```bash
-cd ~/dev/streamtex-dev/projects/ai4se-streamtex
+cd ~/dev/streamtex-dev/projects/stx-ai4se
 stx deploy huggingface . https://huggingface.co/spaces/nicolasguelfi/ai4se
 ```
 
@@ -313,7 +313,7 @@ claude
 # Commiter + push
 
 # Puis propager aux projets :
-stx claude update ~/dev/streamtex-dev/projects/ai4se-streamtex
+stx claude update ~/dev/streamtex-dev/projects/stx-ai4se
 stx claude update ~/dev/streamtex-dev/streamtex-docs
 ```
 
@@ -341,7 +341,7 @@ stx workspace sync
 cd ~/dev/streamtex-dev/streamtex-docs
 uv run streamlit run manuals/stx_manual_intro/book.py
 
-cd ~/dev/streamtex-dev/projects/ai4se-streamtex
+cd ~/dev/streamtex-dev/projects/stx-ai4se
 uv run streamlit run book.py
 ```
 
@@ -367,7 +367,7 @@ visible. PyPI n'est necessaire que pour :
 ### "Comment je sais quel profil Claude est installe dans un projet ?"
 
 ```bash
-cat ~/dev/streamtex-dev/projects/ai4se-streamtex/.claude/.stx-profile
+cat ~/dev/streamtex-dev/projects/stx-ai4se/.claude/.stx-profile
 # → presentation
 ```
 Ou : `stx claude list` depuis n'importe ou.

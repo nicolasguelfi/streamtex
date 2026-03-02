@@ -63,7 +63,7 @@ Migrer le monorepo `streamtex` vers un ecosysteme multi-repo professionnel perme
 |---------|------|---------------|
 | **Nicolas (lib)** | Developpe la librairie streamtex | `streamtex` |
 | **Nicolas (docs)** | Developpe les manuels utilisateur | `streamtex-docs` + `streamtex` (editable) |
-| **Nicolas (projet)** | Developpe des projets de formation | `ai4se-streamtex` + `streamtex` (editable) |
+| **Nicolas (projet)** | Developpe des projets de formation | `stx-ai4se` + `streamtex` (editable) |
 | **Nicolas (claude)** | Maintient la config Claude AI | `streamtex-claude` |
 | **Bob (utilisateur)** | Cree et deploie des projets StreamTeX | Son projet + `streamtex` (PyPI) + `streamtex-claude` (install) |
 
@@ -161,9 +161,9 @@ nicolasguelfi (GitHub)
 ├── streamtex                    REPO 1 : Librairie Python → PyPI
 ├── streamtex-docs               REPO 2 : Manuels + documentation
 ├── streamtex-claude             REPO 3 : Config Claude AI (4 profils)
-├── ai4se-streamtex              REPO 4 : Projet AI4SE
-├── aiai18h-streamtex            REPO 5 : Projet AIAI18H
-└── modelsward-streamtex         REPO 6 : Projet MODELSWARD
+├── stx-ai4se              REPO 4 : Projet AI4SE
+├── stx-aiai18h            REPO 5 : Projet AIAI18H
+└── stx-modelsward         REPO 6 : Projet MODELSWARD
 ```
 
 ### 3.2 Flux de dependances
@@ -240,9 +240,9 @@ nicolasguelfi (GitHub)
 │   └── README.md
 │
 ├── projects/                           ← Dossier local projets
-│   ├── ai4se-streamtex/               ← REPO 4 clone
-│   ├── aiai18h-streamtex/             ← REPO 5 clone
-│   └── modelsward-streamtex/          ← REPO 6 clone
+│   ├── stx-ai4se/               ← REPO 4 clone
+│   ├── stx-aiai18h/             ← REPO 5 clone
+│   └── stx-modelsward/          ← REPO 6 clone
 │
 └── stx.toml                           ← Configuration workspace (genere par stx init)
 ```
@@ -254,7 +254,7 @@ nicolasguelfi (GitHub)
 Chaque repo projet/docs contient dans son `pyproject.toml` :
 
 ```toml
-# pyproject.toml du repo streamtex-docs (ou d'un projet)
+# pyproject.toml du repo streamtex-docs (a la racine du workspace)
 [project]
 dependencies = ["streamtex>=0.3.0"]
 
@@ -263,8 +263,19 @@ dependencies = ["streamtex>=0.3.0"]
 streamtex = { path = "../streamtex", editable = true }
 ```
 
+```toml
+# pyproject.toml d'un projet (dans projects/stx-{nom}/)
+[project]
+dependencies = ["streamtex>=0.3.0"]
+
+# Override pour dev local — deux niveaux car projects/ est un sous-dossier
+[tool.uv.sources]
+streamtex = { path = "../../streamtex", editable = true }
+```
+
 **Comportement** :
 - `uv sync` dans `streamtex-docs/` → installe `streamtex` en editable depuis `../streamtex/`
+- `uv sync` dans `projects/stx-{nom}/` → installe `streamtex` en editable depuis `../../streamtex/`
 - `pip install streamtex-docs` → installe `streamtex>=0.3.0` depuis PyPI
 - Le switch dev/prod est **automatique** selon l'outil utilise
 
@@ -284,7 +295,7 @@ dependencies = ["streamtex>=0.3.0"]
 | Repo librairie | `streamtex` | `nicolasguelfi/streamtex` |
 | Repo docs | `streamtex-docs` | `nicolasguelfi/streamtex-docs` |
 | Repo Claude | `streamtex-claude` | `nicolasguelfi/streamtex-claude` |
-| Repo projet | `{nom}-streamtex` | `nicolasguelfi/ai4se-streamtex` |
+| Repo projet | `stx-{nom}` | `nicolasguelfi/stx-ai4se` |
 | Service Render | `streamtex-{suffixe}` | `streamtex-intro.onrender.com` |
 | Package PyPI | `streamtex` | `pip install streamtex` |
 | Profil Claude | `project`, `presentation`, `library`, `documentation` | `stx claude install project` |
@@ -390,9 +401,9 @@ path = "streamtex-claude"
 type = "claude"
 
 # Projets utilisateur — ajouter au fur et a mesure
-# [repos.ai4se-streamtex]
-# url = "https://github.com/nicolasguelfi/ai4se-streamtex.git"
-# path = "projects/ai4se-streamtex"
+# [repos.stx-ai4se]
+# url = "https://github.com/nicolasguelfi/stx-ai4se.git"
+# path = "projects/stx-ai4se"
 # type = "project"
 
 [deploy]
@@ -440,7 +451,7 @@ StreamTeX Workspace Status
   streamtex        main  ✓ clean   v0.3.0   12 commits ahead
   streamtex-docs   main  ⚠ 3 changes        up to date
   streamtex-claude main  ✓ clean            up to date
-  ai4se-streamtex  main  ✓ clean            2 commits ahead
+  stx-ai4se  main  ✓ clean            2 commits ahead
 ══════════════════════════════════════════════════════════
 ```
 
@@ -452,7 +463,7 @@ Execute `uv sync` dans chaque repo du workspace :
 stx workspace sync
 # → cd streamtex && uv sync
 # → cd streamtex-docs && uv sync
-# → cd projects/ai4se-streamtex && uv sync
+# → cd projects/stx-ai4se && uv sync
 ```
 
 ### 4.4 `stx claude` — Gestion des profils Claude AI
@@ -466,7 +477,7 @@ Installe un profil Claude AI dans un projet.
 stx claude install project
 
 # Installe le profil "presentation" dans un projet specifique
-stx claude install presentation ./projects/ai4se-streamtex
+stx claude install presentation ./projects/stx-ai4se
 
 # Installe le profil "library" dans le repo streamtex
 stx claude install library ./streamtex
@@ -528,7 +539,7 @@ stx claude install library ./streamtex
 Met a jour un profil deja installe :
 
 ```bash
-stx claude update ./projects/ai4se-streamtex
+stx claude update ./projects/stx-ai4se
 ```
 
 1. Detecte le profil installe (stocke dans `.claude/.stx-profile`)
@@ -581,7 +592,7 @@ stx project new mes-formations --collection
 
 **Actions** :
 
-1. Cree le dossier `<name>-streamtex/` (ou `<name>/` si dans le workspace)
+1. Cree le dossier `stx-<name>/`
 2. Scaffolde la structure complete (book.py, blocks/, custom/, static/, .streamlit/)
 3. Initialise un repo git
 4. Cree `pyproject.toml` avec dependance `streamtex>=0.3.0`
@@ -594,11 +605,11 @@ stx project new mes-formations --collection
 Verifie qu'un projet est complet et valide :
 
 ```bash
-stx project validate ./projects/ai4se-streamtex
+stx project validate ./projects/stx-ai4se
 ```
 
 ```
-Project Validation: ai4se-streamtex
+Project Validation: stx-ai4se
 ══════════════════════════════════════════════════════════
   ✓ book.py found
   ✓ blocks/__init__.py found (ProjectBlockRegistry)
@@ -640,7 +651,7 @@ class DockerProvider(DeployProvider): ...
 Checks pre-deploiement universels (tous providers) :
 
 ```bash
-stx deploy preflight ./projects/ai4se-streamtex
+stx deploy preflight ./projects/stx-ai4se
 ```
 
 **Checks effectues** :
@@ -664,13 +675,13 @@ Build et run Docker localement :
 
 ```bash
 # Build + run sur port 8501
-stx deploy docker ./projects/ai4se-streamtex
+stx deploy docker ./projects/stx-ai4se
 
 # Build + run sur port custom
-stx deploy docker ./projects/ai4se-streamtex --port 8505
+stx deploy docker ./projects/stx-ai4se --port 8505
 
 # Build seulement (pas de run)
-stx deploy docker ./projects/ai4se-streamtex --build-only --tag ai4se:latest
+stx deploy docker ./projects/stx-ai4se --build-only --tag ai4se:latest
 ```
 
 **Actions** :
@@ -707,14 +718,14 @@ Deploy sur Render.com :
 
 ```bash
 # Deploy interactif (guide pas a pas)
-stx deploy render ./projects/ai4se-streamtex
+stx deploy render ./projects/stx-ai4se
 
 # Deploy avec service name specifie
-stx deploy render ./projects/ai4se-streamtex --name ai4se-streamtex
+stx deploy render ./projects/stx-ai4se --name stx-ai4se
 
 # Deploy avec options avancees
-stx deploy render ./projects/ai4se-streamtex \
-    --name ai4se-streamtex \
+stx deploy render ./projects/stx-ai4se \
+    --name stx-ai4se \
     --plan free \
     --branch main \
     --env STX_PASSWORD=secret123
@@ -730,9 +741,9 @@ stx deploy render ./projects/ai4se-streamtex \
 # render.yaml — Genere par stx deploy render
 services:
   - type: web
-    name: ai4se-streamtex
+    name: stx-ai4se
     runtime: docker
-    repo: https://github.com/nicolasguelfi/ai4se-streamtex
+    repo: https://github.com/nicolasguelfi/stx-ai4se
     branch: main
     plan: free
     dockerfilePath: ./Dockerfile
@@ -792,8 +803,8 @@ services:
 Deploy sur HuggingFace Spaces :
 
 ```bash
-stx deploy huggingface ./projects/ai4se-streamtex \
-    https://huggingface.co/spaces/nicolasguelfi/ai4se-streamtex
+stx deploy huggingface ./projects/stx-ai4se \
+    https://huggingface.co/spaces/nicolasguelfi/stx-ai4se
 ```
 
 **Actions** :
@@ -818,7 +829,7 @@ pinned: false
 
 6. Ajoute/met a jour le remote `hf` :
    ```bash
-   git remote add hf https://huggingface.co/spaces/nicolasguelfi/ai4se-streamtex
+   git remote add hf https://huggingface.co/spaces/nicolasguelfi/stx-ai4se
    ```
 7. Propose le push : `git push hf main`
 8. Affiche l'URL du Space
@@ -843,10 +854,10 @@ Verifie le statut d'un deploiement :
 stx deploy status render
 
 # Statut d'un service specifique
-stx deploy status render ai4se-streamtex
+stx deploy status render stx-ai4se
 
 # Statut HuggingFace
-stx deploy status huggingface ai4se-streamtex
+stx deploy status huggingface stx-ai4se
 ```
 
 **Output** :
@@ -857,7 +868,7 @@ Render Deployment Status
   streamtex-collection   ✓ Live   https://streamtex.onrender.com
   streamtex-intro        ✓ Live   https://streamtex-intro.onrender.com
   streamtex-advanced     ● Sleep  https://streamtex-advanced.onrender.com
-  ai4se-streamtex        ✓ Live   https://ai4se-streamtex.onrender.com
+  stx-ai4se        ✓ Live   https://stx-ai4se.onrender.com
 ══════════════════════════════════════════════════════════
 ```
 
@@ -1762,7 +1773,7 @@ Rendre chaque projet StreamTeX deployable de maniere independante.
 ### 8.2 Structure type d'un projet autonome
 
 ```
-ai4se-streamtex/
+stx-ai4se/
 ├── blocks/
 │   ├── __init__.py
 │   ├── bck_title.py
@@ -1791,7 +1802,7 @@ ai4se-streamtex/
 
 ```toml
 [project]
-name = "ai4se-streamtex"
+name = "stx-ai4se"
 version = "1.0.0"
 description = "AI4SE course materials built with StreamTeX"
 requires-python = ">=3.10"
@@ -1825,7 +1836,7 @@ Pour chaque projet (AI4SE, AIAI18H, MODELSWARD) :
 
 ```bash
 # 1. Creer le repo GitHub
-gh repo create nicolasguelfi/ai4se-streamtex --public
+gh repo create nicolasguelfi/stx-ai4se --public
 
 # 2. Copier les fichiers du projet (pas d'historique git a migrer pour les projets)
 mkdir /tmp/ai4se-migration
@@ -1834,7 +1845,7 @@ cp -r projects/AI4SE/* /tmp/ai4se-migration/
 # 3. Initialiser le nouveau repo
 cd /tmp/ai4se-migration
 git init
-git remote add origin https://github.com/nicolasguelfi/ai4se-streamtex.git
+git remote add origin https://github.com/nicolasguelfi/stx-ai4se.git
 
 # 4. Ajouter les fichiers d'infrastructure
 # → pyproject.toml, Dockerfile, render.yaml, .gitignore, CI/CD
@@ -1851,10 +1862,10 @@ git push -u origin main
 
 # 7. Cloner dans le workspace
 cd ~/dev/streamtex-dev/projects
-git clone https://github.com/nicolasguelfi/ai4se-streamtex.git
+git clone https://github.com/nicolasguelfi/stx-ai4se.git
 
 # 8. Configurer editable install
-cd ai4se-streamtex
+cd stx-ai4se
 uv sync  # Utilise [tool.uv.sources] pour streamtex editable
 ```
 
@@ -1866,7 +1877,7 @@ uv sync  # Utilise [tool.uv.sources] pour streamtex editable
 | `streamtex-intro` | Docs | streamtex-docs | ~50h/mois |
 | `streamtex-advanced` | Docs | streamtex-docs | ~50h/mois |
 | `streamtex-deploy` | Docs | streamtex-docs | ~50h/mois |
-| `ai4se-streamtex` | Projet | ai4se-streamtex | ~50h/mois |
+| `stx-ai4se` | Projet | stx-ai4se | ~50h/mois |
 | **Total** | | | **~250h/mois** |
 | **Quota gratuit** | | | **750h/mois** |
 | **Marge** | | | **~500h/mois** |
@@ -1919,9 +1930,9 @@ documentation/architecture_collections_multirepo.md → archive
 .claude/designer/               → streamtex-claude/profiles/
 
 # Migration vers repos projets
-projects/AI4SE/                 → ai4se-streamtex/
-projects/project_aiai18h/       → aiai18h-streamtex/
-projects/project_modelsward/    → modelsward-streamtex/
+projects/AI4SE/                 → stx-ai4se/
+projects/project_aiai18h/       → stx-aiai18h/
+projects/project_modelsward/    → stx-modelsward/
 projects/project_html_example/  → archive ou repo dedie
 
 # Suppression (plus necessaire en multi-repo)
@@ -2113,10 +2124,10 @@ Phase 6: CLI stx           ████████████████  Con
 
 | Source (monorepo) | Destination | Action |
 |-------------------|-------------|--------|
-| `projects/AI4SE/` | `ai4se-streamtex/` | Copier + ajouter infra |
+| `projects/AI4SE/` | `stx-ai4se/` | Copier + ajouter infra |
 | `projects/AI4SE/CLAUDE.md` | (regenere depuis profil presentation) | Regenerer |
-| `projects/project_aiai18h/` | `aiai18h-streamtex/` | Copier + ajouter infra |
-| `projects/project_modelsward/` | `modelsward-streamtex/` | Copier + ajouter infra |
+| `projects/project_aiai18h/` | `stx-aiai18h/` | Copier + ajouter infra |
+| `projects/project_modelsward/` | `stx-modelsward/` | Copier + ajouter infra |
 
 ### A.5 Fichiers a archiver/supprimer
 

@@ -38,9 +38,9 @@ url = "https://github.com/nicolasguelfi/streamtex-claude.git"
 path = "streamtex-claude"
 type = "claude"
 
-# [repos.ai4se-streamtex]
-# url = "https://github.com/nicolasguelfi/ai4se-streamtex.git"
-# path = "projects/ai4se-streamtex"
+# [repos.stx-ai4se]
+# url = "https://github.com/nicolasguelfi/stx-ai4se.git"
+# path = "projects/stx-ai4se"
 # type = "project"
 
 [deploy]

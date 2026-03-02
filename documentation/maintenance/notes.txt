@@ -1,0 +1,39 @@
+ afin de pouvoir prendre en main de façon facile, tout la nouvelle organisation mise en place, j'aimerais que tu me proposes un agent Claude code Que je pourrais utiliser pour m'aider à bien déterminer, et à bien m'expliquer ce que je dois faire, comment je dois faire. J'aimerais que cette agent soit accessible quelque soit l'endroit où je lance Claude.
+
+  J'aimerais effectuer un hommage global pour les projets stream.
+  Par exemple, j'aimerais renommer le projet :
+  stx-ai4se
+De la manière suivante :
+stx-ai4se
+La convention serait de toujours préfixé chaque projet stream par
+"stx-"
+
+Peux-tu me donner ton avis, surtout par rapport à l'évolution et la maintenance de ces projets Dans le contexte de la nouvelle organisation.
+
+
+Voici le plan d'action que tu m'avais recommandé de faire :
+
+  1. Supprimer streamtex-dev/streamtex/          (le vieux clone inutile)
+  2. Deplacer l'archive → streamtex-dev/streamtex/  (mv, pas cp)
+  3. Renommer les 4 repertoires projet :
+     ai4se-streamtex/        → stx-ai4se/
+     html-example-streamtex/ → stx-html-example/
+     modelsward-streamtex/   → stx-modelsward/
+     aiai18h-streamtex/      → stx-aiai18h/
+
+
+  4. Mettre a jour les git remotes des 4 repos projet (anciens → nouveaux noms GitHub)
+  5. Appliquer les modifications de code dans streamtex/ :
+     - project_cmd.py (convention stx-<name>)
+     - workspace_cmd.py (template stx.toml)
+     - tests
+     - documentation
+  6. Mettre a jour les fichiers dans chaque repo projet :
+     - pyproject.toml, render.yaml, CLAUDE.md
+  7. uv sync dans streamtex/
+
+
+J'ai déjà fais les étapes 1,2 et trois mais pas les autres.
+Peux-tu le faire avec moi ?
+
+Peux-tu me faire des recommandations concernant les trois écarts que tu as identifiés ?

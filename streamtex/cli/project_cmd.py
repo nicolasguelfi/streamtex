@@ -107,7 +107,7 @@ def generate_pyproject_toml(name: str) -> str:
     """Generate pyproject.toml for a StreamTeX project."""
     return f"""\
 [project]
-name = "{name}-streamtex"
+name = "stx-{name}"
 version = "0.1.0"
 description = "StreamTeX project: {name}"
 requires-python = ">=3.10"
@@ -125,7 +125,7 @@ build-backend = "hatchling.build"
 def generate_setup_py(name: str) -> str:
     """Generate a docstring-only setup.py."""
     return f"""\
-\"\"\"Setup for {name}-streamtex project.\"\"\"
+\"\"\"Setup for stx-{name} project.\"\"\"
 """
 
 
@@ -214,13 +214,13 @@ def scaffold_project(
 def resolve_project_dir(name: str) -> str:
     """Determine target directory for a new project.
 
-    If inside a workspace with ``projects/``, use ``projects/<name>-streamtex/``.
-    Otherwise, use ``./<name>-streamtex/``.
+    If inside a workspace with ``projects/``, use ``projects/stx-<name>/``.
+    Otherwise, use ``./stx-<name>/``.
 
     Raises:
         click.ClickException: if the target directory already exists.
     """
-    dir_name = f"{name}-streamtex"
+    dir_name = f"stx-{name}"
 
     ws_root = find_workspace_root()
     if ws_root is not None:

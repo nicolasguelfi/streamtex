@@ -7,6 +7,8 @@ from streamtex import __version__
 from .bib_cmd import generate_stubs
 from .claude_cmd import install as claude_install
 from .claude_cmd import list_cmd as claude_list
+from .project_cmd import new as project_new
+from .project_cmd import validate as project_validate
 from .shortcuts import run_lint, run_test
 from .workspace_cmd import clone, init, link, status, sync
 
@@ -67,3 +69,14 @@ def bib():
 
 
 bib.add_command(generate_stubs)
+
+
+# --- Project subgroup ------------------------------------------------------
+
+@cli.group()
+def project():
+    """Create and validate StreamTeX projects."""
+
+
+project.add_command(project_new)
+project.add_command(project_validate)

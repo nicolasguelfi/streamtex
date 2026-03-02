@@ -1989,7 +1989,7 @@ cli = [
 | 4 | `stx deploy preflight/docker` | 1 session | **DONE** |
 | 5 | `stx deploy render` | 1 session | **DONE** |
 | 6 | `stx deploy huggingface` | 1 session | P2 |
-| 7 | `stx publish check/pypi` | 0.5 session | P1 |
+| 7 | `stx publish check/pypi` | 0.5 session | **DONE** |
 | 8 | `stx workspace link/sync` | 0.5 session | **DONE** |
 | 9 | `stx deploy status` | 0.5 session | P2 |
 | 10 | `stx claude update/diff` | 0.5 session | P2 |

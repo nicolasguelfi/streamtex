@@ -3,9 +3,12 @@
 > **Date** : 2026-03-01
 > **Auteur** : Nicolas Guelfi + Claude
 > **Version** : 2.0
-> **Statut** : Planification
+> **Statut** : En cours (Phases 1-3 DONE, Phase 4+ a faire)
 > **Predecesseur** : `maintenance_separation_multirepo.md` (v1.0, 2026-02-25)
 
+est-ce que à côté du dossier streamtex dans lequel nous sommes actuellement serait le bon choix ?
+ça serait donc ici:
+/Volumes/Mac_Data/Win_data/data/backups/Dropbox-nicolas.guelfi@laposte.net/messir Dropbox/Nicolas Guelfi/users/NG/dev-dropbox/dvlpt/eclipse/git/github/streamtex-dev
 ---
 
 ## Table des matieres
@@ -14,9 +17,9 @@
 2. [Diagnostic de l'etat actuel](#2-diagnostic-de-letat-actuel)
 3. [Architecture cible](#3-architecture-cible)
 4. [CLI `stx` — Specification complete](#4-cli-stx--specification-complete)
-5. [Phase 1 : Publication PyPI](#5-phase-1--publication-pypi)
-6. [Phase 2 : Repo `streamtex-claude`](#6-phase-2--repo-streamtex-claude)
-7. [Phase 3 : Separation repo `streamtex-docs`](#7-phase-3--separation-repo-streamtex-docs)
+5. [Phase 1 : Publication PyPI — DONE](#5-phase-1--publication-pypi--done-2026-03-01-commit-c7d6d8d)
+6. [Phase 2 : Repo `streamtex-claude` — DONE](#6-phase-2--repo-streamtex-claude--done-2026-03-01)
+7. [Phase 3 : Separation repo `streamtex-docs` — DONE](#7-phase-3--separation-repo-streamtex-docs--done-2026-03-02-commit-1cf89a6)
 8. [Phase 4 : Autonomisation des projets](#8-phase-4--autonomisation-des-projets)
 9. [Phase 5 : Nettoyage du repo librairie](#9-phase-5--nettoyage-du-repo-librairie)
 10. [Phase 6 : Script CLI `stx` et workspace](#10-phase-6--script-cli-stx-et-workspace)
@@ -945,7 +948,7 @@ stx = "streamtex.cli.main:app"
 
 ---
 
-## 5. Phase 1 : Publication PyPI
+## 5. Phase 1 : Publication PyPI — DONE (2026-03-01, commit c7d6d8d)
 
 ### 5.1 Objectif
 
@@ -1179,7 +1182,7 @@ pip install streamtex==0.3.0
 
 ---
 
-## 6. Phase 2 : Repo `streamtex-claude`
+## 6. Phase 2 : Repo `streamtex-claude` — DONE (2026-03-01)
 
 ### 6.1 Objectif
 
@@ -1525,7 +1528,7 @@ def install_profile(profile_name: str, target_dir: Path, project_name: str = "")
 
 ---
 
-## 7. Phase 3 : Separation repo `streamtex-docs`
+## 7. Phase 3 : Separation repo `streamtex-docs` — DONE (2026-03-02, commit 1cf89a6)
 
 ### 7.1 Objectif
 
@@ -2036,9 +2039,9 @@ def test_preflight_missing_book(tmp_path):
 ## 12. Calendrier recommande
 
 ```
-Phase 1: PyPI              ████████░░░░░░░░  1-2 sessions
-Phase 2: streamtex-claude  ░░░░████████░░░░  1 session
-Phase 3: streamtex-docs    ░░░░████████░░░░  1-2 sessions  (parallele avec Phase 2)
+Phase 1: PyPI              ████████████████  DONE (2026-03-01, commit c7d6d8d)
+Phase 2: streamtex-claude  ████████████████  DONE (2026-03-01)
+Phase 3: streamtex-docs    ████████████████  DONE (2026-03-02, commit 1cf89a6)
 Phase 4: Projets           ░░░░░░░░████████  1 session/projet
 Phase 5: Nettoyage lib     ░░░░░░░░░░░░████  1 session
 Phase 6: CLI stx           ████████████████  Continu (incremental, 4-6 sessions total)
@@ -2294,53 +2297,53 @@ jobs:
 
 ## Annexe D : Checklist de validation par phase
 
-### D.1 Phase 1 — Publication PyPI
+### D.1 Phase 1 — Publication PyPI (DONE 2026-03-01)
 
-- [ ] `pyproject.toml` enrichi (classifiers, URLs, authors, version 0.3.0)
-- [ ] `README.md` oriente utilisateur cree
-- [ ] `CHANGELOG.md` cree
-- [ ] `LICENSE` MIT cree
-- [ ] `__version__ = "0.3.0"` dans `streamtex/__init__.py`
-- [ ] `streamlit-ace` deplace vers `[project.optional-dependencies].inspector`
-- [ ] `.github/workflows/publish.yml` cree
-- [ ] Trusted Publishing configure sur PyPI
-- [ ] Publication TestPyPI reussie
-- [ ] Installation depuis TestPyPI validee : `pip install streamtex==0.3.0`
-- [ ] Tag `v0.3.0` pousse
-- [ ] Release GitHub creee → publish.yml declenche
-- [ ] Publication PyPI production reussie
-- [ ] `pip install streamtex` fonctionne dans un venv vierge
+- [x] `pyproject.toml` enrichi (classifiers, URLs, authors, version 0.3.0)
+- [x] `README.md` oriente utilisateur cree
+- [x] `CHANGELOG.md` cree
+- [x] `LICENSE` MIT cree
+- [x] `__version__ = "0.3.0"` dans `streamtex/__init__.py`
+- [x] `streamlit-ace` deplace vers `[project.optional-dependencies].inspector`
+- [x] `.github/workflows/publish.yml` cree
+- [x] Trusted Publishing configure sur PyPI
+- [x] Publication TestPyPI reussie
+- [x] Installation depuis TestPyPI validee : `pip install streamtex==0.3.0`
+- [x] Tag `v0.3.0` pousse
+- [x] Release GitHub creee → publish.yml declenche
+- [x] Publication PyPI production reussie
+- [x] `pip install streamtex` fonctionne dans un venv vierge
 
-### D.2 Phase 2 — Repo `streamtex-claude`
+### D.2 Phase 2 — Repo `streamtex-claude` (DONE 2026-03-01)
 
-- [ ] Repo GitHub `nicolasguelfi/streamtex-claude` cree
-- [ ] Structure `profiles/` avec 4 profils
-- [ ] `manifest.toml` pour chaque profil
-- [ ] `CLAUDE.md.j2` template pour chaque profil
-- [ ] `settings.json` pour chaque profil
-- [ ] `shared/references/` avec coding_standards + cheatsheet
-- [ ] `install.py` fonctionnel
-- [ ] Test : `python install.py project /tmp/test-project` → `.claude/` complet
-- [ ] Test : `python install.py presentation /tmp/test-pres` → profil project + overlay
-- [ ] Test : `python install.py library /tmp/test-lib` → profil minimal
-- [ ] Test : Claude Code fonctionne dans un projet avec profil installe
-- [ ] `README.md` avec instructions d'utilisation
+- [x] Repo GitHub `nicolasguelfi/streamtex-claude` cree
+- [x] Structure `profiles/` avec 4 profils
+- [x] `manifest.toml` pour chaque profil
+- [x] `CLAUDE.md.j2` template pour chaque profil
+- [x] `settings.json` pour chaque profil
+- [x] `shared/references/` avec coding_standards + cheatsheet
+- [x] `install.py` fonctionnel
+- [x] Test : `python install.py project /tmp/test-project` → `.claude/` complet
+- [x] Test : `python install.py presentation /tmp/test-pres` → profil project + overlay
+- [x] Test : `python install.py library /tmp/test-lib` → profil minimal
+- [x] Test : Claude Code fonctionne dans un projet avec profil installe
+- [x] `README.md` avec instructions d'utilisation
 
-### D.3 Phase 3 — Repo `streamtex-docs`
+### D.3 Phase 3 — Repo `streamtex-docs` (DONE 2026-03-02)
 
-- [ ] Repo GitHub `nicolasguelfi/streamtex-docs` cree
-- [ ] Historique Git migre avec `git-filter-repo`
-- [ ] `pyproject.toml` avec `streamtex>=0.3.0`
-- [ ] `[tool.uv.sources]` pour dev local
-- [ ] `setup.py` de chaque manual simplifie (plus de sys.path hack)
-- [ ] `uv sync` fonctionne (installe streamtex depuis PyPI ou editable)
+- [x] Repo GitHub `nicolasguelfi/streamtex-docs` cree
+- [x] Historique Git migre avec `git-filter-repo` (105 commits preserves, LFS inclus)
+- [x] `pyproject.toml` avec `streamtex>=0.3.0`
+- [x] `[tool.uv.sources]` pour dev local (editable `../streamtex`)
+- [x] `setup.py` de chaque manual mis a jour (shared-blocks cross-import)
+- [x] `uv sync` fonctionne (installe streamtex 0.3.0 editable)
 - [ ] `uv run streamlit run manuals/stx_manual_intro/book.py` fonctionne
 - [ ] `uv run streamlit run manuals/stx_manual_advanced/book.py` fonctionne
 - [ ] `uv run streamlit run manuals/stx_manual_deploy/book.py` fonctionne
 - [ ] `uv run streamlit run manuals/stx_manuals_collection/book.py` fonctionne
-- [ ] Profil Claude "documentation" installe et fonctionnel
-- [ ] `Dockerfile` simplifie (streamtex via PyPI)
-- [ ] `render.yaml` pointe vers le nouveau repo
+- [x] Profil Claude "documentation" installe et fonctionnel (19 fichiers)
+- [x] `Dockerfile` simplifie (streamtex via PyPI)
+- [x] `render.yaml` pointe vers le nouveau repo
 - [ ] Docker build + health check passent localement
 - [ ] Services Render migres un par un (ancien → nouveau repo)
 - [ ] Tous les services Render fonctionnels

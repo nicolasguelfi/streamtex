@@ -3,7 +3,7 @@
 > **Date** : 2026-03-01
 > **Auteur** : Nicolas Guelfi + Claude
 > **Version** : 2.0
-> **Statut** : En cours (Phases 1-5 DONE, Phase 6.1-6.7 DONE)
+> **Statut** : En cours (Phases 1-5 DONE, Phase 6.1-6.9 DONE)
 > **Predecesseur** : `maintenance_separation_multirepo.md` (v1.0, 2026-02-25)
 
 est-ce que à côté du dossier streamtex dans lequel nous sommes actuellement serait le bon choix ?
@@ -1991,7 +1991,7 @@ cli = [
 | 6 | `stx deploy huggingface` | 1 session | **DONE** |
 | 7 | `stx publish check/pypi` | 0.5 session | **DONE** |
 | 8 | `stx workspace link/sync` | 0.5 session | **DONE** |
-| 9 | `stx deploy status` | 0.5 session | P2 |
+| 9 | `stx deploy status` | 0.5 session | **DONE** |
 | 10 | `stx claude update/diff` | 0.5 session | P2 |
 
 ### 10.4 Tests du CLI

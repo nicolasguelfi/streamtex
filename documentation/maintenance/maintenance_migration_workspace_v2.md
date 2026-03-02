@@ -3,7 +3,7 @@
 > **Date** : 2026-03-01
 > **Auteur** : Nicolas Guelfi + Claude
 > **Version** : 2.0
-> **Statut** : En cours (Phases 1-5 DONE, Phase 6.1-6.4 DONE)
+> **Statut** : En cours (Phases 1-5 DONE, Phase 6.1-6.5 DONE)
 > **Predecesseur** : `maintenance_separation_multirepo.md` (v1.0, 2026-02-25)
 
 est-ce que à côté du dossier streamtex dans lequel nous sommes actuellement serait le bon choix ?
@@ -1987,7 +1987,7 @@ cli = [
 | 2 | `stx claude install/list` | 1 session | **DONE** |
 | 3 | `stx project new/validate` | 1 session | **DONE** |
 | 4 | `stx deploy preflight/docker` | 1 session | **DONE** |
-| 5 | `stx deploy render` | 1 session | P1 |
+| 5 | `stx deploy render` | 1 session | **DONE** |
 | 6 | `stx deploy huggingface` | 1 session | P2 |
 | 7 | `stx publish check/pypi` | 0.5 session | P1 |
 | 8 | `stx workspace link/sync` | 0.5 session | **DONE** |
@@ -2401,7 +2401,7 @@ Pour chaque projet (AI4SE, AIAI18H, MODELSWARD) :
 - [x] `stx project validate <path>` detecte les problemes
 - [x] `stx deploy preflight` execute tous les checks
 - [x] `stx deploy docker` build + run localement
-- [ ] `stx deploy render` genere render.yaml + guide
+- [x] `stx deploy render` genere render.yaml + guide
 - [ ] `stx deploy huggingface` configure LFS + README + remote
 - [ ] `stx publish check` valide la readiness PyPI
 - [ ] `stx publish pypi --test` publie sur TestPyPI

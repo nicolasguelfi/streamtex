@@ -1,6 +1,7 @@
-"""Workspace commands: init and status."""
+"""Workspace commands: init, clone, link, status, sync."""
 
 import os
+import shutil
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
@@ -21,14 +22,33 @@ name = "{name}"
 created = "{created}"
 
 [repos]
-# library = {{ path = "streamtex", url = "https://github.com/nicolasguelfi/streamtex" }}
-# docs = {{ path = "streamtex-docs", url = "https://github.com/nicolasguelfi/streamtex-docs" }}
+
+[repos.streamtex]
+url = "https://github.com/nicolasguelfi/streamtex.git"
+path = "streamtex"
+type = "library"
+
+[repos.streamtex-docs]
+url = "https://github.com/nicolasguelfi/streamtex-docs.git"
+path = "streamtex-docs"
+type = "docs"
+
+[repos.streamtex-claude]
+url = "https://github.com/nicolasguelfi/streamtex-claude.git"
+path = "streamtex-claude"
+type = "claude"
+
+# [repos.ai4se-streamtex]
+# url = "https://github.com/nicolasguelfi/ai4se-streamtex.git"
+# path = "projects/ai4se-streamtex"
+# type = "project"
 
 [deploy]
-# provider = "render"
+# render_owner = "nicolasguelfi"
+# render_region = "oregon"
 
 [claude]
-# profiles_repo = "streamtex-claude"
+source = "streamtex-claude"
 """
 
 
@@ -171,3 +191,163 @@ def status():
 
     console = get_console()
     console.print(table)
+
+
+# ---------------------------------------------------------------------------
+# Helpers for clone / link / sync
+# ---------------------------------------------------------------------------
+
+def _require_workspace() -> tuple[str, dict]:
+    """Find workspace root and load config, or raise ClickException."""
+    ws_root = find_workspace_root()
+    if ws_root is None:
+        raise click.ClickException(
+            "Not inside a StreamTeX workspace (no stx.toml found in parent directories)."
+        )
+    config = load_stx_toml(ws_root)
+    return ws_root, config
+
+
+def _find_uv() -> str:
+    """Locate the uv binary."""
+    uv = shutil.which("uv")
+    if uv is None:
+        raise click.ClickException("uv not found in PATH. Install it: https://docs.astral.sh/uv/")
+    return uv
+
+
+def _run_uv_sync(
+    repos: dict,
+    ws_root: str,
+    type_filter: set[str] | None = None,
+) -> None:
+    """Run ``uv sync`` in selected repos.
+
+    Parameters
+    ----------
+    repos:
+        The ``[repos]`` mapping from stx.toml.
+    ws_root:
+        Absolute path to the workspace root.
+    type_filter:
+        If provided, only sync repos whose *type* is in this set.
+    """
+    uv = _find_uv()
+    console = get_console()
+    synced = 0
+    skipped = 0
+
+    for repo_name, repo_conf in repos.items():
+        repo_type = repo_conf.get("type", "")
+        if type_filter and repo_type not in type_filter:
+            skipped += 1
+            continue
+
+        repo_path = os.path.join(ws_root, repo_conf.get("path", repo_name))
+        if not os.path.isdir(repo_path):
+            console.print(f"  [yellow]{repo_name}[/yellow]: not cloned — skipped")
+            skipped += 1
+            continue
+
+        # Only sync if there is a pyproject.toml
+        if not os.path.isfile(os.path.join(repo_path, "pyproject.toml")):
+            console.print(f"  [yellow]{repo_name}[/yellow]: no pyproject.toml — skipped")
+            skipped += 1
+            continue
+
+        console.print(f"  [cyan]{repo_name}[/cyan]: running uv sync …")
+        result = subprocess.run(
+            [uv, "sync"],
+            cwd=repo_path,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        if result.returncode == 0:
+            console.print(f"  [green]{repo_name}[/green]: ok")
+            synced += 1
+        else:
+            console.print(f"  [red]{repo_name}[/red]: failed")
+            if result.stderr:
+                console.print(f"    {result.stderr.strip()}")
+            skipped += 1
+
+    console.print(f"\n[bold]Done:[/bold] {synced} synced, {skipped} skipped")
+
+
+# ---------------------------------------------------------------------------
+# clone / link / sync commands
+# ---------------------------------------------------------------------------
+
+@click.command()
+def clone():
+    """Clone all repos declared in stx.toml."""
+    ws_root, config = _require_workspace()
+    repos = config.get("repos", {})
+
+    if not repos:
+        console = get_console()
+        console.print("[yellow]No repos configured in stx.toml[/yellow]")
+        return
+
+    console = get_console()
+    cloned = 0
+    skipped = 0
+
+    for repo_name, repo_conf in repos.items():
+        url = repo_conf.get("url", "")
+        rel_path = repo_conf.get("path", repo_name)
+        target_path = os.path.join(ws_root, rel_path)
+
+        if not url:
+            console.print(f"  [yellow]{repo_name}[/yellow]: no url — skipped")
+            skipped += 1
+            continue
+
+        if os.path.isdir(target_path):
+            console.print(f"  [yellow]{repo_name}[/yellow]: already exists — skipped")
+            skipped += 1
+            continue
+
+        # Ensure parent directory exists (e.g. projects/)
+        os.makedirs(os.path.dirname(target_path), exist_ok=True)
+
+        console.print(f"  [cyan]{repo_name}[/cyan]: cloning {url} …")
+        result = subprocess.run(
+            ["git", "clone", url, target_path],
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        if result.returncode == 0:
+            console.print(f"  [green]{repo_name}[/green]: cloned")
+            cloned += 1
+        else:
+            console.print(f"  [red]{repo_name}[/red]: clone failed")
+            if result.stderr:
+                console.print(f"    {result.stderr.strip()}")
+            skipped += 1
+
+    console.print(f"\n[bold]Done:[/bold] {cloned} cloned, {skipped} skipped")
+
+
+@click.command()
+def link():
+    """Configure editable installs (uv sync in docs/project repos)."""
+    ws_root, config = _require_workspace()
+    repos = config.get("repos", {})
+
+    console = get_console()
+    console.print("[bold]Linking docs & project repos …[/bold]\n")
+    _run_uv_sync(repos, ws_root, type_filter={"docs", "project"})
+
+
+@click.command()
+def sync():
+    """Run uv sync in all workspace repos."""
+    ws_root, config = _require_workspace()
+    repos = config.get("repos", {})
+
+    console = get_console()
+    console.print("[bold]Syncing all repos …[/bold]\n")
+    _run_uv_sync(repos, ws_root)

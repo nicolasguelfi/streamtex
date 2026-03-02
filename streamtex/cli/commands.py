@@ -5,8 +5,10 @@ import click
 from streamtex import __version__
 
 from .bib_cmd import generate_stubs
+from .claude_cmd import install as claude_install
+from .claude_cmd import list_cmd as claude_list
 from .shortcuts import run_lint, run_test
-from .workspace_cmd import init, status
+from .workspace_cmd import clone, init, link, status, sync
 
 
 @click.group()
@@ -40,7 +42,21 @@ def workspace():
 
 
 workspace.add_command(init)
+workspace.add_command(clone)
+workspace.add_command(link)
 workspace.add_command(status)
+workspace.add_command(sync)
+
+
+# --- Claude subgroup -------------------------------------------------------
+
+@cli.group()
+def claude():
+    """Manage Claude AI profiles."""
+
+
+claude.add_command(claude_install)
+claude.add_command(claude_list)
 
 
 # --- Bibliography subgroup -------------------------------------------------

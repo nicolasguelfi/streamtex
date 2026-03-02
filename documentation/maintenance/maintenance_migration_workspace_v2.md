@@ -3,7 +3,7 @@
 > **Date** : 2026-03-01
 > **Auteur** : Nicolas Guelfi + Claude
 > **Version** : 2.0
-> **Statut** : En cours (Phases 1-5 DONE, Phase 6 TODO)
+> **Statut** : En cours (Phases 1-5 DONE, Phase 6.1-6.4 DONE)
 > **Predecesseur** : `maintenance_separation_multirepo.md` (v1.0, 2026-02-25)
 
 est-ce que à côté du dossier streamtex dans lequel nous sommes actuellement serait le bon choix ?
@@ -1983,14 +1983,14 @@ cli = [
 
 | Etape | Commandes | Effort | Priorite |
 |-------|-----------|--------|----------|
-| 1 | `stx workspace init/clone/status` | 1 session | P0 |
-| 2 | `stx claude install/list` | 1 session | P0 |
-| 3 | `stx project new/validate` | 1 session | P0 |
-| 4 | `stx deploy preflight/docker` | 1 session | P1 |
+| 1 | `stx workspace init/clone/status` | 1 session | **DONE** |
+| 2 | `stx claude install/list` | 1 session | **DONE** |
+| 3 | `stx project new/validate` | 1 session | **DONE** |
+| 4 | `stx deploy preflight/docker` | 1 session | **DONE** |
 | 5 | `stx deploy render` | 1 session | P1 |
 | 6 | `stx deploy huggingface` | 1 session | P2 |
 | 7 | `stx publish check/pypi` | 0.5 session | P1 |
-| 8 | `stx workspace link/sync` | 0.5 session | P1 |
+| 8 | `stx workspace link/sync` | 0.5 session | **DONE** |
 | 9 | `stx deploy status` | 0.5 session | P2 |
 | 10 | `stx claude update/diff` | 0.5 session | P2 |
 
@@ -2388,19 +2388,19 @@ Pour chaque projet (AI4SE, AIAI18H, MODELSWARD) :
 
 ### D.6 Phase 6 — CLI `stx`
 
-- [ ] `streamtex/cli/` cree avec structure modulaire
-- [ ] `[project.scripts] stx = ...` dans pyproject.toml
-- [ ] `[project.optional-dependencies] cli = [...]` defini
-- [ ] `stx workspace init` fonctionne
-- [ ] `stx workspace clone` fonctionne
-- [ ] `stx workspace link` fonctionne (uv sync dans chaque repo)
-- [ ] `stx workspace status` affiche l'etat correct
-- [ ] `stx claude install <profile>` fonctionne
-- [ ] `stx claude list` affiche les 4 profils
-- [ ] `stx project new <name>` scaffolde un projet complet
-- [ ] `stx project validate <path>` detecte les problemes
-- [ ] `stx deploy preflight` execute tous les checks
-- [ ] `stx deploy docker` build + run localement
+- [x] `streamtex/cli/` cree avec structure modulaire
+- [x] `[project.scripts] stx = ...` dans pyproject.toml
+- [x] `[project.optional-dependencies] cli = [...]` defini
+- [x] `stx workspace init` fonctionne
+- [x] `stx workspace clone` fonctionne
+- [x] `stx workspace link` fonctionne (uv sync dans chaque repo)
+- [x] `stx workspace status` affiche l'etat correct
+- [x] `stx claude install <profile>` fonctionne
+- [x] `stx claude list` affiche les 4 profils
+- [x] `stx project new <name>` scaffolde un projet complet
+- [x] `stx project validate <path>` detecte les problemes
+- [x] `stx deploy preflight` execute tous les checks
+- [x] `stx deploy docker` build + run localement
 - [ ] `stx deploy render` genere render.yaml + guide
 - [ ] `stx deploy huggingface` configure LFS + README + remote
 - [ ] `stx publish check` valide la readiness PyPI

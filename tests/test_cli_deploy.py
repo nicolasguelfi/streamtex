@@ -10,6 +10,7 @@ from click.testing import CliRunner
 
 from streamtex.cli.commands import cli
 from streamtex.cli.deploy_cmd import (
+    HF_LFS_PATTERNS,
     PreflightCheck,
     derive_service_name,
     detect_git_remote,
@@ -17,10 +18,16 @@ from streamtex.cli.deploy_cmd import (
     docker_build,
     find_docker,
     generate_dockerfile,
+    generate_hf_frontmatter,
     generate_render_service,
     generate_render_yaml,
     parse_env_vars,
     run_preflight,
+    setup_hf_remote,
+    setup_lfs_tracking,
+    update_readme_frontmatter,
+    verify_git_lfs,
+    verify_hf_cli,
 )
 from streamtex.cli.project_cmd import scaffold_project
 
@@ -770,3 +777,372 @@ def test_deploy_group_shows_render():
     result = runner.invoke(cli, ["deploy", "--help"])
     assert result.exit_code == 0
     assert "render" in result.output
+
+
+# ---------------------------------------------------------------------------
+# Hugging Face: verify_git_lfs
+# ---------------------------------------------------------------------------
+
+
+def test_verify_git_lfs_found():
+    mock_result = MagicMock()
+    mock_result.returncode = 0
+    mock_result.stdout = "git-lfs/3.4.0\n"
+
+    with patch("streamtex.cli.deploy_cmd.subprocess.run", return_value=mock_result):
+        assert verify_git_lfs() is True
+
+
+def test_verify_git_lfs_missing():
+    mock_result = MagicMock()
+    mock_result.returncode = 1
+    mock_result.stdout = ""
+
+    with patch("streamtex.cli.deploy_cmd.subprocess.run", return_value=mock_result):
+        assert verify_git_lfs() is False
+
+
+# ---------------------------------------------------------------------------
+# Hugging Face: verify_hf_cli
+# ---------------------------------------------------------------------------
+
+
+def test_verify_hf_cli_authenticated():
+    mock_result = MagicMock()
+    mock_result.returncode = 0
+
+    with (
+        patch("streamtex.cli.deploy_cmd.shutil.which", return_value="/usr/bin/huggingface-cli"),
+        patch("streamtex.cli.deploy_cmd.subprocess.run", return_value=mock_result),
+    ):
+        assert verify_hf_cli() is True
+
+
+def test_verify_hf_cli_not_found():
+    with patch("streamtex.cli.deploy_cmd.shutil.which", return_value=None):
+        assert verify_hf_cli() is False
+
+
+# ---------------------------------------------------------------------------
+# Hugging Face: generate_hf_frontmatter
+# ---------------------------------------------------------------------------
+
+
+def test_generate_hf_frontmatter_defaults():
+    fm = generate_hf_frontmatter("My Project", "\U0001f4ca")
+    assert "title: My Project" in fm
+    assert "sdk: docker" in fm
+    assert "app_port: 8501" in fm
+    assert fm.startswith("---\n")
+    assert fm.endswith("---\n")
+
+
+def test_generate_hf_frontmatter_custom():
+    fm = generate_hf_frontmatter("Custom Title", "\U0001f680", app_port=9000)
+    assert "title: Custom Title" in fm
+    assert "emoji: \U0001f680" in fm
+    assert "app_port: 9000" in fm
+
+
+# ---------------------------------------------------------------------------
+# Hugging Face: update_readme_frontmatter
+# ---------------------------------------------------------------------------
+
+
+def test_update_readme_no_existing(tmp_path):
+    fm = generate_hf_frontmatter("Test", "\U0001f4ca")
+    result = update_readme_frontmatter(str(tmp_path), fm)
+    assert result is True
+    readme = (tmp_path / "README.md").read_text()
+    assert readme.startswith("---\n")
+    assert "title: Test" in readme
+
+
+def test_update_readme_existing_no_frontmatter(tmp_path):
+    (tmp_path / "README.md").write_text("# Hello World\n")
+    fm = generate_hf_frontmatter("Test", "\U0001f4ca")
+    result = update_readme_frontmatter(str(tmp_path), fm)
+    assert result is True
+    readme = (tmp_path / "README.md").read_text()
+    assert readme.startswith("---\n")
+    assert "# Hello World" in readme
+
+
+def test_update_readme_existing_with_frontmatter(tmp_path):
+    old = "---\ntitle: Old\n---\n# Hello\n"
+    (tmp_path / "README.md").write_text(old)
+    fm = generate_hf_frontmatter("New", "\U0001f680")
+    result = update_readme_frontmatter(str(tmp_path), fm)
+    assert result is True
+    readme = (tmp_path / "README.md").read_text()
+    assert "title: New" in readme
+    assert "title: Old" not in readme
+    assert "# Hello" in readme
+
+
+# ---------------------------------------------------------------------------
+# Hugging Face: setup_lfs_tracking
+# ---------------------------------------------------------------------------
+
+
+def test_setup_lfs_tracking_new_file(tmp_path):
+    result = setup_lfs_tracking(str(tmp_path))
+    assert result is True
+    ga = (tmp_path / ".gitattributes").read_text()
+    assert "*.png filter=lfs" in ga
+    assert "*.pdf filter=lfs" in ga
+
+
+def test_setup_lfs_tracking_existing_file(tmp_path):
+    (tmp_path / ".gitattributes").write_text("*.png filter=lfs diff=lfs merge=lfs -text\n")
+    result = setup_lfs_tracking(str(tmp_path))
+    assert result is True
+    ga = (tmp_path / ".gitattributes").read_text()
+    # png already exists, should not be duplicated
+    assert ga.count("*.png") == 1
+    # jpg should be added
+    assert "*.jpg filter=lfs" in ga
+
+
+def test_setup_lfs_tracking_no_change(tmp_path):
+    # Write all patterns
+    lines = [f"{p} filter=lfs diff=lfs merge=lfs -text" for p in HF_LFS_PATTERNS]
+    (tmp_path / ".gitattributes").write_text("\n".join(lines) + "\n")
+    result = setup_lfs_tracking(str(tmp_path))
+    assert result is False
+
+
+# ---------------------------------------------------------------------------
+# Hugging Face: setup_hf_remote
+# ---------------------------------------------------------------------------
+
+
+def test_setup_hf_remote_add(tmp_path):
+    calls = []
+
+    def fake_run(cmd, **kwargs):
+        calls.append(cmd)
+        r = MagicMock()
+        if "get-url" in cmd:
+            r.returncode = 1  # remote doesn't exist yet
+        else:
+            r.returncode = 0
+        return r
+
+    with patch("streamtex.cli.deploy_cmd.subprocess.run", side_effect=fake_run):
+        setup_hf_remote(str(tmp_path), "https://huggingface.co/spaces/user/repo")
+
+    # Should have called get-url then add
+    add_call = [c for c in calls if "add" in c]
+    assert len(add_call) == 1
+    assert "https://huggingface.co/spaces/user/repo.git" in add_call[0]
+
+
+def test_setup_hf_remote_set_url(tmp_path):
+    calls = []
+
+    def fake_run(cmd, **kwargs):
+        calls.append(cmd)
+        r = MagicMock()
+        r.returncode = 0  # remote already exists
+        return r
+
+    with patch("streamtex.cli.deploy_cmd.subprocess.run", side_effect=fake_run):
+        setup_hf_remote(str(tmp_path), "https://huggingface.co/spaces/user/repo")
+
+    set_url_call = [c for c in calls if "set-url" in c]
+    assert len(set_url_call) == 1
+
+
+# ---------------------------------------------------------------------------
+# Hugging Face: Click command
+# ---------------------------------------------------------------------------
+
+
+def test_huggingface_command_help():
+    runner = CliRunner()
+    result = runner.invoke(cli, ["deploy", "huggingface", "--help"])
+    assert result.exit_code == 0
+    assert "--space" in result.output
+    assert "--title" in result.output
+    assert "--emoji" in result.output
+    assert "--skip-push" in result.output
+
+
+def test_deploy_group_shows_huggingface():
+    runner = CliRunner()
+    result = runner.invoke(cli, ["deploy", "--help"])
+    assert result.exit_code == 0
+    assert "huggingface" in result.output
+
+
+def test_huggingface_command_success(tmp_path):
+    proj = _make_deploy_project(tmp_path)
+    (proj / "Dockerfile").write_text("FROM python:3.13-slim\n")
+
+    # Init git
+    subprocess.run(["git", "init", str(proj)], capture_output=True)
+    subprocess.run(["git", "-C", str(proj), "add", "."], capture_output=True)
+    subprocess.run(
+        ["git", "-C", str(proj), "commit", "-m", "init"],
+        capture_output=True,
+        env={**os.environ, "GIT_AUTHOR_NAME": "test", "GIT_AUTHOR_EMAIL": "t@t",
+             "GIT_COMMITTER_NAME": "test", "GIT_COMMITTER_EMAIL": "t@t"},
+    )
+
+    runner = CliRunner()
+    with (
+        patch("streamtex.cli.deploy_cmd.verify_git_lfs", return_value=True),
+        patch("streamtex.cli.deploy_cmd.verify_hf_cli", return_value=True),
+        patch("streamtex.cli.deploy_cmd.setup_hf_remote"),
+        patch("streamtex.cli.deploy_cmd.subprocess.run") as mock_run,
+    ):
+        # Make subprocess calls succeed (for git add/commit/push)
+        mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
+        result = runner.invoke(
+            cli, ["deploy", "huggingface", str(proj),
+                  "--space", "https://huggingface.co/spaces/user/repo"]
+        )
+
+    assert result.exit_code == 0, result.output
+    assert "Space URL" in result.output
+
+
+def test_huggingface_command_skip_push(tmp_path):
+    proj = _make_deploy_project(tmp_path)
+    (proj / "Dockerfile").write_text("FROM python:3.13-slim\n")
+
+    subprocess.run(["git", "init", str(proj)], capture_output=True)
+    subprocess.run(["git", "-C", str(proj), "add", "."], capture_output=True)
+    subprocess.run(
+        ["git", "-C", str(proj), "commit", "-m", "init"],
+        capture_output=True,
+        env={**os.environ, "GIT_AUTHOR_NAME": "test", "GIT_AUTHOR_EMAIL": "t@t",
+             "GIT_COMMITTER_NAME": "test", "GIT_COMMITTER_EMAIL": "t@t"},
+    )
+
+    push_called = []
+
+    runner = CliRunner()
+    with (
+        patch("streamtex.cli.deploy_cmd.verify_git_lfs", return_value=True),
+        patch("streamtex.cli.deploy_cmd.verify_hf_cli", return_value=True),
+        patch("streamtex.cli.deploy_cmd.setup_hf_remote"),
+    ):
+        result = runner.invoke(
+            cli, ["deploy", "huggingface", str(proj),
+                  "--space", "https://huggingface.co/spaces/user/repo",
+                  "--skip-push"]
+        )
+
+    assert result.exit_code == 0, result.output
+    assert "Skip-push mode" in result.output
+    assert "Pushed" not in result.output
+
+
+def test_huggingface_command_generates_dockerfile(tmp_path):
+    proj = _make_deploy_project(tmp_path)
+    # No Dockerfile
+
+    subprocess.run(["git", "init", str(proj)], capture_output=True)
+    subprocess.run(["git", "-C", str(proj), "add", "."], capture_output=True)
+    subprocess.run(
+        ["git", "-C", str(proj), "commit", "-m", "init"],
+        capture_output=True,
+        env={**os.environ, "GIT_AUTHOR_NAME": "test", "GIT_AUTHOR_EMAIL": "t@t",
+             "GIT_COMMITTER_NAME": "test", "GIT_COMMITTER_EMAIL": "t@t"},
+    )
+
+    runner = CliRunner()
+    with (
+        patch("streamtex.cli.deploy_cmd.verify_git_lfs", return_value=True),
+        patch("streamtex.cli.deploy_cmd.verify_hf_cli", return_value=True),
+        patch("streamtex.cli.deploy_cmd.setup_hf_remote"),
+    ):
+        result = runner.invoke(
+            cli, ["deploy", "huggingface", str(proj),
+                  "--space", "https://huggingface.co/spaces/user/repo",
+                  "--skip-push"]
+        )
+
+    assert result.exit_code == 0, result.output
+    assert "Dockerfile generated" in result.output
+    assert (proj / "Dockerfile").is_file()
+
+
+def test_huggingface_command_preflight_fails(tmp_path):
+    empty = tmp_path / "empty"
+    empty.mkdir()
+
+    runner = CliRunner()
+    result = runner.invoke(
+        cli, ["deploy", "huggingface", str(empty),
+              "--space", "https://huggingface.co/spaces/user/repo",
+              "--skip-push"]
+    )
+    assert result.exit_code != 0
+    assert "Preflight failed" in result.output
+
+
+def test_huggingface_command_generates_frontmatter(tmp_path):
+    proj = _make_deploy_project(tmp_path)
+    (proj / "Dockerfile").write_text("FROM python:3.13-slim\n")
+
+    subprocess.run(["git", "init", str(proj)], capture_output=True)
+    subprocess.run(["git", "-C", str(proj), "add", "."], capture_output=True)
+    subprocess.run(
+        ["git", "-C", str(proj), "commit", "-m", "init"],
+        capture_output=True,
+        env={**os.environ, "GIT_AUTHOR_NAME": "test", "GIT_AUTHOR_EMAIL": "t@t",
+             "GIT_COMMITTER_NAME": "test", "GIT_COMMITTER_EMAIL": "t@t"},
+    )
+
+    runner = CliRunner()
+    with (
+        patch("streamtex.cli.deploy_cmd.verify_git_lfs", return_value=True),
+        patch("streamtex.cli.deploy_cmd.verify_hf_cli", return_value=True),
+        patch("streamtex.cli.deploy_cmd.setup_hf_remote"),
+    ):
+        result = runner.invoke(
+            cli, ["deploy", "huggingface", str(proj),
+                  "--space", "https://huggingface.co/spaces/user/repo",
+                  "--skip-push"]
+        )
+
+    assert result.exit_code == 0, result.output
+    readme = (proj / "README.md").read_text()
+    assert "sdk: docker" in readme
+    assert "app_port: 8501" in readme
+
+
+def test_huggingface_command_custom_title_emoji(tmp_path):
+    proj = _make_deploy_project(tmp_path)
+    (proj / "Dockerfile").write_text("FROM python:3.13-slim\n")
+
+    subprocess.run(["git", "init", str(proj)], capture_output=True)
+    subprocess.run(["git", "-C", str(proj), "add", "."], capture_output=True)
+    subprocess.run(
+        ["git", "-C", str(proj), "commit", "-m", "init"],
+        capture_output=True,
+        env={**os.environ, "GIT_AUTHOR_NAME": "test", "GIT_AUTHOR_EMAIL": "t@t",
+             "GIT_COMMITTER_NAME": "test", "GIT_COMMITTER_EMAIL": "t@t"},
+    )
+
+    runner = CliRunner()
+    with (
+        patch("streamtex.cli.deploy_cmd.verify_git_lfs", return_value=True),
+        patch("streamtex.cli.deploy_cmd.verify_hf_cli", return_value=True),
+        patch("streamtex.cli.deploy_cmd.setup_hf_remote"),
+    ):
+        result = runner.invoke(
+            cli, ["deploy", "huggingface", str(proj),
+                  "--space", "https://huggingface.co/spaces/user/repo",
+                  "--title", "My Custom Title",
+                  "--emoji", "\U0001f680",
+                  "--skip-push"]
+        )
+
+    assert result.exit_code == 0, result.output
+    readme = (proj / "README.md").read_text()
+    assert "title: My Custom Title" in readme
+    assert "emoji: \U0001f680" in readme

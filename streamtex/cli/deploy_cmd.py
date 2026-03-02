@@ -1,4 +1,4 @@
-"""Deploy commands: preflight, docker, and render."""
+"""Deploy commands: preflight, docker, render, and huggingface."""
 
 import glob
 import os
@@ -341,6 +341,160 @@ def generate_render_yaml(services: list[str]) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Hugging Face helpers
+# ---------------------------------------------------------------------------
+
+HF_LFS_PATTERNS = [
+    "*.png", "*.jpg", "*.jpeg", "*.gif", "*.bmp", "*.svg", "*.webp",
+    "*.mp4", "*.mp3", "*.wav", "*.ogg",
+    "*.pdf", "*.zip", "*.tar.gz",
+    "*.woff", "*.woff2", "*.ttf", "*.otf",
+]
+
+
+def verify_git_lfs() -> bool:
+    """Check that ``git lfs`` is installed.
+
+    Returns ``True`` when ``git lfs version`` succeeds.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "lfs", "version"],
+            capture_output=True, text=True, timeout=10,
+        )
+        return result.returncode == 0
+    except (subprocess.TimeoutExpired, OSError):
+        return False
+
+
+def verify_hf_cli() -> bool:
+    """Check that ``huggingface-cli`` is installed and authenticated.
+
+    Returns ``True`` when ``huggingface-cli whoami`` succeeds.
+    """
+    hf = shutil.which("huggingface-cli")
+    if hf is None:
+        return False
+    try:
+        result = subprocess.run(
+            [hf, "whoami"],
+            capture_output=True, text=True, timeout=10,
+        )
+        return result.returncode == 0
+    except (subprocess.TimeoutExpired, OSError):
+        return False
+
+
+def setup_lfs_tracking(project_path: str) -> bool:
+    """Write/update ``.gitattributes`` with LFS patterns for heavy assets.
+
+    Returns ``True`` if the file was modified.
+    """
+    ga_path = os.path.join(project_path, ".gitattributes")
+    existing_lines: list[str] = []
+    if os.path.isfile(ga_path):
+        with open(ga_path, encoding="utf-8") as f:
+            existing_lines = f.read().splitlines()
+
+    new_lines: list[str] = []
+    for pattern in HF_LFS_PATTERNS:
+        entry = f"{pattern} filter=lfs diff=lfs merge=lfs -text"
+        if not any(line.startswith(f"{pattern} ") for line in existing_lines):
+            new_lines.append(entry)
+
+    if not new_lines:
+        return False
+
+    with open(ga_path, "a", encoding="utf-8") as f:
+        if existing_lines and existing_lines[-1] != "":
+            f.write("\n")
+        f.write("\n".join(new_lines) + "\n")
+    return True
+
+
+def generate_hf_frontmatter(
+    title: str,
+    emoji: str,
+    app_port: int = 8501,
+) -> str:
+    """Generate YAML front-matter for a Hugging Face Space README."""
+    return (
+        "---\n"
+        f"title: {title}\n"
+        f"emoji: {emoji}\n"
+        "colorFrom: blue\n"
+        "colorTo: indigo\n"
+        "sdk: docker\n"
+        f"app_port: {app_port}\n"
+        "pinned: false\n"
+        "---\n"
+    )
+
+
+def update_readme_frontmatter(project_path: str, frontmatter: str) -> bool:
+    """Insert or replace YAML front-matter in the project ``README.md``.
+
+    Returns ``True`` if the file was created or modified.
+    """
+    readme_path = os.path.join(project_path, "README.md")
+
+    if not os.path.isfile(readme_path):
+        title = os.path.basename(os.path.abspath(project_path))
+        with open(readme_path, "w", encoding="utf-8") as f:
+            f.write(frontmatter + f"\n# {title}\n")
+        return True
+
+    with open(readme_path, encoding="utf-8") as f:
+        content = f.read()
+
+    # Detect existing front-matter delimited by ---
+    if content.startswith("---\n"):
+        end = content.find("\n---\n", 4)
+        if end != -1:
+            # Replace existing front-matter (including closing ---)
+            new_content = frontmatter + content[end + 5:]
+        else:
+            # Malformed: only opening ---, replace first line
+            new_content = frontmatter + content
+    else:
+        new_content = frontmatter + "\n" + content
+
+    if new_content == content:
+        return False
+
+    with open(readme_path, "w", encoding="utf-8") as f:
+        f.write(new_content)
+    return True
+
+
+def setup_hf_remote(project_path: str, space_url: str) -> None:
+    """Add or update a ``hf`` git remote pointing to the HF Space repo.
+
+    Converts ``https://huggingface.co/spaces/user/repo`` to
+    ``https://huggingface.co/spaces/user/repo`` (git clone URL is the same).
+    """
+    url = space_url.rstrip("/")
+    if not url.endswith(".git"):
+        url = url + ".git"
+
+    # Check if remote already exists
+    result = subprocess.run(
+        ["git", "-C", project_path, "remote", "get-url", "hf"],
+        capture_output=True, text=True, timeout=10,
+    )
+    if result.returncode == 0:
+        subprocess.run(
+            ["git", "-C", project_path, "remote", "set-url", "hf", url],
+            capture_output=True, text=True, timeout=10,
+        )
+    else:
+        subprocess.run(
+            ["git", "-C", project_path, "remote", "add", "hf", url],
+            capture_output=True, text=True, timeout=10,
+        )
+
+
+# ---------------------------------------------------------------------------
 # Docker helpers
 # ---------------------------------------------------------------------------
 
@@ -561,3 +715,90 @@ def render_cmd(
     console.print("  1. Review render.yaml and update STX_PASSWORD")
     console.print("  2. git add render.yaml Dockerfile && git commit && git push")
     console.print("  3. Connect your repo on https://dashboard.render.com")
+
+
+@click.command("huggingface")
+@click.argument("path", default=".")
+@click.option(
+    "--space", required=True,
+    help="HF Space URL (https://huggingface.co/spaces/user/repo).",
+)
+@click.option("--title", default=None, help="Space title (defaults to directory name).")
+@click.option("--emoji", default="\U0001f4ca", help="Space emoji.")
+@click.option("--skip-push", is_flag=True, help="Prepare without pushing to HF.")
+def huggingface_cmd(
+    path: str,
+    space: str,
+    title: str | None,
+    emoji: str,
+    skip_push: bool,
+) -> None:
+    """Deploy a StreamTeX project to Hugging Face Spaces."""
+    console = get_console()
+    p = os.path.abspath(path)
+
+    # 1. Preflight (skip tests/lint for speed)
+    checks = run_preflight(p, skip_tests=True, skip_lint=True)
+    fails = [c for c in checks if c.status == "fail"]
+    if fails:
+        for c in fails:
+            console.print(f"  [red]\u2717 {c.name}[/red]: {c.message}")
+        raise click.ClickException(
+            "Preflight failed. Run 'stx deploy preflight' for details."
+        )
+
+    # 2. Verify git-lfs
+    if not verify_git_lfs():
+        console.print("[yellow]\u26a0 git-lfs not found — large files may not be tracked[/yellow]")
+
+    # 3. Verify huggingface-cli
+    if not verify_hf_cli():
+        console.print(
+            "[yellow]\u26a0 huggingface-cli not found or not authenticated[/yellow]"
+        )
+
+    # 4. Generate Dockerfile if missing
+    dockerfile_path = os.path.join(p, "Dockerfile")
+    if not os.path.isfile(dockerfile_path):
+        content = generate_dockerfile()
+        with open(dockerfile_path, "w", encoding="utf-8") as f:
+            f.write(content)
+        console.print("[green]Dockerfile generated[/green]")
+
+    # 5. Setup LFS tracking
+    if setup_lfs_tracking(p):
+        console.print("[green].gitattributes updated with LFS patterns[/green]")
+
+    # 6. Generate/update README front-matter
+    space_title = title or os.path.basename(p)
+    fm = generate_hf_frontmatter(space_title, emoji)
+    if update_readme_frontmatter(p, fm):
+        console.print("[green]README.md front-matter updated[/green]")
+
+    # 7. Setup remote hf
+    setup_hf_remote(p, space)
+    console.print(f"[green]Git remote 'hf' set to {space}[/green]")
+
+    # 8. Push (unless --skip-push)
+    if not skip_push:
+        subprocess.run(
+            ["git", "-C", p, "add", "."],
+            capture_output=True, text=True, timeout=30,
+        )
+        subprocess.run(
+            ["git", "-C", p, "commit", "-m", "Deploy to HF Spaces"],
+            capture_output=True, text=True, timeout=30,
+        )
+        result = subprocess.run(
+            ["git", "-C", p, "push", "hf", "main"],
+            capture_output=True, text=True, timeout=120,
+        )
+        if result.returncode != 0:
+            console.print(f"[red]Push failed:[/red] {result.stderr.strip()}")
+            raise click.ClickException("git push to HF Spaces failed.")
+        console.print("[bold green]Pushed to Hugging Face Spaces![/bold green]")
+    else:
+        console.print("[cyan]Skip-push mode — files prepared but not pushed[/cyan]")
+
+    # 9. Show Space URL
+    console.print(f"\n[bold cyan]Space URL:[/bold cyan] {space}")

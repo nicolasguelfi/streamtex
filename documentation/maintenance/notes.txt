@@ -37,3 +37,9 @@ J'ai déjà fais les étapes 1,2 et trois mais pas les autres.
 Peux-tu le faire avec moi ?
 
 Peux-tu me faire des recommandations concernant les trois écarts que tu as identifiés ?
+
+La dernière fois que j'ai essayé de déployer sur Render, Peux-tu vérifier qu'il y a eu des modifications pour corriger cela et réessayer un redéploiement pour tous les projets
+
+Pour info, j'ai une barrière d'environnement avec le to pypi Qui s'appelle PYPI_TOKEN
+Est-ce que cela serait mieux ?
+Est-ce que je dois renommer le Nom du Token

@@ -49,7 +49,7 @@ source = "streamtex-claude"
     project = claude / "profiles" / "project"
     project.mkdir(parents=True)
     (project / "manifest.toml").write_text(
-        'description = "Project profile for StreamTeX apps"\n'
+        '[profile]\nname = "project"\ndescription = "Project profile for StreamTeX apps"\n'
     )
     commands_dir = project / "commands" / "developer"
     commands_dir.mkdir(parents=True)
@@ -60,7 +60,7 @@ source = "streamtex-claude"
     library = claude / "profiles" / "library"
     library.mkdir(parents=True)
     (library / "manifest.toml").write_text(
-        'description = "Library profile for streamtex core"\n'
+        '[profile]\nname = "library"\ndescription = "Library profile for streamtex core"\n'
     )
 
     # Shared references

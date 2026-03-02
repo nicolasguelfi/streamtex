@@ -68,7 +68,7 @@ def list_profiles(claude_repo: str) -> list[dict]:
         if os.path.isfile(manifest_path):
             with open(manifest_path, "rb") as f:
                 manifest = tomllib.load(f)
-            info["description"] = manifest.get("description", "")
+            info["description"] = manifest.get("profile", {}).get("description", "")
 
         # Count files recursively
         count = 0

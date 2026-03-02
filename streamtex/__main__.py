@@ -1,18 +1,34 @@
 """CLI entry point for StreamTeX utilities.
 
-Usage:
+Usage (with CLI deps installed):
+    uv run stx --help
+    uv run python -m streamtex --help
+
+Fallback (without click/rich):
     uv run python -m streamtex generate-stubs refs.bib [-o custom/bib_refs.py]
-    uv run python -m streamtex --generate-stubs refs.bib [-o custom/bib_refs.py]
 """
 
-import argparse
 import sys
 
 
 def main():
+    # If click is available, delegate to the full CLI
+    try:
+        from streamtex.cli.main import app
+        app()
+        return
+    except ImportError:
+        pass
+
+    # Fallback: argparse for generate-stubs only (retro-compat)
+    import argparse
+
     parser = argparse.ArgumentParser(
         prog="streamtex",
-        description="StreamTeX command-line utilities",
+        description=(
+            "StreamTeX command-line utilities.\n\n"
+            "For the full CLI, install optional deps: uv add streamtex[cli]"
+        ),
     )
     sub = parser.add_subparsers(dest="command")
 

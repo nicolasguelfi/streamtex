@@ -12,6 +12,8 @@ from .deploy_cmd import preflight as deploy_preflight
 from .deploy_cmd import render_cmd as deploy_render
 from .project_cmd import new as project_new
 from .project_cmd import validate as project_validate
+from .publish_cmd import check_cmd as publish_check
+from .publish_cmd import pypi_cmd as publish_pypi
 from .shortcuts import run_lint, run_test
 from .workspace_cmd import clone, init, link, status, sync
 
@@ -95,3 +97,14 @@ def deploy():
 deploy.add_command(deploy_preflight)
 deploy.add_command(deploy_docker)
 deploy.add_command(deploy_render)
+
+
+# --- Publish subgroup ------------------------------------------------------
+
+@cli.group()
+def publish():
+    """Publish StreamTeX to PyPI."""
+
+
+publish.add_command(publish_check)
+publish.add_command(publish_pypi)

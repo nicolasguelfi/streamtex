@@ -3,7 +3,7 @@
 > **Date** : 2026-03-01
 > **Auteur** : Nicolas Guelfi + Claude
 > **Version** : 2.0
-> **Statut** : En cours (Phases 1-3 DONE, Phase 4+ a faire)
+> **Statut** : En cours (Phases 1-5 DONE, Phase 6 TODO)
 > **Predecesseur** : `maintenance_separation_multirepo.md` (v1.0, 2026-02-25)
 
 est-ce que à côté du dossier streamtex dans lequel nous sommes actuellement serait le bon choix ?
@@ -21,7 +21,7 @@ est-ce que à côté du dossier streamtex dans lequel nous sommes actuellement s
 6. [Phase 2 : Repo `streamtex-claude` — DONE](#6-phase-2--repo-streamtex-claude--done-2026-03-01)
 7. [Phase 3 : Separation repo `streamtex-docs` — DONE](#7-phase-3--separation-repo-streamtex-docs--done-2026-03-02-commit-1cf89a6)
 8. [Phase 4 : Autonomisation des projets](#8-phase-4--autonomisation-des-projets)
-9. [Phase 5 : Nettoyage du repo librairie](#9-phase-5--nettoyage-du-repo-librairie)
+9. [Phase 5 : Nettoyage du repo librairie — DONE](#9-phase-5--nettoyage-du-repo-librairie--done-2026-03-02-commit-7fd7d4f)
 10. [Phase 6 : Script CLI `stx` et workspace](#10-phase-6--script-cli-stx-et-workspace)
 11. [Matrice des risques](#11-matrice-des-risques)
 12. [Calendrier recommande](#12-calendrier-recommande)
@@ -1875,7 +1875,7 @@ Avec le free tier et le sleep a 15 minutes, 5 services consomment environ 250h/m
 
 ---
 
-## 9. Phase 5 : Nettoyage du repo librairie
+## 9. Phase 5 : Nettoyage du repo librairie — DONE (2026-03-02, commit 7fd7d4f)
 
 ### 9.1 Objectif
 
@@ -2042,8 +2042,8 @@ def test_preflight_missing_book(tmp_path):
 Phase 1: PyPI              ████████████████  DONE (2026-03-01, commit c7d6d8d)
 Phase 2: streamtex-claude  ████████████████  DONE (2026-03-01)
 Phase 3: streamtex-docs    ████████████████  DONE (2026-03-02, commit 1cf89a6)
-Phase 4: Projets           ░░░░░░░░████████  1 session/projet
-Phase 5: Nettoyage lib     ░░░░░░░░░░░░████  1 session
+Phase 4: Projets           ████████████████  DONE (2026-03-02)
+Phase 5: Nettoyage lib     ████████████████  DONE (2026-03-02, commit 7fd7d4f)
 Phase 6: CLI stx           ████████████████  Continu (incremental, 4-6 sessions total)
 ```
 
@@ -2365,23 +2365,26 @@ Pour chaque projet (AI4SE, AIAI18H, MODELSWARD) :
 - [ ] Premier commit + push reussi
 - [ ] (Si Render) : `render.yaml` cree et service deploye
 
-### D.5 Phase 5 — Nettoyage librairie
+### D.5 Phase 5 — Nettoyage librairie (DONE 2026-03-02)
 
-- [ ] `projects/` supprime du repo librairie
-- [ ] `documentation/manuals/` supprime
-- [ ] `documentation/template_*/` supprime
-- [ ] `documentation/coding_standards.md` supprime (existe dans streamtex-claude + streamtex-docs)
-- [ ] `documentation/streamtex_cheatsheet_*.md` supprime (idem)
-- [ ] `.claude/` reduit au profil "library"
-- [ ] `CLAUDE.md` reecrit pour le profil library
-- [ ] `docker-compose.yml` supprime
-- [ ] `render.yaml` (racine) supprime
-- [ ] `collection.toml` (racine) supprime
-- [ ] `run-test-projects.sh` supprime
-- [ ] `deploy/` archive ou integre dans CLI
-- [ ] Tests passent : `uv run pytest tests/ -v`
-- [ ] Lint propre : `uv run ruff check streamtex/`
-- [ ] CI/CD fonctionne
+- [x] `projects/` supprime du repo librairie
+- [x] `documentation/manuals/` supprime
+- [x] `documentation/template_*/` supprime
+- [x] `documentation/coding_standards.md` supprime (existe dans streamtex-claude + streamtex-docs)
+- [x] `documentation/streamtex_cheatsheet_*.md` supprime (idem)
+- [x] `.claude/` reduit au profil "library" (9 fichiers)
+- [x] `CLAUDE.md` reecrit pour le profil library
+- [x] `docker-compose.yml` supprime
+- [x] `render.yaml` (racine) supprime
+- [x] `collection.toml` (racine) supprime
+- [x] `run-test-projects.sh` supprime
+- [x] `deploy/` supprime
+- [x] `.cursor/` supprime (regles migrees vers streamtex-claude)
+- [x] `ci.yml` simplifie (job Docker build supprime)
+- [x] `.gitignore` et `.dockerignore` nettoyes
+- [x] Tests passent : `uv run pytest tests/ -v` (917 tests)
+- [x] Lint propre : `uv run ruff check streamtex/`
+- [x] CI/CD fonctionne
 
 ### D.6 Phase 6 — CLI `stx`
 

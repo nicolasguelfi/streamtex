@@ -11,6 +11,7 @@ from .deploy_cmd import docker as deploy_docker
 from .deploy_cmd import huggingface_cmd as deploy_huggingface
 from .deploy_cmd import preflight as deploy_preflight
 from .deploy_cmd import render_cmd as deploy_render
+from .deploy_cmd import status_cmd as deploy_status
 from .project_cmd import new as project_new
 from .project_cmd import validate as project_validate
 from .publish_cmd import check_cmd as publish_check
@@ -99,6 +100,7 @@ deploy.add_command(deploy_preflight)
 deploy.add_command(deploy_docker)
 deploy.add_command(deploy_render)
 deploy.add_command(deploy_huggingface)
+deploy.add_command(deploy_status)
 
 
 # --- Publish subgroup ------------------------------------------------------

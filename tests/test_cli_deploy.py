@@ -1,7 +1,9 @@
-"""Tests for stx deploy preflight/docker/render commands."""
+"""Tests for stx deploy preflight/docker/render/huggingface/status commands."""
 
+import json
 import os
 import subprocess
+import urllib.error
 from unittest.mock import MagicMock, patch
 
 import click
@@ -10,8 +12,11 @@ from click.testing import CliRunner
 
 from streamtex.cli.commands import cli
 from streamtex.cli.deploy_cmd import (
+    DeployStatus,
     HF_LFS_PATTERNS,
     PreflightCheck,
+    check_hf_status,
+    check_render_status,
     derive_service_name,
     detect_git_remote,
     discover_manuals,
@@ -21,7 +26,11 @@ from streamtex.cli.deploy_cmd import (
     generate_hf_frontmatter,
     generate_render_service,
     generate_render_yaml,
+    http_probe,
     parse_env_vars,
+    parse_hf_remote,
+    parse_render_yaml_services,
+    render_service_url,
     run_preflight,
     setup_hf_remote,
     setup_lfs_tracking,
@@ -1146,3 +1155,240 @@ def test_huggingface_command_custom_title_emoji(tmp_path):
     readme = (proj / "README.md").read_text()
     assert "title: My Custom Title" in readme
     assert "emoji: \U0001f680" in readme
+
+
+# ---------------------------------------------------------------------------
+# Deploy status: render_service_url
+# ---------------------------------------------------------------------------
+
+
+def test_render_service_url():
+    assert render_service_url("my-app") == "https://my-app.onrender.com"
+
+
+def test_render_service_url_with_dash():
+    assert render_service_url("streamtex-intro") == "https://streamtex-intro.onrender.com"
+
+
+# ---------------------------------------------------------------------------
+# Deploy status: parse_render_yaml_services
+# ---------------------------------------------------------------------------
+
+
+def test_parse_render_yaml_finds_services(tmp_path):
+    yaml_content = """\
+services:
+  - type: web
+    name: streamtex-intro
+    runtime: docker
+  - type: web
+    name: streamtex-advanced
+    runtime: docker
+"""
+    (tmp_path / "render.yaml").write_text(yaml_content)
+    result = parse_render_yaml_services(str(tmp_path))
+    assert result == ["streamtex-advanced", "streamtex-intro"]
+
+
+def test_parse_render_yaml_no_file(tmp_path):
+    result = parse_render_yaml_services(str(tmp_path))
+    assert result == []
+
+
+def test_parse_render_yaml_empty_file(tmp_path):
+    (tmp_path / "render.yaml").write_text("")
+    result = parse_render_yaml_services(str(tmp_path))
+    assert result == []
+
+
+# ---------------------------------------------------------------------------
+# Deploy status: http_probe
+# ---------------------------------------------------------------------------
+
+
+def test_http_probe_live():
+    mock_resp = MagicMock()
+    mock_resp.status = 200
+    mock_resp.__enter__ = lambda s: s
+    mock_resp.__exit__ = MagicMock(return_value=False)
+
+    with patch("streamtex.cli.deploy_cmd.urllib.request.urlopen", return_value=mock_resp):
+        status, msg = http_probe("https://example.onrender.com")
+    assert status == "live"
+    assert "200" in msg
+
+
+def test_http_probe_sleep_502():
+    err = urllib.error.HTTPError(
+        "https://example.com", 502, "Bad Gateway", {}, None
+    )
+    with patch("streamtex.cli.deploy_cmd.urllib.request.urlopen", side_effect=err):
+        status, msg = http_probe("https://example.com")
+    assert status == "sleep"
+    assert "502" in msg
+
+
+def test_http_probe_down_404():
+    err = urllib.error.HTTPError(
+        "https://example.com", 404, "Not Found", {}, None
+    )
+    with patch("streamtex.cli.deploy_cmd.urllib.request.urlopen", side_effect=err):
+        status, msg = http_probe("https://example.com")
+    assert status == "down"
+    assert "404" in msg
+
+
+def test_http_probe_timeout():
+    err = urllib.error.URLError("timed out")
+    with patch("streamtex.cli.deploy_cmd.urllib.request.urlopen", side_effect=err):
+        status, msg = http_probe("https://example.com")
+    assert status == "sleep"
+    assert "Timeout" in msg
+
+
+def test_http_probe_error():
+    err = OSError("Connection refused")
+    with patch("streamtex.cli.deploy_cmd.urllib.request.urlopen", side_effect=err):
+        status, msg = http_probe("https://example.com")
+    assert status == "error"
+    assert "Connection refused" in msg
+
+
+# ---------------------------------------------------------------------------
+# Deploy status: parse_hf_remote
+# ---------------------------------------------------------------------------
+
+
+def test_parse_hf_remote_found(tmp_path):
+    mock_result = MagicMock()
+    mock_result.returncode = 0
+    mock_result.stdout = "https://huggingface.co/spaces/myuser/myrepo.git\n"
+
+    with patch("streamtex.cli.deploy_cmd.subprocess.run", return_value=mock_result):
+        result = parse_hf_remote(str(tmp_path))
+    assert result == "myuser/myrepo"
+
+
+def test_parse_hf_remote_not_found(tmp_path):
+    mock_result = MagicMock()
+    mock_result.returncode = 1
+    mock_result.stdout = ""
+
+    with patch("streamtex.cli.deploy_cmd.subprocess.run", return_value=mock_result):
+        result = parse_hf_remote(str(tmp_path))
+    assert result is None
+
+
+# ---------------------------------------------------------------------------
+# Deploy status: check_render_status
+# ---------------------------------------------------------------------------
+
+
+def test_check_render_status_single_name():
+    with patch(
+        "streamtex.cli.deploy_cmd.http_probe",
+        return_value=("live", "HTTP 200"),
+    ):
+        results = check_render_status("/tmp", name="my-app")
+    assert len(results) == 1
+    assert results[0].name == "my-app"
+    assert results[0].status == "live"
+    assert "onrender.com" in results[0].url
+
+
+def test_check_render_status_from_render_yaml(tmp_path):
+    yaml_content = """\
+services:
+  - type: web
+    name: streamtex-intro
+    runtime: docker
+"""
+    (tmp_path / "render.yaml").write_text(yaml_content)
+
+    with patch(
+        "streamtex.cli.deploy_cmd.http_probe",
+        return_value=("sleep", "HTTP 502 — service may be waking up"),
+    ):
+        results = check_render_status(str(tmp_path))
+    assert len(results) == 1
+    assert results[0].name == "streamtex-intro"
+    assert results[0].status == "sleep"
+
+
+# ---------------------------------------------------------------------------
+# Deploy status: check_hf_status
+# ---------------------------------------------------------------------------
+
+
+def test_check_hf_status_with_name():
+    resp_data = json.dumps({"runtime": {"stage": "RUNNING"}}).encode()
+    mock_resp = MagicMock()
+    mock_resp.read.return_value = resp_data
+    mock_resp.__enter__ = lambda s: s
+    mock_resp.__exit__ = MagicMock(return_value=False)
+
+    with patch("streamtex.cli.deploy_cmd.urllib.request.urlopen", return_value=mock_resp):
+        results = check_hf_status("/tmp", name="user/repo")
+    assert len(results) == 1
+    assert results[0].status == "live"
+    assert results[0].name == "user/repo"
+    assert "huggingface.co" in results[0].url
+
+
+def test_check_hf_status_no_remote(tmp_path):
+    mock_result = MagicMock()
+    mock_result.returncode = 1
+    mock_result.stdout = ""
+
+    with patch("streamtex.cli.deploy_cmd.subprocess.run", return_value=mock_result):
+        results = check_hf_status(str(tmp_path))
+    assert len(results) == 1
+    assert results[0].status == "error"
+    assert "No HF Space found" in results[0].message
+
+
+# ---------------------------------------------------------------------------
+# Deploy status: Click command
+# ---------------------------------------------------------------------------
+
+
+def test_status_command_help():
+    runner = CliRunner()
+    result = runner.invoke(cli, ["deploy", "status", "--help"])
+    assert result.exit_code == 0
+    assert "render" in result.output
+    assert "huggingface" in result.output
+    assert "--path" in result.output
+    assert "--timeout" in result.output
+
+
+def test_status_command_render():
+    runner = CliRunner()
+    with patch(
+        "streamtex.cli.deploy_cmd.check_render_status",
+        return_value=[
+            DeployStatus(name="my-app", status="live", url="https://my-app.onrender.com", message="HTTP 200"),
+        ],
+    ):
+        result = runner.invoke(cli, ["deploy", "status", "render", "my-app"])
+    assert result.exit_code == 0, result.output
+    assert "my-app" in result.output
+    assert "Live" in result.output
+
+
+def test_status_command_no_services():
+    runner = CliRunner()
+    with patch(
+        "streamtex.cli.deploy_cmd.check_render_status",
+        return_value=[],
+    ):
+        result = runner.invoke(cli, ["deploy", "status", "render"])
+    assert result.exit_code == 0, result.output
+    assert "No services found" in result.output
+
+
+def test_deploy_group_shows_status():
+    runner = CliRunner()
+    result = runner.invoke(cli, ["deploy", "--help"])
+    assert result.exit_code == 0
+    assert "status" in result.output

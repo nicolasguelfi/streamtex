@@ -1,10 +1,13 @@
-"""Deploy commands: preflight, docker, render, and huggingface."""
+"""Deploy commands: preflight, docker, render, huggingface, and status."""
 
 import glob
+import json
 import os
 import re
 import shutil
 import subprocess
+import urllib.error
+import urllib.request
 from dataclasses import dataclass
 
 import click
@@ -22,6 +25,16 @@ class PreflightCheck:
 
     name: str
     status: str  # "pass" | "warn" | "fail"
+    message: str
+
+
+@dataclass
+class DeployStatus:
+    """Status of a single deployed service."""
+
+    name: str
+    status: str  # "live" | "sleep" | "down" | "error"
+    url: str
     message: str
 
 
@@ -495,6 +508,172 @@ def setup_hf_remote(project_path: str, space_url: str) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Deploy status helpers
+# ---------------------------------------------------------------------------
+
+
+def render_service_url(name: str) -> str:
+    """Derive the public URL for a Render service."""
+    return f"https://{name}.onrender.com"
+
+
+def parse_render_yaml_services(project_path: str) -> list[str]:
+    """Extract service names from ``render.yaml``.
+
+    Returns a sorted list of service names. Empty list if file is missing.
+    """
+    yaml_path = os.path.join(project_path, "render.yaml")
+    if not os.path.isfile(yaml_path):
+        return []
+
+    with open(yaml_path, encoding="utf-8") as f:
+        content = f.read()
+
+    names = re.findall(r"^\s+name:\s+(.+)$", content, re.MULTILINE)
+    return sorted(n.strip() for n in names)
+
+
+def http_probe(url: str, timeout: int = 10) -> tuple[str, str]:
+    """Probe a URL with HTTP HEAD and return ``(status, message)``.
+
+    Returns:
+        A tuple of ``(status, message)`` where status is one of
+        ``"live"``, ``"sleep"``, ``"down"``, or ``"error"``.
+    """
+    req = urllib.request.Request(url, method="HEAD")
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310
+            return ("live", f"HTTP {resp.status}")
+    except urllib.error.HTTPError as e:
+        if e.code in (502, 503):
+            return ("sleep", f"HTTP {e.code} — service may be waking up")
+        if e.code == 404:
+            return ("down", f"HTTP {e.code} — service not found")
+        return ("error", f"HTTP {e.code}")
+    except urllib.error.URLError:
+        return ("sleep", "Timeout — service may be sleeping")
+    except OSError as e:
+        return ("error", str(e))
+
+
+def parse_hf_remote(project_path: str) -> str | None:
+    """Extract ``owner/repo`` from the ``hf`` git remote.
+
+    Returns ``None`` if the remote is not configured or doesn't match.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "-C", project_path, "remote", "get-url", "hf"],
+            capture_output=True, text=True, timeout=10,
+        )
+        if result.returncode != 0:
+            return None
+        url = result.stdout.strip()
+    except (subprocess.TimeoutExpired, OSError):
+        return None
+
+    m = re.search(r"huggingface\.co/spaces/([^/]+/[^/]+?)(?:\.git)?$", url)
+    return m.group(1) if m else None
+
+
+def check_render_status(
+    project_path: str,
+    name: str | None = None,
+    timeout: int = 10,
+) -> list[DeployStatus]:
+    """Check status of Render services.
+
+    If *name* is provided, probe that single service. Otherwise discover
+    services from ``render.yaml`` or ``manuals/``.
+    """
+    if name:
+        url = render_service_url(name)
+        st, msg = http_probe(url, timeout)
+        return [DeployStatus(name=name, status=st, url=url, message=msg)]
+
+    # Discovery: render.yaml first, fallback to manuals
+    services = parse_render_yaml_services(project_path)
+    if not services:
+        manuals = discover_manuals(project_path)
+        services = [derive_service_name(m) for m in manuals]
+
+    results: list[DeployStatus] = []
+    for svc in services:
+        url = render_service_url(svc)
+        st, msg = http_probe(url, timeout)
+        results.append(DeployStatus(name=svc, status=st, url=url, message=msg))
+    return results
+
+
+def check_hf_status(
+    project_path: str,
+    name: str | None = None,
+    timeout: int = 10,
+) -> list[DeployStatus]:
+    """Check status of a Hugging Face Space.
+
+    *name* should be in ``owner/repo`` format. If not provided, the ``hf``
+    git remote is parsed to discover the space.
+    """
+    owner_repo = name
+    if not owner_repo:
+        owner_repo = parse_hf_remote(project_path)
+
+    if not owner_repo:
+        return [
+            DeployStatus(
+                name="(unknown)",
+                status="error",
+                url="",
+                message="No HF Space found. Pass name as owner/repo or add a 'hf' git remote.",
+            )
+        ]
+
+    api_url = f"https://huggingface.co/api/spaces/{owner_repo}"
+    space_url = f"https://huggingface.co/spaces/{owner_repo}"
+    req = urllib.request.Request(api_url)
+
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310
+            data = json.loads(resp.read().decode())
+    except (urllib.error.URLError, urllib.error.HTTPError, OSError) as e:
+        return [
+            DeployStatus(
+                name=owner_repo,
+                status="error",
+                url=space_url,
+                message=str(e),
+            )
+        ]
+    except (json.JSONDecodeError, KeyError) as e:
+        return [
+            DeployStatus(
+                name=owner_repo,
+                status="error",
+                url=space_url,
+                message=f"Invalid API response: {e}",
+            )
+        ]
+
+    stage = data.get("runtime", {}).get("stage", "UNKNOWN")
+    stage_map = {
+        "RUNNING": "live",
+        "SLEEPING": "sleep",
+        "PAUSED": "sleep",
+        "BUILDING": "sleep",
+    }
+    st = stage_map.get(stage, "down")
+    return [
+        DeployStatus(
+            name=owner_repo,
+            status=st,
+            url=space_url,
+            message=f"Stage: {stage}",
+        )
+    ]
+
+
+# ---------------------------------------------------------------------------
 # Docker helpers
 # ---------------------------------------------------------------------------
 
@@ -802,3 +981,56 @@ def huggingface_cmd(
 
     # 9. Show Space URL
     console.print(f"\n[bold cyan]Space URL:[/bold cyan] {space}")
+
+
+@click.command("status")
+@click.argument("platform", type=click.Choice(["render", "huggingface"]))
+@click.argument("name", required=False, default=None)
+@click.option("--path", default=".", help="Project path (for service discovery).")
+@click.option("--timeout", default=10, type=int, help="HTTP probe timeout in seconds.")
+def status_cmd(
+    platform: str,
+    name: str | None,
+    path: str,
+    timeout: int,
+) -> None:
+    """Check deployment status for Render or Hugging Face."""
+    console = get_console()
+    p = os.path.abspath(path)
+
+    if platform == "render":
+        statuses = check_render_status(p, name=name, timeout=timeout)
+    else:
+        statuses = check_hf_status(p, name=name, timeout=timeout)
+
+    if not statuses:
+        console.print("[yellow]No services found.[/yellow]")
+        console.print(
+            "Hint: provide a service name, add a render.yaml, "
+            "or configure a 'hf' git remote."
+        )
+        return
+
+    from rich.table import Table
+
+    table = Table(title=f"Deploy status: {platform}")
+    table.add_column("Service", style="cyan")
+    table.add_column("Status")
+    table.add_column("URL")
+
+    icons = {
+        "live": "[green]\u2713 Live[/green]",
+        "sleep": "[yellow]\u25cf Sleep[/yellow]",
+        "down": "[red]\u2717 Down[/red]",
+        "error": "[red]? Error[/red]",
+    }
+
+    for s in statuses:
+        table.add_row(s.name, icons.get(s.status, s.status), s.url)
+
+    console.print(table)
+
+    # Show details for non-live services
+    for s in statuses:
+        if s.status != "live" and s.message:
+            console.print(f"  [dim]{s.name}: {s.message}[/dim]")

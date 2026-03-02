@@ -1,9 +1,0 @@
-%%{init: {'flowchart': {'rankSpacing': 30, 'nodeSpacing': 30}}}%%
-graph LR
-    A[Start] --> B{Is it working?}
-    B -->|Yes| C[Great!]
-    B -->|No| D[Debug]
-    D --> E[Read logs]
-    E --> F[Fix code]
-    F --> B
-    C --> G[Deploy]

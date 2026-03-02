@@ -8,6 +8,7 @@ build/
 # === IDE ===
 .idea/
 .vscode/
+.cursor/
 
 # === OS ===
 *.DS_Store
@@ -19,20 +20,8 @@ tokens.md
 # === Generated ===
 html_exports/
 test.html
-projects/convert_html_to_streamtex/exports/
 
 # === Large files ===
 /big/
 /data/models/
 BIG/
-
-# === Legacy projects (no longer in repo) ===
-project_se1/
-project_gai4as/
-project_ai4se/
-template_project_old/
-streamtex_legacy/
-
-# === Legacy rules ===
-.git/
-project_html_example/blocks/bck_showcase_text_generation_all

@@ -27,21 +27,8 @@ Thumbs.db
 # === Tests (not needed in production image) ===
 tests/
 
-# === Documentation (not needed in production image) ===
-# Note: documentation/manuals/ are kept because they can be deployment targets
-documentation/coding_standards.md
-documentation/streamtex_cheatsheet_en.md
-documentation/streamtex_cheatsheet_fr.md
-documentation/export_to_pdf_cli.md
-documentation/architecture_collections_multirepo.md
-documentation/maintenance/
-documentation/template_project/
-documentation/template_collection/
-
-# === Deployment scripts (not needed inside container) ===
-deploy/
-docker-compose.yml
-.dockerignore
+# === Documentation ===
+documentation/
 
 # === Generated / large files ===
 html_exports/
@@ -56,7 +43,5 @@ tokens.md
 .env.*
 
 # === Dev config ===
-ruff.toml
 .python-version
-uvsync.sh
-run-test-projects.sh
+.dockerignore

@@ -1,10 +1,18 @@
-"""Tests for stx claude install/list commands."""
+"""Tests for stx claude install/list/update/diff commands."""
 
 import os
 
 from click.testing import CliRunner
 
-from streamtex.cli.claude_cmd import find_claude_repo, install_profile, list_profiles
+from streamtex.cli.claude_cmd import (
+    FileDiff,
+    collect_source_files,
+    compare_profile,
+    find_claude_repo,
+    install_profile,
+    list_profiles,
+    read_installed_profile,
+)
 from streamtex.cli.commands import cli
 
 
@@ -229,3 +237,298 @@ def test_install_no_claude_repo(tmp_path):
     result = runner.invoke(cli, ["claude", "install", "project", "."])
     assert result.exit_code != 0
     assert "not found" in result.output
+
+
+# ---------------------------------------------------------------------------
+# read_installed_profile
+# ---------------------------------------------------------------------------
+
+def test_read_installed_profile(tmp_path):
+    claude_dir = tmp_path / ".claude"
+    claude_dir.mkdir()
+    (claude_dir / ".stx-profile").write_text("project\n")
+    assert read_installed_profile(str(tmp_path)) == "project"
+
+
+def test_read_installed_profile_missing(tmp_path):
+    assert read_installed_profile(str(tmp_path)) is None
+
+
+def test_read_installed_profile_empty(tmp_path):
+    claude_dir = tmp_path / ".claude"
+    claude_dir.mkdir()
+    (claude_dir / ".stx-profile").write_text("")
+    assert read_installed_profile(str(tmp_path)) is None
+
+
+# ---------------------------------------------------------------------------
+# collect_source_files
+# ---------------------------------------------------------------------------
+
+def test_collect_source_files(tmp_path):
+    ws = _make_workspace(tmp_path)
+    files = collect_source_files(str(ws / "streamtex-claude"), "project")
+
+    assert "CLAUDE.md" in files
+    assert ".claude/commands/developer/test-run.md" in files
+    # shared references
+    assert ".claude/references/coding_standards.md" in files
+    # manifest.toml should be excluded
+    assert all("manifest.toml" not in v for v in files)
+
+
+def test_collect_source_files_unknown_profile(tmp_path):
+    ws = _make_workspace(tmp_path)
+    files = collect_source_files(str(ws / "streamtex-claude"), "nonexistent")
+    assert files == {}
+
+
+# ---------------------------------------------------------------------------
+# compare_profile
+# ---------------------------------------------------------------------------
+
+def test_compare_profile_all_identical(tmp_path):
+    ws = _make_workspace(tmp_path)
+    target = tmp_path / "my-project"
+    target.mkdir()
+
+    # Install then compare — should be identical
+    install_profile(str(ws / "streamtex-claude"), "project", str(target))
+    diffs = compare_profile(str(ws / "streamtex-claude"), "project", str(target))
+
+    statuses = {d.path: d.status for d in diffs}
+    assert statuses["CLAUDE.md"] == "identical"
+    assert statuses[".claude/commands/developer/test-run.md"] == "identical"
+    assert statuses[".claude/references/coding_standards.md"] == "identical"
+
+
+def test_compare_profile_modified(tmp_path):
+    ws = _make_workspace(tmp_path)
+    target = tmp_path / "my-project"
+    target.mkdir()
+
+    install_profile(str(ws / "streamtex-claude"), "project", str(target))
+
+    # Modify CLAUDE.md locally
+    (target / "CLAUDE.md").write_text("# Custom CLAUDE.md\n")
+
+    diffs = compare_profile(str(ws / "streamtex-claude"), "project", str(target))
+    statuses = {d.path: d.status for d in diffs}
+    assert statuses["CLAUDE.md"] == "modified"
+
+
+def test_compare_profile_missing(tmp_path):
+    ws = _make_workspace(tmp_path)
+    target = tmp_path / "my-project"
+    target.mkdir()
+
+    install_profile(str(ws / "streamtex-claude"), "project", str(target))
+
+    # Delete a file
+    os.remove(target / ".claude" / "commands" / "developer" / "test-run.md")
+
+    diffs = compare_profile(str(ws / "streamtex-claude"), "project", str(target))
+    statuses = {d.path: d.status for d in diffs}
+    assert statuses[".claude/commands/developer/test-run.md"] == "missing"
+
+
+def test_compare_profile_extra(tmp_path):
+    ws = _make_workspace(tmp_path)
+    target = tmp_path / "my-project"
+    target.mkdir()
+
+    install_profile(str(ws / "streamtex-claude"), "project", str(target))
+
+    # Add an extra file
+    (target / ".claude" / "custom-notes.md").write_text("My notes\n")
+
+    diffs = compare_profile(str(ws / "streamtex-claude"), "project", str(target))
+    extras = [d for d in diffs if d.status == "extra"]
+    assert len(extras) == 1
+    assert extras[0].path == ".claude/custom-notes.md"
+
+
+# ---------------------------------------------------------------------------
+# diff command
+# ---------------------------------------------------------------------------
+
+def test_diff_command_up_to_date(tmp_path):
+    ws = _make_workspace(tmp_path)
+    target = tmp_path / "my-project"
+    target.mkdir()
+
+    install_profile(str(ws / "streamtex-claude"), "project", str(target))
+
+    runner = CliRunner()
+    os.chdir(ws)
+    result = runner.invoke(cli, ["claude", "diff", str(target)])
+    assert result.exit_code == 0, result.output
+    assert "up to date" in result.output
+
+
+def test_diff_command_has_differences(tmp_path):
+    ws = _make_workspace(tmp_path)
+    target = tmp_path / "my-project"
+    target.mkdir()
+
+    install_profile(str(ws / "streamtex-claude"), "project", str(target))
+    (target / "CLAUDE.md").write_text("# Custom\n")
+
+    runner = CliRunner()
+    os.chdir(ws)
+    result = runner.invoke(cli, ["claude", "diff", str(target)])
+    assert result.exit_code == 0, result.output
+    assert "differences" in result.output
+    assert "Modified" in result.output
+
+
+def test_diff_command_no_profile(tmp_path):
+    ws = _make_workspace(tmp_path)
+    target = tmp_path / "my-project"
+    target.mkdir()
+
+    runner = CliRunner()
+    os.chdir(ws)
+    result = runner.invoke(cli, ["claude", "diff", str(target)])
+    assert result.exit_code != 0
+    assert "No Claude profile" in result.output
+
+
+def test_diff_command_help():
+    runner = CliRunner()
+    result = runner.invoke(cli, ["claude", "diff", "--help"])
+    assert result.exit_code == 0
+    assert "Compare" in result.output
+
+
+# ---------------------------------------------------------------------------
+# update command
+# ---------------------------------------------------------------------------
+
+def test_update_command_already_up_to_date(tmp_path):
+    ws = _make_workspace(tmp_path)
+    target = tmp_path / "my-project"
+    target.mkdir()
+
+    install_profile(str(ws / "streamtex-claude"), "project", str(target))
+
+    runner = CliRunner()
+    os.chdir(ws)
+    result = runner.invoke(cli, ["claude", "update", str(target)])
+    assert result.exit_code == 0, result.output
+    assert "up to date" in result.output
+
+
+def test_update_command_updates_modified(tmp_path):
+    ws = _make_workspace(tmp_path)
+    target = tmp_path / "my-project"
+    target.mkdir()
+
+    install_profile(str(ws / "streamtex-claude"), "project", str(target))
+
+    # Modify source file in claude repo
+    src = ws / "streamtex-claude" / "profiles" / "project" / "commands" / "developer" / "test-run.md"
+    src.write_text("Run tests v2\n")
+
+    runner = CliRunner()
+    os.chdir(ws)
+    result = runner.invoke(cli, ["claude", "update", str(target)])
+    assert result.exit_code == 0, result.output
+    assert "Updated" in result.output
+    assert "test-run.md" in result.output
+
+    # Verify the file was updated
+    updated = (target / ".claude" / "commands" / "developer" / "test-run.md").read_text()
+    assert "v2" in updated
+
+
+def test_update_command_preserves_claude_md(tmp_path):
+    ws = _make_workspace(tmp_path)
+    target = tmp_path / "my-project"
+    target.mkdir()
+
+    install_profile(str(ws / "streamtex-claude"), "project", str(target))
+
+    # User customizes CLAUDE.md
+    (target / "CLAUDE.md").write_text("# My Custom CLAUDE.md\n")
+
+    runner = CliRunner()
+    os.chdir(ws)
+    result = runner.invoke(cli, ["claude", "update", str(target)])
+    assert result.exit_code == 0, result.output
+    assert "Skipped" in result.output
+    assert "CLAUDE.md" in result.output
+
+    # CLAUDE.md preserved
+    assert "My Custom" in (target / "CLAUDE.md").read_text()
+
+
+def test_update_command_force_overwrites_claude_md(tmp_path):
+    ws = _make_workspace(tmp_path)
+    target = tmp_path / "my-project"
+    target.mkdir()
+
+    install_profile(str(ws / "streamtex-claude"), "project", str(target))
+
+    # User customizes CLAUDE.md
+    (target / "CLAUDE.md").write_text("# My Custom CLAUDE.md\n")
+
+    runner = CliRunner()
+    os.chdir(ws)
+    result = runner.invoke(cli, ["claude", "update", str(target), "--force"])
+    assert result.exit_code == 0, result.output
+    assert "Updated" in result.output
+
+    # CLAUDE.md overwritten with repo version
+    assert "Project CLAUDE.md" in (target / "CLAUDE.md").read_text()
+
+
+def test_update_command_restores_missing(tmp_path):
+    ws = _make_workspace(tmp_path)
+    target = tmp_path / "my-project"
+    target.mkdir()
+
+    install_profile(str(ws / "streamtex-claude"), "project", str(target))
+
+    # Delete a file
+    os.remove(target / ".claude" / "commands" / "developer" / "test-run.md")
+
+    runner = CliRunner()
+    os.chdir(ws)
+    result = runner.invoke(cli, ["claude", "update", str(target)])
+    assert result.exit_code == 0, result.output
+    assert "Updated" in result.output
+
+    # File restored
+    assert (target / ".claude" / "commands" / "developer" / "test-run.md").is_file()
+
+
+def test_update_command_no_profile(tmp_path):
+    ws = _make_workspace(tmp_path)
+    target = tmp_path / "my-project"
+    target.mkdir()
+
+    runner = CliRunner()
+    os.chdir(ws)
+    result = runner.invoke(cli, ["claude", "update", str(target)])
+    assert result.exit_code != 0
+    assert "No Claude profile" in result.output
+
+
+def test_update_command_help():
+    runner = CliRunner()
+    result = runner.invoke(cli, ["claude", "update", "--help"])
+    assert result.exit_code == 0
+    assert "--force" in result.output
+
+
+# ---------------------------------------------------------------------------
+# Infrastructure
+# ---------------------------------------------------------------------------
+
+def test_claude_group_shows_update_and_diff():
+    runner = CliRunner()
+    result = runner.invoke(cli, ["claude", "--help"])
+    assert result.exit_code == 0
+    assert "update" in result.output
+    assert "diff" in result.output

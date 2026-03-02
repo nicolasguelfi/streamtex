@@ -5,8 +5,10 @@ import click
 from streamtex import __version__
 
 from .bib_cmd import generate_stubs
+from .claude_cmd import diff_cmd as claude_diff
 from .claude_cmd import install as claude_install
 from .claude_cmd import list_cmd as claude_list
+from .claude_cmd import update_cmd as claude_update
 from .deploy_cmd import docker as deploy_docker
 from .deploy_cmd import huggingface_cmd as deploy_huggingface
 from .deploy_cmd import preflight as deploy_preflight
@@ -66,6 +68,8 @@ def claude():
 
 claude.add_command(claude_install)
 claude.add_command(claude_list)
+claude.add_command(claude_update)
+claude.add_command(claude_diff)
 
 
 # --- Bibliography subgroup -------------------------------------------------

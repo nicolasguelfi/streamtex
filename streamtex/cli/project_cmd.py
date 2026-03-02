@@ -387,14 +387,75 @@ def validate_project(project_path: str) -> list[ValidationCheck]:
 # ---------------------------------------------------------------------------
 
 
+def _copy_rich_template(
+    template_name: str, target: str, project_name: str
+) -> list[str]:
+    """Copy a rich template from streamtex-docs/templates/ into *target*.
+
+    Returns the list of copied relative paths, or raises ClickException.
+    """
+    ws_root = find_workspace_root()
+    if ws_root is None:
+        raise click.ClickException(
+            "--template requires a StreamTeX workspace (no stx.toml found)."
+        )
+
+    src = os.path.join(ws_root, "streamtex-docs", "templates", f"template_{template_name}")
+    if not os.path.isdir(src):
+        raise click.ClickException(
+            f"Template not found: {src}\n"
+            "Make sure streamtex-docs is cloned in the workspace."
+        )
+
+    copied: list[str] = []
+    for dirpath, _dirnames, filenames in os.walk(src):
+        for fname in filenames:
+            src_file = os.path.join(dirpath, fname)
+            rel = os.path.relpath(src_file, src)
+            dst_file = os.path.join(target, rel)
+            os.makedirs(os.path.dirname(dst_file), exist_ok=True)
+            shutil.copy2(src_file, dst_file)
+            copied.append(rel)
+
+    # Generate pyproject.toml (not in the template)
+    pyproject_path = os.path.join(target, "pyproject.toml")
+    if not os.path.isfile(pyproject_path):
+        with open(pyproject_path, "w", encoding="utf-8") as f:
+            f.write(generate_pyproject_toml(project_name))
+        copied.append("pyproject.toml")
+
+    # Generate .gitignore (not in the template)
+    gitignore_path = os.path.join(target, ".gitignore")
+    if not os.path.isfile(gitignore_path):
+        with open(gitignore_path, "w", encoding="utf-8") as f:
+            f.write(generate_gitignore())
+        copied.append(".gitignore")
+
+    return copied
+
+
 @click.command("new")
 @click.argument("name")
 @click.option("--profile", default="project", help="Claude AI profile.")
 @click.option("--collection", "is_collection", is_flag=True, help="Collection hub.")
+@click.option(
+    "--template",
+    default=None,
+    type=click.Choice(["project", "collection"]),
+    help="Use a rich template from streamtex-docs/templates/.",
+)
 @click.option("--no-git", is_flag=True, help="Skip git init.")
 @click.option("--no-sync", is_flag=True, help="Skip uv sync.")
 @click.option("--no-claude", is_flag=True, help="Skip Claude profile.")
-def new(name: str, profile: str, is_collection: bool, no_git: bool, no_sync: bool, no_claude: bool) -> None:
+def new(
+    name: str,
+    profile: str,
+    is_collection: bool,
+    template: str | None,
+    no_git: bool,
+    no_sync: bool,
+    no_claude: bool,
+) -> None:
     """Create a new StreamTeX project."""
     console = get_console()
 
@@ -402,9 +463,13 @@ def new(name: str, profile: str, is_collection: bool, no_git: bool, no_sync: boo
     target = resolve_project_dir(name)
     os.makedirs(target, exist_ok=True)
 
-    # 2. Scaffold files
-    files = scaffold_project(target, name, collection=is_collection)
-    console.print(f"[green]Project scaffolded:[/green] {target}")
+    # 2. Scaffold files (rich template or minimal)
+    if template:
+        files = _copy_rich_template(template, target, name)
+        console.print(f"[green]Project created from template '{template}':[/green] {target}")
+    else:
+        files = scaffold_project(target, name, collection=is_collection)
+        console.print(f"[green]Project scaffolded:[/green] {target}")
     for f in files:
         console.print(f"  {f}")
 

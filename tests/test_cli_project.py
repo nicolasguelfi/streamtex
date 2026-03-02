@@ -9,6 +9,7 @@ from click.testing import CliRunner
 from streamtex.cli.commands import cli
 from streamtex.cli.project_cmd import (
     ValidationCheck,
+    _copy_rich_template,
     generate_block_hello,
     generate_blocks_init,
     generate_book_py,
@@ -304,6 +305,94 @@ def test_new_collection_flag(tmp_path):
     assert (proj / "collection.toml").is_file()
     book_content = (proj / "book.py").read_text()
     assert "st_collection" in book_content
+
+
+# ---------------------------------------------------------------------------
+# --template option
+# ---------------------------------------------------------------------------
+
+
+def _setup_workspace_with_templates(tmp_path):
+    """Create a fake workspace with streamtex-docs/templates/ for testing."""
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    (ws / "stx.toml").write_text('[workspace]\nname = "test"\n')
+    (ws / "projects").mkdir()
+
+    # Create a minimal template_project
+    tpl_proj = ws / "streamtex-docs" / "templates" / "template_project"
+    tpl_proj.mkdir(parents=True)
+    (tpl_proj / "book.py").write_text('"""Template project."""\nimport streamtex\n')
+    blocks = tpl_proj / "blocks"
+    blocks.mkdir()
+    (blocks / "__init__.py").write_text("from streamtex.blocks import ProjectBlockRegistry\nregistry = ProjectBlockRegistry(__file__)\n")
+    (blocks / "bck_01_welcome.py").write_text('"""Welcome."""\ndef build():\n    pass\n')
+    custom = tpl_proj / "custom"
+    custom.mkdir()
+    (custom / "__init__.py").write_text("")
+    (custom / "styles.py").write_text("from streamtex.styles import StxStyles\nclass Styles(StxStyles):\n    pass\n")
+    streamlit = tpl_proj / ".streamlit"
+    streamlit.mkdir()
+    (streamlit / "config.toml").write_text('[server]\nenableStaticServing = true\n')
+    (tpl_proj / "setup.py").write_text('"""Setup."""\n')
+
+    # Create a minimal template_collection
+    tpl_col = ws / "streamtex-docs" / "templates" / "template_collection"
+    tpl_col.mkdir(parents=True)
+    (tpl_col / "book.py").write_text('"""Template collection."""\n')
+    (tpl_col / "collection.toml").write_text('[collection]\nname = "hub"\n')
+    col_blocks = tpl_col / "blocks"
+    col_blocks.mkdir()
+    (col_blocks / "__init__.py").write_text("from streamtex.blocks import ProjectBlockRegistry\nregistry = ProjectBlockRegistry(__file__)\n")
+    (col_blocks / "bck_home.py").write_text('"""Home."""\ndef build():\n    pass\n')
+
+    return ws
+
+
+def test_new_with_template_project(tmp_path):
+    """stx project new --template project copies the rich template."""
+    ws = _setup_workspace_with_templates(tmp_path)
+    os.chdir(ws)
+    runner = CliRunner()
+    result = runner.invoke(
+        cli,
+        ["project", "new", "tpltest", "--template", "project", "--no-git", "--no-sync", "--no-claude"],
+    )
+    assert result.exit_code == 0, result.output
+    proj = ws / "projects" / "stx-tpltest"
+    assert (proj / "book.py").is_file()
+    assert (proj / "blocks" / "bck_01_welcome.py").is_file()
+    assert (proj / "custom" / "styles.py").is_file()
+    assert (proj / "pyproject.toml").is_file()
+    assert "template" in result.output.lower()
+
+
+def test_new_with_template_collection(tmp_path):
+    """stx project new --template collection copies the collection template."""
+    ws = _setup_workspace_with_templates(tmp_path)
+    os.chdir(ws)
+    runner = CliRunner()
+    result = runner.invoke(
+        cli,
+        ["project", "new", "coltest", "--template", "collection", "--no-git", "--no-sync", "--no-claude"],
+    )
+    assert result.exit_code == 0, result.output
+    proj = ws / "projects" / "stx-coltest"
+    assert (proj / "book.py").is_file()
+    assert (proj / "collection.toml").is_file()
+    assert (proj / "blocks" / "bck_home.py").is_file()
+
+
+def test_new_template_requires_workspace(tmp_path):
+    """--template fails if not in a workspace with streamtex-docs."""
+    os.chdir(tmp_path)
+    runner = CliRunner()
+    result = runner.invoke(
+        cli,
+        ["project", "new", "fail", "--template", "project", "--no-git", "--no-sync", "--no-claude"],
+    )
+    assert result.exit_code != 0
+    assert "workspace" in result.output.lower() or "template" in result.output.lower()
 
 
 # ---------------------------------------------------------------------------

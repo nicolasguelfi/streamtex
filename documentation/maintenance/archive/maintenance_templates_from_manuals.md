@@ -1,9 +1,12 @@
+> **ABANDONNE** — Ce plan a ete remplace par l'approche Skills Claude.
+> Voir `documentation/maintenance/maintenance_skills_vs_templates.md` pour le nouveau plan.
+
 # Templates générés depuis les manuels — Plan de développement
 
 > **Date** : 2026-02-26
 > **Auteur** : Claude Code (assisté par Nicolas Guelfi)
 > **Version** : 1.0
-> **Statut** : Planning
+> **Statut** : ABANDONNE (remplace par skills Claude — 2026-03-02)
 
 ---
 

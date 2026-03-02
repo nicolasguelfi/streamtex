@@ -3,7 +3,7 @@
 > **Date** : 2026-03-02
 > **Auteur** : Nicolas Guelfi + Claude
 > **Version** : 1.0
-> **Statut** : A FAIRE
+> **Statut** : IMPLEMENTE (2026-03-02) — reste : tests manuels des skills
 > **Remplace** : `maintenance_templates_from_manuals.md` (script de generation — abandonne)
 
 ---
@@ -789,43 +789,43 @@ claude
 
 ### Phase 1 : Templates statiques
 
-- [ ] Option `--template` ajoutee a `stx project new`
-- [ ] `--template project` copie depuis `streamtex-docs/templates/template_project/`
-- [ ] `--template collection` copie depuis `streamtex-docs/templates/template_collection/`
-- [ ] 3 tests unitaires ajoutees
-- [ ] Documentation mise a jour
+- [x] Option `--template` ajoutee a `stx project new`
+- [x] `--template project` copie depuis `streamtex-docs/templates/template_project/`
+- [x] `--template collection` copie depuis `streamtex-docs/templates/template_collection/`
+- [x] 3 tests unitaires ajoutees (42/42 passent)
+- [x] Documentation mise a jour
 
 ### Phase 2 : Skill `project-init`
 
-- [ ] Fichier `profiles/project/commands/project/project-init.md` cree
-- [ ] Workflow 4 etapes documente
-- [ ] Regles de generation conformes aux coding_standards.md
+- [x] Fichier `profiles/project/commands/project/project-init.md` cree
+- [x] Workflow 4 etapes documente
+- [x] Regles de generation conformes aux coding_standards.md
 - [ ] Teste manuellement avec 3 scenarios differents
 
 ### Phase 3 : Blueprints
 
-- [ ] Fichier `profiles/project/designer/skills/block-blueprints.md` cree
-- [ ] 10 blueprints documentes
-- [ ] `block-new.md` modifie (etape 2b ajoutee)
+- [x] Fichier `profiles/project/designer/skills/block-blueprints.md` cree
+- [x] 10 blueprints documentes
+- [x] `block-new.md` modifie (etape 3 ajoutee — consultation blueprints)
 - [ ] Teste avec `/designer:block-new` + description correspondant a un blueprint
 
 ### Phase 4 : Skill `project-customize`
 
-- [ ] Fichier `profiles/project/commands/project/project-customize.md` cree
-- [ ] 4 domaines de personnalisation documentes
+- [x] Fichier `profiles/project/commands/project/project-customize.md` cree
+- [x] 4 domaines de personnalisation documentes
 - [ ] Teste avec changement de theme, de navigation, de typographie
 
 ### Phase 5 : Agent `project-architect`
 
-- [ ] Fichier `profiles/project/designer/agents/project-architect.md` cree
-- [ ] Principes de conception documentes
-- [ ] Reference par `project-init.md`
+- [x] Fichier `profiles/project/designer/agents/project-architect.md` cree
+- [x] Principes de conception documentes
+- [x] Reference par `project-init.md`
 
 ### Phase 6 : Nettoyage
 
-- [ ] `maintenance_templates_from_manuals.md` marque comme ABANDONNE
-- [ ] `streamtex-claude/README.md` mis a jour
-- [ ] Guide stx-guide mis a jour
+- [x] `maintenance_templates_from_manuals.md` marque comme ABANDONNE
+- [x] `streamtex-claude/README.md` mis a jour
+- [x] Guide stx-guide mis a jour
 
 ---
 

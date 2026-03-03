@@ -1,0 +1,23 @@
+cff-version: 1.2.0
+message: "If you use StreamTeX in your work, please cite it as below."
+type: software
+title: "StreamTeX"
+abstract: "A block-based content framework for Streamlit — styled pages, CSS Grid, diagrams, LaTeX, and more."
+version: "0.3.1"
+date-released: "2025-01-01"
+license: MIT
+url: "https://github.com/nicolasguelfi/streamtex"
+repository-code: "https://github.com/nicolasguelfi/streamtex"
+keywords:
+  - streamlit
+  - css-grid
+  - latex
+  - mermaid
+  - presentation
+  - web-book
+  - python
+authors:
+  - family-names: "Guelfi"
+    given-names: "Nicolas"
+    orcid: "https://orcid.org/0000-0003-0785-3148"
+    affiliation: "Right On Skill"

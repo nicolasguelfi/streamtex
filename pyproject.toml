@@ -57,6 +57,7 @@ Documentation = "https://github.com/nicolasguelfi/streamtex-docs"
 Repository = "https://github.com/nicolasguelfi/streamtex"
 Changelog = "https://github.com/nicolasguelfi/streamtex/blob/main/CHANGELOG.md"
 Issues = "https://github.com/nicolasguelfi/streamtex/issues"
+Funding = "https://github.com/sponsors/nicolasguelfi"
 
 [dependency-groups]
 dev = [

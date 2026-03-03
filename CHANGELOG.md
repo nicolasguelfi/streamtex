@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] - 2026-03-03
+
+### Fixed
+- Fixed broken documentation URLs in README (intro, advanced, deploy manuals)
+- Added missing Developer Guide link to README
+- Fixed Cheatsheet and Coding Standards reference links (moved from `documentation/` to `.claude/references/`)
+- Fixed examples section: repo name `streamtex-manuals` → `streamtex-docs`, corrected book.py path
+
 ## [0.3.0] - 2026-03-02
 
 ### Added

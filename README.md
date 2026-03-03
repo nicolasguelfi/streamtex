@@ -63,9 +63,10 @@ streamlit run app.py
 ### Online manuals (read & explore)
 
 - [All manuals (hub)](https://streamtex.onrender.com)
-- [Introduction](https://intro-manual-streamtex.onrender.com)
-- [Advanced](https://advanced-manual-streamtex.onrender.com)
-- [Deployment Guide](https://deploy-manual-streamtex.onrender.com)
+- [Introduction](https://streamtex-intro.onrender.com)
+- [Advanced](https://streamtex-advanced.onrender.com)
+- [Deployment Guide](https://streamtex-deploy.onrender.com)
+- [Developer Guide](https://streamtex-developer.onrender.com)
 
 ### Examples (source code)
 
@@ -73,19 +74,19 @@ The manuals are also available as source code — clone and run them locally
 to study the examples:
 
 ```bash
-git clone https://github.com/nicolasguelfi/streamtex-manuals
-cd streamtex-manuals
+git clone https://github.com/nicolasguelfi/streamtex-docs
+cd streamtex-docs
 uv sync
-uv run streamlit run stx_manual_intro/book.py
+uv run streamlit run manuals/stx_manual_intro/book.py
 ```
 
-See [streamtex-manuals](https://github.com/nicolasguelfi/streamtex-manuals)
+See [streamtex-docs](https://github.com/nicolasguelfi/streamtex-docs)
 for the full list of example projects.
 
 ### Reference
 
-- [Cheatsheet (EN)](https://github.com/nicolasguelfi/streamtex/blob/main/documentation/streamtex_cheatsheet_en.md)
-- [Coding Standards](https://github.com/nicolasguelfi/streamtex/blob/main/documentation/coding_standards.md)
+- [Cheatsheet (EN)](https://github.com/nicolasguelfi/streamtex/blob/main/.claude/references/streamtex_cheatsheet_en.md)
+- [Coding Standards](https://github.com/nicolasguelfi/streamtex/blob/main/.claude/references/coding_standards.md)
 
 ## Project Structure
 

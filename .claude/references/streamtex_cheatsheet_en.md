@@ -230,13 +230,14 @@ st_write(style, "Subsection", toc_lvl="+1")
 
 # TOCConfig — full options
 toc = TOCConfig(
-    numerate_titles=False,          # Auto-numbering of headings
+    numbering=NumberingMode.SIDEBAR_ONLY,  # Numbered in sidebar TOC, not in document
     toc_position=0,                 # 0=start, -1=end, None=no TOC
     title_style=s.project.titles.section_title + s.center_txt,
     content_style=s.large + s.text.colors.reset,
-    sidebar_max_level=None,         # None = auto (paginated: 1, continuous: 2)
+    sidebar_max_level=2,            # Number headings up to level 2
     search=True,                    # Full-text search in sidebar
 )
+# NumberingMode options: SIDEBAR_ONLY (default), ALL (sidebar + document), NONE
 ```
 
 ### Marker Navigation
@@ -358,14 +359,14 @@ stx.set_static_sources([str(Path(__file__).parent / "static")])
 st.set_page_config(
     page_title="My Project",
     layout="wide",
-    initial_sidebar_state="collapsed",
+    initial_sidebar_state="expanded",
 )
 
 # Inject dark theme
 sts.theme = dark
 
 # TOC + Markers
-toc = TOCConfig(numerate_titles=False, toc_position=0, search=True)
+toc = TOCConfig(numbering=NumberingMode.SIDEBAR_ONLY, toc_position=0, sidebar_max_level=2, search=True)
 marker_config = MarkerConfig(auto_marker_on_toc=1, next_keys=["PageDown"], prev_keys=["PageUp"])
 
 # Orchestrate blocks

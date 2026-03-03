@@ -122,14 +122,16 @@ def install_profile(claude_repo: str, profile: str, target: str) -> list[str]:
             shutil.copy2(src, dst)
             installed.append(os.path.relpath(dst, target))
 
-    # 2. Copy shared/references/ if it exists
+    # 2. Copy shared/references/ if it exists (read-only copies)
     shared_refs = os.path.join(claude_repo, "shared", "references")
     if os.path.isdir(shared_refs):
         dst_refs = os.path.join(claude_dir, "references")
         shutil.copytree(shared_refs, dst_refs, dirs_exist_ok=True)
         for root, _dirs, files in os.walk(dst_refs):
             for f in files:
-                rel = os.path.relpath(os.path.join(root, f), target)
+                fpath = os.path.join(root, f)
+                os.chmod(fpath, 0o444)
+                rel = os.path.relpath(fpath, target)
                 if rel not in installed:
                     installed.append(rel)
 
@@ -438,7 +440,13 @@ def update_cmd(path: str, force: bool) -> None:
 
         dst_path = os.path.join(target, d.path)
         os.makedirs(os.path.dirname(dst_path), exist_ok=True)
+        # Temporarily make writable if read-only
+        if os.path.isfile(dst_path):
+            os.chmod(dst_path, 0o644)
         shutil.copy2(src_path, dst_path)
+        # Re-protect shared references
+        if d.path.startswith(os.path.join(".claude", "references")):
+            os.chmod(dst_path, 0o444)
         updated.append(d.path)
 
     if updated:

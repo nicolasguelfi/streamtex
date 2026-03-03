@@ -22,16 +22,34 @@ def generate_book_py(name: str) -> str:
 
 import streamlit as st
 
-from streamtex import st_book
+from streamtex import st_book, TOCConfig, NumberingMode, MarkerConfig, BannerConfig
 
 from blocks import registry
 
-st.set_page_config(page_title="{name}", layout="wide")
+st.set_page_config(page_title="{name}", layout="wide", initial_sidebar_state="expanded")
+
+# Table of Contents — numbered headings in sidebar only, up to level 2
+toc = TOCConfig(
+    numbering=NumberingMode.SIDEBAR_ONLY,
+    toc_position=0,
+    sidebar_max_level=2,
+    search=True,
+)
+
+# Marker navigation (PageUp/PageDown)
+marker_config = MarkerConfig(
+    auto_marker_on_toc=1,
+    next_keys=["PageDown"],
+    prev_keys=["PageUp"],
+)
 
 st_book(
     registry,
     title="{name}",
+    toc_config=toc,
+    marker_config=marker_config,
     paginate=True,
+    banner=BannerConfig.full(),
 )
 """
 
@@ -45,7 +63,7 @@ import streamlit as st
 
 from streamtex import st_collection
 
-st.set_page_config(page_title="{name}", layout="wide")
+st.set_page_config(page_title="{name}", layout="wide", initial_sidebar_state="expanded")
 
 st_collection(
     "{name}",

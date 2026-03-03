@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "streamtex"
 version = "0.3.1"
-description = "A block-based content framework for Streamlit — styled pages, CSS Grid, diagrams, LaTeX, and more."
+description = "AI-powered content framework for Streamlit — create presentations, courses, and web-books with Claude or Cursor, no coding required."
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
@@ -13,7 +13,11 @@ license-files = ["LICENSE"]
 authors = [
     {name = "Nicolas Guelfi", email = "nicolas.guelfi@laposte.net"},
 ]
-keywords = ["streamlit", "styled-components", "css-grid", "latex", "mermaid", "presentation", "web-book"]
+keywords = [
+    "streamlit", "styled-components", "css-grid", "latex", "mermaid",
+    "presentation", "web-book", "course", "ai-assisted", "claude",
+    "cursor", "no-code", "generative-ai",
+]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
@@ -26,6 +30,8 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
     "Topic :: Text Processing :: Markup",
     "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Multimedia :: Graphics :: Presentation",
 ]
 dependencies = [
     "streamlit>=1.54.0",
@@ -54,6 +60,8 @@ cli = [
 [project.urls]
 Homepage = "https://github.com/nicolasguelfi/streamtex"
 Documentation = "https://github.com/nicolasguelfi/streamtex-docs"
+"AI Guide" = "https://github.com/nicolasguelfi/streamtex/blob/main/AI_GUIDE.md"
+"Claude Profiles" = "https://github.com/nicolasguelfi/streamtex-claude"
 Repository = "https://github.com/nicolasguelfi/streamtex"
 Changelog = "https://github.com/nicolasguelfi/streamtex/blob/main/CHANGELOG.md"
 Issues = "https://github.com/nicolasguelfi/streamtex/issues"

@@ -587,3 +587,178 @@ class TestListCssGeneration:
 
             # Verify that st.html was called for CSS
             assert mock_html.called
+
+
+class TestAltLiStyles:
+    """Tests for the alt_li_styles feature."""
+
+    def test_controller_stores_alt_li_styles(self):
+        """Test that ListController stores alt_li_styles and initializes index."""
+        styles = [Style("color: red;", "red"), Style("color: blue;", "blue")]
+        ctrl = ListController(StxStyles.none, "'•'", is_ordered=False, alt_li_styles=styles)
+
+        assert ctrl.alt_li_styles is styles
+        assert ctrl._item_index == 0
+
+    def test_controller_default_alt_li_styles_none(self):
+        """Test that alt_li_styles defaults to None."""
+        ctrl = ListController(StxStyles.none, "'•'", is_ordered=False)
+
+        assert ctrl.alt_li_styles is None
+        assert ctrl._item_index == 0
+
+    def test_item_cycles_through_alt_styles(self, mock_streamlit):
+        """Test that item() cycles through alt_li_styles."""
+        s1 = Style("color: red;", "red")
+        s2 = Style("color: blue;", "blue")
+        ctrl = ListController(StxStyles.none, "'•'", is_ordered=False, alt_li_styles=[s1, s2])
+
+        with patch("streamtex.list.st_block") as mock_st_block, \
+             patch("streamtex.list.st.container") as mock_container, \
+             patch("streamtex.list.st.html"), \
+             patch("streamtex.list.is_export_active", return_value=False):
+
+            mock_container.return_value.__enter__ = MagicMock()
+            mock_container.return_value.__exit__ = MagicMock(return_value=False)
+            mock_st_block.return_value.__enter__ = MagicMock()
+            mock_st_block.return_value.__exit__ = MagicMock(return_value=False)
+
+            # First item → s1 (index 0)
+            with ctrl.item():
+                pass
+            call1_style = mock_st_block.call_args_list[0][1]["style"]
+            assert "color: red" in str(call1_style)
+
+            # Second item → s2 (index 1)
+            with ctrl.item():
+                pass
+            call2_style = mock_st_block.call_args_list[1][1]["style"]
+            assert "color: blue" in str(call2_style)
+
+            # Third item → s1 again (index 2 % 2 = 0)
+            with ctrl.item():
+                pass
+            call3_style = mock_st_block.call_args_list[2][1]["style"]
+            assert "color: red" in str(call3_style)
+
+        assert ctrl._item_index == 3
+
+    def test_item_index_increments(self, mock_streamlit):
+        """Test that _item_index increments after each item() call."""
+        s1 = Style("color: red;", "red")
+        ctrl = ListController(StxStyles.none, "'•'", is_ordered=False, alt_li_styles=[s1])
+
+        with patch("streamtex.list.st_block") as mock_st_block, \
+             patch("streamtex.list.st.container") as mock_container, \
+             patch("streamtex.list.st.html"), \
+             patch("streamtex.list.is_export_active", return_value=False):
+
+            mock_container.return_value.__enter__ = MagicMock()
+            mock_container.return_value.__exit__ = MagicMock(return_value=False)
+            mock_st_block.return_value.__enter__ = MagicMock()
+            mock_st_block.return_value.__exit__ = MagicMock(return_value=False)
+
+            assert ctrl._item_index == 0
+            with ctrl.item():
+                pass
+            assert ctrl._item_index == 1
+            with ctrl.item():
+                pass
+            assert ctrl._item_index == 2
+
+    def test_alt_style_merges_with_li_style(self, mock_streamlit):
+        """Test that alt style is merged after li_style."""
+        li = Style("font-size: 14px;", "base")
+        alt = Style("color: green;", "green")
+        ctrl = ListController(li, "'•'", is_ordered=False, alt_li_styles=[alt])
+
+        with patch("streamtex.list.st_block") as mock_st_block, \
+             patch("streamtex.list.st.container") as mock_container, \
+             patch("streamtex.list.st.html"), \
+             patch("streamtex.list.is_export_active", return_value=False):
+
+            mock_container.return_value.__enter__ = MagicMock()
+            mock_container.return_value.__exit__ = MagicMock(return_value=False)
+            mock_st_block.return_value.__enter__ = MagicMock()
+            mock_st_block.return_value.__exit__ = MagicMock(return_value=False)
+
+            with ctrl.item():
+                pass
+
+            final = mock_st_block.call_args_list[0][1]["style"]
+            final_str = str(final)
+            assert "font-size: 14px" in final_str
+            assert "color: green" in final_str
+
+    def test_per_item_style_overrides_alt(self, mock_streamlit):
+        """Test that per-item style is applied after alt_li_styles (highest priority)."""
+        alt = Style("color: red;", "red")
+        per_item = Style("color: blue;", "blue")
+        ctrl = ListController(StxStyles.none, "'•'", is_ordered=False, alt_li_styles=[alt])
+
+        with patch("streamtex.list.st_block") as mock_st_block, \
+             patch("streamtex.list.st.container") as mock_container, \
+             patch("streamtex.list.st.html"), \
+             patch("streamtex.list.is_export_active", return_value=False):
+
+            mock_container.return_value.__enter__ = MagicMock()
+            mock_container.return_value.__exit__ = MagicMock(return_value=False)
+            mock_st_block.return_value.__enter__ = MagicMock()
+            mock_st_block.return_value.__exit__ = MagicMock(return_value=False)
+
+            with ctrl.item(style=per_item):
+                pass
+
+            final = mock_st_block.call_args_list[0][1]["style"]
+            # Both colors should be present in the CSS chain
+            final_str = str(final)
+            assert "color: red" in final_str
+            assert "color: blue" in final_str
+
+    def test_no_alt_styles_preserves_behavior(self, mock_streamlit):
+        """Test that without alt_li_styles, behavior is unchanged."""
+        li = Style("font-weight: bold;", "bold")
+        ctrl = ListController(li, "'•'", is_ordered=False, alt_li_styles=None)
+
+        with patch("streamtex.list.st_block") as mock_st_block, \
+             patch("streamtex.list.st.container") as mock_container, \
+             patch("streamtex.list.st.html"), \
+             patch("streamtex.list.is_export_active", return_value=False):
+
+            mock_container.return_value.__enter__ = MagicMock()
+            mock_container.return_value.__exit__ = MagicMock(return_value=False)
+            mock_st_block.return_value.__enter__ = MagicMock()
+            mock_st_block.return_value.__exit__ = MagicMock(return_value=False)
+
+            with ctrl.item():
+                pass
+
+            final = mock_st_block.call_args_list[0][1]["style"]
+            assert "font-weight: bold" in str(final)
+            assert ctrl._item_index == 0  # No increment when alt_li_styles is None
+
+    def test_st_list_passes_alt_li_styles(self, mock_streamlit):
+        """Test that st_list passes alt_li_styles to ListController."""
+        styles = [Style("color: red;", "red"), Style("color: blue;", "blue")]
+
+        with patch("streamtex.list.st_block") as mock_st_block, \
+             patch("streamtex.list.st.html"), \
+             patch("streamtex.list.is_export_active", return_value=False):
+
+            mock_st_block.return_value.__enter__ = MagicMock(return_value=None)
+            mock_st_block.return_value.__exit__ = MagicMock(return_value=False)
+
+            with st_list(alt_li_styles=styles) as ctrl:
+                assert ctrl.alt_li_styles is styles
+
+    def test_st_list_default_no_alt_li_styles(self, mock_streamlit):
+        """Test that st_list defaults to no alt_li_styles."""
+        with patch("streamtex.list.st_block") as mock_st_block, \
+             patch("streamtex.list.st.html"), \
+             patch("streamtex.list.is_export_active", return_value=False):
+
+            mock_st_block.return_value.__enter__ = MagicMock(return_value=None)
+            mock_st_block.return_value.__exit__ = MagicMock(return_value=False)
+
+            with st_list() as ctrl:
+                assert ctrl.alt_li_styles is None

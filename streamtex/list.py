@@ -14,10 +14,13 @@ from .utils import generate_key
 _current_list_level = ContextVar("list_level", default=0)
 
 class ListController:
-    def __init__(self, li_style: Style, bullet_content: str, is_ordered: bool):
+    def __init__(self, li_style: Style, bullet_content: str, is_ordered: bool,
+                 alt_li_styles: list[Style] | None = None):
         self.li_style = li_style
         self.bullet_content = bullet_content
         self.is_ordered = is_ordered
+        self.alt_li_styles = alt_li_styles
+        self._item_index = 0
 
     @contextmanager
     def item(self, style: Style = None):
@@ -26,6 +29,10 @@ class ListController:
         [Bullet] [Vertical Stack of Content]
         """
         final_style = self.li_style
+        if self.alt_li_styles:
+            alt = self.alt_li_styles[self._item_index % len(self.alt_li_styles)]
+            final_style = final_style + alt
+            self._item_index += 1
         if style:
             final_style = final_style + style
 
@@ -109,6 +116,7 @@ def st_list(
     l_style: Style = s.none,
     li_style: Style = s.none,
     align: str = None,
+    alt_li_styles: list[Style] | None = None,
 ):
     """
     A context manager representing a list (ordered or unordered) with optional styles and support for nested lists.
@@ -119,6 +127,9 @@ def st_list(
     :param align: Optional alignment for list items as a block (e.g. ``"center"``).
         When set, the list container uses ``align-items: <align>`` so that
         bullet + text form a centered unit.  Defaults to ``None`` (no change).
+    :param alt_li_styles: Optional list of ``Style`` objects to cycle through for each item.
+        Applied after ``li_style`` and before the per-item ``style`` argument.
+        The style at index ``i % len(alt_li_styles)`` is merged for the i-th item.
 
     Notes:
     - Supports nested lists recursively, with the nesting level affecting the style if `l_style` is a `ListStyle`.
@@ -188,7 +199,7 @@ def st_list(
         _list_base = Style("text-align: left;", "stx-list-base")
         with st_block(style=_list_base + l_style, _export_wrapper=False):
             st.html(f'<span class="{list_id}" style="display:none"></span>')
-            yield ListController(li_style=li_style, bullet_content=bullet_content, is_ordered=is_ordered)
+            yield ListController(li_style=li_style, bullet_content=bullet_content, is_ordered=is_ordered, alt_li_styles=alt_li_styles)
 
         if is_export_active():
             export_pop_wrapper(f"</{tag}>")

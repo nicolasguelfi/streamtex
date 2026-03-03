@@ -644,15 +644,15 @@ show_code("print('hello')", style=s.custom.style)    # Override with explicit st
 show_code('{"key": "value"}', language="json", wrap=True)  # Wrapping for JSON
 
 # show_explanation / show_details render Markdown (bold, italic, lists, links…)
-show_explanation(textwrap.dedent("""\
+show_explanation("""\
     **st_markdown()** renders interpreted Markdown content.
     Use it for documentation with *formatting* and `code`.
-"""))
-show_details(textwrap.dedent("""\
+""")
+show_details("""\
     **Key point**: this is the main takeaway.
 
     Additional details with *emphasis* and `code`.
-"""))
+""")
 ```
 
 ### OOP Inheritance (Advanced)

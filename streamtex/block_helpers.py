@@ -5,6 +5,7 @@ Block rendering helpers with 3 usage modes:
 3. Expert: set_block_helper_config(MyConfig())
 """
 
+import textwrap
 from typing import Optional
 
 import streamlit as st
@@ -204,8 +205,9 @@ def show_code_inline(
 def show_explanation(text: str, style: Optional[object] = None) -> None:
     """Display styled explanation box before an example.
 
-    Pass a multi-line string (use textwrap.dedent) with standard Markdown
-    formatting (bold, italic, lists, links, code spans…).
+    Pass a multi-line string with standard Markdown formatting
+    (bold, italic, lists, links, code spans…).  Indentation is
+    automatically removed (textwrap.dedent) so callers don't need to.
 
     Style resolution (in order):
     1. Explicit style parameter (if provided)
@@ -217,13 +219,13 @@ def show_explanation(text: str, style: Optional[object] = None) -> None:
         style: Optional style override
 
     Example:
-        show_explanation(textwrap.dedent('''
+        show_explanation('''
             **st_markdown()** renders interpreted Markdown content.
             Use it for documentation with *formatting*.
-        '''))
+        ''')
     """
     resolved_style = style or _block_helper_config.get_explanation_style()
-    body = text.strip()
+    body = textwrap.dedent(text).strip()
     with st_block(resolved_style):
         st_write(StxStyles.big + StxStyles.bold, "Purpose")  # Label
         st_space("v", 1)
@@ -234,8 +236,9 @@ def show_explanation(text: str, style: Optional[object] = None) -> None:
 def show_details(text: str, style: Optional[object] = None) -> None:
     """Display 'Details:' section with Markdown-formatted content.
 
-    Pass a multi-line string (use textwrap.dedent) with standard Markdown
-    formatting (bold, italic, lists, links, code spans…).
+    Pass a multi-line string with standard Markdown formatting
+    (bold, italic, lists, links, code spans…).  Indentation is
+    automatically removed (textwrap.dedent) so callers don't need to.
 
     Style resolution (in order):
     1. Explicit style parameter (if provided)
@@ -247,14 +250,14 @@ def show_details(text: str, style: Optional[object] = None) -> None:
         style: Optional style override
 
     Example:
-        show_details(textwrap.dedent('''
+        show_details('''
             **Key point**: this is the main takeaway.
 
             Additional details with *emphasis* and `code`.
-        '''))
+        ''')
     """
     resolved_style = style or _block_helper_config.get_details_style()
-    body = text.strip()
+    body = textwrap.dedent(text).strip()
     with st_block(resolved_style):
         st_write(StxStyles.big + StxStyles.bold, "Details:")  # Label
         st_space("v", 1)

@@ -258,6 +258,17 @@ marker_config = MarkerConfig(
 st_book([...], marker_config=marker_config)
 ```
 
+### Link Configuration
+
+```python
+from streamtex import LinkConfig, set_link_config
+
+set_link_config(LinkConfig(
+    internal_target="_self",     # Same-domain links open in same tab
+    external_target="_blank",    # External links open in new tab
+))
+```
+
 ## Predefined Styles
 
 ### Text Colors

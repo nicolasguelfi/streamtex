@@ -9,6 +9,7 @@ from streamtex.cli.claude_cmd import (
     collect_source_files,
     compare_profile,
     find_claude_repo,
+    find_profile_targets,
     install_profile,
     list_profiles,
     read_installed_profile,
@@ -532,3 +533,162 @@ def test_claude_group_shows_update_and_diff():
     assert result.exit_code == 0
     assert "update" in result.output
     assert "diff" in result.output
+
+
+# ---------------------------------------------------------------------------
+# Workspace with inherited profile
+# ---------------------------------------------------------------------------
+
+def _make_workspace_with_child(tmp_path):
+    """Create a workspace with a ``child`` profile that extends ``project``."""
+    ws = _make_workspace(tmp_path)
+    claude = ws / "streamtex-claude"
+
+    # Profile: child (extends project)
+    child = claude / "profiles" / "child"
+    child.mkdir(parents=True)
+    (child / "manifest.toml").write_text(
+        '[profile]\nname = "child"\ndescription = "Child profile"\nextends = "project"\n'
+    )
+
+    overlay = child / "overlay"
+    overlay.mkdir()
+
+    # Add a new file via overlay
+    overlay_cmds = overlay / "commands" / "designer"
+    overlay_cmds.mkdir(parents=True)
+    (overlay_cmds / "child-cmd.md").write_text("Child command\n")
+
+    # Override an existing parent file via overlay
+    parent_cmds = overlay / "commands" / "developer"
+    parent_cmds.mkdir(parents=True)
+    (parent_cmds / "test-run.md").write_text("Run tests (child override)\n")
+
+    return ws
+
+
+# ---------------------------------------------------------------------------
+# collect_source_files — inheritance
+# ---------------------------------------------------------------------------
+
+def test_collect_source_files_inherited(tmp_path):
+    ws = _make_workspace_with_child(tmp_path)
+    files = collect_source_files(str(ws / "streamtex-claude"), "child")
+
+    # Parent file inherited
+    assert "CLAUDE.md" in files
+
+    # Child overlay file present
+    assert ".claude/commands/designer/child-cmd.md" in files
+
+    # Parent's shared references inherited
+    assert ".claude/references/coding_standards.md" in files
+
+
+def test_collect_source_files_overlay_overrides_parent(tmp_path):
+    ws = _make_workspace_with_child(tmp_path)
+    files = collect_source_files(str(ws / "streamtex-claude"), "child")
+
+    # The overlay version of test-run.md should replace the parent version
+    src = files[".claude/commands/developer/test-run.md"]
+    with open(src) as f:
+        content = f.read()
+    assert "child override" in content
+
+
+# ---------------------------------------------------------------------------
+# find_profile_targets
+# ---------------------------------------------------------------------------
+
+def test_find_profile_targets(tmp_path):
+    ws = _make_workspace(tmp_path)
+    claude_repo = str(ws / "streamtex-claude")
+
+    # Install profiles in two top-level dirs
+    proj_a = ws / "proj-a"
+    proj_a.mkdir()
+    install_profile(claude_repo, "project", str(proj_a))
+
+    proj_b = ws / "proj-b"
+    proj_b.mkdir()
+    install_profile(claude_repo, "library", str(proj_b))
+
+    # Install in a projects/ subdir
+    projects = ws / "projects"
+    projects.mkdir()
+    proj_c = projects / "proj-c"
+    proj_c.mkdir()
+    install_profile(claude_repo, "project", str(proj_c))
+
+    targets = find_profile_targets(str(ws))
+    paths = {t[0] for t in targets}
+    profiles = {t[0]: t[1] for t in targets}
+
+    assert str(proj_a) in paths
+    assert str(proj_b) in paths
+    assert str(proj_c) in paths
+    assert profiles[str(proj_a)] == "project"
+    assert profiles[str(proj_b)] == "library"
+    assert profiles[str(proj_c)] == "project"
+
+
+# ---------------------------------------------------------------------------
+# update --all
+# ---------------------------------------------------------------------------
+
+def test_update_all_flag(tmp_path):
+    ws = _make_workspace(tmp_path)
+    claude_repo = str(ws / "streamtex-claude")
+
+    # Install in two projects
+    proj_a = ws / "proj-a"
+    proj_a.mkdir()
+    install_profile(claude_repo, "project", str(proj_a))
+
+    proj_b = ws / "proj-b"
+    proj_b.mkdir()
+    install_profile(claude_repo, "project", str(proj_b))
+
+    # Modify source so both projects are out of date
+    src = ws / "streamtex-claude" / "profiles" / "project" / "commands" / "developer" / "test-run.md"
+    src.write_text("Run tests v3\n")
+
+    runner = CliRunner()
+    os.chdir(ws)
+    result = runner.invoke(cli, ["claude", "update", "--all"])
+    assert result.exit_code == 0, result.output
+    assert "Updated" in result.output
+
+    # Both projects should be updated
+    for proj in [proj_a, proj_b]:
+        content = (proj / ".claude" / "commands" / "developer" / "test-run.md").read_text()
+        assert "v3" in content
+
+
+# ---------------------------------------------------------------------------
+# check command
+# ---------------------------------------------------------------------------
+
+def test_check_command(tmp_path):
+    ws = _make_workspace(tmp_path)
+    claude_repo = str(ws / "streamtex-claude")
+
+    proj_a = ws / "proj-a"
+    proj_a.mkdir()
+    install_profile(claude_repo, "project", str(proj_a))
+
+    runner = CliRunner()
+    os.chdir(ws)
+
+    # All up to date
+    result = runner.invoke(cli, ["claude", "check"])
+    assert result.exit_code == 0, result.output
+    assert "up to date" in result.output
+
+    # Make source diverge
+    src = ws / "streamtex-claude" / "profiles" / "project" / "commands" / "developer" / "test-run.md"
+    src.write_text("Run tests v4\n")
+
+    result = runner.invoke(cli, ["claude", "check"])
+    assert result.exit_code == 1
+    assert "out of sync" in result.output

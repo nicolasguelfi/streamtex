@@ -164,27 +164,30 @@ def read_installed_profile(target: str) -> str | None:
         return f.read().strip() or None
 
 
-def collect_source_files(claude_repo: str, profile: str) -> dict[str, str]:
-    """Map relative target paths to absolute source paths for a profile.
+def _read_profile_extends(profile_dir: str) -> str:
+    """Read the ``extends`` field from a profile's manifest.toml."""
+    manifest_path = os.path.join(profile_dir, "manifest.toml")
+    if not os.path.isfile(manifest_path):
+        return ""
+    try:
+        import tomllib
+    except ModuleNotFoundError:
+        import tomli as tomllib  # type: ignore[no-redef]
+    with open(manifest_path, "rb") as f:
+        manifest = tomllib.load(f)
+    return manifest.get("profile", {}).get("extends", "")
 
-    Replicates the path logic from :func:`install_profile`:
-    - ``CLAUDE.md`` → project root
-    - ``manifest.toml`` → skipped
-    - everything else → ``.claude/``
-    - ``shared/references/`` → ``.claude/references/``
 
-    Returns a dict of ``{relative_target_path: absolute_source_path}``.
-    """
-    profile_dir = os.path.join(claude_repo, "profiles", profile)
-    if not os.path.isdir(profile_dir):
-        return {}
-
-    files: dict[str, str] = {}
-
-    for entry in os.listdir(profile_dir):
+def _collect_dir_files(
+    directory: str,
+    base_dir: str,
+    files: dict[str, str],
+) -> None:
+    """Walk *directory* and add entries to *files* using *base_dir* as root."""
+    for entry in os.listdir(directory):
         if entry == "manifest.toml":
             continue
-        src = os.path.join(profile_dir, entry)
+        src = os.path.join(directory, entry)
 
         if entry == "CLAUDE.md":
             files["CLAUDE.md"] = src
@@ -194,10 +197,47 @@ def collect_source_files(claude_repo: str, profile: str) -> dict[str, str]:
             for root, _dirs, filenames in os.walk(src):
                 for fname in filenames:
                     abs_src = os.path.join(root, fname)
-                    rel = os.path.relpath(abs_src, profile_dir)
+                    rel = os.path.relpath(abs_src, base_dir)
                     files[os.path.join(".claude", rel)] = abs_src
         else:
             files[os.path.join(".claude", entry)] = src
+
+
+def collect_source_files(claude_repo: str, profile: str) -> dict[str, str]:
+    """Map relative target paths to absolute source paths for a profile.
+
+    Replicates the path logic from :func:`install_profile`:
+    - ``CLAUDE.md`` → project root
+    - ``manifest.toml`` → skipped
+    - everything else → ``.claude/``
+    - ``shared/references/`` → ``.claude/references/``
+
+    When a profile has ``extends``, the parent files are collected first
+    (recursively), then the child's ``overlay/`` directory is applied on top.
+    Shared references are collected by the root parent only.
+
+    Returns a dict of ``{relative_target_path: absolute_source_path}``.
+    """
+    profile_dir = os.path.join(claude_repo, "profiles", profile)
+    if not os.path.isdir(profile_dir):
+        return {}
+
+    parent = _read_profile_extends(profile_dir)
+
+    if parent:
+        # Start with parent files (includes shared/references)
+        files = collect_source_files(claude_repo, parent)
+
+        # Overlay child-specific files from overlay/ directory
+        overlay_dir = os.path.join(profile_dir, "overlay")
+        if os.path.isdir(overlay_dir):
+            _collect_dir_files(overlay_dir, overlay_dir, files)
+
+        return files
+
+    # No extends — existing behaviour
+    files: dict[str, str] = {}
+    _collect_dir_files(profile_dir, profile_dir, files)
 
     # Shared references
     shared_refs = os.path.join(claude_repo, "shared", "references")
@@ -378,45 +418,47 @@ def _render_diff_table(
     console.print("  " + ", ".join(parts))
 
 
-@click.command("diff")
-@click.argument("path", default=".")
-def diff_cmd(path: str) -> None:
-    """Compare installed Claude profile against the source repo."""
-    _ws_root, claude_repo, profile, target = _resolve_profile_context(path)
+def find_profile_targets(ws_root: str) -> list[tuple[str, str]]:
+    """Find all directories with an installed Claude profile.
 
-    console = get_console()
-    console.print(f"[cyan]Profile:[/cyan] {profile}")
+    Scans first-level directories and ``projects/`` subdirectories for
+    ``.claude/.stx-profile`` markers.
 
-    diffs = compare_profile(claude_repo, profile, target)
+    Returns a list of ``(target_path, profile_name)`` tuples.
+    """
+    results: list[tuple[str, str]] = []
 
-    if not diffs:
-        console.print("[yellow]No profile files found to compare.[/yellow]")
-        return
+    def _check(dirpath: str) -> None:
+        profile = read_installed_profile(dirpath)
+        if profile is not None:
+            results.append((dirpath, profile))
 
-    _render_diff_table(diffs, title=f"Claude profile diff: {profile}")
+    for entry in sorted(os.listdir(ws_root)):
+        entry_path = os.path.join(ws_root, entry)
+        if os.path.isdir(entry_path) and not entry.startswith("."):
+            _check(entry_path)
 
-    if all(d.status == "identical" for d in diffs):
-        console.print("\n[bold green]Profile is up to date.[/bold green]")
-    else:
-        console.print(
-            "\n[yellow]Profile has differences.[/yellow] "
-            "Run 'stx claude update' to synchronize."
-        )
+    projects_dir = os.path.join(ws_root, "projects")
+    if os.path.isdir(projects_dir):
+        for entry in sorted(os.listdir(projects_dir)):
+            entry_path = os.path.join(projects_dir, entry)
+            if os.path.isdir(entry_path) and not entry.startswith("."):
+                _check(entry_path)
+
+    return results
 
 
-@click.command("update")
-@click.argument("path", default=".")
-@click.option(
-    "--force", is_flag=True,
-    help="Overwrite all files including CLAUDE.md.",
-)
-def update_cmd(path: str, force: bool) -> None:
-    """Update an installed Claude profile from the source repo."""
-    _ws_root, claude_repo, profile, target = _resolve_profile_context(path)
+def _update_single_target(
+    claude_repo: str,
+    profile: str,
+    target: str,
+    force: bool,
+    console,
+) -> int:
+    """Update a single target from its profile source.
 
-    console = get_console()
-    console.print(f"[cyan]Profile:[/cyan] {profile}")
-
+    Returns the number of files updated.
+    """
     diffs = compare_profile(claude_repo, profile, target)
     source_files = collect_source_files(claude_repo, profile)
 
@@ -460,3 +502,140 @@ def update_cmd(path: str, force: bool) -> None:
         console.print(f"\n[yellow]Skipped {len(skipped)} file(s) (use --force to overwrite):[/yellow]")
         for f in skipped:
             console.print(f"  [yellow]\u25cb[/yellow] {f}")
+
+    return len(updated)
+
+
+# ---------------------------------------------------------------------------
+# Click commands
+# ---------------------------------------------------------------------------
+
+@click.command("diff")
+@click.argument("path", default=".")
+def diff_cmd(path: str) -> None:
+    """Compare installed Claude profile against the source repo."""
+    _ws_root, claude_repo, profile, target = _resolve_profile_context(path)
+
+    console = get_console()
+    console.print(f"[cyan]Profile:[/cyan] {profile}")
+
+    diffs = compare_profile(claude_repo, profile, target)
+
+    if not diffs:
+        console.print("[yellow]No profile files found to compare.[/yellow]")
+        return
+
+    _render_diff_table(diffs, title=f"Claude profile diff: {profile}")
+
+    if all(d.status == "identical" for d in diffs):
+        console.print("\n[bold green]Profile is up to date.[/bold green]")
+    else:
+        console.print(
+            "\n[yellow]Profile has differences.[/yellow] "
+            "Run 'stx claude update' to synchronize."
+        )
+
+
+@click.command("update")
+@click.argument("path", default=".")
+@click.option(
+    "--force", is_flag=True,
+    help="Overwrite all files including CLAUDE.md.",
+)
+@click.option(
+    "--all", "update_all", is_flag=True,
+    help="Update all projects in the workspace.",
+)
+def update_cmd(path: str, force: bool, update_all: bool) -> None:
+    """Update an installed Claude profile from the source repo."""
+    console = get_console()
+
+    if update_all:
+        ws_root = find_workspace_root()
+        if ws_root is None:
+            raise click.ClickException(
+                "Not inside a StreamTeX workspace (no stx.toml found in parent directories)."
+            )
+        config = load_stx_toml(ws_root)
+        claude_repo = find_claude_repo(ws_root, config)
+
+        targets = find_profile_targets(ws_root)
+        if not targets:
+            console.print("[yellow]No projects with Claude profiles found.[/yellow]")
+            return
+
+        total_updated = 0
+        for target_path, profile in targets:
+            rel = os.path.relpath(target_path, ws_root)
+            console.print(f"\n[bold cyan]\u2500\u2500 {rel} [/bold cyan]([cyan]{profile}[/cyan])")
+            total_updated += _update_single_target(
+                claude_repo, profile, target_path, force, console,
+            )
+
+        separator = "\u2500" * 40
+        console.print(f"\n[bold]{separator}[/bold]")
+        if total_updated:
+            console.print(
+                f"[green]Total: {total_updated} file(s) updated "
+                f"across {len(targets)} project(s).[/green]"
+            )
+        else:
+            console.print(
+                f"[bold green]All {len(targets)} project(s) are up to date.[/bold green]"
+            )
+        return
+
+    # Single target mode
+    _ws_root, claude_repo, profile, target = _resolve_profile_context(path)
+    console.print(f"[cyan]Profile:[/cyan] {profile}")
+    _update_single_target(claude_repo, profile, target, force, console)
+
+
+@click.command("check")
+def check_cmd() -> None:
+    """Check synchronization status of all Claude profiles in the workspace."""
+    ws_root = find_workspace_root()
+    if ws_root is None:
+        raise click.ClickException(
+            "Not inside a StreamTeX workspace (no stx.toml found in parent directories)."
+        )
+
+    config = load_stx_toml(ws_root)
+    claude_repo = find_claude_repo(ws_root, config)
+    console = get_console()
+
+    targets = find_profile_targets(ws_root)
+    if not targets:
+        console.print("[yellow]No projects with Claude profiles found.[/yellow]")
+        return
+
+    has_problems = False
+    for target_path, profile in targets:
+        rel = os.path.relpath(target_path, ws_root)
+        diffs = compare_profile(claude_repo, profile, target_path)
+
+        problems = [d for d in diffs if d.status in ("modified", "missing")]
+        if problems:
+            has_problems = True
+            console.print(
+                f"[red]\u2717[/red] {rel} ({profile}) "
+                f"\u2014 {len(problems)} file(s) out of sync"
+            )
+            for d in problems:
+                if d.status == "missing":
+                    icon = "[red]\u2717 Missing[/red]"
+                else:
+                    icon = "[yellow]\u25cb Modified[/yellow]"
+                console.print(f"    {icon}: {d.path}")
+        else:
+            console.print(f"[green]\u2713[/green] {rel} ({profile}) \u2014 up to date")
+
+    if has_problems:
+        console.print(
+            "\n[yellow]Run 'stx claude update --all' to synchronize.[/yellow]"
+        )
+        raise SystemExit(1)
+    else:
+        console.print(
+            f"\n[bold green]All {len(targets)} project(s) are up to date.[/bold green]"
+        )

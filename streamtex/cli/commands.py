@@ -5,6 +5,7 @@ import click
 from streamtex import __version__
 
 from .bib_cmd import generate_stubs
+from .claude_cmd import check_cmd as claude_check
 from .claude_cmd import diff_cmd as claude_diff
 from .claude_cmd import install as claude_install
 from .claude_cmd import list_cmd as claude_list
@@ -70,6 +71,7 @@ claude.add_command(claude_install)
 claude.add_command(claude_list)
 claude.add_command(claude_update)
 claude.add_command(claude_diff)
+claude.add_command(claude_check)
 
 
 # --- Bibliography subgroup -------------------------------------------------

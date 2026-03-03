@@ -43,3 +43,4 @@ La dernière fois que j'ai essayé de déployer sur Render, Peux-tu vérifier qu
 Pour info, j'ai une barrière d'environnement avec le to pypi Qui s'appelle PYPI_TOKEN
 Est-ce que cela serait mieux ?
 Est-ce que je dois renommer le Nom du Token
+

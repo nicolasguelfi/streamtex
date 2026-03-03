@@ -21,6 +21,9 @@ tokens.md
 html_exports/
 test.html
 
+# === Maintenance (internal notes, not published) ===
+documentation/maintenance/
+
 # === Large files ===
 /big/
 /data/models/

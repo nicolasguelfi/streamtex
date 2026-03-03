@@ -910,9 +910,38 @@ bib_sources = ["references.bib"]
 st_book([...], bib_sources=bib_sources, bib_config=bib_config)
 
 # In-text citations (inside blocks)
-from streamtex.bib import st_cite, st_bibliography
+from streamtex.bib import cite, st_cite, st_bibliography
 st_cite("author2024key")           # Inline citation widget
+cite("key1", "key2")               # Multi-key inline citation string
 st_bibliography()                   # Render full bibliography
+```
+
+### Output Formats (BibFormat)
+
+```python
+BibFormat.APA       # Author, A. B. (Year). Title. Journal.
+BibFormat.MLA       # Author. "Title." Journal, vol. N, Year.
+BibFormat.IEEE      # [1] A. Author, "Title," Journal, Year.
+BibFormat.CHICAGO   # Author. "Title." Journal N (Year): Pages.
+BibFormat.HARVARD   # Author Year, 'Title', Journal, vol. N.
+```
+
+### Citation Styles (CitationStyle)
+
+```python
+CitationStyle.AUTHOR_YEAR  # (Smith et al., 2020)
+CitationStyle.NUMERIC      # [1]
+CitationStyle.SUPERSCRIPT  # Text^1
+```
+
+### Custom Parsers
+
+```python
+from streamtex.bib import register_bib_parser, BibEntry
+
+def my_parser(filepath: str) -> list[BibEntry]:
+    ...
+register_bib_parser("myformat", my_parser)  # Auto-detect .myformat files
 ```
 
 ## Collection System (Multi-Project Hub)
@@ -962,16 +991,32 @@ st_book([
 ## Google Sheets Import
 
 ```python
-from streamtex import GSheetConfig, set_gsheet_config, load_gsheet, load_gsheet_df
+from streamtex import GSheetConfig, GSheetSource, AuthMode
+from streamtex import set_gsheet_config, load_gsheet, load_gsheet_df
+
+# Authentication modes
+AuthMode.PUBLIC            # No auth (public sheets)
+AuthMode.SERVICE_ACCOUNT   # Server-side JSON key (production)
+AuthMode.OAUTH2            # Interactive browser auth (dev)
 
 # Configure
-config = GSheetConfig(...)
+config = GSheetConfig(
+    auth_mode=AuthMode.PUBLIC,          # or SERVICE_ACCOUNT, OAUTH2
+    credentials_path="service.json",    # For SERVICE_ACCOUNT
+    cache_ttl=300,                      # Cache seconds (0=no, None=forever)
+)
 set_gsheet_config(config)
 
-# Load as module or DataFrame
-block_module = load_gsheet("path/to/source")
-df = load_gsheet_df("path/to/source")
+# Define source
+src = GSheetSource(sheet_id="abc123", tab_name="Sheet1")
+src = GSheetSource.from_url("https://docs.google.com/spreadsheets/d/abc123/...")
+
+# Load data
+data = load_gsheet(src)                 # List[Dict]
+df = load_gsheet_df(src)                # pandas DataFrame
 ```
+
+Credentials resolution: explicit path > `GSHEET_CREDENTIALS` env > `GOOGLE_APPLICATION_CREDENTIALS` env.
 
 ## Utilities
 

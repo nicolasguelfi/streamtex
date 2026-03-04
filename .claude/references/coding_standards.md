@@ -248,17 +248,48 @@ uv run streamlit run documentation/manuals/stx_manuals_collection/book.py
 - **Hugging Face Spaces**: Push Docker image to HF Space via git remote
 - **pip install**: `pip install -e .` for development (eliminates setup.py PATH hack)
 
-## 12. Testing
+## 12. Testing & Linting
+
+### Running tests
 ```bash
-# Unit tests (all)
-uv run pytest tests/ -v
-
-# Specific test file
-uv run pytest tests/test_export.py -v
-
-# Watch mode (requires pytest-watch)
-uv run pytest-watch tests/
+uv run pytest tests/ -v              # All tests
+uv run pytest tests/test_export.py -v  # Specific file
 ```
+
+### Ruff configuration (MANDATORY for all projects)
+
+Every StreamTeX project `pyproject.toml` MUST include:
+```toml
+[tool.ruff.lint]
+ignore = ["F403", "F405", "E701", "E741"]
+```
+
+These rules are suppressed because they conflict with standard StreamTeX patterns:
+- **F403/F405** — `from streamtex import *` is the standard import
+- **E701** — `with l.item(): st_write("text")` one-liner list items
+- **E741** — `as l` variable name in `with st_list(...) as l:`
+
+### CI configuration (MANDATORY for projects with `[tool.uv.sources]`)
+
+Projects with editable local sources MUST use `UV_NO_SOURCES=1` in CI:
+```yaml
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    env:
+      UV_NO_SOURCES: 1    # Ignore [tool.uv.sources] — resolve from PyPI
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+      - run: uv sync              # NOT --frozen (lock file encodes local path)
+      - run: uv run ruff check .
+```
+
+**Why:** `[tool.uv.sources]` points to a local path (e.g. `../../streamtex`) that
+does not exist in CI. `UV_NO_SOURCES=1` tells uv to ignore it and resolve from PyPI.
+`--frozen` fails because the lock file also encodes the local path.
 
 ## 13. Block Registry Patterns
 
@@ -343,11 +374,26 @@ Raises `BlockNotFoundError` if not found, `BlockImportError` on import failure.
 
 Block helpers (`show_code`, `show_explanation`, `show_details`) support 3 usage modes.
 
-**Important:** `show_explanation()` and `show_details()` render the body text via
-`st_markdown()`, so standard Markdown formatting works: **bold**, *italic*, `code`,
-lists, links, etc. The text is displayed at `StxStyles.big` font size with
-`p { font-size: inherit; }` to ensure Streamlit's `<p>` elements inherit the
-container size.
+**Important:** `show_explanation()`, `show_details()`, `show_code()`, `show_code_inline()`,
+`st_write()` and `st_code()` apply `textwrap.dedent()` automatically — callers
+do NOT need to wrap text in `textwrap.dedent()`.
+The body text is rendered via `st_markdown()`, so standard Markdown formatting
+works: **bold**, *italic*, `code`, lists, links, etc.
+
+```python
+# CORRECT — simple, no textwrap import needed
+show_explanation("""\
+    **st_write()** renders styled text.
+
+    1. First argument is the style
+    2. Second argument is the text
+""")
+
+# WRONG — redundant (still works, but unnecessary)
+show_code("""\
+    ...
+"""))
+```
 
 ### Mode 1: Config Injection (Recommended)
 

@@ -134,9 +134,18 @@ dependencies = [
     "streamlit>=1.54.0",
 ]
 
+[dependency-groups]
+dev = ["pytest>=7.0", "ruff>=0.4.0"]
+
+[tool.uv]
+default-groups = ["dev"]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.ruff.lint]
+ignore = ["F403", "F405", "E701", "E741"]
 """
 
 

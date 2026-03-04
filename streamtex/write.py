@@ -1,3 +1,4 @@
+import textwrap
 from typing import Optional
 
 from .enums import Tag, Tags
@@ -39,6 +40,7 @@ def st_write(
 
     # Parse style and txt arguments
     container_style, final_txt = _parse_args(*args, style=style, no_link_decor=no_link_decor, hover=hover)
+    final_txt = textwrap.dedent(final_txt)
 
     # Handle ToC registration and element id
     final_txt, key_anchor = _handle_toc(final_txt, toc_lvl, label, marker)

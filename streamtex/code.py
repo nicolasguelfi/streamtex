@@ -1,3 +1,4 @@
+import textwrap
 from typing import Optional
 
 from .export import _render
@@ -109,6 +110,8 @@ def st_code(
     from .utils import resolve_content
 
     code = resolve_content(code, file=file, encoding=encoding)
+    if not file:
+        code = textwrap.dedent(code).strip()
 
     # Line extraction
     if start_line or end_line:

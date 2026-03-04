@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "streamtex"
-version = "0.3.2.post3"
+version = "0.3.2.post4"
 description = "AI-powered content framework for Streamlit — create presentations, courses, and web-books with Claude or Cursor, no coding required."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -99,7 +99,7 @@ line-length = 120
 select = ["E", "F", "I", "W"]
 
 [tool.ruff.lint.per-file-ignores]
-"__init__.py" = ["F401", "I001"]
+"__init__.py" = ["F401", "I001", "E402"]
 # Files with embedded HTML/CSS/JS/SVG strings that cannot be shortened
 "streamtex/bib_preview.py" = ["E501"]
 "streamtex/marker.py" = ["E501"]

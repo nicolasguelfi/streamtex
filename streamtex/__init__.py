@@ -1,6 +1,16 @@
 """StreamTeX — A Streamlit wrapper for styled content rendering."""
 
-__version__ = "0.3.2.post3"
+# Suppress Streamlit "No runtime found" warnings when imported outside a
+# Streamlit app (e.g. from the stx CLI).  Streamlit creates per-module loggers
+# with their own StreamHandler(stderr) at import time, so we must redirect
+# stderr during the initial import cascade.
+import io as _io
+import sys as _sys
+
+_real_stderr = _sys.stderr
+_sys.stderr = _io.StringIO()
+
+__version__ = "0.3.2.post4"
 
 # Core style system
 from .styles import Style, ListStyle, StyleGrid, StxStyles, StreamTeX_Styles, theme
@@ -97,3 +107,7 @@ from .link_config import LinkConfig, set_link_config, get_link_config
 
 # Block Inspector (opt-in)
 from .inspector import InspectorConfig, FileCategoryRegistry
+
+# Restore stderr after all imports are done
+_sys.stderr = _real_stderr
+del _real_stderr, _io, _sys

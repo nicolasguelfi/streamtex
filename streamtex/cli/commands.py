@@ -1,8 +1,10 @@
 """Click command hierarchy for the stx CLI."""
 
+from importlib.metadata import version
+
 import click
 
-from streamtex import __version__
+__version__ = version("streamtex")
 
 from .bib_cmd import generate_stubs
 from .claude_cmd import check_cmd as claude_check

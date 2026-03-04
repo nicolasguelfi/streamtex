@@ -365,6 +365,33 @@ def clone():
                 console.print(f"    {result.stderr.strip()}")
             skipped += 1
 
+    # --- Install shared commands globally (~/.claude/commands/) ---
+    try:
+        from .claude_cmd import find_claude_repo
+
+        claude_repo = find_claude_repo(ws_root, config)
+        shared_cmd_dir = os.path.join(claude_repo, "shared", "commands")
+        if os.path.isdir(shared_cmd_dir):
+            global_claude_cmd = os.path.join(Path.home(), ".claude", "commands")
+            os.makedirs(global_claude_cmd, exist_ok=True)
+            count = 0
+            for fname in os.listdir(shared_cmd_dir):
+                src = os.path.join(shared_cmd_dir, fname)
+                if os.path.isfile(src):
+                    dst = os.path.join(global_claude_cmd, fname)
+                    # Remove read-only before overwrite
+                    if os.path.exists(dst):
+                        os.chmod(dst, 0o644)
+                    shutil.copy2(src, dst)
+                    os.chmod(dst, 0o444)
+                    count += 1
+            if count:
+                console.print(
+                    f"  [green]global[/green]: {count} shared command(s) → ~/.claude/commands/"
+                )
+    except click.ClickException:
+        pass  # No claude repo configured/cloned yet — skip silently
+
     console.print(f"\n[bold]Done:[/bold] {cloned} cloned, {skipped} skipped")
 
 

@@ -24,8 +24,11 @@ and web-books — without writing Python code.
 ```bash
 mkdir my-workspace && cd my-workspace
 stx workspace init .        # default: standard preset (docs + claude)
-stx workspace clone          # clones repos declared in stx.toml
+stx workspace clone          # clones repos + installs shared commands globally
 ```
+
+> After cloning, shared commands (like `/stx-guide`) are copied to `~/.claude/commands/`
+> and available globally — even outside any project.
 
 ### Step 2 — Create a project and install a Claude profile
 

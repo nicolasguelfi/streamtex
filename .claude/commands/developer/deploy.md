@@ -45,6 +45,32 @@ Report the health check status.
    ```
 4. After deployment, verify the app is accessible on the GCP VM's IP at port 8501.
 
+## Target: render (auto-deploy)
+
+Render services are automatically redeployed on every push to `main` via a
+GitHub Actions workflow (`.github/workflows/render-deploy.yml`) that calls
+the Render API.
+
+**Setup (one-time):**
+1. Add the `RENDER_API_KEY` secret to the GitHub repo:
+   ```bash
+   gh secret set RENDER_API_KEY -R nicolasguelfi/<repo> --body "<key>"
+   ```
+2. The workflow reads `render.yaml` to extract service names, resolves their
+   IDs via the Render API, and triggers a deploy for each.
+
+**Manual trigger:**
+```bash
+# From GitHub Actions UI: "Run workflow" button
+# Or via CLI:
+gh workflow run render-deploy.yml -R nicolasguelfi/<repo>
+```
+
+**Why not Render's built-in auto-deploy?**
+Render uses a GitHub App for auto-deploy. After consecutive build failures,
+Render silently suspends the trigger (even though `autoDeploy` still shows
+`yes`). The GitHub Actions workflow bypasses this entirely.
+
 ## Target: env-sync
 
 Synchronize environment variables from `render.yaml` to live Render services:

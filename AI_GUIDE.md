@@ -366,6 +366,25 @@ Commands are simple markdown files with instructions for the AI assistant.
 The deploy command supports Docker, Hugging Face Spaces, and GCP targets.
 It runs pre-flight checks (tests, linting, requirements) before deploying.
 
+### How does Render auto-deploy work?
+
+Render services are automatically redeployed on every push to `main` via a GitHub Actions
+workflow (`.github/workflows/render-deploy.yml`). The workflow reads `render.yaml`, resolves
+service IDs via the Render API, and triggers a deploy for each service.
+
+**Setup (one-time per repo):**
+```bash
+gh secret set RENDER_API_KEY -R nicolasguelfi/<repo> --body "<your-render-api-key>"
+```
+
+**Manual trigger:**
+```bash
+gh workflow run render-deploy.yml -R nicolasguelfi/<repo>
+```
+
+> **Note:** Render's built-in GitHub App auto-deploy can silently stop after consecutive
+> build failures. The GitHub Actions workflow bypasses this limitation entirely.
+
 ### How do I sync env vars to Render after changing render.yaml?
 
 ```bash

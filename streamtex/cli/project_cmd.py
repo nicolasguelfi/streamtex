@@ -424,14 +424,16 @@ def _copy_rich_template(
     ws_root = find_workspace_root()
     if ws_root is None:
         raise click.ClickException(
-            "--template requires a StreamTeX workspace (no stx.toml found)."
+            "--template requires a StreamTeX workspace.\n"
+            "Run: stx workspace init . --preset standard"
         )
 
     src = os.path.join(ws_root, "streamtex-docs", "templates", f"template_{template_name}")
     if not os.path.isdir(src):
         raise click.ClickException(
             f"Template not found: {src}\n"
-            "Make sure streamtex-docs is cloned in the workspace."
+            "streamtex-docs is required. "
+            "Run: stx workspace upgrade standard && stx workspace clone"
         )
 
     copied: list[str] = []

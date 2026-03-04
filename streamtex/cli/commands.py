@@ -20,7 +20,7 @@ from .project_cmd import validate as project_validate
 from .publish_cmd import check_cmd as publish_check
 from .publish_cmd import pypi_cmd as publish_pypi
 from .shortcuts import run_lint, run_test
-from .workspace_cmd import clone, init, link, status, sync
+from .workspace_cmd import clone, init, link, status, sync, upgrade
 
 
 @click.group()
@@ -58,6 +58,7 @@ workspace.add_command(clone)
 workspace.add_command(link)
 workspace.add_command(status)
 workspace.add_command(sync)
+workspace.add_command(upgrade)
 
 
 # --- Claude subgroup -------------------------------------------------------

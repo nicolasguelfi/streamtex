@@ -11,7 +11,7 @@ and web-books — without writing Python code.
 |------|:--------:|---------|
 | Python >= 3.10 | Yes | [python.org](https://www.python.org/downloads/) |
 | uv | Yes | `curl -LsSf https://astral.sh/uv/install.sh \| sh` |
-| StreamTeX | Yes | `pip install streamtex` |
+| StreamTeX CLI | Yes | `uv tool install streamtex[cli]` |
 | Claude Code | Recommended | [claude.ai/claude-code](https://claude.ai/claude-code) |
 | Cursor | Alternative | [cursor.com](https://cursor.com) |
 
@@ -19,29 +19,26 @@ and web-books — without writing Python code.
 
 ## Setup (5 minutes)
 
-### Step 1 — Create a workspace
+### Step 1 — Create a workspace and clone repos
 
 ```bash
 mkdir my-workspace && cd my-workspace
+stx workspace init .        # default: standard preset (docs + claude)
+stx workspace clone          # clones repos declared in stx.toml
 ```
 
-### Step 2 — Clone the AI profiles
+### Step 2 — Create a project and install a Claude profile
 
 ```bash
-git clone https://github.com/nicolasguelfi/streamtex-claude
-```
-
-### Step 3 — Create and initialize your project
-
-```bash
-mkdir my-project && cd my-project
-python ../streamtex-claude/install.py project .
+stx project new my-project
+cd projects/stx-my-project
+stx claude install project .
 ```
 
 This creates a `.claude/` directory with commands, skills, agents,
 and references tailored to your workflow.
 
-### Step 4 — Open in Claude Code or Cursor
+### Step 3 — Open in Claude Code or Cursor
 
 ```bash
 claude          # Open Claude Code in this directory
@@ -248,14 +245,14 @@ StreamTeX provides 4 installable AI profiles via
 - **Commands**: 19 (designer + migration + project + developer)
 - **Agents**: Project Architect, Slide Designer, Slide Reviewer
 - **Skills**: Block blueprints, visual design rules, style conventions, quick reference
-- **Install**: `python streamtex-claude/install.py project ./my-project`
+- **Install**: `stx claude install project ./my-project`
 
 ### `presentation` (extends project)
 
 - **Audience**: Live presenters (amphitheater, conference)
 - **Adds**: 3 commands + 1 agent + 2 skills on top of `project`
 - **Key difference**: Enforces large fonts (48pt+), keyword-only bullets, high contrast for 10-20m distance
-- **Install**: `python streamtex-claude/install.py presentation ./my-project`
+- **Install**: `stx claude install presentation ./my-project`
 
 ### `documentation` (manual authoring)
 
@@ -263,14 +260,14 @@ StreamTeX provides 4 installable AI profiles via
 - **Commands**: 10 (designer + project + developer)
 - **Agents**: Slide Designer, Slide Reviewer
 - **Focus**: Multi-manual coordination, course generation
-- **Install**: `python streamtex-claude/install.py documentation ./my-project`
+- **Install**: `stx claude install documentation ./my-project`
 
 ### `library` (core development)
 
 - **Audience**: StreamTeX library contributors
 - **Commands**: 3 (test, lint, deploy)
 - **Skills**: Architecture reference, testing patterns
-- **Install**: `python streamtex-claude/install.py library ./streamtex`
+- **Install**: `stx claude install library ./streamtex`
 
 ---
 

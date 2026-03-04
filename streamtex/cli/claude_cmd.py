@@ -37,7 +37,8 @@ def find_claude_repo(ws_root: str, config: dict) -> str:
                 return repo_path
 
     raise click.ClickException(
-        "streamtex-claude repo not found in workspace. Run 'stx workspace clone' first."
+        "streamtex-claude repo not found in workspace.\n"
+        "Run: stx workspace upgrade user && stx workspace clone"
     )
 
 

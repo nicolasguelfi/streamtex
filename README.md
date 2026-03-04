@@ -14,27 +14,32 @@ and web-books with Claude or Cursor. No coding required.
 > Describe your project in natural language, and let Claude or Cursor build it —
 > or use the Python API for full control.
 
-## Three Ways to Use StreamTeX
+## Getting Started
 
-### Quick Start with the CLI (recommended)
+StreamTeX supports 4 installation levels. Pick the one that fits your needs.
 
-From zero to a running project in 5 commands:
+### Quick Start (minimal, no workspace)
+
+From zero to a running project in 3 commands:
 
 ```bash
-# 1. Install the CLI
 uv tool install streamtex[cli]
+stx project new mon-projet
+cd stx-mon-projet && uv sync && uv run streamlit run book.py
+```
 
-# 2. Create and initialize a workspace
+### Standard Setup (recommended)
+
+Full workspace with rich templates, documentation, and Claude AI profiles:
+
+```bash
+uv tool install streamtex[cli]
 mkdir streamtex-dev && cd streamtex-dev
 stx workspace init .
-stx workspace clone       # clones streamtex, streamtex-docs, streamtex-claude
-stx workspace link        # configures editable installs
-
-# 3. Create a project from the rich template
+stx workspace clone
 stx project new mon-projet --template project
-
-# 4. Run it
 cd projects/stx-mon-projet
+stx claude install project .
 uv run streamlit run book.py
 ```
 
@@ -47,7 +52,7 @@ Install StreamTeX and a Claude AI profile, then let the AI build your project:
 ```bash
 uv tool install streamtex[cli]
 mkdir streamtex-dev && cd streamtex-dev
-stx workspace init . && stx workspace clone && stx workspace link
+stx workspace init . && stx workspace clone
 stx project new mon-projet
 cd projects/stx-mon-projet
 stx claude install project .
@@ -85,6 +90,40 @@ sx.st_write(style, "Hello StreamTeX!")
 
 ```bash
 uv run streamlit run app.py
+```
+
+### Manual Installation (without stx CLI)
+
+```bash
+pip install streamtex
+git clone https://github.com/nicolasguelfi/streamtex-claude.git
+mkdir my-project && cd my-project
+python ../streamtex-claude/install.py project .
+uv run streamlit run book.py
+```
+
+### Workspace Presets
+
+The `stx workspace init` command supports 4 presets:
+
+| Preset | Repos | Use case |
+|--------|-------|----------|
+| `basic` | none | Workspace only, upgrade later |
+| `user` | streamtex-claude | + Claude AI profiles |
+| `standard` (default) | streamtex-docs + streamtex-claude | + rich templates + local docs |
+| `developer` | all 3 repos | + library source + editable install |
+
+```bash
+stx workspace init . --preset user       # Claude profiles only
+stx workspace init .                     # standard (default)
+stx workspace init . --preset developer  # full developer setup
+```
+
+Upgrade an existing workspace:
+
+```bash
+stx workspace upgrade developer
+stx workspace clone
 ```
 
 ## AI-Powered Features

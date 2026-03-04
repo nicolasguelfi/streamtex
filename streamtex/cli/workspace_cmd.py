@@ -1,6 +1,7 @@
-"""Workspace commands: init, clone, link, status, sync."""
+"""Workspace commands: init, clone, link, status, sync, upgrade."""
 
 import os
+import re
 import shutil
 import subprocess
 from datetime import datetime, timezone
@@ -11,45 +12,76 @@ import click
 from .console import get_console
 
 # ---------------------------------------------------------------------------
+# Preset definitions
+# ---------------------------------------------------------------------------
+
+PRESET_REPOS = {
+    "basic": [],
+    "user": ["claude"],
+    "standard": ["docs", "claude"],
+    "developer": ["library", "docs", "claude"],
+}
+
+PRESET_ORDER = ["basic", "user", "standard", "developer"]
+
+ALL_REPOS = {
+    "library": {
+        "name": "streamtex",
+        "url": "https://github.com/nicolasguelfi/streamtex.git",
+        "path": "streamtex",
+        "type": "library",
+    },
+    "docs": {
+        "name": "streamtex-docs",
+        "url": "https://github.com/nicolasguelfi/streamtex-docs.git",
+        "path": "streamtex-docs",
+        "type": "docs",
+    },
+    "claude": {
+        "name": "streamtex-claude",
+        "url": "https://github.com/nicolasguelfi/streamtex-claude.git",
+        "path": "streamtex-claude",
+        "type": "claude",
+    },
+}
+
+# ---------------------------------------------------------------------------
 # TOML helpers
 # ---------------------------------------------------------------------------
 
-def generate_stx_toml(name: str, created: str) -> str:
+def generate_stx_toml(name: str, created: str, preset: str = "standard") -> str:
     """Generate the content of a stx.toml file."""
-    return f"""\
-[workspace]
-name = "{name}"
-created = "{created}"
+    lines = [
+        "[workspace]",
+        f'name = "{name}"',
+        f'created = "{created}"',
+        f'preset = "{preset}"',
+        "",
+        "[repos]",
+    ]
 
-[repos]
+    for repo_key in PRESET_REPOS.get(preset, []):
+        repo = ALL_REPOS[repo_key]
+        lines.append("")
+        lines.append(f"[repos.{repo['name']}]")
+        lines.append(f'url = "{repo["url"]}"')
+        lines.append(f'path = "{repo["path"]}"')
+        lines.append(f'type = "{repo["type"]}"')
 
-[repos.streamtex]
-url = "https://github.com/nicolasguelfi/streamtex.git"
-path = "streamtex"
-type = "library"
+    lines.append("")
+    lines.append("[deploy]")
+    lines.append("# render_owner = \"nicolasguelfi\"")
+    lines.append("# render_region = \"oregon\"")
+    lines.append("")
 
-[repos.streamtex-docs]
-url = "https://github.com/nicolasguelfi/streamtex-docs.git"
-path = "streamtex-docs"
-type = "docs"
+    if "claude" in PRESET_REPOS.get(preset, []):
+        lines.append("[claude]")
+        lines.append('source = "streamtex-claude"')
+    else:
+        lines.append("[claude]")
 
-[repos.streamtex-claude]
-url = "https://github.com/nicolasguelfi/streamtex-claude.git"
-path = "streamtex-claude"
-type = "claude"
-
-# [repos.stx-ai4se]
-# url = "https://github.com/nicolasguelfi/stx-ai4se.git"
-# path = "projects/stx-ai4se"
-# type = "project"
-
-[deploy]
-# render_owner = "nicolasguelfi"
-# render_region = "oregon"
-
-[claude]
-source = "streamtex-claude"
-"""
+    lines.append("")
+    return "\n".join(lines)
 
 
 def load_stx_toml(workspace_path: str) -> dict:
@@ -127,7 +159,12 @@ def get_repo_status(repo_path: str) -> dict:
 @click.command()
 @click.argument("path", default=".")
 @click.option("--name", default=None, help="Workspace name (defaults to directory name).")
-def init(path, name):
+@click.option(
+    "--preset", default="standard",
+    type=click.Choice(PRESET_ORDER),
+    help="Installation preset (default: standard).",
+)
+def init(path, name, preset):
     """Initialize a StreamTeX workspace with stx.toml."""
     target = os.path.abspath(path)
     toml_path = os.path.join(target, "stx.toml")
@@ -140,7 +177,7 @@ def init(path, name):
     ws_name = name or os.path.basename(target)
     created = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
-    content = generate_stx_toml(ws_name, created)
+    content = generate_stx_toml(ws_name, created, preset=preset)
     with open(toml_path, "w", encoding="utf-8") as f:
         f.write(content)
 
@@ -150,7 +187,7 @@ def init(path, name):
 
     console = get_console()
     console.print(f"[green]Workspace initialized:[/green] {target}")
-    console.print(f"  stx.toml created (name={ws_name!r})")
+    console.print(f"  stx.toml created (name={ws_name!r}, preset={preset!r})")
     console.print("  projects/ directory created")
 
 
@@ -351,3 +388,87 @@ def sync():
     console = get_console()
     console.print("[bold]Syncing all repos …[/bold]\n")
     _run_uv_sync(repos, ws_root)
+
+
+# ---------------------------------------------------------------------------
+# upgrade command
+# ---------------------------------------------------------------------------
+
+@click.command()
+@click.argument("preset", type=click.Choice(PRESET_ORDER))
+def upgrade(preset):
+    """Upgrade workspace to a higher preset."""
+    ws_root, config = _require_workspace()
+    console = get_console()
+
+    # Current preset — backwards compat: missing field → "developer"
+    current = config.get("workspace", {}).get("preset", "developer")
+    current_idx = PRESET_ORDER.index(current) if current in PRESET_ORDER else len(PRESET_ORDER) - 1
+    new_idx = PRESET_ORDER.index(preset)
+
+    if new_idx < current_idx:
+        raise click.ClickException(
+            f"Cannot downgrade from '{current}' to '{preset}'."
+        )
+
+    if new_idx == current_idx:
+        console.print(f"[yellow]Already at preset '{current}'.[/yellow]")
+        return
+
+    # Repos to add
+    current_repos = set(PRESET_REPOS.get(current, []))
+    new_repos = set(PRESET_REPOS[preset])
+    to_add = new_repos - current_repos
+
+    # Rewrite stx.toml
+    toml_path = os.path.join(ws_root, "stx.toml")
+    with open(toml_path, encoding="utf-8") as f:
+        text = f.read()
+
+    # Update preset line
+    if re.search(r'^preset\s*=', text, re.MULTILINE):
+        text = re.sub(
+            r'^(preset\s*=\s*).*$',
+            f'preset = "{preset}"',
+            text,
+            flags=re.MULTILINE,
+        )
+    else:
+        # Insert preset after created line in [workspace]
+        text = re.sub(
+            r'^(created\s*=\s*".+")$',
+            f'\\1\npreset = "{preset}"',
+            text,
+            flags=re.MULTILINE,
+        )
+
+    # Add missing repo sections before [deploy]
+    if to_add:
+        new_sections = []
+        for repo_key in PRESET_REPOS[preset]:
+            if repo_key in to_add:
+                repo = ALL_REPOS[repo_key]
+                new_sections.append(f"\n[repos.{repo['name']}]")
+                new_sections.append(f'url = "{repo["url"]}"')
+                new_sections.append(f'path = "{repo["path"]}"')
+                new_sections.append(f'type = "{repo["type"]}"')
+        insert_block = "\n".join(new_sections) + "\n"
+        text = text.replace("\n[deploy]", f"{insert_block}\n[deploy]")
+
+    # Add claude.source if upgrading to a preset that includes claude
+    if "claude" in to_add:
+        if re.search(r'^\[claude\]\s*$', text, re.MULTILINE):
+            text = re.sub(
+                r'^\[claude\]\s*$',
+                '[claude]\nsource = "streamtex-claude"',
+                text,
+                flags=re.MULTILINE,
+            )
+
+    with open(toml_path, "w", encoding="utf-8") as f:
+        f.write(text)
+
+    console.print(f"[green]Upgraded from '{current}' to '{preset}'.[/green]")
+    for repo_key in sorted(to_add):
+        console.print(f"  + {ALL_REPOS[repo_key]['name']}")
+    console.print("\nRun [bold]stx workspace clone[/bold] to clone the new repos.")

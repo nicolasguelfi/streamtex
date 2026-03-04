@@ -1,4 +1,4 @@
-"""Tests for stx workspace init/clone/link/status/sync commands."""
+"""Tests for stx workspace init/clone/link/status/sync/upgrade commands."""
 
 import os
 from unittest.mock import patch
@@ -20,30 +20,30 @@ except ModuleNotFoundError:
 # ---------------------------------------------------------------------------
 
 def test_generate_stx_toml():
+    """Default preset is standard: 2 repos (docs + claude)."""
     content = generate_stx_toml("test-ws", "2026-01-01T00:00:00Z")
     assert "[workspace]" in content
     assert 'name = "test-ws"' in content
+    assert 'preset = "standard"' in content
     assert "[repos]" in content
     assert "[deploy]" in content
     assert "[claude]" in content
 
     data = tomllib.loads(content)
     assert data["workspace"]["name"] == "test-ws"
+    assert data["workspace"]["preset"] == "standard"
 
 
 def test_generate_stx_toml_has_repos():
+    """Default (standard) has docs + claude, not library."""
     content = generate_stx_toml("ws", "2026-01-01T00:00:00Z")
     data = tomllib.loads(content)
 
     repos = data["repos"]
-    assert "streamtex" in repos
-    assert repos["streamtex"]["type"] == "library"
-    assert repos["streamtex"]["url"].endswith(".git")
-    assert repos["streamtex"]["path"] == "streamtex"
-
+    # standard preset: docs + claude only
+    assert "streamtex" not in repos
     assert "streamtex-docs" in repos
     assert repos["streamtex-docs"]["type"] == "docs"
-
     assert "streamtex-claude" in repos
     assert repos["streamtex-claude"]["type"] == "claude"
 
@@ -92,9 +92,11 @@ def test_init_toml_valid(tmp_path):
     assert "repos" in data
     assert "deploy" in data
     assert "claude" in data
-    # New: verify repos have proper structure
-    assert "streamtex" in data["repos"]
-    assert data["repos"]["streamtex"]["type"] == "library"
+    # Default preset is standard: docs + claude
+    assert data["workspace"]["preset"] == "standard"
+    assert "streamtex-docs" in data["repos"]
+    assert "streamtex-claude" in data["repos"]
+    assert "streamtex" not in data["repos"]
 
 
 def test_init_custom_name(tmp_path):
@@ -152,13 +154,14 @@ def test_status_outside_workspace(tmp_path):
 # clone
 # ---------------------------------------------------------------------------
 
-def _write_stx_toml(ws: os.PathLike) -> None:
-    """Write a minimal stx.toml into *ws*."""
-    content = generate_stx_toml("test-ws", "2026-01-01T00:00:00Z")
+def _write_stx_toml(ws: os.PathLike, preset: str = "standard") -> None:
+    """Write a stx.toml into *ws* with the given preset."""
+    content = generate_stx_toml("test-ws", "2026-01-01T00:00:00Z", preset=preset)
     (ws / "stx.toml").write_text(content)  # type: ignore[union-attr]
 
 
 def test_clone_clones_repos(tmp_path):
+    """Default standard preset has 2 repos to clone."""
     ws = tmp_path / "ws"
     ws.mkdir()
     _write_stx_toml(ws)
@@ -181,9 +184,8 @@ def test_clone_clones_repos(tmp_path):
             result = runner.invoke(cli, ["workspace", "clone"])
 
     assert result.exit_code == 0
-    # Should have called git clone for each repo
     git_calls = [c for c in calls if c[0] == "git"]
-    assert len(git_calls) == 3  # streamtex, streamtex-docs, streamtex-claude
+    assert len(git_calls) == 2  # streamtex-docs + streamtex-claude (standard)
     assert "cloned" in result.output
 
 
@@ -193,7 +195,7 @@ def test_clone_skips_existing(tmp_path):
     _write_stx_toml(ws)
 
     # Pre-create one repo directory
-    (ws / "streamtex").mkdir()
+    (ws / "streamtex-docs").mkdir()
 
     calls: list[list[str]] = []
 
@@ -214,7 +216,7 @@ def test_clone_skips_existing(tmp_path):
 
     assert result.exit_code == 0
     git_calls = [c for c in calls if c[0] == "git"]
-    assert len(git_calls) == 2  # streamtex skipped
+    assert len(git_calls) == 1  # streamtex-docs skipped, only streamtex-claude
     assert "already exists" in result.output
 
 
@@ -230,23 +232,28 @@ def test_clone_outside_workspace(tmp_path):
 # link / sync
 # ---------------------------------------------------------------------------
 
-def _create_workspace_with_repos(tmp_path):
+def _create_workspace_with_repos(tmp_path, preset="developer"):
     """Create a workspace with fake repo directories and pyproject.toml files."""
     ws = tmp_path / "ws"
     ws.mkdir()
-    _write_stx_toml(ws)
+    _write_stx_toml(ws, preset=preset)
 
-    # Create repo directories with pyproject.toml
-    for name in ("streamtex", "streamtex-docs", "streamtex-claude"):
-        repo = ws / name
-        repo.mkdir()
-        (repo / "pyproject.toml").write_text(f'[project]\nname = "{name}"\n')
+    from streamtex.cli.workspace_cmd import PRESET_REPOS, ALL_REPOS
+
+    # Create repo directories for the preset
+    for repo_key in PRESET_REPOS[preset]:
+        repo = ALL_REPOS[repo_key]
+        repo_dir = ws / repo["path"]
+        repo_dir.mkdir()
+        (repo_dir / "pyproject.toml").write_text(
+            f'[project]\nname = "{repo["name"]}"\n'
+        )
 
     return ws
 
 
 def test_link_runs_uv_sync(tmp_path):
-    ws = _create_workspace_with_repos(tmp_path)
+    ws = _create_workspace_with_repos(tmp_path, preset="developer")
 
     sync_dirs: list[str] = []
 
@@ -275,7 +282,7 @@ def test_link_runs_uv_sync(tmp_path):
 
 
 def test_sync_runs_all_repos(tmp_path):
-    ws = _create_workspace_with_repos(tmp_path)
+    ws = _create_workspace_with_repos(tmp_path, preset="developer")
 
     sync_dirs: list[str] = []
 
@@ -298,7 +305,7 @@ def test_sync_runs_all_repos(tmp_path):
         result = runner.invoke(cli, ["workspace", "sync"])
 
     assert result.exit_code == 0
-    # sync runs in ALL repos
+    # sync runs in ALL repos (developer = 3)
     assert len(sync_dirs) == 3
 
 
@@ -308,3 +315,188 @@ def test_sync_outside_workspace(tmp_path):
         result = runner.invoke(cli, ["workspace", "sync"])
     assert result.exit_code != 0
     assert "stx.toml" in result.output
+
+
+# ---------------------------------------------------------------------------
+# Preset-specific generation tests
+# ---------------------------------------------------------------------------
+
+def test_generate_stx_toml_preset_basic():
+    content = generate_stx_toml("ws", "2026-01-01T00:00:00Z", preset="basic")
+    data = tomllib.loads(content)
+    assert data["workspace"]["preset"] == "basic"
+    assert len(data["repos"]) == 0
+
+
+def test_generate_stx_toml_preset_user():
+    content = generate_stx_toml("ws", "2026-01-01T00:00:00Z", preset="user")
+    data = tomllib.loads(content)
+    assert data["workspace"]["preset"] == "user"
+    repos = data["repos"]
+    assert "streamtex-claude" in repos
+    assert "streamtex" not in repos
+    assert "streamtex-docs" not in repos
+    assert data["claude"]["source"] == "streamtex-claude"
+
+
+def test_generate_stx_toml_preset_standard():
+    content = generate_stx_toml("ws", "2026-01-01T00:00:00Z", preset="standard")
+    data = tomllib.loads(content)
+    assert data["workspace"]["preset"] == "standard"
+    repos = data["repos"]
+    assert "streamtex-docs" in repos
+    assert "streamtex-claude" in repos
+    assert "streamtex" not in repos
+    assert data["claude"]["source"] == "streamtex-claude"
+
+
+def test_generate_stx_toml_preset_developer():
+    content = generate_stx_toml("ws", "2026-01-01T00:00:00Z", preset="developer")
+    data = tomllib.loads(content)
+    assert data["workspace"]["preset"] == "developer"
+    repos = data["repos"]
+    assert "streamtex" in repos
+    assert repos["streamtex"]["type"] == "library"
+    assert repos["streamtex"]["url"].endswith(".git")
+    assert "streamtex-docs" in repos
+    assert "streamtex-claude" in repos
+    assert data["claude"]["source"] == "streamtex-claude"
+
+
+def test_init_default_preset_is_standard(tmp_path):
+    target = tmp_path / "ws"
+    runner = CliRunner()
+    result = runner.invoke(cli, ["workspace", "init", str(target)])
+    assert result.exit_code == 0
+
+    with open(target / "stx.toml", "rb") as f:
+        data = tomllib.load(f)
+    assert data["workspace"]["preset"] == "standard"
+    assert len(data["repos"]) == 2
+
+
+def test_init_preset_basic(tmp_path):
+    target = tmp_path / "ws"
+    runner = CliRunner()
+    result = runner.invoke(cli, ["workspace", "init", str(target), "--preset", "basic"])
+    assert result.exit_code == 0
+
+    with open(target / "stx.toml", "rb") as f:
+        data = tomllib.load(f)
+    assert data["workspace"]["preset"] == "basic"
+    assert len(data["repos"]) == 0
+
+
+def test_clone_user_preset_clones_one_repo(tmp_path):
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    _write_stx_toml(ws, preset="user")
+
+    calls: list[list[str]] = []
+
+    def fake_run(cmd, **_kwargs):
+        calls.append(cmd)
+
+        class _R:
+            returncode = 0
+            stdout = ""
+            stderr = ""
+        return _R()
+
+    with patch("streamtex.cli.workspace_cmd.subprocess.run", side_effect=fake_run):
+        runner = CliRunner()
+        with runner.isolated_filesystem(temp_dir=ws):
+            os.chdir(ws)
+            result = runner.invoke(cli, ["workspace", "clone"])
+
+    assert result.exit_code == 0
+    git_calls = [c for c in calls if c[0] == "git"]
+    assert len(git_calls) == 1  # only streamtex-claude
+
+
+# ---------------------------------------------------------------------------
+# Upgrade tests
+# ---------------------------------------------------------------------------
+
+def test_upgrade_basic_to_user(tmp_path):
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    _write_stx_toml(ws, preset="basic")
+
+    runner = CliRunner()
+    os.chdir(ws)
+    result = runner.invoke(cli, ["workspace", "upgrade", "user"])
+
+    assert result.exit_code == 0
+    assert "Upgraded" in result.output
+    assert "streamtex-claude" in result.output
+
+    with open(ws / "stx.toml", "rb") as f:
+        data = tomllib.load(f)
+    assert data["workspace"]["preset"] == "user"
+    assert "streamtex-claude" in data["repos"]
+
+
+def test_upgrade_user_to_standard(tmp_path):
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    _write_stx_toml(ws, preset="user")
+
+    runner = CliRunner()
+    os.chdir(ws)
+    result = runner.invoke(cli, ["workspace", "upgrade", "standard"])
+
+    assert result.exit_code == 0
+    assert "Upgraded" in result.output
+
+    with open(ws / "stx.toml", "rb") as f:
+        data = tomllib.load(f)
+    assert data["workspace"]["preset"] == "standard"
+    assert "streamtex-docs" in data["repos"]
+    assert "streamtex-claude" in data["repos"]
+
+
+def test_upgrade_standard_to_developer(tmp_path):
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    _write_stx_toml(ws, preset="standard")
+
+    runner = CliRunner()
+    os.chdir(ws)
+    result = runner.invoke(cli, ["workspace", "upgrade", "developer"])
+
+    assert result.exit_code == 0
+    assert "Upgraded" in result.output
+
+    with open(ws / "stx.toml", "rb") as f:
+        data = tomllib.load(f)
+    assert data["workspace"]["preset"] == "developer"
+    assert "streamtex" in data["repos"]
+    assert "streamtex-docs" in data["repos"]
+    assert "streamtex-claude" in data["repos"]
+
+
+def test_upgrade_refuses_downgrade(tmp_path):
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    _write_stx_toml(ws, preset="developer")
+
+    runner = CliRunner()
+    os.chdir(ws)
+    result = runner.invoke(cli, ["workspace", "upgrade", "user"])
+
+    assert result.exit_code != 0
+    assert "Cannot downgrade" in result.output
+
+
+def test_upgrade_same_preset_noop(tmp_path):
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    _write_stx_toml(ws, preset="standard")
+
+    runner = CliRunner()
+    os.chdir(ws)
+    result = runner.invoke(cli, ["workspace", "upgrade", "standard"])
+
+    assert result.exit_code == 0
+    assert "Already at" in result.output

@@ -11,7 +11,7 @@ and web-books — without writing Python code.
 |------|:--------:|---------|
 | Python >= 3.10 | Yes | [python.org](https://www.python.org/downloads/) |
 | uv | Yes | `curl -LsSf https://astral.sh/uv/install.sh \| sh` |
-| StreamTeX CLI | Yes | `uv tool install "streamtex[cli]"` |
+| StreamTeX CLI | Yes | `uv tool install "streamtex[cli]"` (upgrade: `uv tool upgrade streamtex`) |
 | Claude Code | Recommended | [claude.ai/claude-code](https://claude.ai/claude-code) |
 | Cursor | Alternative | [cursor.com](https://cursor.com) |
 

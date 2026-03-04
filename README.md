@@ -263,6 +263,9 @@ my-project/
 # Recommended: install the CLI as a global tool
 uv tool install "streamtex[cli]"
 
+# Upgrade to the latest version
+uv tool upgrade streamtex
+
 # Or as a project dependency
 uv add streamtex
 ```

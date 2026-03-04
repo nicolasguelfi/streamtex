@@ -1,8 +1,7 @@
 """Tests for the Table of Contents system."""
 
-import pytest
-from streamtex.toc import NumberingMode, TOCConfig, TOCRegistry
 from streamtex.book import _resolve_sidebar_max_level
+from streamtex.toc import NumberingMode, TOCConfig, TOCRegistry
 
 
 class TestTOCConfig:

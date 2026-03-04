@@ -1,10 +1,8 @@
 """Tests for st_write rendering."""
 
-import pytest
-from unittest.mock import patch, call
-from streamtex.styles import Style, StxStyles
 from streamtex.enums import Tags
-from streamtex.write import st_write, _parse_args
+from streamtex.styles import StxStyles, Style
+from streamtex.write import _parse_args, st_write
 
 
 class TestParseArgs:

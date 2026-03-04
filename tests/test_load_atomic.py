@@ -1,8 +1,9 @@
 """Tests for load_atomic_block()."""
 
+
 import pytest
-from pathlib import Path
-from streamtex.blocks import load_atomic_block, BlockNotFoundError, BlockImportError
+
+from streamtex.blocks import BlockImportError, BlockNotFoundError, load_atomic_block
 
 
 @pytest.fixture

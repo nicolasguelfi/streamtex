@@ -71,6 +71,7 @@ Funding = "https://github.com/sponsors/nicolasguelfi"
 dev = [
     "pytest>=7.0",
     "ruff>=0.4.0",
+    "pre-commit>=3.0",
     "click>=8.0",
     "rich>=13.0",
     "jinja2>=3.0",
@@ -109,3 +110,5 @@ select = ["E", "F", "I", "W"]
 "streamtex/image.py" = ["E501"]
 # Re-export file with intentional import organization by section
 "streamtex/utils.py" = ["I001"]
+# Test files: F841 = unused mock variables (legitimate pattern), E501 = long assertion strings, E741 = single-letter vars
+"tests/**/*.py" = ["F841", "E501", "E741"]

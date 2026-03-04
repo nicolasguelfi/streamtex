@@ -472,3 +472,70 @@ def upgrade(preset):
     for repo_key in sorted(to_add):
         console.print(f"  + {ALL_REPOS[repo_key]['name']}")
     console.print("\nRun [bold]stx workspace clone[/bold] to clone the new repos.")
+
+
+# ---------------------------------------------------------------------------
+# hooks command
+# ---------------------------------------------------------------------------
+
+@click.command()
+def hooks():
+    """Install pre-commit hooks in all workspace repos and projects."""
+    ws_root, config = _require_workspace()
+    console = get_console()
+    uv = _find_uv()
+
+    console.print("[bold]Installing pre-commit hooks …[/bold]\n")
+
+    installed = 0
+    skipped = 0
+
+    # Collect all directories to process: repos + projects/
+    dirs_to_process: list[tuple[str, str]] = []
+
+    # Repos from stx.toml (skip claude — not a Python project)
+    for repo_name, repo_conf in config.get("repos", {}).items():
+        repo_type = repo_conf.get("type", "")
+        if repo_type == "claude":
+            continue
+        repo_path = os.path.join(ws_root, repo_conf.get("path", repo_name))
+        dirs_to_process.append((repo_name, repo_path))
+
+    # Projects in projects/ directory
+    projects_dir = os.path.join(ws_root, "projects")
+    if os.path.isdir(projects_dir):
+        for entry in sorted(os.listdir(projects_dir)):
+            proj_path = os.path.join(projects_dir, entry)
+            if os.path.isdir(proj_path) and os.path.isfile(
+                os.path.join(proj_path, "pyproject.toml")
+            ):
+                dirs_to_process.append((f"projects/{entry}", proj_path))
+
+    for name, path in dirs_to_process:
+        if not os.path.isdir(path):
+            console.print(f"  [yellow]{name}[/yellow]: not found — skipped")
+            skipped += 1
+            continue
+
+        if not os.path.isfile(os.path.join(path, ".pre-commit-config.yaml")):
+            console.print(f"  [yellow]{name}[/yellow]: no .pre-commit-config.yaml — skipped")
+            skipped += 1
+            continue
+
+        result = subprocess.run(
+            [uv, "run", "pre-commit", "install"],
+            cwd=path,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        if result.returncode == 0:
+            console.print(f"  [green]{name}[/green]: ok")
+            installed += 1
+        else:
+            console.print(f"  [red]{name}[/red]: failed")
+            if result.stderr:
+                console.print(f"    {result.stderr.strip()}")
+            skipped += 1
+
+    console.print(f"\n[bold]Done:[/bold] {installed} installed, {skipped} skipped")

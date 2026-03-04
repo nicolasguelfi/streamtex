@@ -1,24 +1,21 @@
 """Unit tests for streamtex.export — buffer, config, global functions, st_html."""
 
-from unittest.mock import patch, MagicMock
-import pytest
+from unittest.mock import patch
 
+import streamtex.export as export_mod
 from streamtex.export import (
     ExportConfig,
     HtmlExportBuffer,
-    reset_export_buffer,
-    is_export_active,
-    export_append,
-    export_push_wrapper,
-    export_pop_wrapper,
-    generate_export_html,
-    st_html,
     _render,
+    export_append,
+    export_pop_wrapper,
+    export_push_wrapper,
+    generate_export_html,
+    is_export_active,
+    reset_export_buffer,
     st_export,
-    _IFRAME_BASE,
+    st_html,
 )
-import streamtex.export as export_mod
-
 
 # ---------------------------------------------------------------------------
 # ExportConfig

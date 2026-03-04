@@ -9,10 +9,7 @@ module.  Replace it with ``st_html(...)`` from ``streamtex.export``.
 """
 
 import ast
-import os
 from pathlib import Path
-
-import pytest
 
 # Expected st.html() call counts per file (infrastructure only).
 # Content calls MUST use st_html() from export.py instead.

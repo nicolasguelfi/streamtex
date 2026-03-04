@@ -5,7 +5,6 @@ import os
 from click.testing import CliRunner
 
 from streamtex.cli.claude_cmd import (
-    FileDiff,
     collect_source_files,
     compare_profile,
     find_claude_repo,
@@ -15,7 +14,6 @@ from streamtex.cli.claude_cmd import (
     read_installed_profile,
 )
 from streamtex.cli.commands import cli
-
 
 # ---------------------------------------------------------------------------
 # Fixtures: build a minimal workspace with a mock streamtex-claude repo
@@ -78,8 +76,6 @@ source = "streamtex-claude"
 
 def test_find_claude_repo(tmp_path):
     ws = _make_workspace(tmp_path)
-    import click
-    import pytest
 
     from streamtex.cli.workspace_cmd import load_stx_toml
 

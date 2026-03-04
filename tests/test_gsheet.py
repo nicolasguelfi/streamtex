@@ -1,14 +1,21 @@
 """Tests for streamtex.gsheet — Google Sheets data import."""
 
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 
 from streamtex.gsheet import (
-    GSheetConfig, GSheetSource, GSheetError, AuthMode,
-    load_gsheet, set_gsheet_config, get_gsheet_config,
-    _load_public_csv, _parse_csv_text, _rows_to_dicts,
+    AuthMode,
+    GSheetConfig,
+    GSheetError,
+    GSheetSource,
+    _load_public_csv,
+    _parse_csv_text,
+    _rows_to_dicts,
+    get_gsheet_config,
+    load_gsheet,
+    set_gsheet_config,
 )
-
 
 # ===================================================================
 # GSheetSource

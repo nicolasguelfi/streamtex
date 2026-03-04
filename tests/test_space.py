@@ -1,8 +1,8 @@
 """Unit tests for streamtex.space — vertical and horizontal spacing."""
 
-from unittest.mock import patch, MagicMock
-import pytest
-from streamtex.space import st_space, st_br
+from unittest.mock import patch
+
+from streamtex.space import st_br, st_space
 
 
 class TestStSpace:
@@ -302,7 +302,6 @@ class TestIntegration:
 
     def test_render_is_from_export_module(self):
         """Verify that _render is imported from streamtex.export"""
-        from streamtex import space
         import streamtex.export
         # Verify that _render is accessible through the export module
         assert hasattr(streamtex.export, '_render')

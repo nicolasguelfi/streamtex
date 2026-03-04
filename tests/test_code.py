@@ -1,9 +1,7 @@
 """Tests for streamtex/code.py — syntax-highlighted code rendering."""
 
 import sys
-import pytest
-from unittest.mock import patch, MagicMock
-
+from unittest.mock import patch
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -194,7 +192,6 @@ class TestStCodeFallbackNoPygments:
 
     def test_fallback_uses_pre_tag(self):
         # Patch the pygments import inside the function to raise ImportError
-        import importlib
         with patch.dict(sys.modules, {"pygments": None,
                                        "pygments.highlight": None,
                                        "pygments.lexers": None,

@@ -1,11 +1,10 @@
 """Tests for streamtex.container — st_block and st_span context managers."""
 
-import pytest
-from unittest.mock import patch, call, MagicMock
-import streamtex.export as export_mod
+from unittest.mock import MagicMock, patch
+
 from streamtex.container import st_block, st_span
-from streamtex.styles import Style, StxStyles
 from streamtex.export import ExportConfig, reset_export_buffer
+from streamtex.styles import Style
 
 
 class TestStBlockBasic:

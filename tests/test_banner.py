@@ -1,7 +1,6 @@
 """Tests for the Banner configuration system."""
 
-import pytest
-from streamtex.banner import BannerConfig, BannerMode, _MODE_DEFAULTS
+from streamtex.banner import _MODE_DEFAULTS, BannerConfig, BannerMode
 
 
 class TestBannerMode:

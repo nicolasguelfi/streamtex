@@ -1,6 +1,5 @@
 """Tests for stx bib generate-stubs command."""
 
-import os
 
 from click.testing import CliRunner
 

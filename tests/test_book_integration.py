@@ -8,9 +8,9 @@ runtime and are excluded from unit testing.
 
 import hashlib
 import types
-import pytest
-from unittest.mock import patch, MagicMock, call
+from unittest.mock import patch
 
+import pytest
 
 # ---------------------------------------------------------------------------
 # _compute_cache_hash

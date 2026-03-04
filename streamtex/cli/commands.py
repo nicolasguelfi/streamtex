@@ -11,17 +11,17 @@ from .claude_cmd import install as claude_install
 from .claude_cmd import list_cmd as claude_list
 from .claude_cmd import update_cmd as claude_update
 from .deploy_cmd import docker as deploy_docker
+from .deploy_cmd import env_sync_cmd as deploy_env_sync
 from .deploy_cmd import huggingface_cmd as deploy_huggingface
 from .deploy_cmd import preflight as deploy_preflight
 from .deploy_cmd import render_cmd as deploy_render
-from .deploy_cmd import env_sync_cmd as deploy_env_sync
 from .deploy_cmd import status_cmd as deploy_status
 from .project_cmd import new as project_new
 from .project_cmd import validate as project_validate
 from .publish_cmd import check_cmd as publish_check
 from .publish_cmd import pypi_cmd as publish_pypi
 from .shortcuts import run_lint, run_test
-from .workspace_cmd import clone, init, link, status, sync, upgrade
+from .workspace_cmd import clone, hooks, init, link, status, sync, upgrade
 
 
 @click.group()
@@ -60,6 +60,7 @@ workspace.add_command(link)
 workspace.add_command(status)
 workspace.add_command(sync)
 workspace.add_command(upgrade)
+workspace.add_command(hooks)
 
 
 # --- Claude subgroup -------------------------------------------------------

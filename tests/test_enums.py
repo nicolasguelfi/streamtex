@@ -1,6 +1,6 @@
 """Tests for StreamTeX enums."""
 
-from streamtex.enums import Tag, Tags, ListType, ListTypes
+from streamtex.enums import ListType, ListTypes, Tag, Tags
 
 
 class TestTag:

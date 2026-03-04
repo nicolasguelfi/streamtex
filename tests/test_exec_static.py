@@ -1,7 +1,8 @@
 """Tests for streamtex.utils.exec_static()."""
 
-import pytest
 from unittest.mock import patch
+
+import pytest
 
 
 class TestExecStatic:

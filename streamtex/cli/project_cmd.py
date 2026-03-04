@@ -135,7 +135,7 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = ["pytest>=7.0", "ruff>=0.4.0"]
+dev = ["pytest>=7.0", "ruff>=0.4.0", "pre-commit>=3.0"]
 
 [tool.uv]
 default-groups = ["dev"]
@@ -166,6 +166,18 @@ __pycache__/
 dist/
 build/
 .ruff_cache/
+"""
+
+
+def generate_pre_commit_config() -> str:
+    """Generate .pre-commit-config.yaml for a StreamTeX project."""
+    return """\
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.11.2
+    hooks:
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
 """
 
 
@@ -221,6 +233,7 @@ def scaffold_project(
     _write("pyproject.toml", generate_pyproject_toml(name))
     _write("setup.py", generate_setup_py(name))
     _write(".gitignore", generate_gitignore())
+    _write(".pre-commit-config.yaml", generate_pre_commit_config())
 
     # static/images/ (empty directory)
     images_dir = os.path.join(target_dir, "static", "images")
@@ -545,6 +558,16 @@ def new(
             )
             if result.returncode == 0:
                 console.print("[green]uv sync:[/green] ok")
+                # Install pre-commit hooks
+                result = subprocess.run(
+                    [uv, "run", "pre-commit", "install"],
+                    cwd=target,
+                    capture_output=True, text=True, timeout=60,
+                )
+                if result.returncode == 0:
+                    console.print("[green]pre-commit install:[/green] ok")
+                else:
+                    console.print(f"[yellow]pre-commit install:[/yellow] {result.stderr.strip()}")
             else:
                 console.print(f"[yellow]uv sync:[/yellow] {result.stderr.strip()}")
         else:

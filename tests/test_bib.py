@@ -1,26 +1,42 @@
 """Tests for streamtex.bib — Bibliography system."""
 
-import os
 import json
+import os
 import tempfile
 import textwrap
 
 import pytest
 
 from streamtex.bib import (
-    BibEntry, BibConfig, BibFormat, CitationStyle, BibParseError,
+    BibConfig,
+    BibEntry,
+    BibFormat,
     BibRegistry,
-    set_bib_config, get_bib_config, get_bib_registry, reset_bib_registry,
-    load_bibtex, load_bib_json, load_bib_ris, load_bib_csl_json,
-    load_bib, register_bib_parser,
-    parse_bibtex_string, parse_ris_string,
-    cite, export_bibtex,
-    format_entry,
-    _format_apa, _format_ieee, _format_mla, _format_chicago, _format_harvard,
+    CitationStyle,
     _fields_to_entry,
-    st_refs, generate_bib_stubs,
+    _format_apa,
+    _format_chicago,
+    _format_harvard,
+    _format_ieee,
+    _format_mla,
+    cite,
+    export_bibtex,
+    format_entry,
+    generate_bib_stubs,
+    get_bib_config,
+    get_bib_registry,
+    load_bib,
+    load_bib_csl_json,
+    load_bib_json,
+    load_bib_ris,
+    load_bibtex,
+    parse_bibtex_string,
+    parse_ris_string,
+    register_bib_parser,
+    reset_bib_registry,
+    set_bib_config,
+    st_refs,
 )
-
 
 # ===================================================================
 # BibEntry

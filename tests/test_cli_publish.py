@@ -1,15 +1,12 @@
 """Tests for stx publish check/pypi commands."""
 
 import os
-import subprocess
 from unittest.mock import MagicMock, patch
 
-import pytest
 from click.testing import CliRunner
 
 from streamtex.cli.commands import cli
-from streamtex.cli.publish_cmd import PublishCheck, run_publish_checks
-
+from streamtex.cli.publish_cmd import run_publish_checks
 
 # ---------------------------------------------------------------------------
 # Helpers

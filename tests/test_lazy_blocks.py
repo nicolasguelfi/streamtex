@@ -2,10 +2,10 @@
 
 import os
 import tempfile
-import pytest
-from pathlib import Path
 
-from streamtex.blocks import LazyBlockRegistry, set_static_sources, get_static_sources, resolve_static
+import pytest
+
+from streamtex.blocks import LazyBlockRegistry, get_static_sources, resolve_static, set_static_sources
 
 
 class TestLazyBlockRegistry:

@@ -12,9 +12,8 @@ from click.testing import CliRunner
 
 from streamtex.cli.commands import cli
 from streamtex.cli.deploy_cmd import (
-    DeployStatus,
     HF_LFS_PATTERNS,
-    PreflightCheck,
+    DeployStatus,
     check_hf_status,
     check_render_status,
     derive_service_name,
@@ -39,7 +38,6 @@ from streamtex.cli.deploy_cmd import (
     verify_hf_cli,
 )
 from streamtex.cli.project_cmd import scaffold_project
-
 
 # ---------------------------------------------------------------------------
 # Helpers

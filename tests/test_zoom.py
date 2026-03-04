@@ -1,10 +1,8 @@
 """Unit tests for streamtex.zoom — add_zoom_options and inject_zoom_logic."""
 
-from unittest.mock import patch, MagicMock, call
-import pytest
+from unittest.mock import MagicMock, patch
 
-from streamtex.zoom import add_zoom_options, inject_zoom_logic, _PAGE_WIDTH_KEY, _ZOOM_KEY
-
+from streamtex.zoom import _PAGE_WIDTH_KEY, _ZOOM_KEY, add_zoom_options, inject_zoom_logic
 
 # ---------------------------------------------------------------------------
 # inject_zoom_logic — CSS values
@@ -72,8 +70,9 @@ class TestInjectZoomLogicNoJS:
 
     def test_no_components_import(self):
         """zoom.py should not import streamlit.components."""
-        import streamtex.zoom as zoom_mod
         import inspect
+
+        import streamtex.zoom as zoom_mod
         source = inspect.getsource(zoom_mod)
         assert "components" not in source
 

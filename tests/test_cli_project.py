@@ -8,8 +8,6 @@ from click.testing import CliRunner
 
 from streamtex.cli.commands import cli
 from streamtex.cli.project_cmd import (
-    ValidationCheck,
-    _copy_rich_template,
     generate_block_hello,
     generate_blocks_init,
     generate_book_py,

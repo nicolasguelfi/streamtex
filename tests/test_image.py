@@ -1,18 +1,15 @@
 """Tests for streamtex/image.py and streamtex/image_utils.py."""
 
-import os
 import base64
-import pytest
-from unittest.mock import patch, MagicMock, mock_open
+from unittest.mock import MagicMock, mock_open, patch
 
 from streamtex.image_utils import (
-    _is_url,
+    _get_base64_encoded_image,
+    _get_mime_type,
     _is_absolute_path,
     _is_relative_path,
-    _get_mime_type,
-    _get_base64_encoded_image,
+    _is_url,
 )
-
 
 # ---------------------------------------------------------------------------
 # image_utils — detection helpers

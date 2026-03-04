@@ -1,43 +1,33 @@
 """Unit tests for streamtex/inspector.py — Block Inspector."""
 
-import json
 import os
 import types
-from pathlib import Path
-from unittest.mock import MagicMock, patch, call
-
-import pytest
+from unittest.mock import MagicMock, patch
 
 from streamtex.inspector import (
-    InspectorConfig,
+    _STX_INSPECTOR_BLOCK,
+    _STX_INSPECTOR_OPEN,
+    _STX_INSPECTOR_PENDING,
     FileCategory,
     FileCategoryRegistry,
+    InspectorConfig,
     SourceFile,
-    _validate_python,
-    _validate_json,
-    discover_sources,
+    _apply_edits,
+    _cancel_edits,
+    _close_inspector,
+    _find_project_root,
+    _get_cached_project_files,
+    _invalidate_module_cache,
     _render_editor,
+    _save_and_reload,
+    _scan_project_files,
+    _validate_json,
+    _validate_python,
+    discover_sources,
     inject_inspector_css,
     render_edit_button,
     render_inspector_panel,
-    _find_project_root,
-    _close_inspector,
-    _apply_edits,
-    _save_and_reload,
-    _cancel_edits,
-    _invalidate_module_cache,
-    _scan_project_files,
-    _get_cached_project_files,
-    _EXCLUDED_DIRS,
-    _STX_INSPECTOR_OPEN,
-    _STX_INSPECTOR_BLOCK,
-    _STX_INSPECTOR_AUTH,
-    _STX_INSPECTOR_PENDING,
-    _STX_INSPECTOR_MODE,
-    _STX_INSPECTOR_PROJECT_ROOT,
-    _STX_INSPECTOR_PROJECT_FILES,
 )
-
 
 # ---------------------------------------------------------------------------
 # InspectorConfig
@@ -613,7 +603,7 @@ class TestInvalidateModuleCache:
 
     def test_clears_both_registries(self, tmp_path):
         """Both registry types are cleared in a single call."""
-        from streamtex.blocks import ProjectBlockRegistry, LazyBlockRegistry
+        from streamtex.blocks import LazyBlockRegistry, ProjectBlockRegistry
 
         preg = ProjectBlockRegistry(tmp_path)
         preg._cache["bck_a"] = types.ModuleType("a")

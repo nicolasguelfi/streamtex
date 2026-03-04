@@ -8,7 +8,6 @@ from click.testing import CliRunner
 from streamtex.cli.commands import cli
 from streamtex.cli.workspace_cmd import generate_stx_toml, load_stx_toml
 
-
 try:
     import tomllib
 except ModuleNotFoundError:
@@ -238,7 +237,7 @@ def _create_workspace_with_repos(tmp_path, preset="developer"):
     ws.mkdir()
     _write_stx_toml(ws, preset=preset)
 
-    from streamtex.cli.workspace_cmd import PRESET_REPOS, ALL_REPOS
+    from streamtex.cli.workspace_cmd import ALL_REPOS, PRESET_REPOS
 
     # Create repo directories for the preset
     for repo_key in PRESET_REPOS[preset]:

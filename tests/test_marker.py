@@ -1,14 +1,20 @@
 """Tests for the Marker Navigation system."""
 
+from unittest.mock import patch
+
 import pytest
-from unittest.mock import patch, MagicMock
+
+import streamtex.marker as marker_mod
 from streamtex.marker import (
-    MarkerConfig, MarkerRegistry,
-    reset_marker_registry, register_marker,
-    marker_entries, marker_count, get_marker_config,
+    MarkerConfig,
+    MarkerRegistry,
+    get_marker_config,
+    marker_count,
+    marker_entries,
+    register_marker,
+    reset_marker_registry,
     st_marker,
 )
-import streamtex.marker as marker_mod
 
 
 class TestMarkerConfig:

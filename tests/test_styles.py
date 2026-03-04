@@ -1,13 +1,23 @@
 """Tests for the StreamTeX style system."""
 
 import pytest
+
 from streamtex.styles import (
-    Style, ListStyle, StyleGrid, StxStyles,
-    theme, add_css, remove_css,
-    Colors, Sizes, Weights, Alignments, Decors, Fonts,
-    BackgroundColors, Paddings, Margins, Borders, ContainerSizes,
-    Flex, Layouts, Visibility, Positions,
-    Text, Container, Titles, ListStyles,
+    Borders,
+    Colors,
+    ListStyle,
+    Margins,
+    Paddings,
+    Positions,
+    Sizes,
+    StxStyles,
+    Style,
+    StyleGrid,
+    Visibility,
+    Weights,
+    add_css,
+    remove_css,
+    theme,
 )
 
 

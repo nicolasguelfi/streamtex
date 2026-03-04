@@ -1,9 +1,7 @@
 """Tests for streamtex/overlay.py — OverlayController and st_overlay."""
 
-import pytest
 from contextlib import contextmanager
-from unittest.mock import patch, MagicMock, call
-
+from unittest.mock import patch
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -190,7 +188,7 @@ class TestStOverlay:
     """Tests for the st_overlay context manager."""
 
     def test_yields_overlay_controller(self):
-        from streamtex.overlay import st_overlay, OverlayController
+        from streamtex.overlay import OverlayController, st_overlay
 
         with patch("streamtex.overlay.st_block", side_effect=_make_fake_st_block()):
             with st_overlay() as ctrl:

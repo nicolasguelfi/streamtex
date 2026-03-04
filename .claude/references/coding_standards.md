@@ -291,6 +291,34 @@ jobs:
 does not exist in CI. `UV_NO_SOURCES=1` tells uv to ignore it and resolve from PyPI.
 `--frozen` fails because the lock file also encodes the local path.
 
+### Pre-commit hooks (MANDATORY)
+
+Every StreamTeX repo and project MUST have a `.pre-commit-config.yaml` with ruff:
+```yaml
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.11.2
+    hooks:
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+```
+
+This auto-fixes lint issues (including import ordering I001) before each commit.
+`--exit-non-zero-on-fix` aborts the commit when files are modified so you can review and re-stage.
+
+**Setup:**
+```bash
+uv sync                       # Installs pre-commit (dev dep)
+uv run pre-commit install     # Activates the git hook
+```
+
+**Workspace-wide install:**
+```bash
+stx workspace hooks           # Installs hooks in all repos + projects/
+```
+
+`stx project new` automatically generates `.pre-commit-config.yaml` and installs hooks.
+
 ## 13. Block Registry Patterns
 
 StreamTeX provides two registries for lazy-loading blocks.

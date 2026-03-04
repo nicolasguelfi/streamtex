@@ -1,12 +1,12 @@
 """Tests for the list module."""
 
+from unittest.mock import MagicMock, patch
+
 import pytest
-from contextlib import contextmanager
-from contextvars import ContextVar
-from unittest.mock import MagicMock, patch, call
-from streamtex.list import ListController, st_list, _current_list_level
-from streamtex.styles import Style, ListStyle, StxStyles
-from streamtex.enums import ListType, ListTypes
+
+from streamtex.enums import ListTypes
+from streamtex.list import ListController, _current_list_level, st_list
+from streamtex.styles import ListStyle, StxStyles, Style
 
 
 class TestListController:

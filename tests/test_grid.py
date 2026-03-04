@@ -1,12 +1,11 @@
 """Unit tests for streamtex.grid — GridController and st_grid context manager."""
 
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock, call
-from contextlib import contextmanager
 
-from streamtex.styles import Style, StyleGrid, StxStyles
-from streamtex.grid import GridController, st_grid, responsive_cols, CELL_STYLES_TYPE
-
+from streamtex.grid import GridController, responsive_cols, st_grid
+from streamtex.styles import StxStyles, Style, StyleGrid
 
 # ===========================================================================
 # TestGridController — Style resolution and cell counter

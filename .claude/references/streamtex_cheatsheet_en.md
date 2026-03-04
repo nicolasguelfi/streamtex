@@ -267,6 +267,9 @@ set_link_config(LinkConfig(
     internal_target="_self",     # Same-domain links open in same tab
     external_target="_blank",    # External links open in new tab
 ))
+
+# Retrieve current configuration
+cfg = get_link_config()             # Returns current LinkConfig
 ```
 
 ## Predefined Styles
@@ -562,6 +565,61 @@ path = stx.resolve_static("logo.png")   # Searches each source in order
 # st_image() calls resolve_static() internally
 ```
 
+### Block Management — Advanced API
+
+#### LazyBlockRegistry
+
+```python
+from streamtex import LazyBlockRegistry
+
+# LazyBlockRegistry(sources) — lazy-load blocks from multiple directories
+shared = LazyBlockRegistry([
+    "blocks/overrides",             # Checked first (project overrides)
+    "../../shared-blocks/blocks",   # Checked second (originals)
+])
+mod = shared.bck_header             # Lazy-loaded on first access, then cached
+
+# Key methods
+shared.list_blocks()                # List all discoverable bck_*.py block names
+shared.get("bck_header")            # Explicit block access (same as attribute access)
+shared.invalidate()                 # Clear cache so modules reload from disk
+LazyBlockRegistry.invalidate_all()  # Clear caches on ALL LazyBlockRegistry instances
+```
+
+#### ProjectBlockRegistry
+
+```python
+from streamtex import ProjectBlockRegistry
+from pathlib import Path
+
+# ProjectBlockRegistry(blocks_dir) — registry for a project's blocks/ directory
+registry = ProjectBlockRegistry(Path("blocks"))
+
+# Key methods
+registry.get("bck_intro")           # Load and return block module (cached)
+registry.list_blocks()              # All bck_*.py names in the directory
+registry.list_blocks("composite")   # Filter by type: "composite" or "atomic"
+registry.load_all()                 # Force-load every block (for testing)
+registry.get_stats()                # {"total": N, "loaded": N, "composites": N, "atomics": N}
+registry.invalidate()               # Clear cache and manifest (reload from disk)
+ProjectBlockRegistry.invalidate_all()  # Clear caches on ALL instances
+```
+
+#### Static Source Management
+
+```python
+from streamtex import get_static_sources, set_static_sources
+
+# set_static_sources(sources) — set directories for static file resolution
+set_static_sources([
+    str(Path(__file__).parent / "static"),
+    str(Path(__file__).parent.parent / "shared-blocks" / "static"),
+])
+
+# get_static_sources() — retrieve currently configured static source directories
+sources = get_static_sources()       # Returns list of absolute paths (copy)
+```
+
 ## Code Blocks — `st_code()`
 
 ```python
@@ -653,6 +711,35 @@ show_details("""\
 
     Additional details with *emphasis* and `code`.
 """)
+```
+
+### Block Helper Functions — Additional API
+
+```python
+from streamtex import (
+    show_code_inline, get_block_helper_config,
+    BlockHelperConfig, set_block_helper_config,
+)
+
+# show_code_inline(code_string, ...) — display code without the box wrapper
+# Same parameters as show_code but renders raw code inside any container
+show_code_inline("x = 42", language="python")
+show_code_inline(file="examples/snippet.py", start_line=5, end_line=10)
+
+# get_block_helper_config() — retrieve the current global BlockHelperConfig
+config = get_block_helper_config()   # Returns active BlockHelperConfig instance
+
+# BlockHelperConfig — base configuration class (override in subclass)
+# Override methods: get_code_style(), get_code_inline_style(),
+#                   get_explanation_style(), get_details_style()
+class MyConfig(BlockHelperConfig):
+    def get_code_style(self):
+        return s.project.containers.code_box
+    def get_code_inline_style(self):
+        return s.project.containers.code_inline
+
+# set_block_helper_config(config) — inject project-specific helper styles
+set_block_helper_config(MyConfig())
 ```
 
 ### OOP Inheritance (Advanced)
@@ -956,6 +1043,110 @@ def my_parser(filepath: str) -> list[BibEntry]:
 register_bib_parser("myformat", my_parser)  # Auto-detect .myformat files
 ```
 
+### Bibliography Advanced API
+
+#### Configuration and Registry
+
+```python
+from streamtex import (
+    get_bib_config, set_bib_config, get_bib_registry, reset_bib_registry,
+    BibRegistry, BibParseError,
+)
+
+# get_bib_config() — retrieve current global bibliography configuration
+cfg = get_bib_config()               # Returns the active BibConfig instance
+print(cfg.format, cfg.citation_style)
+
+# set_bib_config(config) — set the global bibliography configuration
+from streamtex.bib import BibConfig, BibFormat
+set_bib_config(BibConfig(format=BibFormat.IEEE, sort_by="year"))
+
+# get_bib_registry() — access the global BibRegistry singleton
+registry = get_bib_registry()
+print(len(registry))                 # Number of registered entries
+entry = registry.get("vaswani2017")  # Retrieve a BibEntry by key
+keys = registry.list_keys()          # Sorted list of all entry keys
+
+# reset_bib_registry() — clear all entries and citation tracking
+reset_bib_registry()
+
+# BibRegistry — singleton storing entries and citation tracking
+registry = get_bib_registry()
+registry.register(entry)             # Register a single BibEntry
+registry.register_many(entries)      # Register a list of BibEntry objects
+registry.cite("key")                 # Mark key as cited, returns 1-based number
+cited = registry.get_cited_entries()  # List of cited BibEntry in citation order
+all_entries = registry.get_all_entries()  # All registered entries
+registry.reset()                     # Clear all entries and citations
+
+# BibParseError — raised when bibliography file parsing fails
+try:
+    entries = load_bib("malformed.bib")
+except BibParseError as e:
+    print(f"Parse error: {e}")
+```
+
+#### Multi-Format Loaders
+
+```python
+from streamtex import (
+    load_bib, load_bibtex, load_bib_json, load_bib_ris, load_bib_csl_json,
+    parse_bibtex_string, parse_ris_string,
+)
+
+# load_bib(path) — auto-detect format by extension and parse
+entries = load_bib("refs.bib")           # .bib → BibTeX parser
+entries = load_bib("refs.json")          # .json → JSON parser
+entries = load_bib("refs.ris")           # .ris → RIS parser
+entries = load_bib("refs.csl-json")      # .csl-json → CSL-JSON parser
+
+# Format-specific loaders (for explicit control)
+entries = load_bibtex("refs.bib")        # Parse a .bib file into BibEntry list
+entries = load_bib_json("refs.json")     # Parse JSON array of {key, title, authors, ...}
+entries = load_bib_ris("refs.ris")       # Parse RIS format (TY, AU, TI tags)
+entries = load_bib_csl_json("refs.csl-json")  # Parse Zotero/Mendeley CSL-JSON
+
+# String parsers (for inline content, not files)
+entries = parse_bibtex_string(bibtex_content)  # Parse BibTeX from a string
+entries = parse_ris_string(ris_content)        # Parse RIS from a string
+```
+
+#### Formatting and Export
+
+```python
+from streamtex import format_entry, export_bibtex
+from streamtex.bib import BibFormat
+
+# format_entry(entry, fmt, number) — format a BibEntry as an HTML string
+html = format_entry(entry, BibFormat.APA)          # APA formatted HTML string
+html = format_entry(entry, BibFormat.IEEE, number=3)  # IEEE with [3] prefix
+
+# export_bibtex(only_cited) — generate .bib file content from the registry
+bib_text = export_bibtex()                  # Export only cited entries
+bib_text = export_bibtex(only_cited=False)  # Export all registered entries
+with open("output.bib", "w") as f:
+    f.write(bib_text)
+```
+
+#### BibRefs Proxy and Stub Generation
+
+```python
+from streamtex import st_refs, BibRefs, generate_bib_stubs
+
+# st_refs — global BibRefs proxy; attribute access calls cite()
+st_write(s.big, "According to ", st_refs.vaswani2017, " transformers...")
+# Equivalent to: st_write(s.big, "According to ", cite("vaswani2017"), "...")
+
+# BibRefs — proxy class mapping attribute access to cite() calls
+refs = BibRefs()
+html_citation = refs.some_key          # Returns cite("some_key") HTML string
+
+# generate_bib_stubs(*paths, output_path) — generate typed Python module for IDE completion
+content = generate_bib_stubs("refs.bib", output_path="custom/bib_refs.py")
+# Generates a .py file with @property per key for full IDE autocompletion
+# CLI: uv run python -m streamtex generate-stubs refs.bib -o custom/bib_refs.py
+```
+
 ## Collection System (Multi-Project Hub)
 
 ### collection.toml
@@ -1019,6 +1210,9 @@ config = GSheetConfig(
 )
 set_gsheet_config(config)
 
+# Retrieve current configuration
+cfg = get_gsheet_config()               # Optional[GSheetConfig] — None if not set
+
 # Define source
 src = GSheetSource(sheet_id="abc123", tab_name="Sheet1")
 src = GSheetSource.from_url("https://docs.google.com/spreadsheets/d/abc123/...")
@@ -1030,7 +1224,270 @@ df = load_gsheet_df(src)                # pandas DataFrame
 
 Credentials resolution: explicit path > `GSHEET_CREDENTIALS` env > `GOOGLE_APPLICATION_CREDENTIALS` env.
 
+## Configuration Classes
+
+### ExportConfig
+
+```python
+from streamtex import ExportConfig
+
+# ExportConfig — settings for HTML export
+config = ExportConfig(
+    enabled=True,                    # Enable export buffer (default False)
+    page_title="My StreamTeX Export",  # Title of exported HTML document
+    page_width="210mm",              # CSS max-width of the page container
+    page_padding="20mm 15mm",        # CSS padding around the page
+)
+# Passed internally by st_book(export=True); rarely constructed manually
+```
+
+### FileCategoryRegistry
+
+```python
+from streamtex import FileCategoryRegistry
+from streamtex.inspector import FileCategory
+
+# FileCategoryRegistry — extensible mapping of file extensions to categories
+# Pre-registers: Python (.py), Diagrams (.mmd,.tex,.puml,.dot),
+#                Data (.json,.csv,.toml,.yaml,.yml), Texts (.txt,.md,.bib,.ris)
+registry = FileCategoryRegistry()
+
+# Register a custom category
+registry.register(FileCategory(
+    name="Config",
+    extensions={".ini", ".cfg"},
+    ace_mode="text",
+))
+
+# Detect category for a file path
+cat = registry.detect("blocks/bck_intro.py")  # Returns FileCategory(name="Python", ...)
+all_cats = registry.categories                 # List of all registered FileCategory objects
+```
+
+### GSheetError
+
+```python
+from streamtex import GSheetError
+
+# GSheetError — raised when Google Sheets data cannot be loaded
+try:
+    data = load_gsheet(src)
+except GSheetError as e:
+    st.error(f"Google Sheets error: {e}")
+```
+
+### BibParseError
+
+```python
+from streamtex import BibParseError
+
+# BibParseError — raised when bibliography file parsing fails
+try:
+    entries = load_bib("refs.bib")
+except BibParseError as e:
+    st.error(f"Bibliography parse error: {e}")
+```
+
+### BibRegistry
+
+```python
+from streamtex import BibRegistry, get_bib_registry
+
+# BibRegistry — singleton storing bibliographic entries and citation tracking
+registry = get_bib_registry()
+registry.register(entry)             # Register a BibEntry (overwrites if key exists)
+registry.register_many(entries)      # Register multiple entries
+entry = registry.get("key")          # Retrieve by key (None if not found)
+num = registry.cite("key")           # Mark as cited, returns 1-based citation number
+cited = registry.get_cited_entries()  # Cited entries in citation order
+all_e = registry.get_all_entries()   # All registered entries
+keys = registry.list_keys()          # Sorted list of all keys
+registry.reset()                     # Clear entries and citations
+len(registry)                        # Number of entries
+"key" in registry                    # Membership test
+```
+
+### ProjectMeta
+
+```python
+from streamtex import ProjectMeta
+
+# ProjectMeta — metadata for a single project in a collection
+meta = ProjectMeta(
+    title="Introduction Course",
+    description="Learn the basics",
+    cover="static/images/covers/intro.png",
+    project_url="http://localhost:8502",
+    order=1,
+)
+```
+
+## Style System — Advanced
+
+### StyleGrid
+
+```python
+from streamtex.styles import StyleGrid as sg, Style as ns
+
+# StyleGrid — grid of styles for per-cell styling in st_grid
+# Create with cell ranges in Excel-like notation (A1, B2, A1:C3)
+header = sg.create("A1:B1", s.bold + s.container.bg_colors.blue_bg)
+first_col = sg.create("A1:A5", s.text.colors.white)
+
+# Combine grids with + (add styles) or * (override: right-hand side wins)
+combined = header + first_col
+overridden = header * sg.create("A1", s.text.colors.red)  # A1 gets red
+
+# Subtract styles
+cleaned = combined - sg.create("A1:A5", s.text.colors.white)
+```
+
+### StreamTeX_Styles
+
+```python
+from streamtex import StreamTeX_Styles
+
+# StreamTeX_Styles — alias for StxStyles, the full aggregation class
+# Provides: .none, .text, .container, .visibility, .bold, .italic,
+#           .center_txt, .reset, .GIANT through .tiny, .light_bg
+# Used as the base class for project Styles:
+#   class Styles(StxStyles):
+#       project = Custom
+```
+
+### ListStyle
+
+```python
+from streamtex.styles import ListStyle
+
+# ListStyle — Style subclass for lists with custom bullet symbols
+custom_list = ListStyle(
+    css="color: blue;",
+    style_id="blue_list",
+    symbols=["►", "○", "■"],       # Cycles through symbols per nesting level
+)
+custom_list.lvl(1)                   # Returns "list-style-type: '►';"
+custom_list.lvl(2)                   # Returns "list-style-type: '○';"
+custom_list.lvl(4)                   # Returns "list-style-type: '►';" (cycles)
+```
+
 ## Utilities
+
+### responsive_cols
+
+```python
+from streamtex import responsive_cols
+
+# responsive_cols(cols, min_width) — generate responsive CSS grid-template-columns
+template = responsive_cols(3)              # "repeat(auto-fit, minmax(280px, 1fr))"
+template = responsive_cols(2, 400)         # "repeat(auto-fit, minmax(400px, 1fr))"
+template = responsive_cols(4, "15em")      # "repeat(auto-fit, minmax(15em, 1fr))"
+template = responsive_cols(1)              # "1fr" (single column, no repeat)
+
+# Use with st_grid
+with st_grid(cols=responsive_cols(3)) as g:
+    with g.cell(): st_write("A")
+    with g.cell(): st_write("B")
+    with g.cell(): st_write("C")
+```
+
+### st_toc
+
+```python
+from streamtex import st_toc
+
+# st_toc(toc_title_style) — render a TOC placeholder in the main content area
+# Writes a "Table of Contents" heading and returns an st.empty() container
+# The container is filled later by st_book with the generated TOC links
+toc_block = st_toc(s.project.titles.section_title)
+```
+
+### load_css
+
+```python
+from streamtex import load_css
+
+# load_css(file_name) — load a CSS file from the static directory and inject it
+load_css("custom-theme.css")         # Reads static/{file_name} and injects <style>
+```
+
+### reset_toc_registry
+
+```python
+from streamtex import reset_toc_registry, TOCConfig
+
+# reset_toc_registry(toc_config) — clear all registered TOC entries for the current run
+reset_toc_registry()                          # Reset with default TOCConfig
+reset_toc_registry(TOCConfig(max_level=3))    # Reset with custom config
+```
+
+### toc_entries
+
+```python
+from streamtex import toc_entries
+
+# toc_entries() — retrieve the list of registered TOC entries
+entries = toc_entries()
+# Each entry: {"level": int, "title": str, "section_number": str, "key_anchor": str}
+for e in entries:
+    print(f"Level {e['level']}: {e['title']} -> #{e['key_anchor']}")
+```
+
+### exec_static
+
+```python
+from streamtex import exec_static
+
+# exec_static(path, context, start_line, end_line) — load and execute a Python file
+# Path is resolved via resolve_static(). Uses caller's globals/locals if context is None.
+exec_static("examples/demo.py")                       # Execute entire file
+exec_static("examples/demo.py", start_line=5, end_line=20)  # Execute lines 5-20 only
+exec_static("examples/demo.py", context={"s": s, "stx": stx})  # Custom context
+```
+
+### inject_link_preview_scaffold
+
+```python
+from streamtex import inject_link_preview_scaffold
+
+# inject_link_preview_scaffold() — inject CSS/JS for link hover preview cards
+# Called once by st_book(). Adds a hidden tooltip container and mouse event listeners
+# that show page title + favicon on link hover.
+inject_link_preview_scaffold()
+```
+
+### resolve_content
+
+```python
+from streamtex import resolve_content
+
+# resolve_content(content, file, encoding) — resolve text from string or file
+# When file is provided, resolve_static() is used for path resolution.
+text = resolve_content(content="Hello world")        # Returns "Hello world"
+text = resolve_content(file="docs/intro.txt")        # Reads file via resolve_static()
+# Raises ValueError if both content and file are provided
+```
+
+### configure_image_path
+
+```python
+from streamtex import configure_image_path
+
+# configure_image_path(base_path) — set the base path for static image URI resolution
+# Default is "app/static/images". Call before rendering images if using a custom layout.
+configure_image_path("app/static/assets")
+```
+
+### add_wrap_all_option
+
+```python
+from streamtex import add_wrap_all_option
+
+# add_wrap_all_option(default) — add a "Wrap All" toggle to the sidebar
+# When toggled, all st_code() blocks wrap long lines on the next re-render.
+add_wrap_all_option()                # Default: wrap enabled (True)
+add_wrap_all_option(default=False)   # Default: wrap disabled
+```
 
 ### Spacing
 

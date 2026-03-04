@@ -1,29 +1,26 @@
 """Unit tests for streamtex.export_widgets — export-aware widget helpers."""
 
-from unittest.mock import patch, MagicMock
-import json
+from unittest.mock import MagicMock, patch
 
 import pandas as pd
-import pytest
 
 import streamtex.export as export_mod
-from streamtex.export import ExportConfig, reset_export_buffer, generate_export_html, is_export_active
+from streamtex.export import ExportConfig, generate_export_html, reset_export_buffer
 from streamtex.export_widgets import (
-    _to_dataframe,
     _dataframe_to_html,
-    st_dataframe,
-    st_table,
-    st_metric,
-    st_json,
-    st_graphviz,
-    st_line_chart,
-    st_bar_chart,
+    _to_dataframe,
     st_area_chart,
-    st_scatter_chart,
     st_audio,
+    st_bar_chart,
+    st_dataframe,
+    st_graphviz,
+    st_json,
+    st_line_chart,
+    st_metric,
+    st_scatter_chart,
+    st_table,
     st_video,
 )
-
 
 # ---------------------------------------------------------------------------
 # _to_dataframe
@@ -220,7 +217,6 @@ class TestStGraphviz:
         mock_gv.Source.return_value = mock_source
 
         # Patch the import inside the function
-        import streamtex.export_widgets as ew
         original_graphviz = None
         try:
             import graphviz as real_gv

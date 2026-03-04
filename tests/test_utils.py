@@ -1,7 +1,5 @@
 """Tests for StreamTeX utility functions."""
 
-import os
-import pytest
 import streamtex.utils as _utils
 
 strip_html = _utils.strip_html

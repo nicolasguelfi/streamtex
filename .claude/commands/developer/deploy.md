@@ -45,6 +45,25 @@ Report the health check status.
    ```
 4. After deployment, verify the app is accessible on the GCP VM's IP at port 8501.
 
+## Target: env-sync
+
+Synchronize environment variables from `render.yaml` to live Render services:
+
+```bash
+stx deploy env-sync                     # Sync all services
+stx deploy env-sync --dry-run           # Show diff without applying
+stx deploy env-sync --service svc-name  # Sync one service only
+stx deploy env-sync --path ./my-project # Custom project path
+```
+
+**Workflow:**
+1. Reads `render.yaml` to extract service names and their `envVars`
+2. Reads `~/.render/cli.yaml` for the API key (requires `render login`)
+3. Resolves service IDs via the Render API
+4. For each service: fetches current env vars, computes diff, displays a Rich table
+5. If not `--dry-run`: applies changes via `PUT /services/{id}/env-vars`
+6. Optionally triggers a redeploy after applying changes
+
 ## Post-Deployment
 
 - Report deployment status (success/failure)

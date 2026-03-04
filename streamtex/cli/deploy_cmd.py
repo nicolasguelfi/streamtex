@@ -1034,3 +1034,302 @@ def status_cmd(
     for s in statuses:
         if s.status != "live" and s.message:
             console.print(f"  [dim]{s.name}: {s.message}[/dim]")
+
+
+# ---------------------------------------------------------------------------
+# Env-sync helpers (Render API)
+# ---------------------------------------------------------------------------
+
+
+def _read_render_cli_config() -> dict[str, str]:
+    """Read ``~/.render/cli.yaml`` and return ``{"api_key": ..., "owner_id": ...}``.
+
+    The file is a simple YAML with ``api-key`` and optional ``owner-id`` fields.
+    We parse it with basic string matching (no extra dependency needed).
+
+    Raises:
+        click.ClickException: if the file is missing or the API key is absent.
+    """
+    cli_yaml = os.path.expanduser("~/.render/cli.yaml")
+    if not os.path.isfile(cli_yaml):
+        raise click.ClickException(
+            f"Render CLI config not found: {cli_yaml}\n"
+            "Install the Render CLI and run 'render login' first."
+        )
+
+    with open(cli_yaml, encoding="utf-8") as f:
+        content = f.read()
+
+    api_key: str | None = None
+    owner_id: str | None = None
+    for line in content.splitlines():
+        line = line.strip()
+        if line.startswith("api-key:"):
+            api_key = line.split(":", 1)[1].strip().strip("\"'")
+        elif line.startswith("owner-id:"):
+            owner_id = line.split(":", 1)[1].strip().strip("\"'")
+
+    if not api_key:
+        raise click.ClickException(
+            f"No api-key found in {cli_yaml}. Run 'render login' first."
+        )
+
+    return {"api_key": api_key, "owner_id": owner_id or ""}
+
+
+def _parse_render_yaml_env_vars(
+    project_path: str,
+) -> dict[str, list[tuple[str, str]]]:
+    """Parse ``render.yaml`` and extract env vars per service.
+
+    Returns ``{service_name: [(key, value), ...]}`` for every service
+    that declares ``envVars``.  Uses regex parsing consistent with
+    :func:`parse_render_yaml_services`.
+    """
+    yaml_path = os.path.join(project_path, "render.yaml")
+    if not os.path.isfile(yaml_path):
+        raise click.ClickException(f"render.yaml not found in {project_path}")
+
+    with open(yaml_path, encoding="utf-8") as f:
+        content = f.read()
+
+    # Split into service blocks (each starts with "  - type:")
+    blocks = re.split(r"(?=^\s+-\s+type:)", content, flags=re.MULTILINE)
+
+    result: dict[str, list[tuple[str, str]]] = {}
+    for block in blocks:
+        name_m = re.search(r"^\s+name:\s+(.+)$", block, re.MULTILINE)
+        if not name_m:
+            continue
+        svc_name = name_m.group(1).strip()
+
+        # Extract envVars section
+        env_section = re.search(
+            r"^\s+envVars:\s*\n((?:\s+-.+\n?|\s+\w.+\n?)*)",
+            block,
+            re.MULTILINE,
+        )
+        if not env_section:
+            result[svc_name] = []
+            continue
+
+        env_text = env_section.group(1)
+        keys = re.findall(r"^\s+-\s+key:\s+(.+)$", env_text, re.MULTILINE)
+        values = re.findall(r"^\s+value:\s+(.+)$", env_text, re.MULTILINE)
+
+        result[svc_name] = [
+            (k.strip(), v.strip()) for k, v in zip(keys, values)
+        ]
+
+    return result
+
+
+def _render_api_get(path: str, api_key: str) -> object:
+    """HTTP GET against the Render API v1."""
+    url = f"https://api.render.com/v1/{path}"
+    req = urllib.request.Request(url)
+    req.add_header("Authorization", f"Bearer {api_key}")
+    req.add_header("Accept", "application/json")
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:  # noqa: S310
+            return json.loads(resp.read().decode())
+    except urllib.error.HTTPError as e:
+        body = e.read().decode() if e.fp else ""
+        raise click.ClickException(
+            f"Render API error ({e.code}): {body}"
+        ) from e
+    except urllib.error.URLError as e:
+        raise click.ClickException(f"Render API unreachable: {e}") from e
+
+
+def _render_api_put(path: str, api_key: str, body: object) -> object:
+    """HTTP PUT against the Render API v1."""
+    url = f"https://api.render.com/v1/{path}"
+    data = json.dumps(body).encode()
+    req = urllib.request.Request(url, data=data, method="PUT")
+    req.add_header("Authorization", f"Bearer {api_key}")
+    req.add_header("Content-Type", "application/json")
+    req.add_header("Accept", "application/json")
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:  # noqa: S310
+            raw = resp.read().decode()
+            return json.loads(raw) if raw else {}
+    except urllib.error.HTTPError as e:
+        body_text = e.read().decode() if e.fp else ""
+        raise click.ClickException(
+            f"Render API error ({e.code}): {body_text}"
+        ) from e
+    except urllib.error.URLError as e:
+        raise click.ClickException(f"Render API unreachable: {e}") from e
+
+
+def _render_api_post(path: str, api_key: str, body: object = None) -> object:
+    """HTTP POST against the Render API v1."""
+    url = f"https://api.render.com/v1/{path}"
+    data = json.dumps(body).encode() if body else b""
+    req = urllib.request.Request(url, data=data, method="POST")
+    req.add_header("Authorization", f"Bearer {api_key}")
+    req.add_header("Content-Type", "application/json")
+    req.add_header("Accept", "application/json")
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:  # noqa: S310
+            raw = resp.read().decode()
+            return json.loads(raw) if raw else {}
+    except urllib.error.HTTPError as e:
+        body_text = e.read().decode() if e.fp else ""
+        raise click.ClickException(
+            f"Render API error ({e.code}): {body_text}"
+        ) from e
+    except urllib.error.URLError as e:
+        raise click.ClickException(f"Render API unreachable: {e}") from e
+
+
+def _resolve_render_service_ids(
+    names: list[str],
+    api_key: str,
+    owner_id: str,
+) -> dict[str, str]:
+    """Map service *names* to Render service IDs via the API.
+
+    Calls ``GET /services`` and filters by the names declared in
+    ``render.yaml``.  Returns ``{name: service_id}``.
+    """
+    params = "limit=100"
+    if owner_id:
+        params += f"&ownerId={owner_id}"
+    data = _render_api_get(f"services?{params}", api_key)
+
+    # Response is a list of {"service": {...}} wrappers
+    mapping: dict[str, str] = {}
+    for item in data:
+        svc = item.get("service", item)  # handle both shapes
+        svc_name = svc.get("name", "")
+        svc_id = svc.get("id", "")
+        if svc_name in names:
+            mapping[svc_name] = svc_id
+
+    return mapping
+
+
+# ---------------------------------------------------------------------------
+# env-sync command
+# ---------------------------------------------------------------------------
+
+
+@click.command("env-sync")
+@click.option("--path", default=".", help="Project directory containing render.yaml.")
+@click.option("--dry-run", is_flag=True, help="Show changes without applying.")
+@click.option("--service", default=None, help="Sync a specific service only.")
+def env_sync_cmd(path: str, dry_run: bool, service: str | None) -> None:
+    """Sync env vars from render.yaml to live Render services."""
+    from rich.table import Table
+
+    console = get_console()
+    p = os.path.abspath(path)
+
+    # 1. Parse render.yaml env vars
+    yaml_env = _parse_render_yaml_env_vars(p)
+    if not yaml_env:
+        raise click.ClickException("No services found in render.yaml.")
+
+    # Filter to a single service if requested
+    if service:
+        if service not in yaml_env:
+            raise click.ClickException(
+                f"Service '{service}' not found in render.yaml. "
+                f"Available: {', '.join(sorted(yaml_env))}"
+            )
+        yaml_env = {service: yaml_env[service]}
+
+    # 2. Read Render CLI config
+    config = _read_render_cli_config()
+    api_key = config["api_key"]
+    owner_id = config["owner_id"]
+
+    # 3. Resolve service IDs
+    console.print("[cyan]Resolving Render service IDs…[/cyan]")
+    id_map = _resolve_render_service_ids(list(yaml_env), api_key, owner_id)
+
+    missing = set(yaml_env) - set(id_map)
+    if missing:
+        console.print(
+            f"[yellow]⚠ Services not found on Render: {', '.join(sorted(missing))}[/yellow]"
+        )
+
+    # 4. Compare and sync
+    any_changes = False
+
+    for svc_name, desired_vars in sorted(yaml_env.items()):
+        svc_id = id_map.get(svc_name)
+        if not svc_id:
+            continue
+
+        # Fetch current env vars from Render
+        current_raw = _render_api_get(
+            f"services/{svc_id}/env-vars", api_key
+        )
+        current_map: dict[str, str] = {
+            item["key"]: item["value"]
+            for item in current_raw
+            if "key" in item and "value" in item
+        }
+
+        desired_map = dict(desired_vars)
+
+        # Compute diff
+        changes: list[tuple[str, str, str]] = []  # (key, current, new)
+        for key, new_val in desired_map.items():
+            old_val = current_map.get(key, "")
+            if old_val != new_val:
+                changes.append((key, old_val, new_val))
+
+        if not changes:
+            console.print(f"[green]✓ {svc_name}[/green]: already in sync")
+            continue
+
+        any_changes = True
+
+        # Display diff table
+        table = Table(title=f"Changes for {svc_name}")
+        table.add_column("Key", style="cyan")
+        table.add_column("Current")
+        table.add_column("→")
+        table.add_column("New", style="green")
+
+        for key, old_val, new_val in changes:
+            display_old = old_val if old_val else "[dim](not set)[/dim]"
+            table.add_row(key, display_old, "→", new_val)
+
+        console.print(table)
+
+        # Apply if not dry-run
+        if not dry_run:
+            # Build the full env var list for PUT (bulk replace)
+            put_body = [
+                {"key": k, "value": v} for k, v in desired_map.items()
+            ]
+            _render_api_put(
+                f"services/{svc_id}/env-vars", api_key, put_body
+            )
+            console.print(
+                f"  [bold green]✓ {svc_name}[/bold green]: "
+                f"{len(changes)} env var(s) updated"
+            )
+
+    if dry_run and any_changes:
+        console.print(
+            "\n[yellow]Dry-run mode — no changes applied. "
+            "Remove --dry-run to apply.[/yellow]"
+        )
+    elif not any_changes:
+        console.print("\n[bold green]All services are already in sync.[/bold green]")
+    else:
+        # Propose redeploy
+        console.print()
+        if click.confirm("Trigger a redeploy for updated services?", default=False):
+            for svc_name in sorted(yaml_env):
+                svc_id = id_map.get(svc_name)
+                if svc_id:
+                    _render_api_post(f"services/{svc_id}/deploys", api_key)
+                    console.print(f"  [cyan]↻ {svc_name}[/cyan]: deploy triggered")
+            console.print("[bold green]Redeploy triggered![/bold green]")

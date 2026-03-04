@@ -365,3 +365,13 @@ Commands are simple markdown files with instructions for the AI assistant.
 
 The deploy command supports Docker, Hugging Face Spaces, and GCP targets.
 It runs pre-flight checks (tests, linting, requirements) before deploying.
+
+### How do I sync env vars to Render after changing render.yaml?
+
+```bash
+stx deploy env-sync              # Sync all services
+stx deploy env-sync --dry-run    # Preview changes without applying
+stx deploy env-sync --service streamtex-intro  # Sync one service
+```
+
+This reads your `render.yaml` env vars and pushes them to live Render services via the API. Requires `render login` (stores API key in `~/.render/cli.yaml`).

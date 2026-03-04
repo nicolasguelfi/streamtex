@@ -294,6 +294,36 @@ If your project uses `[tool.uv.sources]` for editable installs, set
 `UV_NO_SOURCES=1` in CI environments so uv resolves from PyPI instead
 of local paths.
 
+## Keeping Up to Date
+
+### Update the CLI
+
+The `stx` CLI is installed as a global tool with its own frozen copy of
+the library. You must upgrade it explicitly after each release:
+
+```bash
+uv tool upgrade streamtex[cli]
+```
+
+### Update your workspace
+
+```bash
+cd streamtex-dev/
+stx workspace clone          # pull latest repos (docs, claude profiles)
+stx workspace sync           # update Python dependencies in all projects
+stx claude update --all      # propagate new commands, skills, references
+stx claude check             # verify everything is in sync
+```
+
+### Update a standalone project (no workspace)
+
+```bash
+cd my-project/
+uv add streamtex --upgrade   # update the library dependency
+```
+
+> Use `/stx-guide update` inside Claude Code for guided assistance.
+
 ## Contributing
 
 See [CONTRIBUTING.md](https://github.com/nicolasguelfi/streamtex/blob/main/CONTRIBUTING.md) for guidelines on code, content,

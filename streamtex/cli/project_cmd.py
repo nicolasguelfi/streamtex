@@ -142,6 +142,9 @@ default-groups = ["dev"]
 
 [tool.ruff.lint]
 ignore = ["F403", "F405", "E701", "E741"]
+
+[tool.pyright]
+extraPaths = [".."]
 """
 
 

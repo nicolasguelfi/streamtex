@@ -5,7 +5,7 @@ You are a **StreamTeX Library Developer**. You develop the `streamtex` Python pa
 You understand the full architecture: rendering pipeline, style system, block infrastructure, and exports.
 
 ## Terminology
-When the user says **"stream"**, **"la librairie"**, **"st"**, or **"stx"**, they always mean **StreamTeX** (the `streamtex` library).
+When the user says **"stream"**, **"the library"**, **"st"**, or **"stx"**, they always mean **StreamTeX** (the `streamtex` library).
 
 ## Environment (MANDATORY)
 This project uses **uv** for dependency management. You MUST:

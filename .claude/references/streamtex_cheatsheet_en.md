@@ -99,6 +99,7 @@ st_list(
     l_style=s.none,                     # Style for the list container (ListStyle for custom symbols)
     li_style=s.none,                    # Style for individual list items
     align=None,                         # "center" to center list block, None for left (default)
+    alt_li_styles=None,                 # list[Style] — cycle styles per list item (optional)
 )
 ```
 
@@ -110,6 +111,7 @@ st_write(
     tag=t.span,                     # HTML tag: t.div, t.span, t.h1, t.p, t.section...
     link="",                        # Optional hyperlink URL
     no_link_decor=False,            # Remove underline from links
+    hover=True,                     # Enable hover effect on links (default: True)
     toc_lvl=None,                   # TOC level: "1", "+1", "-1"
     label="",                       # Custom TOC entry label
     marker=None,                    # Per-heading marker control (True/False/None=auto)
@@ -142,6 +144,22 @@ st_image(uri="image.png", link="https://example.com")
 
 # Image with auto-height style
 st_image(s.container.sizes.height_auto, uri="image.png")
+
+# Image with light background (adds white bg for dark-mode compatibility)
+st_image(uri="diagram.png", light_bg=True)
+```
+
+### st_grid — Full Signature
+
+```python
+st_grid(
+    cols=2,                             # int or CSS string ("1fr 1fr", "repeat(auto-fit, ...)")
+    grid_style=s.none,                  # Style for the grid container
+    cell_styles=s.none,                 # Style(s) for cells (or StyleGrid for per-cell)
+    gap=None,                           # CSS gap string (e.g. "24px") — shorthand for gap in grid_style
+    responsive=False,                   # When True, auto-wraps columns using min_width
+    min_width=None,                     # Min column width for responsive mode (e.g. "350px" or 350)
+)
 ```
 
 ### Grids and Tables (Responsive-First)
@@ -413,6 +431,8 @@ st_book(
     bib_config=None,                # BibConfig for bibliography
     inspector=None,                 # InspectorConfig for block inspector
     page_width=90,                  # Page width as % of browser width (default 90)
+    banner_color="rgba(211,47,47,0.8)",  # Legacy — use banner=BannerConfig(...) instead
+    monties_color=None,             # Legacy — use banner=BannerConfig(...) instead
 )
 ```
 
@@ -640,9 +660,12 @@ stx.st_code(style, code="print('hello')", font_size="14pt")
 - `line_numbers` — Show line numbers (default: `True`)
 - `font_size` — CSS font size (default: responsive via `--stx-code-size`)
 - `line_number_color` — Color for line numbers (default: `"#6A9BC5"`)
-- `wrap` — When `True`, long lines wrap instead of scrolling horizontally (default: `False`)
+- `wrap` — When `True`, long lines wrap instead of scrolling horizontally (default: `None` — resolves to the global toggle set by `add_wrap_all_option()`, which defaults to `True` when called by `st_book()`)
 - `file` — Path to a source file (resolved via `resolve_static()`). Mutually exclusive with `code`
 - `encoding` — File encoding when using `file=` (default: `"utf-8"`)
+- `line_start` — Starting line number for display (default: `None` — starts at 1)
+- `start_line` — Extract from this line number when using `file=` (default: `None`)
+- `end_line` — Extract up to this line number when using `file=` (default: `None`)
 
 ```python
 # Load code from an external file

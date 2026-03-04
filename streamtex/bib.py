@@ -734,7 +734,7 @@ def cite(*keys: str, prefix: str = "", suffix: str = "") -> str:
     Unlike st_cite() which renders immediately, cite() returns a string
     for embedding inline:
 
-        st_write(s.big, "Selon ", cite("vaswani2017"), " les transformers...")
+        st_write(s.big, "According to ", cite("vaswani2017"), " transformers...")
 
     Args:
         *keys: One or more BibEntry keys

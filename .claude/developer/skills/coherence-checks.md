@@ -1,6 +1,6 @@
 # Coherence Check Rules
 
-Reference file for `/coherence:audit`. Defines 9 check categories.
+Reference file for `/coherence:audit`. Defines 11 check categories.
 
 ---
 
@@ -75,6 +75,7 @@ Reference file for `/coherence:audit`. Defines 9 check categories.
 | `streamtex-claude/profiles/project/designer/skills/*.md` | `projects/*/.claude/designer/skills/` |
 | `streamtex-claude/profiles/documentation/commands/designer/*.md` | `streamtex-docs/.claude/commands/designer/` |
 | `streamtex-claude/profiles/documentation/designer/agents/*.md` | `streamtex-docs/.claude/designer/agents/` |
+| `streamtex-claude/shared/commands/stx-guide.md` | `streamtex/.claude/commands/`, `streamtex-docs/.claude/commands/`, `projects/*/.claude/commands/` |
 
 **Method**: Read both files, compare content. If different, report as ERROR.
 
@@ -132,7 +133,7 @@ Reference file for `/coherence:audit`. Defines 9 check categories.
 
 **Goal**: The global `stx-guide.md` skill accurately reflects the current ecosystem state.
 
-**Source**: `~/.claude/commands/stx-guide.md`
+**Source**: `streamtex-claude/shared/commands/stx-guide.md`
 
 **Cross-reference with**:
 - All `manifest.toml` files in `streamtex-claude/profiles/*/` — command categories and counts
@@ -163,3 +164,107 @@ Reference file for `/coherence:audit`. Defines 9 check categories.
 - INFO: report total links found and how many are absolute vs relative
 
 **How to check**: Regex `\[([^\]]+)\]\((?!https?://|#)([^)]+)\)` finds relative links.
+
+---
+
+## Check 10: Language Consistency — English (scope: all)
+
+**Goal**: All ecosystem content must be written in English, except explicitly exempted files.
+
+**Scope**: All text content across the ecosystem.
+
+**Files to check**:
+
+| Category | Paths | What to check |
+|----------|-------|---------------|
+| Library code | `streamtex/streamtex/**/*.py` | Docstrings, comments, string literals in error messages |
+| Manual blocks | `streamtex-docs/manuals/**/blocks/**/*.py` | `st_write()` text, `show_explanation()`, `show_details()`, `show_code()` descriptions, docstrings, comments |
+| Manual book.py | `streamtex-docs/manuals/**/book.py` | TOC entries, banner text, section titles |
+| Claude profiles | `streamtex-claude/profiles/**/*.md` | All markdown content |
+| Claude commands | `streamtex-claude/profiles/**/commands/**/*.md` | Command descriptions and instructions |
+| Claude skills | `streamtex-claude/profiles/**/skills/**/*.md` | Skill content |
+| Claude agents | `streamtex-claude/profiles/**/agents/**/*.md` | Agent prompts and instructions |
+| Shared references | `streamtex-claude/shared/references/*.md` | Cheatsheet, coding standards |
+| Project templates | `streamtex-docs/templates/**/*.py` | Same rules as manual blocks |
+| README files | `*/README.md` | Full content |
+| CLAUDE.md files | `*/CLAUDE.md`, `projects/*/CLAUDE.md` | Full content |
+
+**Explicit exceptions** (allowed in French or other languages):
+- `streamtex-claude/shared/commands/stx-guide.md` — French by design (user-facing guide)
+- Manual content that demonstrates multilingual features (e.g., i18n examples)
+- Inline code identifiers (variable/function names are language-neutral)
+
+**Rules**:
+- ERROR if a Claude profile/command/skill/agent file contains non-English prose
+- WARNING if a manual block contains non-English text in `st_write()`, `show_explanation()`, or `show_details()`
+- WARNING if docstrings or comments in library code are not in English
+- WARNING if a `CLAUDE.md` or `README.md` contains non-English prose
+- INFO: report total files scanned and language status
+
+**How to check**: For each file, sample text passages (docstrings, markdown paragraphs, `st_write()` string arguments). Flag content containing common non-English patterns:
+- French indicators: words like `le`, `la`, `les`, `un`, `une`, `des`, `est`, `sont`, `avec`, `pour`, `dans`, `cette`, `nous`, `vous` in prose context
+- Look for accented characters typical of French (`é`, `è`, `ê`, `ë`, `à`, `ù`, `ç`, `ô`, `î`) in non-code text
+- Ignore: code identifiers, URLs, file paths, proper nouns
+
+---
+
+## Check 11: Claude Artifact API Validation (scope: profiles, all)
+
+**Goal**: All Python code examples in Claude artifacts (skills, agents, commands) use correct, current StreamTeX API.
+
+**Why this check is critical**: Users generate most of their project code via Claude artifacts (`/designer:block-new`, `/project:project-init`, agents). If these artifacts contain incorrect API usage, every generated project inherits the bugs.
+
+**Scope**: All `.md` files containing Python code blocks in:
+- `streamtex-claude/profiles/**/skills/**/*.md`
+- `streamtex-claude/profiles/**/agents/**/*.md`
+- `streamtex-claude/profiles/**/commands/**/*.md`
+- `streamtex-claude/shared/commands/*.md`
+
+**Method**:
+1. Extract all fenced Python code blocks (` ```python ... ``` `) from each `.md` file
+2. For each code block, check the rules below against the actual library API
+3. To verify the actual API, introspect the library:
+   - `from streamtex.enums import ListTypes; dir(ListTypes)` → valid enum members
+   - `from streamtex.enums import Tags; dir(Tags)` → valid tag names
+   - `from streamtex import *; inspect.signature(st_list)` → valid parameters
+   - `from streamtex import *; inspect.signature(st_image)` → valid parameters
+   - (repeat for all `st_*` functions used in code blocks)
+
+**Rules**:
+
+### Enum validation
+- ERROR if code uses `lt.ul` or `lt.ol` (correct: `lt.unordered`, `lt.ordered`)
+- ERROR if code uses any `lt.<name>` where `<name>` is not in `dir(ListTypes)`
+- ERROR if code uses any `t.<name>` where `<name>` is not in `dir(Tags)`
+
+### Function signature validation
+- ERROR if code passes a keyword argument that does not exist in the function signature
+  - Example: `st_list(..., items=[...])` — `items` is not a parameter of `st_list()`
+  - Example: `st_image(..., caption="...")` — `caption` is not a parameter of `st_image()`
+- ERROR if code uses a function as a regular call when it is a context manager
+  - Example: `st_list(style, items=[...])` should be `with st_list(...) as l:` + `l.item()`
+- WARNING if code passes positional arguments in the wrong order vs. the signature
+
+### st_grid validation
+- ERROR if `cols` receives a Python list (e.g., `st_grid([1, 1])`) — must be `int` or `str`
+- WARNING if code uses fixed columns without responsive pattern (same as coding standards rule)
+
+### Cross-reference with cheatsheet
+- WARNING if an artifact shows a pattern that contradicts the cheatsheet
+- WARNING if an artifact uses a deprecated parameter (e.g., `banner_color` instead of `banner=BannerConfig(...)`)
+
+**How to check** (automated introspection):
+```bash
+uv run python -c "
+from streamtex.enums import ListTypes, Tags
+print('ListTypes:', [x for x in dir(ListTypes) if not x.startswith('_')])
+print('Tags:', [x for x in dir(Tags) if not x.startswith('_')])
+"
+uv run python -c "
+import inspect
+from streamtex import st_list, st_image, st_grid, st_write, st_code, st_space, st_block, st_overlay
+for fn in [st_list, st_image, st_grid, st_write, st_code, st_space, st_block, st_overlay]:
+    print(f'{fn.__name__}: {inspect.signature(fn)}')
+"
+```
+Then for each code block, parse function calls and verify parameter names and enum values against the introspected API.

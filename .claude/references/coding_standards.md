@@ -114,10 +114,14 @@ stx.st_html('<div>long content</div>', height=600, scrolling=True)
 # - grid_style: Style object for the entire grid (includes gap via CSS)
 # - cell_styles: Style(s) for individual cells
 
-# Gap between cells goes in grid_style, NOT as a parameter
+# Gap between cells — use the dedicated gap parameter or grid_style
+with st_grid(cols=2, gap="24px"):
+    # 2-column layout with 24px gap (using gap parameter)
+
+# Alternative: gap via grid_style CSS
 gap_style = Style("gap:24px;", "grid_gap")
 with st_grid(cols=2, grid_style=gap_style):
-    # 2-column layout with 24px gap
+    # 2-column layout with 24px gap (using grid_style)
 
 # Common column patterns:
 st_grid(cols=2)                                    # 2 equal columns
@@ -216,7 +220,8 @@ with st_grid(cols=2, grid_style=grid_gap):
 - Default font size is responsive via the CSS variable `--stx-code-size` (18pt desktop, 14pt tablet, 11pt mobile)
 - Override with `font_size="14pt"` for specific sizes
 - Use `wrap=True` for prose-like code (JSON, logs) where horizontal alignment doesn't matter
-- Use `wrap=False` (default) for code where columns must align (tables, diffs, ASCII art)
+- Use `wrap=False` for code where columns must align (tables, diffs, ASCII art)
+- Default `wrap=None` defers to the global toggle set by `add_wrap_all_option()` (called by `st_book()`), which defaults to `True`. Pass `wrap=False` explicitly when alignment matters.
 - `show_code()` and `show_code_inline()` forward the `wrap` parameter to `st_code()`
 
 ### External File Loading (`file=` parameter)

@@ -67,6 +67,11 @@ source = "streamtex-claude"
     shared_refs.mkdir(parents=True)
     (shared_refs / "coding_standards.md").write_text("# Coding Standards\n")
 
+    # Shared commands
+    shared_cmds = claude / "shared" / "commands"
+    shared_cmds.mkdir(parents=True)
+    (shared_cmds / "stx-guide.md").write_text("# STX Guide\n")
+
     return ws
 
 
@@ -169,6 +174,21 @@ def test_install_copies_shared_references(tmp_path):
     install_profile(str(ws / "streamtex-claude"), "project", str(target))
 
     assert (target / ".claude" / "references" / "coding_standards.md").is_file()
+
+
+def test_install_copies_shared_commands(tmp_path):
+    ws = _make_workspace(tmp_path)
+    target = tmp_path / "my-project"
+    target.mkdir()
+
+    install_profile(str(ws / "streamtex-claude"), "project", str(target))
+
+    cmd_file = target / ".claude" / "commands" / "stx-guide.md"
+    assert cmd_file.is_file()
+    # Shared commands are read-only
+    import stat
+    mode = cmd_file.stat().st_mode
+    assert not (mode & stat.S_IWUSR)
 
 
 def test_install_writes_stx_profile(tmp_path):

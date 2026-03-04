@@ -123,18 +123,19 @@ def install_profile(claude_repo: str, profile: str, target: str) -> list[str]:
             shutil.copy2(src, dst)
             installed.append(os.path.relpath(dst, target))
 
-    # 2. Copy shared/references/ if it exists (read-only copies)
-    shared_refs = os.path.join(claude_repo, "shared", "references")
-    if os.path.isdir(shared_refs):
-        dst_refs = os.path.join(claude_dir, "references")
-        shutil.copytree(shared_refs, dst_refs, dirs_exist_ok=True)
-        for root, _dirs, files in os.walk(dst_refs):
-            for f in files:
-                fpath = os.path.join(root, f)
-                os.chmod(fpath, 0o444)
-                rel = os.path.relpath(fpath, target)
-                if rel not in installed:
-                    installed.append(rel)
+    # 2. Copy shared/references/ and shared/commands/ (read-only copies)
+    for shared_kind, dst_name in [("references", "references"), ("commands", "commands")]:
+        shared_dir = os.path.join(claude_repo, "shared", shared_kind)
+        if os.path.isdir(shared_dir):
+            dst_dir = os.path.join(claude_dir, dst_name)
+            shutil.copytree(shared_dir, dst_dir, dirs_exist_ok=True)
+            for root, _dirs, files in os.walk(dst_dir):
+                for f in files:
+                    fpath = os.path.join(root, f)
+                    os.chmod(fpath, 0o444)
+                    rel = os.path.relpath(fpath, target)
+                    if rel not in installed:
+                        installed.append(rel)
 
     # 3. Write .claude/.stx-profile marker
     marker_path = os.path.join(claude_dir, ".stx-profile")
@@ -212,6 +213,7 @@ def collect_source_files(claude_repo: str, profile: str) -> dict[str, str]:
     - ``manifest.toml`` → skipped
     - everything else → ``.claude/``
     - ``shared/references/`` → ``.claude/references/``
+    - ``shared/commands/`` → ``.claude/commands/``
 
     When a profile has ``extends``, the parent files are collected first
     (recursively), then the child's ``overlay/`` directory is applied on top.
@@ -240,14 +242,15 @@ def collect_source_files(claude_repo: str, profile: str) -> dict[str, str]:
     files: dict[str, str] = {}
     _collect_dir_files(profile_dir, profile_dir, files)
 
-    # Shared references
-    shared_refs = os.path.join(claude_repo, "shared", "references")
-    if os.path.isdir(shared_refs):
-        for root, _dirs, filenames in os.walk(shared_refs):
-            for fname in filenames:
-                abs_src = os.path.join(root, fname)
-                rel = os.path.relpath(abs_src, shared_refs)
-                files[os.path.join(".claude", "references", rel)] = abs_src
+    # Shared references and commands
+    for shared_kind in ("references", "commands"):
+        shared_dir = os.path.join(claude_repo, "shared", shared_kind)
+        if os.path.isdir(shared_dir):
+            for root, _dirs, filenames in os.walk(shared_dir):
+                for fname in filenames:
+                    abs_src = os.path.join(root, fname)
+                    rel = os.path.relpath(abs_src, shared_dir)
+                    files[os.path.join(".claude", shared_kind, rel)] = abs_src
 
     return files
 
@@ -487,8 +490,9 @@ def _update_single_target(
         if os.path.isfile(dst_path):
             os.chmod(dst_path, 0o644)
         shutil.copy2(src_path, dst_path)
-        # Re-protect shared references
-        if d.path.startswith(os.path.join(".claude", "references")):
+        # Re-protect shared references and commands
+        if d.path.startswith(os.path.join(".claude", "references")) or \
+           d.path.startswith(os.path.join(".claude", "commands")):
             os.chmod(dst_path, 0o444)
         updated.append(d.path)
 

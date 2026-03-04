@@ -140,13 +140,6 @@ dev = ["pytest>=7.0", "ruff>=0.4.0", "pre-commit>=3.0"]
 [tool.uv]
 default-groups = ["dev"]
 
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
-
-[tool.hatch.build.targets.wheel]
-packages = []
-
 [tool.ruff.lint]
 ignore = ["F403", "F405", "E701", "E741"]
 """

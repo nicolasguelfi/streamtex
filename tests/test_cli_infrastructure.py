@@ -13,10 +13,12 @@ def test_cli_help():
 
 
 def test_cli_version():
+    from streamtex import __version__
+
     runner = CliRunner()
     result = runner.invoke(cli, ["--version"])
     assert result.exit_code == 0
-    assert "0.3.2" in result.output
+    assert __version__ in result.output
 
 
 def test_workspace_group_exists():

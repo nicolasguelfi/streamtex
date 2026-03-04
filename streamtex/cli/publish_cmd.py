@@ -268,11 +268,19 @@ def pypi_cmd(path: str, use_test_pypi: bool, skip_tests: bool, skip_lint: bool) 
     # 2. Extract version for display
     version = next((c.message for c in checks if c.name == "version"), "unknown")
 
-    # 3. Build
+    # 3. Clean dist/ to avoid uploading stale artefacts
     uv = _find_uv()
     if not uv:
         raise click.ClickException("uv not found in PATH.")
 
+    import shutil
+
+    dist_dir = os.path.join(p, "dist")
+    if os.path.isdir(dist_dir):
+        shutil.rmtree(dist_dir)
+        console.print("[dim]Cleaned dist/[/dim]")
+
+    # 4. Build
     console.print("[cyan]Building package…[/cyan]")
     result = subprocess.run(
         [uv, "build"],
@@ -285,7 +293,22 @@ def pypi_cmd(path: str, use_test_pypi: bool, skip_tests: bool, skip_lint: bool) 
 
     console.print("[green]Build succeeded[/green]")
 
-    # 4. Upload
+    # 5. Load token from .env if UV_PUBLISH_TOKEN is not already set
+    env = os.environ.copy()
+    if not env.get("UV_PUBLISH_TOKEN"):
+        env_file = os.path.join(p, ".env")
+        if os.path.isfile(env_file):
+            with open(env_file, encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if line.startswith("PYPI_TOKEN=") and not line.startswith("#"):
+                        token = line.split("=", 1)[1].strip()
+                        if token:
+                            env["UV_PUBLISH_TOKEN"] = token
+                            console.print("[dim]Token loaded from .env[/dim]")
+                            break
+
+    # 6. Upload
     publish_cmd = [uv, "publish"]
     if use_test_pypi:
         publish_cmd.extend(["--index", "testpypi"])
@@ -294,6 +317,7 @@ def pypi_cmd(path: str, use_test_pypi: bool, skip_tests: bool, skip_lint: bool) 
     result = subprocess.run(
         publish_cmd,
         cwd=p,
+        env=env,
         timeout=120,
     )
     if result.returncode != 0:

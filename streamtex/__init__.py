@@ -1,6 +1,6 @@
 """StreamTeX — A Streamlit wrapper for styled content rendering."""
 
-__version__ = "0.3.2.post1"
+__version__ = "0.3.2.post2"
 
 # Core style system
 from .styles import Style, ListStyle, StyleGrid, StxStyles, StreamTeX_Styles, theme

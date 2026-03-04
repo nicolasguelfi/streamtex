@@ -253,6 +253,27 @@ def _find_uv() -> str:
     return uv
 
 
+def _has_missing_local_sources(repo_path: str) -> bool:
+    """Return True if pyproject.toml has [tool.uv.sources] with local paths that don't exist."""
+    pyproject = os.path.join(repo_path, "pyproject.toml")
+    try:
+        import tomllib
+    except ModuleNotFoundError:
+        import tomli as tomllib  # type: ignore[no-redef]
+    try:
+        with open(pyproject, "rb") as f:
+            data = tomllib.load(f)
+    except (OSError, ValueError):
+        return False
+    sources = data.get("tool", {}).get("uv", {}).get("sources", {})
+    for _name, spec in sources.items():
+        if isinstance(spec, dict) and "path" in spec:
+            resolved = os.path.join(repo_path, spec["path"])
+            if not os.path.exists(resolved):
+                return True
+    return False
+
+
 def _run_uv_sync(
     repos: dict,
     ws_root: str,
@@ -292,9 +313,15 @@ def _run_uv_sync(
             skipped += 1
             continue
 
-        console.print(f"  [cyan]{repo_name}[/cyan]: running uv sync …")
+        # If local editable sources are missing, fall back to PyPI
+        cmd = [uv, "sync"]
+        if _has_missing_local_sources(repo_path):
+            cmd.append("--no-sources")
+            console.print(f"  [cyan]{repo_name}[/cyan]: running uv sync --no-sources (editable source not found) …")
+        else:
+            console.print(f"  [cyan]{repo_name}[/cyan]: running uv sync …")
         result = subprocess.run(
-            [uv, "sync"],
+            cmd,
             cwd=repo_path,
             capture_output=True,
             text=True,

@@ -1,6 +1,6 @@
 # Coherence Check Rules
 
-Reference file for `/coherence:audit`. Defines 8 check categories.
+Reference file for `/coherence:audit`. Defines 9 check categories.
 
 ---
 
@@ -147,3 +147,19 @@ Reference file for `/coherence:audit`. Defines 8 check categories.
 - WARNING if a manual in `streamtex-docs/manuals/` is missing from Section 2 layout
 - WARNING if a gotcha in Section 5 references deprecated behavior
 - INFO: report stx-guide line count and last-known sync date
+
+---
+
+## Check 9: README Links for PyPI (scope: library, all)
+
+**Goal**: README.md uses only absolute URLs so links work on PyPI, GitHub, and locally.
+
+**Source**: `streamtex/README.md`
+
+**Rules**:
+- WARNING if any markdown link uses a relative path (e.g., `[text](FILE.md)` instead of `[text](https://github.com/nicolasguelfi/streamtex/blob/main/FILE.md)`)
+- PyPI renders README.md but does NOT resolve relative links — they become broken
+- `stx publish check` also detects this (check "README links")
+- INFO: report total links found and how many are absolute vs relative
+
+**How to check**: Regex `\[([^\]]+)\]\((?!https?://|#)([^)]+)\)` finds relative links.

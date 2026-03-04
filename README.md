@@ -2,7 +2,7 @@
 
 [![PyPI version](https://img.shields.io/pypi/v/streamtex)](https://pypi.org/project/streamtex/)
 [![Python](https://img.shields.io/pypi/pyversions/streamtex)](https://pypi.org/project/streamtex/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/nicolasguelfi/streamtex/blob/main/LICENSE)
 [![CI](https://github.com/nicolasguelfi/streamtex/actions/workflows/ci.yml/badge.svg)](https://github.com/nicolasguelfi/streamtex/actions/workflows/ci.yml)
 [![Works with Claude Code](https://img.shields.io/badge/Works%20with-Claude%20Code-blueviolet)](https://claude.ai/claude-code)
 [![Works with Cursor](https://img.shields.io/badge/Works%20with-Cursor-blue)](https://cursor.com)
@@ -73,7 +73,7 @@ and generates all files — blocks, styles, book.py — ready to run:
 uv run streamlit run book.py
 ```
 
-See the **[AI Guide](AI_GUIDE.md)** for all commands, agents, and workflows.
+See the **[AI Guide](https://github.com/nicolasguelfi/streamtex/blob/main/AI_GUIDE.md)** for all commands, agents, and workflows.
 
 ### Code-First with Python
 
@@ -166,7 +166,7 @@ and **10 block templates** for AI-assisted development.
 | **Slide Reviewer** | Reviews and validates completed slides |
 | **Presentation Designer** | Specialist for live projection (large fonts, minimal text) |
 
-See the **[AI Guide](AI_GUIDE.md)** for the complete reference.
+See the **[AI Guide](https://github.com/nicolasguelfi/streamtex/blob/main/AI_GUIDE.md)** for the complete reference.
 
 ## Claude & Cursor Integration
 
@@ -234,7 +234,7 @@ for the full list of example projects.
 
 ### Reference
 
-- [AI Guide](AI_GUIDE.md) — zero-code workflows with Claude/Cursor
+- [AI Guide](https://github.com/nicolasguelfi/streamtex/blob/main/AI_GUIDE.md) — zero-code workflows with Claude/Cursor
 - [Cheatsheet (EN)](https://github.com/nicolasguelfi/streamtex/blob/main/.claude/references/streamtex_cheatsheet_en.md)
 - [Coding Standards](https://github.com/nicolasguelfi/streamtex/blob/main/.claude/references/coding_standards.md)
 
@@ -296,9 +296,9 @@ of local paths.
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on code, content,
+See [CONTRIBUTING.md](https://github.com/nicolasguelfi/streamtex/blob/main/CONTRIBUTING.md) for guidelines on code, content,
 and AI profile contributions.
 
 ## License
 
-[MIT](LICENSE) — Copyright (c) 2026 Nicolas Guelfi
+[MIT](https://github.com/nicolasguelfi/streamtex/blob/main/LICENSE) — Copyright (c) 2026 Nicolas Guelfi

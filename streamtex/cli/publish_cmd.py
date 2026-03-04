@@ -202,6 +202,26 @@ def run_publish_checks(
     else:
         checks.append(PublishCheck("dist files", "fail", "No dist/ directory"))
 
+    # 11. README links — no relative links (broken on PyPI)
+    import re
+
+    readme_path = os.path.join(p, "README.md")
+    if os.path.isfile(readme_path):
+        with open(readme_path, encoding="utf-8") as f:
+            content = f.read()
+        # Match markdown links that are NOT absolute URLs or anchors
+        relative = re.findall(r'\[([^\]]+)\]\((?!https?://|#)([^)]+)\)', content)
+        if relative:
+            labels = [label for label, _ in relative]
+            checks.append(
+                PublishCheck(
+                    "README links", "warn",
+                    f"Relative links (broken on PyPI): {', '.join(labels)}",
+                )
+            )
+        else:
+            checks.append(PublishCheck("README links", "pass", "All links absolute"))
+
     return checks
 
 

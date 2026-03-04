@@ -45,21 +45,29 @@ Report the health check status.
    ```
 4. After deployment, verify the app is accessible on the GCP VM's IP at port 8501.
 
-## Target: render (auto-deploy)
+## Target: render (auto-deploy with smart filtering)
 
-Render services are automatically redeployed on every push to `main` via a
-GitHub Actions workflow (`.github/workflows/render-deploy.yml`) that calls
-the Render API.
+Render services are automatically redeployed on push to `main` via a
+GitHub Actions workflow (`.github/workflows/render-deploy.yml`) with
+**smart path-based filtering** — only services whose files changed are redeployed.
+
+**How filtering works:**
+- Changes in a manual folder (e.g. `manuals/stx_manual_intro/**`) → deploy only that service
+- Changes in shared files (`Dockerfile`, `pyproject.toml`, `shared-blocks/`, `.github/`, `scripts/`) → deploy ALL services
+- Manual trigger (`workflow_dispatch`) → deploy ALL services
+
+The mapping between services and folders is extracted at runtime from the `FOLDER`
+env var in `render.yaml`.
 
 **Setup (one-time):**
 1. Add the `RENDER_API_KEY` secret to the GitHub repo:
    ```bash
    gh secret set RENDER_API_KEY -R nicolasguelfi/<repo> --body "<key>"
    ```
-2. The workflow reads `render.yaml` to extract service names, resolves their
-   IDs via the Render API, and triggers a deploy for each.
+2. The workflow reads `render.yaml` to extract service names and FOLDER mappings,
+   resolves service IDs via the Render API, and triggers deploys for affected services.
 
-**Manual trigger:**
+**Manual trigger (deploys all services):**
 ```bash
 # From GitHub Actions UI: "Run workflow" button
 # Or via CLI:

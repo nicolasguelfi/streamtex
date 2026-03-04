@@ -368,16 +368,23 @@ It runs pre-flight checks (tests, linting, requirements) before deploying.
 
 ### How does Render auto-deploy work?
 
-Render services are automatically redeployed on every push to `main` via a GitHub Actions
-workflow (`.github/workflows/render-deploy.yml`). The workflow reads `render.yaml`, resolves
-service IDs via the Render API, and triggers a deploy for each service.
+Render services are automatically redeployed on push to `main` via a GitHub Actions
+workflow (`.github/workflows/render-deploy.yml`). The workflow uses **smart path-based
+filtering** — only services whose files actually changed are redeployed:
+
+- Changes in `manuals/stx_manual_intro/**` → deploy `streamtex-intro` only
+- Changes in shared files (`Dockerfile`, `pyproject.toml`, `shared-blocks/`, `.github/`, `scripts/`) → deploy **ALL** services
+- Manual trigger (`workflow_dispatch`) → deploy **ALL** services
+
+The mapping between services and folders is extracted automatically from the `FOLDER`
+env var in `render.yaml`.
 
 **Setup (one-time per repo):**
 ```bash
 gh secret set RENDER_API_KEY -R nicolasguelfi/<repo> --body "<your-render-api-key>"
 ```
 
-**Manual trigger:**
+**Manual trigger (deploys all services):**
 ```bash
 gh workflow run render-deploy.yml -R nicolasguelfi/<repo>
 ```

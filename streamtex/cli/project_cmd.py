@@ -462,11 +462,12 @@ def _copy_rich_template(
             shutil.copy2(src_file, dst_file)
             copied.append(rel)
 
-    # Generate pyproject.toml (not in the template)
+    # Always generate pyproject.toml (overwrite template version to ensure
+    # correct project name and hatchling packages=[] config)
     pyproject_path = os.path.join(target, "pyproject.toml")
-    if not os.path.isfile(pyproject_path):
-        with open(pyproject_path, "w", encoding="utf-8") as f:
-            f.write(generate_pyproject_toml(project_name))
+    with open(pyproject_path, "w", encoding="utf-8") as f:
+        f.write(generate_pyproject_toml(project_name))
+    if "pyproject.toml" not in copied:
         copied.append("pyproject.toml")
 
     # Generate .gitignore (not in the template)

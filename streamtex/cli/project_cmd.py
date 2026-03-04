@@ -125,7 +125,7 @@ def generate_pyproject_toml(name: str) -> str:
     """Generate pyproject.toml for a StreamTeX project."""
     return f"""\
 [project]
-name = "stx-{name}"
+name = "{name}"
 version = "0.1.0"
 description = "StreamTeX project: {name}"
 requires-python = ">=3.10"
@@ -144,6 +144,9 @@ default-groups = ["dev"]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+[tool.hatch.build.targets.wheel]
+packages = []
+
 [tool.ruff.lint]
 ignore = ["F403", "F405", "E701", "E741"]
 """
@@ -152,7 +155,7 @@ ignore = ["F403", "F405", "E701", "E741"]
 def generate_setup_py(name: str) -> str:
     """Generate a docstring-only setup.py."""
     return f"""\
-\"\"\"Setup for stx-{name} project.\"\"\"
+\"\"\"Setup for {name} project.\"\"\"
 """
 
 
@@ -254,13 +257,13 @@ def scaffold_project(
 def resolve_project_dir(name: str) -> str:
     """Determine target directory for a new project.
 
-    If inside a workspace with ``projects/``, use ``projects/stx-<name>/``.
-    Otherwise, use ``./stx-<name>/``.
+    If inside a workspace with ``projects/``, use ``projects/<name>/``.
+    Otherwise, use ``./<name>/``.
 
     Raises:
         click.ClickException: if the target directory already exists.
     """
-    dir_name = f"stx-{name}"
+    dir_name = name
 
     ws_root = find_workspace_root()
     if ws_root is not None:

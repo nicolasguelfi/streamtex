@@ -41,7 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CHANGELOG
 
 ### Changed
-- Moved `streamlit-ace` from required to optional dependency (`pip install streamtex[inspector]`)
+- Moved `streamlit-ace` from required to optional dependency (`pip install "streamtex[inspector]"`)
 - Updated project metadata (authors, classifiers, keywords, URLs)
 
 ## [0.2.0] - 2026-02-20

@@ -23,9 +23,9 @@ StreamTeX supports 4 installation levels. Pick the one that fits your needs.
 From zero to a running project in 3 commands:
 
 ```bash
-uv tool install streamtex[cli]
-stx project new mon-projet
-cd stx-mon-projet && uv sync && uv run streamlit run book.py
+uv tool install "streamtex[cli]"
+stx project new my-project
+cd my-project && uv sync && uv run streamlit run book.py
 ```
 
 ### Standard Setup (recommended)
@@ -33,12 +33,12 @@ cd stx-mon-projet && uv sync && uv run streamlit run book.py
 Full workspace with rich templates, documentation, and Claude AI profiles:
 
 ```bash
-uv tool install streamtex[cli]
+uv tool install "streamtex[cli]"
 mkdir streamtex-dev && cd streamtex-dev
 stx workspace init .
 stx workspace clone
-stx project new mon-projet --template project
-cd projects/stx-mon-projet
+stx project new my-project --template project
+cd projects/my-project
 stx claude install project .
 uv run streamlit run book.py
 ```
@@ -50,11 +50,11 @@ uv run streamlit run book.py
 Install StreamTeX and a Claude AI profile, then let the AI build your project:
 
 ```bash
-uv tool install streamtex[cli]
+uv tool install "streamtex[cli]"
 mkdir streamtex-dev && cd streamtex-dev
 stx workspace init . && stx workspace clone
-stx project new mon-projet
-cd projects/stx-mon-projet
+stx project new my-project
+cd projects/my-project
 stx claude install project .
 ```
 
@@ -261,7 +261,7 @@ my-project/
 
 ```bash
 # Recommended: install the CLI as a global tool
-uv tool install streamtex[cli]
+uv tool install "streamtex[cli]"
 
 # Or as a project dependency
 uv add streamtex
@@ -270,8 +270,8 @@ uv add streamtex
 Optional extras:
 
 ```bash
-uv add streamtex[inspector]    # Live code inspector sidebar
-uv add streamtex[cli]          # stx CLI commands
+uv add "streamtex[inspector]"    # Live code inspector sidebar
+uv add "streamtex[cli]"          # stx CLI commands
 ```
 
 ### Prerequisites

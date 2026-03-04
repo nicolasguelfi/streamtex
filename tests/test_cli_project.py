@@ -61,7 +61,7 @@ def test_generate_block_hello_has_build():
 def test_generate_pyproject_toml_valid():
     content = generate_pyproject_toml("demo")
     data = tomllib.loads(content)
-    assert data["project"]["name"] == "stx-demo"
+    assert data["project"]["name"] == "demo"
     deps = data["project"]["dependencies"]
     assert any("streamtex" in d for d in deps)
 
@@ -162,19 +162,19 @@ def test_resolve_in_workspace_uses_projects(tmp_path):
 
     os.chdir(ws)
     target = resolve_project_dir("demo")
-    assert target.endswith(os.path.join("projects", "stx-demo"))
+    assert target.endswith(os.path.join("projects", "demo"))
 
 
 def test_resolve_outside_workspace(tmp_path):
     os.chdir(tmp_path)
     target = resolve_project_dir("demo")
-    assert target.endswith("stx-demo")
+    assert target.endswith("demo")
     assert "projects" not in target
 
 
 def test_resolve_raises_if_exists(tmp_path):
     os.chdir(tmp_path)
-    (tmp_path / "stx-demo").mkdir()
+    (tmp_path / "demo").mkdir()
 
     import click
 
@@ -195,7 +195,7 @@ def test_new_creates_project(tmp_path):
         ["project", "new", "myproj", "--no-git", "--no-sync", "--no-claude"],
     )
     assert result.exit_code == 0, result.output
-    proj = tmp_path / "stx-myproj"
+    proj = tmp_path / "myproj"
     assert (proj / "book.py").is_file()
     assert (proj / "blocks" / "__init__.py").is_file()
     assert (proj / "pyproject.toml").is_file()
@@ -286,7 +286,7 @@ def test_new_no_claude_flag(tmp_path):
         ["project", "new", "noclaude", "--no-git", "--no-sync", "--no-claude"],
     )
     assert result.exit_code == 0, result.output
-    proj = tmp_path / "stx-noclaude"
+    proj = tmp_path / "noclaude"
     # .claude/ should NOT be created when --no-claude
     assert not (proj / ".claude").is_dir()
 
@@ -299,7 +299,7 @@ def test_new_collection_flag(tmp_path):
         ["project", "new", "hub", "--collection", "--no-git", "--no-sync", "--no-claude"],
     )
     assert result.exit_code == 0, result.output
-    proj = tmp_path / "stx-hub"
+    proj = tmp_path / "hub"
     assert (proj / "collection.toml").is_file()
     book_content = (proj / "book.py").read_text()
     assert "st_collection" in book_content
@@ -357,7 +357,7 @@ def test_new_with_template_project(tmp_path):
         ["project", "new", "tpltest", "--template", "project", "--no-git", "--no-sync", "--no-claude"],
     )
     assert result.exit_code == 0, result.output
-    proj = ws / "projects" / "stx-tpltest"
+    proj = ws / "projects" / "tpltest"
     assert (proj / "book.py").is_file()
     assert (proj / "blocks" / "bck_01_welcome.py").is_file()
     assert (proj / "custom" / "styles.py").is_file()
@@ -375,7 +375,7 @@ def test_new_with_template_collection(tmp_path):
         ["project", "new", "coltest", "--template", "collection", "--no-git", "--no-sync", "--no-claude"],
     )
     assert result.exit_code == 0, result.output
-    proj = ws / "projects" / "stx-coltest"
+    proj = ws / "projects" / "coltest"
     assert (proj / "book.py").is_file()
     assert (proj / "collection.toml").is_file()
     assert (proj / "blocks" / "bck_home.py").is_file()

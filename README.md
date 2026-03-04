@@ -23,7 +23,7 @@ StreamTeX supports 4 installation levels. Pick the one that fits your needs.
 From zero to a running project in 3 commands:
 
 ```bash
-uv tool install "streamtex[cli]"
+uv tool install "streamtex[cli]" -U
 stx project new my-project
 cd my-project && uv sync && uv run streamlit run book.py
 ```
@@ -33,7 +33,7 @@ cd my-project && uv sync && uv run streamlit run book.py
 Full workspace with rich templates, documentation, and Claude AI profiles:
 
 ```bash
-uv tool install "streamtex[cli]"
+uv tool install "streamtex[cli]" -U
 mkdir streamtex-dev && cd streamtex-dev
 stx workspace init .
 stx workspace clone
@@ -50,7 +50,7 @@ uv run streamlit run book.py
 Install StreamTeX and a Claude AI profile, then let the AI build your project:
 
 ```bash
-uv tool install "streamtex[cli]"
+uv tool install "streamtex[cli]" -U
 mkdir streamtex-dev && cd streamtex-dev
 stx workspace init . && stx workspace clone
 stx project new my-project
@@ -260,11 +260,8 @@ my-project/
 ## Installation
 
 ```bash
-# Recommended: install the CLI as a global tool
-uv tool install "streamtex[cli]"
-
-# Upgrade to the latest version
-uv tool upgrade streamtex
+# Install or upgrade the CLI as a global tool
+uv tool install "streamtex[cli]" -U
 
 # Or as a project dependency
 uv add streamtex

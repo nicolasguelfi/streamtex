@@ -1,18 +1,13 @@
 """Tests for stx workspace init/update/status/upgrade commands (+ deprecated clone/link/sync/hooks)."""
 
 import os
+import tomllib
 from unittest.mock import patch
 
 from click.testing import CliRunner
 
 from streamtex.cli.commands import cli
 from streamtex.cli.workspace_cmd import generate_stx_toml, load_stx_toml
-
-try:
-    import tomllib
-except ModuleNotFoundError:
-    import tomli as tomllib  # type: ignore[no-redef]
-
 
 # ---------------------------------------------------------------------------
 # stx.toml generation

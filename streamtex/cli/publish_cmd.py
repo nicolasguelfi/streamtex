@@ -42,10 +42,7 @@ def run_publish_checks(
     pyproject_path = os.path.join(p, "pyproject.toml")
     data = None
     if os.path.isfile(pyproject_path):
-        try:
-            import tomllib
-        except ModuleNotFoundError:
-            import tomli as tomllib  # type: ignore[no-redef]
+        import tomllib
 
         try:
             with open(pyproject_path, "rb") as f:

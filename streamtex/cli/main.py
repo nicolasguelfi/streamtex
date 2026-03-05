@@ -23,6 +23,17 @@ def app() -> None:
         )
         sys.exit(1)
 
-    from .commands import cli
+    try:
+        from .commands import cli
+    except Exception as exc:
+        print(f"Error: failed to load stx CLI: {exc}", file=sys.stderr)
+        if "tomllib" in str(exc) or "tomli" in str(exc):
+            print(
+                "\nThis usually means your Python version is too old.\n"
+                "StreamTeX requires Python 3.11+. Check with: python3 --version\n"
+                "To fix: uv tool install \"streamtex[cli]\" -U --python 3.12",
+                file=sys.stderr,
+            )
+        sys.exit(1)
 
     cli()

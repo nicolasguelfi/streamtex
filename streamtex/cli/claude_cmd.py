@@ -51,10 +51,7 @@ def list_profiles(claude_repo: str) -> list[dict]:
     if not os.path.isdir(profiles_dir):
         return []
 
-    try:
-        import tomllib
-    except ModuleNotFoundError:
-        import tomli as tomllib  # type: ignore[no-redef]
+    import tomllib
 
     profiles = []
     for entry in sorted(os.listdir(profiles_dir)):
@@ -171,10 +168,7 @@ def _read_profile_extends(profile_dir: str) -> str:
     manifest_path = os.path.join(profile_dir, "manifest.toml")
     if not os.path.isfile(manifest_path):
         return ""
-    try:
-        import tomllib
-    except ModuleNotFoundError:
-        import tomli as tomllib  # type: ignore[no-redef]
+    import tomllib
     with open(manifest_path, "rb") as f:
         manifest = tomllib.load(f)
     return manifest.get("profile", {}).get("extends", "")

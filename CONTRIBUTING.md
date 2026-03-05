@@ -33,7 +33,7 @@ Improve the AI-assisted experience:
 
 ### Prerequisites
 
-- Python >= 3.10
+- Python >= 3.11
 - [uv](https://docs.astral.sh/uv/) (package manager)
 
 ### Install

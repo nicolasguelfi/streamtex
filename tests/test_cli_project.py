@@ -1,6 +1,7 @@
 """Tests for stx project new/validate commands."""
 
 import os
+import tomllib
 from unittest.mock import patch
 
 import pytest
@@ -20,12 +21,6 @@ from streamtex.cli.project_cmd import (
     scaffold_project,
     validate_project,
 )
-
-try:
-    import tomllib
-except ModuleNotFoundError:
-    import tomli as tomllib  # type: ignore[no-redef]
-
 
 # ---------------------------------------------------------------------------
 # Template generators

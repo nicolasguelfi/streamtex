@@ -43,7 +43,7 @@ stx claude install project .
 uv run streamlit run book.py
 ```
 
-**Prerequisites**: Python 3.10+, git, [uv](https://docs.astral.sh/uv/).
+**Prerequisites**: Python 3.11+, git, [uv](https://docs.astral.sh/uv/).
 
 ### Zero-Code with Claude or Cursor
 
@@ -276,7 +276,7 @@ uv add "streamtex[cli]"          # stx CLI commands
 
 ### Prerequisites
 
-- Python >= 3.10
+- Python >= 3.11
 - [uv](https://docs.astral.sh/uv/) (recommended package manager)
 - git
 

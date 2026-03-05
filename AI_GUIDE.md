@@ -9,7 +9,7 @@ and web-books — without writing Python code.
 
 | Tool | Required | Install |
 |------|:--------:|---------|
-| Python >= 3.10 | Yes | [python.org](https://www.python.org/downloads/) |
+| Python >= 3.11 | Yes | [python.org](https://www.python.org/downloads/) |
 | uv | Yes | `curl -LsSf https://astral.sh/uv/install.sh \| sh` |
 | StreamTeX CLI | Yes | `uv tool install "streamtex[cli]" -U` |
 | Claude Code | Recommended | [claude.ai/claude-code](https://claude.ai/claude-code) |

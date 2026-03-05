@@ -94,10 +94,7 @@ def load_stx_toml(workspace_path: str) -> dict:
     if not os.path.isfile(toml_path):
         raise click.ClickException(f"stx.toml not found in {workspace_path}")
 
-    try:
-        import tomllib
-    except ModuleNotFoundError:
-        import tomli as tomllib  # type: ignore[no-redef]
+    import tomllib
 
     with open(toml_path, "rb") as f:
         return tomllib.load(f)
@@ -256,10 +253,7 @@ def _find_uv() -> str:
 def _has_missing_local_sources(repo_path: str) -> bool:
     """Return True if pyproject.toml has [tool.uv.sources] with local paths that don't exist."""
     pyproject = os.path.join(repo_path, "pyproject.toml")
-    try:
-        import tomllib
-    except ModuleNotFoundError:
-        import tomli as tomllib  # type: ignore[no-redef]
+    import tomllib
     try:
         with open(pyproject, "rb") as f:
             data = tomllib.load(f)
@@ -421,20 +415,47 @@ def _install_precommit_hooks(ws_root: str, config: dict, console, *, dry_run: bo
             installed += 1
             continue
 
-        result = subprocess.run(
-            [uv, "run", "pre-commit", "install"],
-            cwd=path,
-            capture_output=True,
-            text=True,
-            timeout=60,
-        )
+        env = None
+        missing_sources = _has_missing_local_sources(path)
+        if missing_sources:
+            env = {**os.environ, "UV_NO_SOURCES": "1"}
+
+        try:
+            result = subprocess.run(
+                [uv, "run", "pre-commit", "install"],
+                cwd=path,
+                capture_output=True,
+                text=True,
+                timeout=60,
+                env=env,
+            )
+        except subprocess.TimeoutExpired:
+            console.print(f"  [yellow]{name}[/yellow]: timed out — skipped")
+            skipped += 1
+            continue
+
         if result.returncode == 0:
             console.print(f"  [green]{name}[/green]: ok")
             installed += 1
         else:
-            console.print(f"  [red]{name}[/red]: failed")
-            if result.stderr:
-                console.print(f"    {result.stderr.strip()}")
+            stderr = (result.stderr or "").strip()
+            # Detect common failure: local editable source not found
+            if "Distribution not found" in stderr or "not found at" in stderr:
+                console.print(
+                    f"  [yellow]{name}[/yellow]: skipped (editable source not available)"
+                )
+                console.print(
+                    "    [dim]Tip: pre-commit hooks require all dependencies to be resolvable.[/dim]"
+                )
+                console.print(
+                    "    [dim]This is expected in standard/user presets where the library repo is not cloned.[/dim]"
+                )
+            else:
+                console.print(f"  [yellow]{name}[/yellow]: failed")
+                if stderr:
+                    # Show only the last meaningful line, not the full traceback
+                    last_line = stderr.splitlines()[-1]
+                    console.print(f"    [dim]{last_line}[/dim]")
             skipped += 1
 
     console.print(f"  {installed} installed, {skipped} skipped")

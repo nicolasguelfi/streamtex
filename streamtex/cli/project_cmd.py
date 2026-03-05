@@ -128,7 +128,7 @@ def generate_pyproject_toml(name: str) -> str:
 name = "{name}"
 version = "0.1.0"
 description = "StreamTeX project: {name}"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "streamtex>=0.3.0",
     "streamlit>=1.54.0",
@@ -348,10 +348,7 @@ def validate_project(project_path: str) -> list[ValidationCheck]:
     # 6. pyproject.toml with streamtex dependency
     pyproject_path = os.path.join(p, "pyproject.toml")
     if os.path.isfile(pyproject_path):
-        try:
-            import tomllib
-        except ModuleNotFoundError:
-            import tomli as tomllib  # type: ignore[no-redef]
+        import tomllib
 
         with open(pyproject_path, "rb") as f:
             data = tomllib.load(f)

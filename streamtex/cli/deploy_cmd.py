@@ -109,10 +109,7 @@ def run_preflight(
     # 3. pyproject.toml with streamtex dependency
     pyproject_path = os.path.join(p, "pyproject.toml")
     if os.path.isfile(pyproject_path):
-        try:
-            import tomllib
-        except ModuleNotFoundError:
-            import tomli as tomllib  # type: ignore[no-redef]
+        import tomllib
 
         with open(pyproject_path, "rb") as f:
             data = tomllib.load(f)

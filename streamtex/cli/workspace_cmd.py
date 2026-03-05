@@ -349,6 +349,10 @@ def _run_uv_sync(
         if result.returncode == 0:
             console.print(f"  [green]{repo_name}[/green]: ok")
             synced += 1
+            # --no-sources rewrites uv.lock (local paths → PyPI).
+            # Restore the committed version so the repo stays clean.
+            if "--no-sources" in cmd:
+                _restore_uv_lock_if_only_dirty(repo_path)
         else:
             console.print(f"  [red]{repo_name}[/red]: failed")
             if result.stderr:

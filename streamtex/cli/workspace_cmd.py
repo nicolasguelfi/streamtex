@@ -466,6 +466,9 @@ def _install_precommit_hooks(ws_root: str, config: dict, console, *, dry_run: bo
         if result.returncode == 0:
             console.print(f"  [green]{name}[/green]: ok")
             installed += 1
+            # uv run re-syncs implicitly and may dirty uv.lock again
+            if missing_sources:
+                _restore_uv_lock_if_only_dirty(path)
         else:
             stderr = (result.stderr or "").strip()
             # Detect common failure: local editable source not found

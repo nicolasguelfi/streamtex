@@ -268,6 +268,31 @@ def _has_missing_local_sources(repo_path: str) -> bool:
     return False
 
 
+def _restore_uv_lock_if_only_dirty(repo_path: str) -> None:
+    """Restore uv.lock via ``git checkout`` when it is the only modified file.
+
+    ``uv sync --no-sources`` rewrites uv.lock (replaces local editable paths
+    with PyPI versions).  This blocks ``git pull`` because of uncommitted
+    changes, even though Step 3 will regenerate the file anyway.
+
+    We only restore when uv.lock is the *sole* dirty file so we never
+    discard intentional user edits to other files.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "-C", repo_path, "diff", "--name-only"],
+            capture_output=True, text=True, timeout=10,
+        )
+        dirty_files = [f for f in result.stdout.strip().splitlines() if f]
+        if dirty_files == ["uv.lock"]:
+            subprocess.run(
+                ["git", "-C", repo_path, "checkout", "--", "uv.lock"],
+                capture_output=True, timeout=10,
+            )
+    except (subprocess.TimeoutExpired, OSError):
+        pass  # best-effort; pull will report the real error if needed
+
+
 def _run_uv_sync(
     repos: dict,
     ws_root: str,
@@ -679,6 +704,12 @@ def update(skip_sync, skip_profiles, dry_run, repair):
             continue
 
         console.print(f"  [cyan]{repo_name}[/cyan]: git pull …")
+
+        # If uv.lock is the only dirty file, restore it before pulling.
+        # uv sync --no-sources rewrites uv.lock (replaces local paths with PyPI),
+        # but git pull needs a clean tree.  Step 3 will regenerate it anyway.
+        _restore_uv_lock_if_only_dirty(repo_path)
+
         result = subprocess.run(
             ["git", "-C", repo_path, "pull", "--ff-only"],
             capture_output=True,

@@ -172,18 +172,18 @@ stx lint                    # Lance ruff check streamtex/
 stx lint -- --fix           # Auto-fix des problemes de lint
 ```
 
-### Workspace
+### Workspace (4 commandes essentielles)
 
 ```bash
 stx workspace init [PATH]         # Initialise un workspace (cree stx.toml + projects/)
   --name NAME                     # Nom du workspace (defaut: nom du repertoire)
   --preset PRESET                 # Preset d'installation: basic, user, standard (defaut), developer
 
-stx workspace clone               # Clone tous les repos declares dans stx.toml
-
-stx workspace link                # uv sync dans les repos docs/project (editable installs)
-
-stx workspace sync                # uv sync dans TOUS les repos du workspace
+stx workspace update              # Pull + clone + sync + hooks + profiles + global commands
+  --skip-sync                     # Skip uv sync
+  --skip-profiles                 # Skip mise a jour des profils Claude
+  --dry-run                       # Affiche les etapes sans executer
+  --repair                        # Active les checks de reparation (venv, __init__.py, paths)
 
 stx workspace status              # Git status de tous les repos (branche, clean/dirty, ahead/behind)
 
@@ -192,6 +192,9 @@ stx workspace upgrade PRESET      # Upgrade le workspace vers un preset superieu
                                   # Ajoute les repos manquants dans stx.toml
                                   # Ne permet pas de downgrade
 ```
+
+> **Commandes deprecees** : `clone`, `sync`, `link`, `hooks` fonctionnent encore
+> mais affichent un avertissement et redirigent vers `stx workspace update`.
 
 ### Claude profiles
 
@@ -303,20 +306,15 @@ mkdir streamtex-dev && cd streamtex-dev
 # 2. Initialiser le workspace
 stx workspace init .
 
-# 3. (Optionnel) Decommentez les repos souhaites dans stx.toml
+# 3. Tout installer (clone + sync + hooks + profiles + global commands)
+stx workspace update
 
-# 4. Cloner tous les repos
-stx workspace clone
-
-# 5. Configurer les editable installs
-stx workspace link
-
-# 6. Verifier l'etat
+# 4. Verifier l'etat
 stx workspace status
 
-# 7. (Optionnel) Upgrader vers un preset superieur
+# 5. (Optionnel) Upgrader vers un preset superieur
 stx workspace upgrade developer    # Ajoute les repos manquants (library, docs, claude)
-stx workspace clone                # Clone les nouveaux repos ajoutes
+stx workspace update               # Clone + sync les nouveaux repos
 ```
 
 ### 4.2 Creation d'un nouveau projet
@@ -523,18 +521,12 @@ stx claude check
 #### Workflow de mise a jour (apres une modification des profils)
 
 Quand des fichiers sont modifies dans `streamtex-claude/` (nouvelles commandes,
-mise a jour des skills, standards, etc.), voici comment propager les changements :
+mise a jour des skills, standards, etc.), la commande unifiee fait tout :
 
 ```bash
-# 1. Mettre a jour le repo source
-cd streamtex-dev/streamtex-claude
-git pull
-
-# 2. Propager a tous les projets du workspace
-stx claude update --all
-
-# 3. Verifier que tout est synchronise
-stx claude check
+cd streamtex-dev/
+stx workspace update          # git pull + uv sync + profils + commandes globales
+stx claude check              # verifier que tout est synchronise
 ```
 
 #### Ce qui est propage
@@ -544,7 +536,7 @@ L'installeur et la commande `update` copient ces fichiers depuis `streamtex-clau
 | Source | Destination dans chaque projet |
 |--------|------|
 | `shared/references/*.md` | `.claude/references/` |
-| `shared/commands/*.md` | `.claude/commands/` |
+| `shared/commands/*.md` | `.claude/commands/` (par projet) + `~/.claude/commands/` (global via clone) |
 | `profiles/<profil>/commands/` | `.claude/commands/` |
 | `profiles/<profil>/*/skills/` | `.claude/*/skills/` |
 | `profiles/<profil>/*/agents/` | `.claude/*/agents/` |
@@ -552,6 +544,10 @@ L'installeur et la commande `update` copient ces fichiers depuis `streamtex-clau
 
 Les fichiers partages (`references/` et `commands/`) sont proteges en
 lecture seule (0o444) pour signaler qu'ils sont geres automatiquement.
+
+> **Commandes globales** : `stx workspace update` copie aussi `shared/commands/`
+> vers `~/.claude/commands/`, rendant `/stx-guide` accessible depuis n'importe
+> quel repertoire, meme sans profil Claude installe.
 
 #### Pourquoi CLAUDE.md est preserve
 
@@ -595,7 +591,7 @@ uv sync                       # Installe pre-commit (dev dep)
 uv run pre-commit install     # Active le hook git
 
 # Installation dans tout le workspace
-stx workspace hooks           # Tous les repos + projects/
+stx workspace update           # Tous les repos + projects/
 
 # Lancer manuellement sur tous les fichiers
 uv run pre-commit run --all-files
@@ -699,7 +695,7 @@ Le binaire `stx` installe via `uv tool` est une copie figee.
 Il faut le mettre a jour pour qu'il connaisse les derniers changements :
 
 ```bash
-uv tool upgrade streamtex[cli]
+uv tool install "streamtex[cli]" -U
 stx --version    # doit afficher X.Y.Z
 ```
 
@@ -715,10 +711,10 @@ stx claude check           # tout doit etre "up to date"
 
 | Changement | Quoi publier | Action utilisateur |
 |---|---|---|
-| Librairie seulement | PyPI (phase 2) | `uv tool upgrade` + `stx workspace sync` |
-| Profils Claude seulement | git push (phase 3) | `stx workspace clone` + `stx claude update --all` |
-| Librairie + profils | Phases 2 + 3 + 4 | Workflow complet (voir 4.11) |
-| Docs seulement | git push (phase 3) | `stx workspace clone` (Render deploie automatiquement) |
+| Librairie seulement | PyPI (phase 2) | `uv tool install "streamtex[cli]" -U` + `stx workspace update` |
+| Profils Claude seulement | git push (phase 3) | `stx workspace update` |
+| Librairie + profils | Phases 2 + 3 + 4 | `uv tool install "streamtex[cli]" -U` + `stx workspace update` |
+| Docs seulement | git push (phase 3) | `stx workspace update` (Render deploie automatiquement) |
 
 ---
 
@@ -730,32 +726,27 @@ workspace et tous ses projets.
 **Etape 1 — Mettre a jour le CLI**
 
 ```bash
-uv tool upgrade streamtex[cli]
+uv tool install "streamtex[cli]" -U
 ```
 
 > Important : sans cette etape, `stx` utilise l'ancienne version du code
 > et ne detecte/propage pas les nouveaux fichiers (ex: shared/commands/).
 
-**Etape 2 — Mettre a jour les repos du workspace**
+**Etape 2 — Mettre a jour le workspace (tout en une commande)**
 
 ```bash
 cd streamtex-dev/
-stx workspace clone          # git pull sur tous les repos declares dans stx.toml
+stx workspace update
+# → git pull tous les repos, uv sync, installe commandes globales, met a jour profils Claude
 ```
 
-**Etape 3 — Mettre a jour les dependances Python**
-
+Fine-grained control :
 ```bash
-stx workspace sync           # uv sync dans tous les repos et projets
+stx workspace update --skip-sync      # sauter uv sync
+stx workspace update --skip-profiles  # sauter la mise a jour des profils Claude
 ```
 
-**Etape 4 — Propager les profils Claude**
-
-```bash
-stx claude update --all      # propage les commandes, skills, agents, references
-```
-
-**Etape 5 — Verifier**
+**Etape 3 — Verifier**
 
 ```bash
 stx claude check             # doit afficher "up to date" pour chaque projet
@@ -764,8 +755,8 @@ stx claude check             # doit afficher "up to date" pour chaque projet
 **Nouveaux utilisateurs** : tout est automatique a l'installation :
 
 ```bash
-uv tool install streamtex[cli]
-stx workspace init . && stx workspace clone && stx workspace link
+uv tool install "streamtex[cli]"
+stx workspace init . && stx workspace update
 stx project new mon-projet
 # → derniere version PyPI + derniers profils GitHub
 ```
@@ -828,10 +819,8 @@ stx project new mon-projet
 | Tache | Commande |
 |-------|----------|
 | Initialiser un workspace | `stx workspace init .` |
-| Cloner tous les repos | `stx workspace clone` |
+| Tout mettre a jour | `stx workspace update` |
 | Etat du workspace | `stx workspace status` |
-| Synchroniser les deps | `stx workspace sync` |
-| Installer pre-commit hooks | `stx workspace hooks` |
 | Upgrader le preset | `stx workspace upgrade developer` |
 | Creer un projet (minimal) | `stx project new <name>` |
 | Creer un projet (template riche) | `stx project new <name> --template project` |

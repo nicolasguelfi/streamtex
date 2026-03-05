@@ -213,18 +213,51 @@ def status():
     table.add_column("Status")
     table.add_column("Ahead/Behind")
 
+    hints: list[str] = []
+
     for repo_name, repo_conf in repos.items():
         repo_path = os.path.join(ws_root, repo_conf.get("path", repo_name))
         if not os.path.isdir(repo_path):
             table.add_row(repo_name, "-", "[red]not cloned[/red]", "-")
+            hints.append(f"  [yellow]{repo_name}[/yellow]: run [bold]stx workspace update[/bold] to clone")
             continue
         info = get_repo_status(repo_path)
         status_text = "[green]clean[/green]" if info["clean"] else "[red]dirty[/red]"
         ab = f"+{info['ahead']}/-{info['behind']}" if info["ahead"] or info["behind"] else "-"
         table.add_row(repo_name, info["branch"], status_text, ab)
 
+        if not info["clean"]:
+            dirty_files = _get_dirty_files(repo_path)
+            if dirty_files == ["uv.lock"]:
+                hints.append(
+                    f"  [yellow]{repo_name}[/yellow]: uv.lock modified locally"
+                    " — run [bold]stx workspace update[/bold] to fix"
+                )
+            else:
+                file_list = ", ".join(dirty_files[:5])
+                if len(dirty_files) > 5:
+                    file_list += f" (+{len(dirty_files) - 5} more)"
+                hints.append(
+                    f"  [yellow]{repo_name}[/yellow]: uncommitted changes in {file_list}"
+                    " — commit or stash before updating"
+                )
+        if info["behind"]:
+            hints.append(
+                f"  [yellow]{repo_name}[/yellow]: {info['behind']} commit(s) behind remote"
+                " — run [bold]stx workspace update[/bold] to pull"
+            )
+        if info["ahead"]:
+            hints.append(
+                f"  [yellow]{repo_name}[/yellow]: {info['ahead']} commit(s) ahead of remote"
+                " — run [bold]git push[/bold] in {repo_name}/"
+            )
+
     console = get_console()
     console.print(table)
+    if hints:
+        console.print()
+        for hint in hints:
+            console.print(hint)
 
 
 # ---------------------------------------------------------------------------
@@ -240,6 +273,25 @@ def _require_workspace() -> tuple[str, dict]:
         )
     config = load_stx_toml(ws_root)
     return ws_root, config
+
+
+def _get_dirty_files(repo_path: str) -> list[str]:
+    """Return the list of dirty file paths in a git repo."""
+    try:
+        result = subprocess.run(
+            ["git", "-C", repo_path, "diff", "--name-only"],
+            capture_output=True, text=True, timeout=5,
+        )
+        tracked = [f for f in result.stdout.strip().splitlines() if f]
+        # Also check untracked files
+        result2 = subprocess.run(
+            ["git", "-C", repo_path, "ls-files", "--others", "--exclude-standard"],
+            capture_output=True, text=True, timeout=5,
+        )
+        untracked = [f for f in result2.stdout.strip().splitlines() if f]
+        return tracked + untracked
+    except (subprocess.TimeoutExpired, OSError):
+        return ["(unknown)"]
 
 
 def _find_uv() -> str:

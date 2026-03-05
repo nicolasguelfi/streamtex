@@ -5,10 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.3.3] — 2026-03-05
 
 ### Added
-- `stx workspace clone` now installs shared commands globally to `~/.claude/commands/` (read-only, 0o444) — makes `/stx-guide` available from any directory without a project profile
+- `stx workspace update` — single command for all workspace operations: git pull, clone missing repos, uv sync, install pre-commit hooks, update Claude profiles, install global commands. Adds `--dry-run` and `--repair` flags
+- `stx workspace update --repair` — detects and fixes broken `.venv`, missing `__init__.py`, broken `[tool.uv.sources]` paths
+
+### Changed
+- `stx workspace clone/sync/link/hooks` — deprecated with warning, redirects to `stx workspace update`
+- `stx workspace upgrade` output now says `stx workspace update` instead of `stx workspace clone`
+- User update workflow simplified from 5 commands to 2: `uv tool install "streamtex[cli]" -U` then `stx workspace update`
 - `stx deploy env-sync` — synchronize env vars from `render.yaml` to live Render services via the Render API (`--dry-run`, `--service` options, interactive redeploy prompt)
 - `.github/workflows/render-deploy.yml` — GitHub Actions workflow for auto-deploying all Render services on push to `main` (bypasses Render's GitHub App, reads service names from `render.yaml`)
 - `AI_GUIDE.md` — complete zero-code workflow guide for Claude/Cursor users (22 commands, 4 agents, 10 blueprints, 4 profiles, FAQ)

@@ -445,7 +445,7 @@ def _copy_rich_template(
         raise click.ClickException(
             f"Template not found: {src}\n"
             "streamtex-docs is required. "
-            "Run: stx workspace upgrade standard && stx workspace clone"
+            "Run: stx workspace upgrade standard && stx workspace update"
         )
 
     copied: list[str] = []

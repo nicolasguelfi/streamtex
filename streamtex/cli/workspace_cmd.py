@@ -1,4 +1,4 @@
-"""Workspace commands: init, clone, link, status, sync, upgrade."""
+"""Workspace commands: init, update, status, upgrade (+ deprecated clone/link/sync/hooks)."""
 
 import os
 import re
@@ -340,12 +340,193 @@ def _run_uv_sync(
 
 
 # ---------------------------------------------------------------------------
-# clone / link / sync commands
+# Shared helper: install global commands
 # ---------------------------------------------------------------------------
 
-@click.command()
+def _install_global_commands(ws_root: str, config: dict, console) -> None:
+    """Copy ``shared/commands/`` to ``~/.claude/commands/`` (read-only)."""
+    try:
+        from .claude_cmd import find_claude_repo
+
+        claude_repo = find_claude_repo(ws_root, config)
+        shared_cmd_dir = os.path.join(claude_repo, "shared", "commands")
+        if os.path.isdir(shared_cmd_dir):
+            global_claude_cmd = os.path.join(Path.home(), ".claude", "commands")
+            os.makedirs(global_claude_cmd, exist_ok=True)
+            count = 0
+            for fname in os.listdir(shared_cmd_dir):
+                src = os.path.join(shared_cmd_dir, fname)
+                if os.path.isfile(src):
+                    dst = os.path.join(global_claude_cmd, fname)
+                    # Remove read-only before overwrite
+                    if os.path.exists(dst):
+                        os.chmod(dst, 0o644)
+                    shutil.copy2(src, dst)
+                    os.chmod(dst, 0o444)
+                    count += 1
+            if count:
+                console.print(
+                    f"  [green]global[/green]: {count} shared command(s) → ~/.claude/commands/"
+                )
+    except click.ClickException:
+        pass  # No claude repo configured/cloned yet — skip silently
+
+
+def _deprecation_warning(old_cmd: str, new_cmd: str) -> None:
+    """Print a deprecation warning directing users to the new command."""
+    console = get_console()
+    console.print(
+        f"\n[yellow]⚠ 'stx workspace {old_cmd}' is deprecated. "
+        f"Use 'stx workspace {new_cmd}' instead.[/yellow]\n"
+    )
+
+
+def _install_precommit_hooks(ws_root: str, config: dict, console, *, dry_run: bool = False) -> None:
+    """Install pre-commit hooks in all workspace repos and projects."""
+    uv = _find_uv()
+    installed = 0
+    skipped = 0
+
+    dirs_to_process: list[tuple[str, str]] = []
+
+    for repo_name, repo_conf in config.get("repos", {}).items():
+        repo_type = repo_conf.get("type", "")
+        if repo_type == "claude":
+            continue
+        repo_path = os.path.join(ws_root, repo_conf.get("path", repo_name))
+        dirs_to_process.append((repo_name, repo_path))
+
+    projects_dir = os.path.join(ws_root, "projects")
+    if os.path.isdir(projects_dir):
+        for entry in sorted(os.listdir(projects_dir)):
+            proj_path = os.path.join(projects_dir, entry)
+            if os.path.isdir(proj_path) and os.path.isfile(
+                os.path.join(proj_path, "pyproject.toml")
+            ):
+                dirs_to_process.append((f"projects/{entry}", proj_path))
+
+    for name, path in dirs_to_process:
+        if not os.path.isdir(path):
+            console.print(f"  [yellow]{name}[/yellow]: not found — skipped")
+            skipped += 1
+            continue
+
+        if not os.path.isfile(os.path.join(path, ".pre-commit-config.yaml")):
+            console.print(f"  [yellow]{name}[/yellow]: no .pre-commit-config.yaml — skipped")
+            skipped += 1
+            continue
+
+        if dry_run:
+            console.print(f"  [cyan]{name}[/cyan]: would install hooks")
+            installed += 1
+            continue
+
+        result = subprocess.run(
+            [uv, "run", "pre-commit", "install"],
+            cwd=path,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        if result.returncode == 0:
+            console.print(f"  [green]{name}[/green]: ok")
+            installed += 1
+        else:
+            console.print(f"  [red]{name}[/red]: failed")
+            if result.stderr:
+                console.print(f"    {result.stderr.strip()}")
+            skipped += 1
+
+    console.print(f"  {installed} installed, {skipped} skipped")
+
+
+def _run_repair_checks(ws_root: str, config: dict, console, *, dry_run: bool = False) -> None:
+    """Run repair checks on the workspace."""
+    repos = config.get("repos", {})
+    issues = 0
+
+    # Collect all directories (repos + projects/)
+    dirs: list[tuple[str, str]] = []
+    for repo_name, repo_conf in repos.items():
+        repo_path = os.path.join(ws_root, repo_conf.get("path", repo_name))
+        if os.path.isdir(repo_path):
+            dirs.append((repo_name, repo_path))
+    projects_dir = os.path.join(ws_root, "projects")
+    if os.path.isdir(projects_dir):
+        for entry in sorted(os.listdir(projects_dir)):
+            proj_path = os.path.join(projects_dir, entry)
+            if os.path.isdir(proj_path):
+                dirs.append((f"projects/{entry}", proj_path))
+
+    for name, path in dirs:
+        # 1. Broken .venv detection
+        venv_cfg = os.path.join(path, ".venv", "pyvenv.cfg")
+        if os.path.isfile(venv_cfg):
+            try:
+                with open(venv_cfg, encoding="utf-8") as f:
+                    for line in f:
+                        if line.startswith("home"):
+                            home_path = line.split("=", 1)[1].strip()
+                            if not os.path.isdir(home_path):
+                                issues += 1
+                                if dry_run:
+                                    console.print(
+                                        f"  [yellow]{name}[/yellow]: broken .venv — would delete"
+                                    )
+                                else:
+                                    shutil.rmtree(os.path.join(path, ".venv"))
+                                    console.print(
+                                        f"  [green]{name}[/green]: deleted broken .venv"
+                                    )
+                            break
+            except OSError:
+                pass
+
+        # 2. Missing custom/__init__.py
+        custom_dir = os.path.join(path, "custom")
+        custom_init = os.path.join(custom_dir, "__init__.py")
+        if os.path.isdir(custom_dir) and not os.path.isfile(custom_init):
+            issues += 1
+            if dry_run:
+                console.print(f"  [yellow]{name}[/yellow]: missing custom/__init__.py — would create")
+            else:
+                with open(custom_init, "w") as f:
+                    f.write("")
+                console.print(f"  [green]{name}[/green]: created custom/__init__.py")
+
+        # 3. Missing blocks/__init__.py
+        blocks_dir = os.path.join(path, "blocks")
+        blocks_init = os.path.join(blocks_dir, "__init__.py")
+        if os.path.isdir(blocks_dir) and not os.path.isfile(blocks_init):
+            issues += 1
+            if dry_run:
+                console.print(f"  [yellow]{name}[/yellow]: missing blocks/__init__.py — would create")
+            else:
+                with open(blocks_init, "w", encoding="utf-8") as f:
+                    f.write(
+                        "from pathlib import Path\n"
+                        "from streamtex import ProjectBlockRegistry\n\n"
+                        "registry = ProjectBlockRegistry(Path(__file__).parent)\n"
+                    )
+                console.print(f"  [green]{name}[/green]: created blocks/__init__.py with ProjectBlockRegistry")
+
+        # 4. Broken [tool.uv.sources] paths
+        if _has_missing_local_sources(path):
+            issues += 1
+            console.print(f"  [yellow]{name}[/yellow]: broken [tool.uv.sources] paths in pyproject.toml")
+
+    if issues == 0:
+        console.print("  [green]No issues found.[/green]")
+
+
+# ---------------------------------------------------------------------------
+# clone / link / sync commands (deprecated — kept for backward compat)
+# ---------------------------------------------------------------------------
+
+@click.command(deprecated=True)
 def clone():
-    """Clone all repos declared in stx.toml."""
+    """Clone all repos declared in stx.toml. [deprecated: use 'stx workspace update']"""
+    _deprecation_warning("clone", "update")
     ws_root, config = _require_workspace()
     repos = config.get("repos", {})
 
@@ -393,38 +574,15 @@ def clone():
             skipped += 1
 
     # --- Install shared commands globally (~/.claude/commands/) ---
-    try:
-        from .claude_cmd import find_claude_repo
-
-        claude_repo = find_claude_repo(ws_root, config)
-        shared_cmd_dir = os.path.join(claude_repo, "shared", "commands")
-        if os.path.isdir(shared_cmd_dir):
-            global_claude_cmd = os.path.join(Path.home(), ".claude", "commands")
-            os.makedirs(global_claude_cmd, exist_ok=True)
-            count = 0
-            for fname in os.listdir(shared_cmd_dir):
-                src = os.path.join(shared_cmd_dir, fname)
-                if os.path.isfile(src):
-                    dst = os.path.join(global_claude_cmd, fname)
-                    # Remove read-only before overwrite
-                    if os.path.exists(dst):
-                        os.chmod(dst, 0o644)
-                    shutil.copy2(src, dst)
-                    os.chmod(dst, 0o444)
-                    count += 1
-            if count:
-                console.print(
-                    f"  [green]global[/green]: {count} shared command(s) → ~/.claude/commands/"
-                )
-    except click.ClickException:
-        pass  # No claude repo configured/cloned yet — skip silently
+    _install_global_commands(ws_root, config, console)
 
     console.print(f"\n[bold]Done:[/bold] {cloned} cloned, {skipped} skipped")
 
 
-@click.command()
+@click.command(deprecated=True)
 def link():
-    """Configure editable installs (uv sync in docs/project repos)."""
+    """Configure editable installs (uv sync in docs/project repos). [deprecated: use 'stx workspace update']"""
+    _deprecation_warning("link", "update")
     ws_root, config = _require_workspace()
     repos = config.get("repos", {})
 
@@ -433,15 +591,176 @@ def link():
     _run_uv_sync(repos, ws_root, type_filter={"docs", "project"})
 
 
-@click.command()
+@click.command(deprecated=True)
 def sync():
-    """Run uv sync in all workspace repos."""
+    """Run uv sync in all workspace repos. [deprecated: use 'stx workspace update']"""
+    _deprecation_warning("sync", "update")
     ws_root, config = _require_workspace()
     repos = config.get("repos", {})
 
     console = get_console()
     console.print("[bold]Syncing all repos …[/bold]\n")
     _run_uv_sync(repos, ws_root)
+
+
+# ---------------------------------------------------------------------------
+# update command
+# ---------------------------------------------------------------------------
+
+@click.command()
+@click.option("--skip-sync", is_flag=True, help="Skip uv sync step.")
+@click.option("--skip-profiles", is_flag=True, help="Skip Claude profile update step.")
+@click.option("--dry-run", is_flag=True, help="Show steps without executing.")
+@click.option("--repair", is_flag=True, help="Run repair checks (broken venv, missing __init__.py).")
+def update(skip_sync, skip_profiles, dry_run, repair):
+    """Pull repos, clone missing, sync deps, install hooks, update profiles."""
+    ws_root, config = _require_workspace()
+    repos = config.get("repos", {})
+    console = get_console()
+
+    # Dynamic step counter
+    total_steps = 6  # pull, clone, sync, global commands, profiles, hooks
+    if skip_sync:
+        total_steps -= 1
+    if skip_profiles:
+        total_steps -= 1
+    if repair:
+        total_steps += 1
+    step = 0
+
+    def _step(label: str) -> None:
+        nonlocal step
+        step += 1
+        console.print(f"\n[bold cyan]Step {step}/{total_steps}:[/bold cyan] {label}\n")
+
+    if dry_run:
+        console.print("[bold]Updating workspace (dry run) …[/bold]")
+    else:
+        console.print("[bold]Updating workspace …[/bold]")
+
+    # --- git pull existing repos ---
+    _step("Pulling latest changes …")
+    pulled = 0
+    for repo_name, repo_conf in repos.items():
+        rel_path = repo_conf.get("path", repo_name)
+        repo_path = os.path.join(ws_root, rel_path)
+
+        if not os.path.isdir(repo_path):
+            continue
+
+        if not os.path.isdir(os.path.join(repo_path, ".git")):
+            console.print(f"  [yellow]{repo_name}[/yellow]: not a git repo — skipped")
+            continue
+
+        if dry_run:
+            console.print(f"  [cyan]{repo_name}[/cyan]: would git pull")
+            pulled += 1
+            continue
+
+        console.print(f"  [cyan]{repo_name}[/cyan]: git pull …")
+        result = subprocess.run(
+            ["git", "-C", repo_path, "pull", "--ff-only"],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        if result.returncode == 0:
+            output = result.stdout.strip()
+            if "Already up to date" in output:
+                console.print(f"  [green]{repo_name}[/green]: already up to date")
+            else:
+                console.print(f"  [green]{repo_name}[/green]: updated")
+            pulled += 1
+        else:
+            console.print(f"  [red]{repo_name}[/red]: pull failed")
+            if result.stderr:
+                console.print(f"    {result.stderr.strip()}")
+
+    # --- clone missing repos ---
+    missing = []
+    for repo_name, repo_conf in repos.items():
+        rel_path = repo_conf.get("path", repo_name)
+        target_path = os.path.join(ws_root, rel_path)
+        url = repo_conf.get("url", "")
+        if url and not os.path.isdir(target_path):
+            missing.append((repo_name, url, target_path))
+
+    _step(f"Cloning {len(missing)} missing repo(s) …")
+    if missing:
+        for repo_name, url, target_path in missing:
+            if dry_run:
+                console.print(f"  [cyan]{repo_name}[/cyan]: would clone {url}")
+                continue
+            os.makedirs(os.path.dirname(target_path), exist_ok=True)
+            console.print(f"  [cyan]{repo_name}[/cyan]: cloning {url} …")
+            result = subprocess.run(
+                ["git", "clone", url, target_path],
+                capture_output=True,
+                text=True,
+                timeout=120,
+            )
+            if result.returncode == 0:
+                console.print(f"  [green]{repo_name}[/green]: cloned")
+            else:
+                console.print(f"  [red]{repo_name}[/red]: clone failed")
+                if result.stderr:
+                    console.print(f"    {result.stderr.strip()}")
+    else:
+        console.print("  No missing repos.")
+
+    # --- uv sync ---
+    if not skip_sync:
+        _step("Syncing dependencies …")
+        if dry_run:
+            for repo_name, repo_conf in repos.items():
+                repo_path = os.path.join(ws_root, repo_conf.get("path", repo_name))
+                if os.path.isdir(repo_path) and os.path.isfile(os.path.join(repo_path, "pyproject.toml")):
+                    console.print(f"  [cyan]{repo_name}[/cyan]: would uv sync")
+        else:
+            _run_uv_sync(repos, ws_root)
+
+    # --- install global commands ---
+    _step("Installing global commands …")
+    if dry_run:
+        console.print("  Would install shared commands → ~/.claude/commands/")
+    else:
+        _install_global_commands(ws_root, config, console)
+
+    # --- update Claude profiles ---
+    if not skip_profiles:
+        _step("Updating Claude profiles …")
+        if dry_run:
+            console.print("  Would update all Claude profiles")
+        else:
+            try:
+                from .claude_cmd import (
+                    _update_single_target,
+                    find_claude_repo,
+                    find_profile_targets,
+                )
+
+                claude_repo = find_claude_repo(ws_root, config)
+                targets = find_profile_targets(ws_root)
+                if targets:
+                    for target_path, profile in targets:
+                        rel = os.path.relpath(target_path, ws_root)
+                        console.print(f"  [bold cyan]── {rel} [/bold cyan]([cyan]{profile}[/cyan])")
+                        _update_single_target(claude_repo, profile, target_path, False, console)
+                else:
+                    console.print("  [yellow]No projects with Claude profiles found.[/yellow]")
+            except click.ClickException:
+                console.print("  [yellow]Claude repo not available — skipped.[/yellow]")
+
+    # --- install pre-commit hooks ---
+    _step("Installing pre-commit hooks …")
+    _install_precommit_hooks(ws_root, config, console, dry_run=dry_run)
+
+    # --- repair checks ---
+    if repair:
+        _step("Running repair checks …")
+        _run_repair_checks(ws_root, config, console, dry_run=dry_run)
+
+    console.print("\n[bold green]Workspace update complete.[/bold green]")
 
 
 # ---------------------------------------------------------------------------
@@ -525,71 +844,19 @@ def upgrade(preset):
     console.print(f"[green]Upgraded from '{current}' to '{preset}'.[/green]")
     for repo_key in sorted(to_add):
         console.print(f"  + {ALL_REPOS[repo_key]['name']}")
-    console.print("\nRun [bold]stx workspace clone[/bold] to clone the new repos.")
+    console.print("\nRun [bold]stx workspace update[/bold] to clone the new repos.")
 
 
 # ---------------------------------------------------------------------------
 # hooks command
 # ---------------------------------------------------------------------------
 
-@click.command()
+@click.command(deprecated=True)
 def hooks():
-    """Install pre-commit hooks in all workspace repos and projects."""
+    """Install pre-commit hooks in all workspace repos and projects. [deprecated: use 'stx workspace update']"""
+    _deprecation_warning("hooks", "update")
     ws_root, config = _require_workspace()
     console = get_console()
-    uv = _find_uv()
 
     console.print("[bold]Installing pre-commit hooks …[/bold]\n")
-
-    installed = 0
-    skipped = 0
-
-    # Collect all directories to process: repos + projects/
-    dirs_to_process: list[tuple[str, str]] = []
-
-    # Repos from stx.toml (skip claude — not a Python project)
-    for repo_name, repo_conf in config.get("repos", {}).items():
-        repo_type = repo_conf.get("type", "")
-        if repo_type == "claude":
-            continue
-        repo_path = os.path.join(ws_root, repo_conf.get("path", repo_name))
-        dirs_to_process.append((repo_name, repo_path))
-
-    # Projects in projects/ directory
-    projects_dir = os.path.join(ws_root, "projects")
-    if os.path.isdir(projects_dir):
-        for entry in sorted(os.listdir(projects_dir)):
-            proj_path = os.path.join(projects_dir, entry)
-            if os.path.isdir(proj_path) and os.path.isfile(
-                os.path.join(proj_path, "pyproject.toml")
-            ):
-                dirs_to_process.append((f"projects/{entry}", proj_path))
-
-    for name, path in dirs_to_process:
-        if not os.path.isdir(path):
-            console.print(f"  [yellow]{name}[/yellow]: not found — skipped")
-            skipped += 1
-            continue
-
-        if not os.path.isfile(os.path.join(path, ".pre-commit-config.yaml")):
-            console.print(f"  [yellow]{name}[/yellow]: no .pre-commit-config.yaml — skipped")
-            skipped += 1
-            continue
-
-        result = subprocess.run(
-            [uv, "run", "pre-commit", "install"],
-            cwd=path,
-            capture_output=True,
-            text=True,
-            timeout=60,
-        )
-        if result.returncode == 0:
-            console.print(f"  [green]{name}[/green]: ok")
-            installed += 1
-        else:
-            console.print(f"  [red]{name}[/red]: failed")
-            if result.stderr:
-                console.print(f"    {result.stderr.strip()}")
-            skipped += 1
-
-    console.print(f"\n[bold]Done:[/bold] {installed} installed, {skipped} skipped")
+    _install_precommit_hooks(ws_root, config, console)

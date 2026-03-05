@@ -36,7 +36,7 @@ Full workspace with rich templates, documentation, and Claude AI profiles:
 uv tool install "streamtex[cli]" -U
 mkdir streamtex-dev && cd streamtex-dev
 stx workspace init .
-stx workspace clone
+stx workspace update
 stx project new my-project --template project
 cd projects/my-project
 stx claude install project .
@@ -52,7 +52,7 @@ Install StreamTeX and a Claude AI profile, then let the AI build your project:
 ```bash
 uv tool install "streamtex[cli]" -U
 mkdir streamtex-dev && cd streamtex-dev
-stx workspace init . && stx workspace clone
+stx workspace init . && stx workspace update
 stx project new my-project
 cd projects/my-project
 stx claude install project .
@@ -123,7 +123,7 @@ Upgrade an existing workspace:
 
 ```bash
 stx workspace upgrade developer
-stx workspace clone
+stx workspace update
 ```
 
 ## AI-Powered Features
@@ -302,17 +302,20 @@ The `stx` CLI is installed as a global tool with its own frozen copy of
 the library. You must upgrade it explicitly after each release:
 
 ```bash
-uv tool upgrade streamtex[cli]
+uv tool install "streamtex[cli]" -U
 ```
 
 ### Update your workspace
 
 ```bash
 cd streamtex-dev/
-stx workspace clone          # pull latest repos (docs, claude profiles)
-stx workspace sync           # update Python dependencies in all projects
-stx claude update --all      # propagate new commands, skills, references
-stx claude check             # verify everything is in sync
+stx workspace update         # pulls repos, syncs deps, updates profiles
+```
+
+Fine-grained control:
+```bash
+stx workspace update --skip-sync      # skip uv sync
+stx workspace update --skip-profiles  # skip Claude profile update
 ```
 
 ### Update a standalone project (no workspace)

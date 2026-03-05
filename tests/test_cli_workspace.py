@@ -1,4 +1,4 @@
-"""Tests for stx workspace init/clone/link/status/sync/upgrade commands."""
+"""Tests for stx workspace init/update/status/upgrade commands (+ deprecated clone/link/sync/hooks)."""
 
 import os
 from unittest.mock import patch
@@ -499,3 +499,196 @@ def test_upgrade_same_preset_noop(tmp_path):
 
     assert result.exit_code == 0
     assert "Already at" in result.output
+
+
+def test_upgrade_output_says_update(tmp_path):
+    """Upgrade output should say 'stx workspace update', not 'clone'."""
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    _write_stx_toml(ws, preset="basic")
+
+    runner = CliRunner()
+    os.chdir(ws)
+    result = runner.invoke(cli, ["workspace", "upgrade", "user"])
+
+    assert result.exit_code == 0
+    assert "stx workspace update" in result.output
+    assert "stx workspace clone" not in result.output
+
+
+# ---------------------------------------------------------------------------
+# Deprecation warnings
+# ---------------------------------------------------------------------------
+
+def test_clone_shows_deprecation_warning(tmp_path):
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    _write_stx_toml(ws)
+
+    with patch("streamtex.cli.workspace_cmd.subprocess.run") as mock_run:
+        mock_run.return_value.returncode = 0
+        mock_run.return_value.stdout = ""
+        mock_run.return_value.stderr = ""
+        runner = CliRunner()
+        os.chdir(ws)
+        result = runner.invoke(cli, ["workspace", "clone"])
+
+    assert "deprecated" in result.output.lower()
+    assert "stx workspace update" in result.output
+
+
+def test_sync_shows_deprecation_warning(tmp_path):
+    ws = _create_workspace_with_repos(tmp_path, preset="standard")
+
+    with (
+        patch("streamtex.cli.workspace_cmd.subprocess.run") as mock_run,
+        patch("streamtex.cli.workspace_cmd.shutil.which", return_value="/usr/bin/uv"),
+    ):
+        mock_run.return_value.returncode = 0
+        mock_run.return_value.stdout = ""
+        mock_run.return_value.stderr = ""
+        runner = CliRunner()
+        os.chdir(ws)
+        result = runner.invoke(cli, ["workspace", "sync"])
+
+    assert "deprecated" in result.output.lower()
+    assert "stx workspace update" in result.output
+
+
+def test_link_shows_deprecation_warning(tmp_path):
+    ws = _create_workspace_with_repos(tmp_path, preset="developer")
+
+    with (
+        patch("streamtex.cli.workspace_cmd.subprocess.run") as mock_run,
+        patch("streamtex.cli.workspace_cmd.shutil.which", return_value="/usr/bin/uv"),
+    ):
+        mock_run.return_value.returncode = 0
+        mock_run.return_value.stdout = ""
+        mock_run.return_value.stderr = ""
+        runner = CliRunner()
+        os.chdir(ws)
+        result = runner.invoke(cli, ["workspace", "link"])
+
+    assert "deprecated" in result.output.lower()
+    assert "stx workspace update" in result.output
+
+
+def test_hooks_shows_deprecation_warning(tmp_path):
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    _write_stx_toml(ws, preset="standard")
+
+    with (
+        patch("streamtex.cli.workspace_cmd.subprocess.run") as mock_run,
+        patch("streamtex.cli.workspace_cmd.shutil.which", return_value="/usr/bin/uv"),
+    ):
+        mock_run.return_value.returncode = 0
+        mock_run.return_value.stdout = ""
+        mock_run.return_value.stderr = ""
+        runner = CliRunner()
+        os.chdir(ws)
+        result = runner.invoke(cli, ["workspace", "hooks"])
+
+    assert "deprecated" in result.output.lower()
+    assert "stx workspace update" in result.output
+
+
+# ---------------------------------------------------------------------------
+# update command tests
+# ---------------------------------------------------------------------------
+
+def test_update_dry_run(tmp_path):
+    """--dry-run shows steps without executing."""
+    ws = _create_workspace_with_repos(tmp_path, preset="standard")
+    # Create .git dirs so pull step finds them
+    for repo_dir in [ws / "streamtex-docs", ws / "streamtex-claude"]:
+        (repo_dir / ".git").mkdir()
+
+    with (
+        patch("streamtex.cli.workspace_cmd.subprocess.run") as mock_run,
+        patch("streamtex.cli.workspace_cmd.shutil.which", return_value="/usr/bin/uv"),
+    ):
+        mock_run.return_value.returncode = 0
+        mock_run.return_value.stdout = ""
+        mock_run.return_value.stderr = ""
+        runner = CliRunner()
+        os.chdir(ws)
+        result = runner.invoke(cli, ["workspace", "update", "--dry-run"])
+
+    assert result.exit_code == 0
+    assert "dry run" in result.output.lower()
+    assert "would git pull" in result.output
+    # subprocess.run should NOT have been called for git pull
+    git_pull_calls = [c for c in mock_run.call_args_list if "pull" in str(c)]
+    assert len(git_pull_calls) == 0
+
+
+def test_update_runs_all_steps(tmp_path):
+    """Update runs all steps: pull, clone, sync, global commands, profiles, hooks."""
+    ws = _create_workspace_with_repos(tmp_path, preset="standard")
+    for repo_dir in [ws / "streamtex-docs", ws / "streamtex-claude"]:
+        (repo_dir / ".git").mkdir()
+
+    with (
+        patch("streamtex.cli.workspace_cmd.subprocess.run") as mock_run,
+        patch("streamtex.cli.workspace_cmd.shutil.which", return_value="/usr/bin/uv"),
+    ):
+        mock_run.return_value.returncode = 0
+        mock_run.return_value.stdout = "Already up to date."
+        mock_run.return_value.stderr = ""
+        runner = CliRunner()
+        os.chdir(ws)
+        result = runner.invoke(cli, ["workspace", "update"])
+
+    assert result.exit_code == 0
+    assert "Workspace update complete" in result.output
+    # Should show step numbers
+    assert "Step 1/" in result.output
+    assert "Step 2/" in result.output
+
+
+def test_update_skip_sync(tmp_path):
+    """--skip-sync skips the uv sync step."""
+    ws = _create_workspace_with_repos(tmp_path, preset="standard")
+    for repo_dir in [ws / "streamtex-docs", ws / "streamtex-claude"]:
+        (repo_dir / ".git").mkdir()
+
+    with (
+        patch("streamtex.cli.workspace_cmd.subprocess.run") as mock_run,
+        patch("streamtex.cli.workspace_cmd.shutil.which", return_value="/usr/bin/uv"),
+    ):
+        mock_run.return_value.returncode = 0
+        mock_run.return_value.stdout = "Already up to date."
+        mock_run.return_value.stderr = ""
+        runner = CliRunner()
+        os.chdir(ws)
+        result = runner.invoke(cli, ["workspace", "update", "--skip-sync"])
+
+    assert result.exit_code == 0
+    assert "Syncing dependencies" not in result.output
+
+
+def test_update_repair_finds_missing_init(tmp_path):
+    """--repair detects missing custom/__init__.py."""
+    ws = _create_workspace_with_repos(tmp_path, preset="standard")
+    for repo_dir in [ws / "streamtex-docs", ws / "streamtex-claude"]:
+        (repo_dir / ".git").mkdir()
+    # Create a custom/ dir without __init__.py in one repo
+    custom_dir = ws / "streamtex-docs" / "custom"
+    custom_dir.mkdir()
+
+    with (
+        patch("streamtex.cli.workspace_cmd.subprocess.run") as mock_run,
+        patch("streamtex.cli.workspace_cmd.shutil.which", return_value="/usr/bin/uv"),
+    ):
+        mock_run.return_value.returncode = 0
+        mock_run.return_value.stdout = "Already up to date."
+        mock_run.return_value.stderr = ""
+        runner = CliRunner()
+        os.chdir(ws)
+        result = runner.invoke(cli, ["workspace", "update", "--repair"])
+
+    assert result.exit_code == 0
+    assert "custom/__init__.py" in result.output
+    # File should have been created
+    assert (custom_dir / "__init__.py").is_file()

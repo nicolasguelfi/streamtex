@@ -125,6 +125,8 @@ def _offer_export_downloads(html: str, base_name: str,
                         page_numbers=pdf_page_numbers,
                         header_template=defaults.header_template,
                         footer_template=defaults.footer_template,
+                        theme_bg=st.session_state.get(_STX_THEME_BG_KEY, "#fff"),
+                        theme_text=st.session_state.get(_STX_THEME_TEXT_KEY, "#333"),
                     )
                     results["pdf"] = export_pdf(html, config=cfg)
             st.session_state[state_key] = results
@@ -234,6 +236,10 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
         banner_config = BannerConfig(color=banner_color)
     # --- Password gate (env-driven, no-op locally) ---
     _password_gate()
+    # --- Cache theme colors (once, early, in guaranteed Streamlit context) ---
+    if _STX_THEME_BG_KEY not in st.session_state:
+        st.session_state[_STX_THEME_BG_KEY] = st.get_option("theme.backgroundColor") or "#fff"
+        st.session_state[_STX_THEME_TEXT_KEY] = st.get_option("theme.textColor") or "#333"
     # --- Bibliography setup ---
     _setup_bibliography(bib_sources, bib_config)
     # --- View mode toggle (sidebar) ---
@@ -573,6 +579,8 @@ def st_include(block_file_module, *args, _inspector_config=None, **kwargs):
 _STX_CACHE_KEY = "_stx_page_cache"
 _STX_PAGE_KEY = "_stx_current_page"
 _STX_VIEW_MODE_KEY = "_stx_view_mode"
+_STX_THEME_BG_KEY = "_stx_theme_bg"
+_STX_THEME_TEXT_KEY = "_stx_theme_text"
 
 
 def _compute_cache_hash(module_list):

@@ -34,6 +34,9 @@ class TestPdfConfig:
         assert cfg.scale == 1.0
         assert cfg.header_template == ""
         assert cfg.footer_template == ""
+        assert cfg.page_numbers is False
+        assert cfg.theme_bg == "#fff"
+        assert cfg.theme_text == "#333"
 
     def test_custom_values(self):
         cfg = PdfConfig(mode=PdfMode.CONTINUOUS, format="Letter", landscape=False, scale=0.8)
@@ -41,6 +44,17 @@ class TestPdfConfig:
         assert cfg.format == "Letter"
         assert cfg.landscape is False
         assert cfg.scale == 0.8
+
+    def test_theme_colors(self):
+        cfg = PdfConfig(theme_bg="#111111", theme_text="#fafafa")
+        assert cfg.theme_bg == "#111111"
+        assert cfg.theme_text == "#fafafa"
+
+    def test_page_numbers_with_theme(self):
+        cfg = PdfConfig(page_numbers=True, theme_bg="#0e1117", theme_text="#fafafa")
+        assert cfg.page_numbers is True
+        assert cfg.theme_bg == "#0e1117"
+        assert cfg.theme_text == "#fafafa"
 
 
 class TestInjectPrintCss:
@@ -114,15 +128,3 @@ class TestParseMargin:
 
     def test_invalid(self):
         assert _parse_margin("auto") == 0.0
-
-
-class TestPdfConfigPageNumbers:
-    """Tests for page_numbers field."""
-
-    def test_default_false(self):
-        cfg = PdfConfig()
-        assert cfg.page_numbers is False
-
-    def test_custom_true(self):
-        cfg = PdfConfig(page_numbers=True)
-        assert cfg.page_numbers is True

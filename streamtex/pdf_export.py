@@ -73,6 +73,12 @@ class PdfConfig:
     page_numbers: bool = False
     """Add page numbers in the footer (e.g. '1 / 5')."""
 
+    theme_bg: str = "#fff"
+    """Background color for PDF margins/header/footer (read from Streamlit theme)."""
+
+    theme_text: str = "#333"
+    """Text color for page numbers (read from Streamlit theme)."""
+
 
 # ---------------------------------------------------------------------------
 # Print CSS injection
@@ -115,18 +121,6 @@ def inject_print_css(html: str, mode: PdfMode) -> str:
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _get_theme_color(option: str, fallback: str) -> str:
-    """Read a Streamlit theme color, with fallback for non-Streamlit contexts."""
-    try:
-        import streamlit as st
-        val = st.get_option(option)
-        if val:
-            return val
-    except Exception:
-        pass
-    return fallback
-
-
 # Conversion factors to millimetres
 _UNIT_TO_MM = {"mm": 1.0, "cm": 10.0, "in": 25.4, "px": 0.264583, "pt": 0.352778}
 
@@ -163,6 +157,8 @@ def export_pdf(
         output_path: Optional file path to write the PDF. If None, PDF is
                      only returned as bytes.
         config: PDF configuration. Defaults to PdfConfig().
+            Set ``theme_bg`` and ``theme_text`` on the config to match the
+            current Streamlit theme (``book.py`` does this automatically).
 
     Returns:
         PDF content as bytes.
@@ -183,25 +179,26 @@ def export_pdf(
     cfg = config or PdfConfig()
     html = inject_print_css(html, cfg.mode)
 
-    # Read theme colors for footer styling
-    bg = _get_theme_color("theme.backgroundColor", "#fff")
-    text = _get_theme_color("theme.textColor", "#333")
+    text = cfg.theme_text
 
-    # Page numbers footer — styled to match theme background
+    # Page numbers footer (inline styles only — Chromium template parser is restrictive)
     footer = cfg.footer_template
     if cfg.page_numbers and not footer:
         footer = (
-            f'<div style="font-size:10px; width:100%; text-align:center;'
-            f' background:{bg}; color:{text}; padding:2px 0;">'
-            '<span class="pageNumber"></span> / <span class="totalPages"></span>'
+            f'<div style="font-size:18pt; font-weight:bold; width:100%; text-align:center;'
+            f' color:{text}; margin:0; padding:0; line-height:1;">'
+            '<span class="pageNumber"></span> / '
+            '<span class="totalPages"></span>'
             '</div>'
         )
 
-    # Force a minimum bottom margin when page_numbers is enabled
-    # (Chromium renders header/footer templates in the margin area)
+    header = cfg.header_template
+
+    # Force minimum bottom margin when page_numbers is enabled
+    # (Chromium renders footer template in the margin area — needs space)
     margin_bottom = cfg.margin_bottom
-    if cfg.page_numbers and _parse_margin(margin_bottom) < 8:
-        margin_bottom = "8mm"
+    if cfg.page_numbers and _parse_margin(margin_bottom) < 0.01:
+        margin_bottom = "0.01mm"
 
     display_header_footer = bool(cfg.header_template or footer or cfg.page_numbers)
 
@@ -222,7 +219,7 @@ def export_pdf(
                 "right": cfg.margin_right,
             },
             display_header_footer=display_header_footer,
-            header_template=cfg.header_template or "<span></span>",
+            header_template=header or "<span></span>",
             footer_template=footer or "<span></span>",
         )
         browser.close()

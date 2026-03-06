@@ -73,6 +73,9 @@ class HtmlExportBuffer:
         body = self.get_body_html()
         css = _load_default_css()
         c = self.config
+        bg = _get_theme_color("theme.backgroundColor", "#fff")
+        text = _get_theme_color("theme.textColor", "#333")
+        link = _get_theme_color("theme.primaryColor", "#1155cc")
         return (
             "<!DOCTYPE html>\n"
             f"<html lang=\"en\">\n<head>\n"
@@ -81,8 +84,8 @@ class HtmlExportBuffer:
             f"<title>{c.page_title}</title>\n"
             f"<style>\n"
             f"*, *::before, *::after {{ box-sizing: border-box; margin: 0; padding: 0; }}\n"
-            f"body {{ font-family: Arial, Helvetica, sans-serif; background: #fff; }}\n"
-            f"a {{ color: #1155cc; }}\n"
+            f"body {{ font-family: Arial, Helvetica, sans-serif; background: {bg}; color: {text}; }}\n"
+            f"a {{ color: {link}; }}\n"
             f"{css}\n"
             f".streamtex-page {{\n"
             f"  max-width: {c.page_width};\n"
@@ -101,6 +104,17 @@ class HtmlExportBuffer:
 # ---------------------------------------------------------------------------
 # Internal helper
 # ---------------------------------------------------------------------------
+
+def _get_theme_color(option: str, fallback: str) -> str:
+    """Read a Streamlit theme color from config, with fallback."""
+    try:
+        val = st.get_option(option)
+        if val:
+            return val
+    except Exception:
+        pass
+    return fallback
+
 
 def _load_default_css() -> str:
     """Load the default.css bundled with StreamTeX."""

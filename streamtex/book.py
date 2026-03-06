@@ -17,6 +17,7 @@ from .code import add_wrap_all_option
 from .enums import Tags
 from .export import ExportConfig, generate_export_html, is_export_active, reset_export_buffer
 from .marker import MarkerConfig, inject_marker_navigation, marker_entries, reset_marker_registry
+from .pdf_export import PdfConfig
 from .search import generate_search_input_html, generate_search_script, start_collector, stop_collector
 from .space import st_br, st_space
 from .styles import Style
@@ -26,6 +27,126 @@ from .write import st_write
 from .zoom import _PAGE_WIDTH_KEY, add_zoom_options
 
 logger = logging.getLogger(__name__)
+
+
+def _is_pdf_available() -> bool:
+    """Return True if playwright is installed (PDF export possible)."""
+    try:
+        import playwright  # noqa: F401
+        return True
+    except ImportError:
+        return False
+
+
+def _offer_export_downloads(html: str, base_name: str,
+                            pdf_config: PdfConfig | None = None) -> None:
+    """Render a 'Download as...' expander with format selection and download buttons.
+
+    Uses st.form so that toggling options does NOT trigger a full page rerun.
+    Files are generated on submit and cached in session_state.
+    """
+    from .pdf_export import PdfMode, export_pdf
+
+    pdf_available = _is_pdf_available()
+    state_key = f"_stx_export_{base_name}"
+    defaults = pdf_config or PdfConfig()
+
+    with st.expander("Download as..."):
+        with st.form(key=f"_stx_export_form_{base_name}"):
+            want_html = st.checkbox("HTML", value=True)
+            want_pdf = False
+            if pdf_available:
+                want_pdf = st.checkbox("PDF", value=False)
+
+                # --- PDF options (all PdfConfig fields) ---
+                st.markdown("**PDF options**")
+                col1, col2 = st.columns(2)
+                with col1:
+                    pdf_format = st.selectbox(
+                        "Page format",
+                        options=["A4", "A3", "Letter", "Legal", "Tabloid"],
+                        index=["A4", "A3", "Letter", "Legal", "Tabloid"].index(defaults.format)
+                        if defaults.format in ["A4", "A3", "Letter", "Legal", "Tabloid"] else 0,
+                        key=f"_stx_pdf_format_{base_name}",
+                    )
+                    pdf_mode = st.selectbox(
+                        "Slide breaks",
+                        options=["Paginated", "Continuous"],
+                        index=0 if defaults.mode == PdfMode.PAGINATED else 1,
+                        key=f"_stx_pdf_mode_{base_name}",
+                    )
+                with col2:
+                    pdf_landscape = st.checkbox("Landscape", value=defaults.landscape,
+                                                key=f"_stx_pdf_land_{base_name}")
+                    pdf_background = st.checkbox("Print background", value=defaults.print_background,
+                                                 key=f"_stx_pdf_bg_{base_name}")
+                    pdf_page_numbers = st.checkbox("Page numbers", value=defaults.page_numbers,
+                                                   key=f"_stx_pdf_pn_{base_name}")
+
+                pdf_scale = st.slider("Scale", min_value=0.5, max_value=2.0,
+                                      value=defaults.scale, step=0.1,
+                                      key=f"_stx_pdf_scale_{base_name}")
+
+                st.markdown("**Margins**")
+                mc1, mc2, mc3, mc4 = st.columns(4)
+                with mc1:
+                    m_top = st.text_input("Top", value=defaults.margin_top,
+                                          key=f"_stx_pdf_mt_{base_name}")
+                with mc2:
+                    m_bottom = st.text_input("Bottom", value=defaults.margin_bottom,
+                                             key=f"_stx_pdf_mb_{base_name}")
+                with mc3:
+                    m_left = st.text_input("Left", value=defaults.margin_left,
+                                           key=f"_stx_pdf_ml_{base_name}")
+                with mc4:
+                    m_right = st.text_input("Right", value=defaults.margin_right,
+                                            key=f"_stx_pdf_mr_{base_name}")
+            else:
+                st.caption("PDF requires `streamtex[pdf]`")
+
+            submitted = st.form_submit_button("Generate")
+
+        if submitted:
+            results = {}
+            if want_html:
+                results["html"] = html
+            if want_pdf and pdf_available:
+                with st.spinner("Generating PDF..."):
+                    cfg = PdfConfig(
+                        mode=PdfMode.PAGINATED if pdf_mode == "Paginated" else PdfMode.CONTINUOUS,
+                        format=pdf_format,
+                        landscape=pdf_landscape,
+                        margin_top=m_top,
+                        margin_bottom=m_bottom,
+                        margin_left=m_left,
+                        margin_right=m_right,
+                        print_background=pdf_background,
+                        scale=pdf_scale,
+                        page_numbers=pdf_page_numbers,
+                        header_template=defaults.header_template,
+                        footer_template=defaults.footer_template,
+                    )
+                    results["pdf"] = export_pdf(html, config=cfg)
+            st.session_state[state_key] = results
+
+        # Show download buttons from cached results
+        results = st.session_state.get(state_key, {})
+        if "html" in results:
+            st.download_button(
+                label="Download HTML",
+                data=results["html"],
+                file_name=f"{base_name}.html",
+                mime="text/html",
+                key=f"_stx_dl_html_{base_name}",
+            )
+        if "pdf" in results:
+            st.download_button(
+                label="Download PDF",
+                data=results["pdf"],
+                file_name=f"{base_name}.pdf",
+                mime="application/pdf",
+                key=f"_stx_dl_pdf_{base_name}",
+            )
 
 
 def _resolve_sidebar_max_level(toc_config: TOCConfig, paginated: bool) -> int | None:
@@ -74,6 +195,7 @@ def _inject_bib_preview_if_enabled():
 
 def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConfig = None, separator=None,
             export: bool = True, export_title: str = "StreamTeX Export",
+            pdf_config: PdfConfig = None,
             paginate: bool = False,
             banner_color: str = "rgba(211, 47, 47, 0.8)",
             banner: BannerConfig = None,
@@ -87,6 +209,7 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
     :param separator: Optional module with a build() function, rendered between each block.
     :param export: If True, enables HTML export with a download button in the sidebar.
     :param export_title: Title used for the exported HTML document.
+    :param pdf_config: Optional PdfConfig to customise PDF export (format, margins, scale, etc.).
     :param paginate: If True, renders one block at a time for faster widget interactions.
     :param banner_color: Background color for paginated navigation banners (CSS value).
     :param banner: Optional BannerConfig for full banner customisation (overrides banner_color).
@@ -128,7 +251,8 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
     if st.session_state[_STX_VIEW_MODE_KEY] == "Paginated":
         _paginated_book(module_list, toc_config, marker_config, separator,
                         export, export_title, banner_config, *args,
-                        inspector=inspector, page_width=page_width, zoom=zoom, **kwargs)
+                        pdf_config=pdf_config, inspector=inspector,
+                        page_width=page_width, zoom=zoom, **kwargs)
         return
 
     start_time = time.time()
@@ -236,18 +360,13 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
     if marker_config is not None:
         inject_marker_navigation()
 
-    # Offer HTML download when export is active
+    # Offer export downloads when export is active
     if is_export_active():
         full_html = generate_export_html()
         if full_html:
-            file_name = f"{export_title.replace(' ', '_').lower()}.html"
+            base_name = export_title.replace(' ', '_').lower()
             with st.sidebar:
-                st.download_button(
-                    label="\U0001F4E5 Download HTML",
-                    data=full_html,
-                    file_name=file_name,
-                    mime="text/html",
-                )
+                _offer_export_downloads(full_html, base_name, pdf_config=pdf_config)
 
     # --- Inspector panel (opt-in, rendered into reserved sidebar placeholder) ---
     if _inspector_placeholder is not None and st.session_state.get("_stx_inspector_open", False):
@@ -929,7 +1048,8 @@ def _inject_paginated_nav_js(current_page, total, marker_config,
 
 def _paginated_book(module_list, toc_config, marker_config, separator,
                     export, export_title, banner_config: BannerConfig, *args,
-                    inspector=None, page_width=100, zoom=100, **kwargs):
+                    pdf_config=None, inspector=None, page_width=100, zoom=100,
+                    **kwargs):
     """Paginated rendering — only renders one block per rerun."""
     start_time = time.time()
     logger.debug("Starting st_book (paginated)...")
@@ -1106,18 +1226,13 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
     # --- Paginated navigation JS (finds & hides buttons, overscroll, callbacks) ---
     _inject_paginated_nav_js(current_page, total, marker_config, page_marker_info)
 
-    # --- Export download button ---
+    # --- Export downloads ---
     if is_export_active():
         full_html = generate_export_html()
         if full_html:
-            file_name = f"{export_title.replace(' ', '_').lower()}.html"
+            base_name = export_title.replace(' ', '_').lower()
             with st.sidebar:
-                st.download_button(
-                    label="\U0001F4E5 Download HTML",
-                    data=full_html,
-                    file_name=file_name,
-                    mime="text/html",
-                )
+                _offer_export_downloads(full_html, base_name, pdf_config=pdf_config)
 
     # --- Inspector panel (opt-in, rendered into reserved sidebar placeholder) ---
     if _inspector_placeholder is not None and st.session_state.get("_stx_inspector_open", False):

@@ -9,10 +9,10 @@ class TestStSpace:
     """Tests for st_space function."""
 
     def test_vertical_space_with_int_size(self):
-        """Test st_space('v', 2) generates <div style='padding-top: 2em;'></div>"""
+        """Test st_space('v', 2) generates <div style='height: 2em;'></div>"""
         with patch('streamtex.space._render') as mock_render:
             st_space("v", 2)
-            mock_render.assert_called_once_with('<div style="padding-top: 2em;"></div>')
+            mock_render.assert_called_once_with('<div style="height: 2em;"></div>')
 
     def test_horizontal_space_with_int_size(self):
         """Test st_space('h', 3) generates <span style='padding-left: 3em;'></span>"""
@@ -24,7 +24,7 @@ class TestStSpace:
         """Test st_space('v', '20px') uses the string value directly"""
         with patch('streamtex.space._render') as mock_render:
             st_space("v", "20px")
-            mock_render.assert_called_once_with('<div style="padding-top: 20px;"></div>')
+            mock_render.assert_called_once_with('<div style="height: 20px;"></div>')
 
     def test_horizontal_space_with_string_size(self):
         """Test st_space('h', '15px') uses the string value directly"""
@@ -36,13 +36,13 @@ class TestStSpace:
         """Test st_space() defaults to vertical spacing with '1em'"""
         with patch('streamtex.space._render') as mock_render:
             st_space()
-            mock_render.assert_called_once_with('<div style="padding-top: 1em;"></div>')
+            mock_render.assert_called_once_with('<div style="height: 1em;"></div>')
 
     def test_default_size_is_1em(self):
         """Test st_space('v') uses default size of '1em'"""
         with patch('streamtex.space._render') as mock_render:
             st_space("v")
-            mock_render.assert_called_once_with('<div style="padding-top: 1em;"></div>')
+            mock_render.assert_called_once_with('<div style="height: 1em;"></div>')
 
     def test_default_size_horizontal(self):
         """Test st_space('h') uses default size of '1em' with horizontal orientation"""
@@ -51,10 +51,10 @@ class TestStSpace:
             mock_render.assert_called_once_with('<span style="padding-left: 1em;"></span>')
 
     def test_vertical_space_zero_size(self):
-        """Test st_space('v', 0) generates <div style='padding-top: 0em;'></div>"""
+        """Test st_space('v', 0) generates <div style='height: 0em;'></div>"""
         with patch('streamtex.space._render') as mock_render:
             st_space("v", 0)
-            mock_render.assert_called_once_with('<div style="padding-top: 0em;"></div>')
+            mock_render.assert_called_once_with('<div style="height: 0em;"></div>')
 
     def test_horizontal_space_zero_size(self):
         """Test st_space('h', 0) generates <span style='padding-left: 0em;'></span>"""
@@ -66,31 +66,31 @@ class TestStSpace:
         """Test st_space with large integer size (100)"""
         with patch('streamtex.space._render') as mock_render:
             st_space("v", 100)
-            mock_render.assert_called_once_with('<div style="padding-top: 100em;"></div>')
+            mock_render.assert_called_once_with('<div style="height: 100em;"></div>')
 
     def test_float_size_string(self):
         """Test st_space with float size as string"""
         with patch('streamtex.space._render') as mock_render:
             st_space("v", "1.5em")
-            mock_render.assert_called_once_with('<div style="padding-top: 1.5em;"></div>')
+            mock_render.assert_called_once_with('<div style="height: 1.5em;"></div>')
 
     def test_rem_unit_size(self):
         """Test st_space with rem units"""
         with patch('streamtex.space._render') as mock_render:
             st_space("v", "2rem")
-            mock_render.assert_called_once_with('<div style="padding-top: 2rem;"></div>')
+            mock_render.assert_called_once_with('<div style="height: 2rem;"></div>')
 
     def test_percent_unit_size(self):
         """Test st_space with percentage units"""
         with patch('streamtex.space._render') as mock_render:
             st_space("v", "50%")
-            mock_render.assert_called_once_with('<div style="padding-top: 50%;"></div>')
+            mock_render.assert_called_once_with('<div style="height: 50%;"></div>')
 
     def test_negative_int_size(self):
         """Test st_space with negative integer (edge case)"""
         with patch('streamtex.space._render') as mock_render:
             st_space("v", -5)
-            mock_render.assert_called_once_with('<div style="padding-top: -5em;"></div>')
+            mock_render.assert_called_once_with('<div style="height: -5em;"></div>')
 
     def test_render_called_once_vertical(self):
         """Test that _render is called exactly once for vertical space"""
@@ -110,7 +110,7 @@ class TestStSpace:
             st_space("v", 5)
             call_arg = mock_render.call_args[0][0]
             assert "5em" in call_arg
-            assert "padding-top: 5em;" in call_arg
+            assert "height: 5em;" in call_arg
 
     def test_string_size_unchanged(self):
         """Test that string size is used without modification"""
@@ -118,7 +118,7 @@ class TestStSpace:
             st_space("v", "10pt")
             call_arg = mock_render.call_args[0][0]
             assert "10pt" in call_arg
-            assert "padding-top: 10pt;" in call_arg
+            assert "height: 10pt;" in call_arg
 
     def test_horizontal_uses_padding_left(self):
         """Test that horizontal space uses padding-left property"""
@@ -126,14 +126,14 @@ class TestStSpace:
             st_space("h", "25px")
             call_arg = mock_render.call_args[0][0]
             assert "padding-left" in call_arg
-            assert "padding-top" not in call_arg
+            assert "height" not in call_arg
 
     def test_vertical_uses_padding_top(self):
-        """Test that vertical space uses padding-top property"""
+        """Test that vertical space uses height property"""
         with patch('streamtex.space._render') as mock_render:
             st_space("v", "25px")
             call_arg = mock_render.call_args[0][0]
-            assert "padding-top" in call_arg
+            assert "height" in call_arg
             assert "padding-left" not in call_arg
 
     def test_vertical_uses_div_tag(self):
@@ -164,7 +164,7 @@ class TestStSpace:
             st_space("v", 2)
             st_space("h", 3)
             assert mock_render.call_count == 2
-            assert mock_render.call_args_list[0][0][0] == '<div style="padding-top: 2em;"></div>'
+            assert mock_render.call_args_list[0][0][0] == '<div style="height: 2em;"></div>'
             assert mock_render.call_args_list[1][0][0] == '<span style="padding-left: 3em;"></span>'
 
 
@@ -279,7 +279,7 @@ class TestIntegration:
 
             assert mock_render.call_count == 3
             calls = [call[0][0] for call in mock_render.call_args_list]
-            assert '<div style="padding-top: 2em;"></div>' in calls
+            assert '<div style="height: 2em;"></div>' in calls
             assert "<br><br>" in calls
             assert '<span style="padding-left: 10px;"></span>' in calls
 
@@ -296,7 +296,7 @@ class TestIntegration:
             st_space("h", "5em")
 
             assert len(rendered_html) == 3
-            assert rendered_html[0] == '<div style="padding-top: 3em;"></div>'
+            assert rendered_html[0] == '<div style="height: 3em;"></div>'
             assert rendered_html[1] == "<br><br>"
             assert rendered_html[2] == '<span style="padding-left: 5em;"></span>'
 

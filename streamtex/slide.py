@@ -5,7 +5,6 @@ from typing import Optional
 
 from .export import _render
 from .marker import st_marker
-from .space import st_space
 
 
 @dataclass
@@ -91,7 +90,7 @@ def st_slide_break(
         f"border-top: {cfg.thickness} solid rgba({cfg.color}, {cfg.opacity}); "
         f"margin: 0.5em 0;"
     )
-    _render(f'<hr style="{rule_css}">')
-    st_space("v", cfg.space)
+    _render(f'<hr class="stx-slide-break-rule" style="{rule_css}">')
+    _render(f'<div class="stx-slide-break-spacer" style="height: {cfg.space};"></div>')
     if cfg.marker:
         st_marker(marker_label, hidden=True)

@@ -54,6 +54,7 @@ cli = [
     "rich>=13.0",
     "jinja2>=3.0",
 ]
+pdf = ["playwright>=1.40"]
 
 [project.urls]
 Homepage = "https://github.com/nicolasguelfi/streamtex"
@@ -73,6 +74,7 @@ dev = [
     "click>=8.0",
     "rich>=13.0",
     "jinja2>=3.0",
+    "playwright>=1.58.0",
 ]
 
 [tool.setuptools.packages.find]

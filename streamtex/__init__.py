@@ -50,6 +50,9 @@ from .zoom import add_zoom_options, inject_zoom_logic
 # Export
 from .export import ExportConfig, st_export, st_html
 
+# PDF Export (requires optional 'pdf' extra)
+from .pdf_export import PdfConfig, PdfMode, export_pdf
+
 # Export-aware widget wrappers
 from .export_widgets import (
     st_dataframe, st_table, st_metric, st_json, st_graphviz,

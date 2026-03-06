@@ -24,7 +24,7 @@ from .styles import Style
 from .toc import NumberingMode, TOCConfig, reset_toc_registry, toc_entries
 from .utils import inject_link_preview_scaffold
 from .write import st_write
-from .zoom import _PAGE_WIDTH_KEY, add_zoom_options
+from .zoom import _PAGE_WIDTH_KEY, _ZOOM_KEY, add_zoom_options
 
 logger = logging.getLogger(__name__)
 
@@ -58,49 +58,49 @@ def _offer_export_downloads(html: str, base_name: str,
             if pdf_available:
                 want_pdf = st.checkbox("PDF", value=False)
 
-                # --- PDF options (all PdfConfig fields) ---
+                # --- PDF options (single column for narrow sidebar) ---
+                _cur_w = st.session_state.get(_PAGE_WIDTH_KEY, 100)
+                _cur_z = st.session_state.get(_ZOOM_KEY, 100)
+                st.caption(f"Current view: Width {_cur_w}% · Zoom {_cur_z}%")
                 st.markdown("**PDF options**")
-                col1, col2 = st.columns(2)
-                with col1:
-                    pdf_format = st.selectbox(
-                        "Page format",
-                        options=["A4", "A3", "Letter", "Legal", "Tabloid"],
-                        index=["A4", "A3", "Letter", "Legal", "Tabloid"].index(defaults.format)
-                        if defaults.format in ["A4", "A3", "Letter", "Legal", "Tabloid"] else 0,
-                        key=f"_stx_pdf_format_{base_name}",
-                    )
-                    pdf_mode = st.selectbox(
-                        "Slide breaks",
-                        options=["Paginated", "Continuous"],
-                        index=0 if defaults.mode == PdfMode.PAGINATED else 1,
-                        key=f"_stx_pdf_mode_{base_name}",
-                    )
-                with col2:
-                    pdf_landscape = st.checkbox("Landscape", value=defaults.landscape,
-                                                key=f"_stx_pdf_land_{base_name}")
-                    pdf_background = st.checkbox("Print background", value=defaults.print_background,
-                                                 key=f"_stx_pdf_bg_{base_name}")
-                    pdf_page_numbers = st.checkbox("Page numbers", value=defaults.page_numbers,
-                                                   key=f"_stx_pdf_pn_{base_name}")
-
+                pdf_format = st.selectbox(
+                    "Page format",
+                    options=["A4", "A3", "Letter", "Legal", "Tabloid"],
+                    index=["A4", "A3", "Letter", "Legal", "Tabloid"].index(defaults.format)
+                    if defaults.format in ["A4", "A3", "Letter", "Legal", "Tabloid"] else 0,
+                    key=f"_stx_pdf_format_{base_name}",
+                )
+                # Default to the current view mode (Paginated/Continuous radio)
+                _view = st.session_state.get(_STX_VIEW_MODE_KEY, "Paginated")
+                _mode_default = 0 if _view == "Paginated" else 1
+                pdf_mode = st.selectbox(
+                    "Slide breaks",
+                    options=["Paginated", "Continuous"],
+                    index=_mode_default,
+                    key=f"_stx_pdf_mode_{base_name}",
+                )
+                pdf_landscape = st.checkbox("Landscape", value=defaults.landscape,
+                                            key=f"_stx_pdf_land_{base_name}")
+                pdf_background = st.checkbox("Print background", value=defaults.print_background,
+                                             key=f"_stx_pdf_bg_{base_name}")
+                pdf_page_numbers = st.checkbox("Page numbers", value=defaults.page_numbers,
+                                               key=f"_stx_pdf_pn_{base_name}")
+                # Default PDF scale to current Zoom % (if user hasn't set a custom scale)
+                _zoom_pct = st.session_state.get(_ZOOM_KEY, 100)
+                _scale_default = round(_zoom_pct / 100, 1)
+                _scale_default = max(0.5, min(2.0, _scale_default))
                 pdf_scale = st.slider("Scale", min_value=0.5, max_value=2.0,
-                                      value=defaults.scale, step=0.1,
+                                      value=_scale_default, step=0.1,
                                       key=f"_stx_pdf_scale_{base_name}")
-
                 st.markdown("**Margins**")
-                mc1, mc2, mc3, mc4 = st.columns(4)
-                with mc1:
-                    m_top = st.text_input("Top", value=defaults.margin_top,
-                                          key=f"_stx_pdf_mt_{base_name}")
-                with mc2:
-                    m_bottom = st.text_input("Bottom", value=defaults.margin_bottom,
-                                             key=f"_stx_pdf_mb_{base_name}")
-                with mc3:
-                    m_left = st.text_input("Left", value=defaults.margin_left,
-                                           key=f"_stx_pdf_ml_{base_name}")
-                with mc4:
-                    m_right = st.text_input("Right", value=defaults.margin_right,
-                                            key=f"_stx_pdf_mr_{base_name}")
+                m_top = st.text_input("Top", value=defaults.margin_top,
+                                      key=f"_stx_pdf_mt_{base_name}")
+                m_bottom = st.text_input("Bottom", value=defaults.margin_bottom,
+                                         key=f"_stx_pdf_mb_{base_name}")
+                m_left = st.text_input("Left", value=defaults.margin_left,
+                                       key=f"_stx_pdf_ml_{base_name}")
+                m_right = st.text_input("Right", value=defaults.margin_right,
+                                        key=f"_stx_pdf_mr_{base_name}")
             else:
                 st.caption("PDF requires `streamtex[pdf]`")
 
@@ -271,10 +271,11 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
     add_zoom_options(default_page_width=page_width, default_zoom=zoom)
     add_wrap_all_option()
 
-    # Initialise the export buffer (reads effective width from session_state)
+    # Initialise the export buffer (reads effective width/zoom from session_state)
     effective_pw = f"{st.session_state.get(_PAGE_WIDTH_KEY, page_width)}%"
+    effective_zoom = st.session_state.get(_ZOOM_KEY, zoom) / 100
     reset_export_buffer(ExportConfig(enabled=export, page_title=export_title,
-                                     page_width=effective_pw))
+                                     page_width=effective_pw, zoom=effective_zoom))
 
     # Inject inspector CSS once + reserve sidebar placeholder
     _inspector_placeholder = None
@@ -325,12 +326,19 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
             collector.set_block(i)
 
         toc_before = len(toc_entries()) if use_toc_sidebar else 0
+        markers_before = len(marker_entries()) if marker_config is not None else 0
 
         st_include(module, *args, _inspector_config=inspector, **kwargs)
 
         # Tag new TOC entries with their block index
         if use_toc_sidebar:
             for entry in toc_entries()[toc_before:]:
+                if "block_idx" not in entry:
+                    entry["block_idx"] = i
+
+        # Tag new marker entries with their block index (for search filtering)
+        if marker_config is not None:
+            for entry in marker_entries()[markers_before:]:
                 if "block_idx" not in entry:
                     entry["block_idx"] = i
 
@@ -354,7 +362,7 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
                      block_index=block_index, search_js_placeholder=search_js_ph,
                      max_level=effective_max_level, toc_config=toc_config)
         if markers_sidebar is not None:
-            populate_markers_sidebar(markers_sidebar)
+            populate_markers_sidebar(markers_sidebar, block_index=block_index)
 
     # Inject marker navigation JS (only if markers were registered)
     if marker_config is not None:
@@ -499,16 +507,29 @@ def populate_toc(toc_sidebar: Delta, toc_block: Delta = None, toc_content_style:
                 st_br()
 
 
-def populate_markers_sidebar(markers_placeholder: Delta):
+def populate_markers_sidebar(markers_placeholder: Delta, block_index: dict[int, str] = None):
     entries = [e for e in marker_entries() if not e.get("hidden")]
     if not entries:
         return
     with markers_placeholder.container():
-        for i, entry in enumerate(entries):
-            st.html(
-                f'<span style="overflow:hidden;text-overflow:ellipsis;text-wrap:nowrap;word-wrap:normal;">'
-                f'<a href="#{entry["anchor"]}">{i + 1}. {entry["label"]}</a></span>'
-            )
+        if block_index is not None:
+            # Search-enabled: single st.markdown block with data-stx-block attributes
+            parts = []
+            for i, entry in enumerate(entries):
+                block_attr = f' data-stx-block="{entry.get("block_idx", 0)}"'
+                parts.append(
+                    f'<div{block_attr} style="overflow:hidden;text-overflow:ellipsis;'
+                    f'white-space:nowrap;padding:1px 0;font-size:14px;">'
+                    f'<a href="#{entry["anchor"]}">{i + 1}. {entry["label"]}</a></div>'
+                )
+            parts.append('<div style="height:40px;"></div>')
+            st.markdown("\n".join(parts), unsafe_allow_html=True)
+        else:
+            for i, entry in enumerate(entries):
+                st.html(
+                    f'<span style="overflow:hidden;text-overflow:ellipsis;text-wrap:nowrap;word-wrap:normal;">'
+                    f'<a href="#{entry["anchor"]}">{i + 1}. {entry["label"]}</a></span>'
+                )
 
 
 def st_toc(toc_title_style):
@@ -1109,8 +1130,9 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
 
     # --- Prepare registries for current page ---
     effective_pw = f"{st.session_state.get(_PAGE_WIDTH_KEY, page_width)}%"
+    effective_zoom = st.session_state.get(_ZOOM_KEY, zoom) / 100
     reset_export_buffer(ExportConfig(enabled=export, page_title=export_title,
-                                     page_width=effective_pw))
+                                     page_width=effective_pw, zoom=effective_zoom))
     reset_toc_registry(toc_config)
     if marker_config is not None:
         reset_marker_registry(marker_config)

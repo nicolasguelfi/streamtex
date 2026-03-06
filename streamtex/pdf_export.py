@@ -6,6 +6,7 @@ Requires the optional ``pdf`` extra::
     playwright install chromium
 """
 
+import re
 from dataclasses import dataclass
 from enum import Enum
 from typing import Optional
@@ -111,6 +112,39 @@ def inject_print_css(html: str, mode: PdfMode) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _get_theme_color(option: str, fallback: str) -> str:
+    """Read a Streamlit theme color, with fallback for non-Streamlit contexts."""
+    try:
+        import streamlit as st
+        val = st.get_option(option)
+        if val:
+            return val
+    except Exception:
+        pass
+    return fallback
+
+
+# Conversion factors to millimetres
+_UNIT_TO_MM = {"mm": 1.0, "cm": 10.0, "in": 25.4, "px": 0.264583, "pt": 0.352778}
+
+
+def _parse_margin(value: str) -> float:
+    """Parse a CSS margin string (e.g. '10mm', '0', '1in') to millimetres."""
+    value = value.strip()
+    if not value:
+        return 0.0
+    m = re.match(r"^([0-9]*\.?[0-9]+)\s*(mm|cm|in|px|pt)?$", value)
+    if not m:
+        return 0.0
+    num = float(m.group(1))
+    unit = m.group(2) or "mm"
+    return num * _UNIT_TO_MM.get(unit, 1.0)
+
+
+# ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
@@ -149,14 +183,25 @@ def export_pdf(
     cfg = config or PdfConfig()
     html = inject_print_css(html, cfg.mode)
 
-    # Page numbers footer
+    # Read theme colors for footer styling
+    bg = _get_theme_color("theme.backgroundColor", "#fff")
+    text = _get_theme_color("theme.textColor", "#333")
+
+    # Page numbers footer — styled to match theme background
     footer = cfg.footer_template
     if cfg.page_numbers and not footer:
         footer = (
-            '<div style="font-size:10px; width:100%; text-align:center;">'
+            f'<div style="font-size:10px; width:100%; text-align:center;'
+            f' background:{bg}; color:{text}; padding:2px 0;">'
             '<span class="pageNumber"></span> / <span class="totalPages"></span>'
             '</div>'
         )
+
+    # Force a minimum bottom margin when page_numbers is enabled
+    # (Chromium renders header/footer templates in the margin area)
+    margin_bottom = cfg.margin_bottom
+    if cfg.page_numbers and _parse_margin(margin_bottom) < 8:
+        margin_bottom = "8mm"
 
     display_header_footer = bool(cfg.header_template or footer or cfg.page_numbers)
 
@@ -172,7 +217,7 @@ def export_pdf(
             scale=cfg.scale,
             margin={
                 "top": cfg.margin_top,
-                "bottom": cfg.margin_bottom,
+                "bottom": margin_bottom,
                 "left": cfg.margin_left,
                 "right": cfg.margin_right,
             },

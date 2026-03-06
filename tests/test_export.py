@@ -28,11 +28,16 @@ class TestExportConfig:
         assert cfg.page_title == "StreamTeX Export"
         assert cfg.page_width == "100%"
         assert cfg.page_padding == "var(--stx-page-padding, 36pt)"
+        assert cfg.zoom == 1.0
 
     def test_custom(self):
         cfg = ExportConfig(enabled=True, page_title="My Book", page_width="800px", page_padding="20px")
         assert cfg.enabled is True
         assert cfg.page_title == "My Book"
+
+    def test_custom_zoom(self):
+        cfg = ExportConfig(enabled=True, zoom=0.8)
+        assert cfg.zoom == 0.8
 
 
 # ---------------------------------------------------------------------------
@@ -103,6 +108,24 @@ class TestHtmlExportBuffer:
         assert "<title>StreamTeX Export</title>" in html
         assert "streamtex-page" in html
         assert "<p>content</p>" in html
+
+    def test_generate_full_html_no_zoom_when_default(self):
+        buf = self._make_buffer()
+        buf.append("<p>test</p>")
+        html = buf.generate_full_html()
+        assert "zoom:" not in html
+
+    def test_generate_full_html_with_zoom(self):
+        buf = HtmlExportBuffer(ExportConfig(enabled=True, zoom=0.8))
+        buf.append("<p>test</p>")
+        html = buf.generate_full_html()
+        assert "zoom: 0.8;" in html
+
+    def test_generate_full_html_zoom_100_no_css(self):
+        buf = HtmlExportBuffer(ExportConfig(enabled=True, zoom=1.0))
+        buf.append("<p>test</p>")
+        html = buf.generate_full_html()
+        assert "zoom:" not in html
 
 
 # ---------------------------------------------------------------------------

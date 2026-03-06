@@ -3,6 +3,7 @@
 from streamtex.pdf_export import (
     PdfConfig,
     PdfMode,
+    _parse_margin,
     inject_print_css,
 )
 
@@ -76,3 +77,52 @@ class TestInjectPrintCss:
         result = inject_print_css(html, PdfMode.CONTINUOUS)
         # No </head> to replace, so CSS is not injected
         assert result == html
+
+
+class TestParseMargin:
+    """Tests for _parse_margin helper."""
+
+    def test_mm(self):
+        assert _parse_margin("10mm") == 10.0
+
+    def test_zero(self):
+        assert _parse_margin("0") == 0.0
+
+    def test_cm(self):
+        assert _parse_margin("1cm") == 10.0
+
+    def test_inches(self):
+        assert _parse_margin("1in") == 25.4
+
+    def test_px(self):
+        assert abs(_parse_margin("100px") - 26.4583) < 0.01
+
+    def test_pt(self):
+        assert abs(_parse_margin("10pt") - 3.52778) < 0.01
+
+    def test_empty(self):
+        assert _parse_margin("") == 0.0
+
+    def test_whitespace(self):
+        assert _parse_margin("  10mm  ") == 10.0
+
+    def test_no_unit_defaults_mm(self):
+        assert _parse_margin("15") == 15.0
+
+    def test_decimal(self):
+        assert _parse_margin("2.5mm") == 2.5
+
+    def test_invalid(self):
+        assert _parse_margin("auto") == 0.0
+
+
+class TestPdfConfigPageNumbers:
+    """Tests for page_numbers field."""
+
+    def test_default_false(self):
+        cfg = PdfConfig()
+        assert cfg.page_numbers is False
+
+    def test_custom_true(self):
+        cfg = PdfConfig(page_numbers=True)
+        assert cfg.page_numbers is True

@@ -27,6 +27,7 @@ class ExportConfig:
     page_title: str = "StreamTeX Export"
     page_width: str = PAGE_WIDTH
     page_padding: str = PAGE_PADDING
+    zoom: float = 1.0
 
 
 # ---------------------------------------------------------------------------
@@ -76,6 +77,7 @@ class HtmlExportBuffer:
         bg = _get_theme_color("theme.backgroundColor", "#fff")
         text = _get_theme_color("theme.textColor", "#333")
         link = _get_theme_color("theme.primaryColor", "#1155cc")
+        zoom_css = f"  zoom: {c.zoom};\n" if c.zoom != 1.0 else ""
         return (
             "<!DOCTYPE html>\n"
             f"<html lang=\"en\">\n<head>\n"
@@ -91,6 +93,7 @@ class HtmlExportBuffer:
             f"  max-width: {c.page_width};\n"
             f"  margin: 0 auto;\n"
             f"  padding: {c.page_padding};\n"
+            f"{zoom_css}"
             f"}}\n"
             f"</style>\n"
             f"</head>\n<body>\n"

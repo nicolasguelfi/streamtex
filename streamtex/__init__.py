@@ -38,6 +38,9 @@ from .toc import reset_toc_registry, toc_entries, TOCConfig, NumberingMode
 # Marker Navigation
 from .marker import st_marker, MarkerConfig
 
+# Slide break (presentation mode)
+from .slide import st_slide_break, SlideBreakConfig, set_slide_break_config, get_slide_break_config
+
 # Enums
 from .enums import Tags
 

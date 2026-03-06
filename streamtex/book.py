@@ -80,6 +80,7 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
             bib_sources=None, bib_config=None,
             inspector=None,
             page_width: int = 90,
+            zoom: int = 100,
             *args, monties_color: str = None, **kwargs):
     """Generates a web page e-book from a list of block modules.
 
@@ -93,6 +94,7 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
     :param bib_config: Optional BibConfig to configure bibliography formatting.
     :param inspector: Optional InspectorConfig to enable the block inspector panel.
     :param page_width: Page width as % of browser width (default 90).
+    :param zoom: Default zoom level as % (default 100).
     """
     # --- Resolve banner configuration (3 levels) ---
     if banner is not None:
@@ -126,7 +128,7 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
     if st.session_state[_STX_VIEW_MODE_KEY] == "Paginated":
         _paginated_book(module_list, toc_config, marker_config, separator,
                         export, export_title, banner_config, *args,
-                        inspector=inspector, page_width=page_width, **kwargs)
+                        inspector=inspector, page_width=page_width, zoom=zoom, **kwargs)
         return
 
     start_time = time.time()
@@ -142,7 +144,7 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
     _inject_bib_preview_if_enabled()
 
     # Add zoom options to sidebar (BEFORE export so session_state is populated)
-    add_zoom_options(default_page_width=page_width)
+    add_zoom_options(default_page_width=page_width, default_zoom=zoom)
     add_wrap_all_option()
 
     # Initialise the export buffer (reads effective width from session_state)
@@ -379,15 +381,14 @@ def populate_toc(toc_sidebar: Delta, toc_block: Delta = None, toc_content_style:
 
 
 def populate_markers_sidebar(markers_placeholder: Delta):
-    entries = marker_entries()
+    entries = [e for e in marker_entries() if not e.get("hidden")]
     if not entries:
         return
     with markers_placeholder.container():
-        for entry in entries:
-            idx = entry['index'] + 1
+        for i, entry in enumerate(entries):
             st.html(
                 f'<span style="overflow:hidden;text-overflow:ellipsis;text-wrap:nowrap;word-wrap:normal;">'
-                f'<a href="#{entry["anchor"]}">{idx}. {entry["label"]}</a></span>'
+                f'<a href="#{entry["anchor"]}">{i + 1}. {entry["label"]}</a></span>'
             )
 
 
@@ -927,7 +928,8 @@ def _inject_paginated_nav_js(current_page, total, marker_config,
 
 
 def _paginated_book(module_list, toc_config, marker_config, separator,
-                    export, export_title, banner_config: BannerConfig, *args, inspector=None, page_width=100, **kwargs):
+                    export, export_title, banner_config: BannerConfig, *args,
+                    inspector=None, page_width=100, zoom=100, **kwargs):
     """Paginated rendering — only renders one block per rerun."""
     start_time = time.time()
     logger.debug("Starting st_book (paginated)...")
@@ -940,7 +942,7 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
     load_css("default.css")
     inject_link_preview_scaffold()
     _inject_bib_preview_if_enabled()
-    add_zoom_options(default_page_width=page_width)
+    add_zoom_options(default_page_width=page_width, default_zoom=zoom)
     add_wrap_all_option()
 
     # Inject inspector CSS once + reserve sidebar placeholder

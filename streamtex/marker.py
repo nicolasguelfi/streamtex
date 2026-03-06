@@ -54,9 +54,9 @@ class MarkerRegistry:
     def reset(self) -> None:
         self._entries = []
 
-    def register(self, label: str, anchor: str) -> int:
+    def register(self, label: str, anchor: str, hidden: bool = False) -> int:
         idx = len(self._entries)
-        self._entries.append({"index": idx, "label": label, "anchor": anchor})
+        self._entries.append({"index": idx, "label": label, "anchor": anchor, "hidden": hidden})
         return idx
 
     def get_entries(self) -> list[dict]:
@@ -84,13 +84,13 @@ def reset_marker_registry(config: MarkerConfig = None) -> None:
         _registry = MarkerRegistry(config)
 
 
-def register_marker(label: str, anchor: str) -> int:
+def register_marker(label: str, anchor: str, hidden: bool = False) -> int:
     """Register a marker in the global registry. Requires prior init."""
     global _registry
     assert isinstance(_registry, MarkerRegistry), (
         "Marker registry is not initialized. Call reset_marker_registry first."
     )
-    return _registry.register(label, anchor)
+    return _registry.register(label, anchor, hidden=hidden)
 
 
 def marker_entries() -> list[dict]:
@@ -121,10 +121,16 @@ def get_marker_config() -> Optional[MarkerConfig]:
 # Public API — st_marker()
 # ---------------------------------------------------------------------------
 
-def st_marker(label: str = "", visible: bool = False) -> None:
+def st_marker(label: str = "", visible: bool = False, hidden: bool = False) -> None:
     """Place a navigation marker in the content.
 
     No-op if the marker registry has not been initialized (backward compat).
+
+    Args:
+        label: Marker label shown in the sidebar list and nav widget.
+        visible: If True, render a visible dashed line in the content.
+        hidden: If True, the marker works for PageUp/PageDown navigation
+                but does not appear in the sidebar list or nav widget.
     """
     if _registry is None:
         return
@@ -138,7 +144,7 @@ def st_marker(label: str = "", visible: bool = False) -> None:
     slug = TOCRegistry.get_key_anchor(label)
     anchor = f"stx-marker-{slug}-{idx}"
 
-    _registry.register(label, anchor)
+    _registry.register(label, anchor, hidden=hidden)
 
     if visible:
         style = (
@@ -187,6 +193,7 @@ def inject_marker_navigation() -> None:
     var hostWin = hostDoc.defaultView || parent;
 
     var markers = __MARKERS__;
+    var visibleMarkers = markers.filter(function(m) { return !m.hidden; });
     var nextKeys = __NEXT_KEYS__;
     var prevKeys = __PREV_KEYS__;
     var OFFSET = __OFFSET__;
@@ -314,8 +321,8 @@ def inject_marker_navigation() -> None:
     btnPrev.onmouseleave = function() { this.style.background = 'none'; };
     btnPrev.onclick = function() { navigateTo(currentIdx - 1); };
 
-    /* Fixed-width counter */
-    var totalDigits = String(markers.length).length;
+    /* Fixed-width counter (based on visible markers only) */
+    var totalDigits = String(visibleMarkers.length || markers.length).length;
     var counterWidth = (totalDigits * 2 + 3) + 'ch';
     var counter = hostDoc.createElement('span');
     counter.style.cssText = 'min-width:' + counterWidth + ';text-align:center;display:inline-block;font-variant-numeric:tabular-nums;';
@@ -350,12 +357,14 @@ def inject_marker_navigation() -> None:
     var popup = hostDoc.createElement('div');
     popup.style.cssText = 'display:none;position:absolute;bottom:calc(100% + 8px);right:0;background:rgba(30,30,30,.95);color:#eee;border-radius:12px;padding:6px 0;min-width:240px;max-width:350px;max-height:400px;overflow-y:auto;box-shadow:0 4px 20px rgba(0,0,0,.5);backdrop-filter:blur(8px);font-size:12px;';
 
-    for (var mi = 0; mi < markers.length; mi++) {
+    for (var vi = 0; vi < visibleMarkers.length; vi++) {
+        var globalIdx = visibleMarkers[vi].index;
         var row = hostDoc.createElement('div');
         row.className = 'stx-popup-item';
-        row.dataset.idx = mi;
+        row.dataset.idx = String(globalIdx);
+        row.dataset.visIdx = String(vi);
         row.style.cssText = 'padding:7px 16px;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border-left:3px solid transparent;transition:background .1s;';
-        row.textContent = (mi + 1) + '. ' + markers[mi].label;
+        row.textContent = (vi + 1) + '. ' + visibleMarkers[vi].label;
         row.onmouseenter = function() { this.style.background = 'rgba(128,128,128,.25)'; };
         row.onmouseleave = function() {
             if (parseInt(this.dataset.idx) !== currentIdx) this.style.background = 'transparent';
@@ -363,7 +372,7 @@ def inject_marker_navigation() -> None:
         };
         (function(idx) {
             row.onclick = function() { navigateTo(idx); togglePopup(false); };
-        })(mi);
+        })(globalIdx);
         popup.appendChild(row);
     }
     nav.appendChild(popup);
@@ -377,13 +386,16 @@ def inject_marker_navigation() -> None:
 
     function highlightPopup() {
         var items = popup.querySelectorAll('.stx-popup-item');
+        var activeItem = null;
         for (var j = 0; j < items.length; j++) {
-            var isActive = j === currentIdx;
+            var itemGlobalIdx = parseInt(items[j].dataset.idx);
+            var isActive = itemGlobalIdx === currentIdx;
             items[j].style.background = isActive ? 'rgba(128,128,128,.2)' : 'transparent';
             items[j].style.borderLeftColor = isActive ? '__LINK_ACTIVE_COLOR__' : 'transparent';
             items[j].style.fontWeight = isActive ? '600' : 'normal';
+            if (isActive) activeItem = items[j];
         }
-        if (items[currentIdx]) items[currentIdx].scrollIntoView({ block: 'nearest' });
+        if (activeItem) activeItem.scrollIntoView({ block: 'nearest' });
     }
 
     /* Close popup on outside click */
@@ -392,12 +404,21 @@ def inject_marker_navigation() -> None:
     }
     hostDoc.addEventListener('click', outsideClick);
 
-    /* --- Update UI --- */
+    /* --- Update UI (counter/label based on visible markers only) --- */
+    function visiblePosition() {
+        for (var i = 0; i < visibleMarkers.length; i++) {
+            if (visibleMarkers[i].index >= currentIdx) return i;
+        }
+        return Math.max(0, visibleMarkers.length - 1);
+    }
     function updateUI() {
         var m = markers[currentIdx];
-        var padded = String(currentIdx + 1).padStart(totalDigits, '\\u2007');
-        counter.textContent = padded + ' / ' + markers.length;
-        label.textContent = m ? m.label : '';
+        var vPos = visiblePosition();
+        var total = visibleMarkers.length || markers.length;
+        var padded = String(vPos + 1).padStart(totalDigits, '\\u2007');
+        counter.textContent = padded + ' / ' + total;
+        var visLabel = visibleMarkers[vPos] ? visibleMarkers[vPos].label : (m ? m.label : '');
+        label.textContent = visLabel;
         if (popupOpen) highlightPopup();
     }
 

@@ -88,12 +88,19 @@ def generate_block_hello() -> str:
     return """\
 \"\"\"Hello block — starter template.\"\"\"
 
-from streamtex import st_write
+from streamtex import st_write, st_slide_break, st_space
 
 
 def build():
     \"\"\"Render this block.\"\"\"
     st_write("Hello from StreamTeX!")
+    st_space("v", 1)
+    st_write("Use st_slide_break() to separate presentation sections:")
+
+    st_slide_break()
+
+    st_write("This section appears after a slide break.")
+    st_write("PageDown will stop here during presentations.")
 """
 
 
@@ -115,6 +122,8 @@ def generate_streamlit_config() -> str:
     return """\
 [server]
 enableStaticServing = true
+fileWatcherType = "poll"
+runOnSave = true
 
 [theme]
 base = "dark"

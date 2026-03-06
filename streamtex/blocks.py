@@ -45,6 +45,8 @@ class LazyBlockRegistry:
         """
         self.sources = [os.path.abspath(s) for s in sources]
         self._cache = {}
+        self._cache_paths: Dict[str, str] = {}
+        self._mtimes: Dict[str, float] = {}
         self._not_found = set()  # Track blocks we've already searched for (not found)
         LazyBlockRegistry._instances.append(self)
 
@@ -65,9 +67,17 @@ class LazyBlockRegistry:
         if block_name.startswith('_'):
             raise AttributeError(f"LazyBlockRegistry has no attribute '{block_name}'")
 
-        # Return cached block if already loaded
+        # Check cached block: reload if file changed on disk
         if block_name in self._cache:
-            return self._cache[block_name]
+            block_path = self._cache_paths.get(block_name)
+            if block_path:
+                current_mtime = os.path.getmtime(block_path)
+                if current_mtime <= self._mtimes.get(block_name, 0):
+                    return self._cache[block_name]
+                # File changed — fall through to reimport
+                del self._cache[block_name]
+            else:
+                return self._cache[block_name]
 
         # Skip if we already searched and didn't find it
         if block_name in self._not_found:
@@ -88,8 +98,10 @@ class LazyBlockRegistry:
                     module = importlib.util.module_from_spec(spec)
                     spec.loader.exec_module(module)
 
-                    # Cache and return
+                    # Cache with mtime
                     self._cache[block_name] = module
+                    self._cache_paths[block_name] = block_path
+                    self._mtimes[block_name] = os.path.getmtime(block_path)
                     return module
 
         # Block not found in any source
@@ -113,6 +125,8 @@ class LazyBlockRegistry:
     def invalidate(self) -> None:
         """Clear the block cache so modules are reloaded from disk."""
         self._cache.clear()
+        self._cache_paths.clear()
+        self._mtimes.clear()
         self._not_found.clear()
 
     @classmethod
@@ -158,6 +172,7 @@ class ProjectBlockRegistry:
     def __init__(self, blocks_dir: Path):
         self.blocks_dir = Path(blocks_dir)
         self._cache: Dict[str, object] = {}
+        self._mtimes: Dict[str, float] = {}
         self._manifest: Optional[Dict] = None
         ProjectBlockRegistry._instances.append(self)
 
@@ -197,8 +212,13 @@ class ProjectBlockRegistry:
             raise BlockNotFoundError(
                 f"Block '{block_name}' not found.\nAvailable: {available}"
             )
-        if block_name not in self._cache:
-            path = self.manifest[block_name]["path"]
+        path = self.manifest[block_name]["path"]
+        current_mtime = os.path.getmtime(path)
+        needs_load = (
+            block_name not in self._cache
+            or current_mtime > self._mtimes.get(block_name, 0)
+        )
+        if needs_load:
             try:
                 spec = importlib.util.spec_from_file_location(
                     f"project_blocks.{block_name}", path
@@ -207,6 +227,7 @@ class ProjectBlockRegistry:
                     module = importlib.util.module_from_spec(spec)
                     spec.loader.exec_module(module)
                     self._cache[block_name] = module
+                    self._mtimes[block_name] = current_mtime
                     self.manifest[block_name]["loaded"] = True
                 else:
                     raise BlockImportError(f"Cannot create spec for '{block_name}'")
@@ -243,6 +264,7 @@ class ProjectBlockRegistry:
     def invalidate(self) -> None:
         """Clear the block cache and manifest so modules are reloaded from disk."""
         self._cache.clear()
+        self._mtimes.clear()
         self._manifest = None
 
     @classmethod

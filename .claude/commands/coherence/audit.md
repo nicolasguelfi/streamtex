@@ -1,6 +1,6 @@
 Audit the StreamTeX ecosystem for cross-component coherence issues.
 
-Arguments: $ARGUMENTS (optional scope: all | library | docs | profiles | blocks | artifacts — default: all)
+Arguments: $ARGUMENTS (optional scope: all | library | docs | profiles | blocks | artifacts | tests — default: all)
 
 ## Steps
 
@@ -10,12 +10,13 @@ Arguments: $ARGUMENTS (optional scope: all | library | docs | profiles | blocks 
 2. **Load rules**: Read `.claude/developer/skills/coherence-checks.md`.
 
 3. **Determine scope** from arguments:
-   - `all` (default) — Run all 11 check categories
-   - `library` — Checks 1 + 2 + 10 (API coverage, cheatsheet sync, language)
+   - `all` (default) — Run all 12 check categories
+   - `library` — Checks 1 + 2 + 10 + 12 (API coverage, cheatsheet sync, language, test coverage sync)
    - `docs` — Checks 3 + 6 + 10 (cross-manual consistency, block structure, language)
    - `profiles` — Checks 4 + 8 + 10 + 11 (profile file sync, stx-guide sync, language, artifact API validation)
    - `blocks` — Checks 3 + 6 + 7 + 10 (block patterns, structure, template freshness, language)
    - `artifacts` — Check 11 only (Claude artifact API validation)
+   - `tests` — Check 12 only (test coverage sync)
    - `language` — Check 10 only (language consistency)
 
 4. **Execute checks** for the selected scope. For each check:

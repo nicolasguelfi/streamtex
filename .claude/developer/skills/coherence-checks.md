@@ -1,6 +1,6 @@
 # Coherence Check Rules
 
-Reference file for `/coherence:audit`. Defines 11 check categories.
+Reference file for `/coherence:audit`. Defines 12 check categories.
 
 ---
 
@@ -268,3 +268,81 @@ for fn in [st_list, st_image, st_grid, st_write, st_code, st_space, st_block, st
 "
 ```
 Then for each code block, parse function calls and verify parameter names and enum values against the introspected API.
+
+---
+
+## Check 12: Test Coverage Sync (scope: library, tests, all)
+
+**Goal**: Tests stay up-to-date when the library API changes. A modified or new public function should have corresponding test coverage, and existing tests should not use stale signatures.
+
+**Why this check is critical**: Library changes (new parameters, renamed functions, modified behavior) can silently invalidate existing tests. Tests that pass but test the wrong thing (e.g., missing a new required parameter) give a false sense of safety.
+
+**Source files**:
+- `streamtex/streamtex/__init__.py` — public exports
+- `streamtex/streamtex/*.py` — module source files (function signatures, classes)
+
+**Target files**:
+- `streamtex/tests/test_*.py` — all test files
+
+### Sub-check 12a: Test file coverage
+
+**Method**: For each source module `streamtex/<module>.py`, check if a corresponding `tests/test_<module>.py` exists.
+
+**Rules**:
+- WARNING if a source module with public functions has no corresponding test file
+- INFO: report module → test file mapping and coverage ratio
+
+**Known exceptions** (modules not expected to have dedicated test files):
+- `__init__.py`, `constants.py`, `enums.py`, `utils.py` (tested indirectly)
+- Modules with only re-exports or trivial wrappers
+
+### Sub-check 12b: Signature drift
+
+**Method**: For each public function in `__init__.py`, introspect its current signature. Then grep all `test_*.py` files for calls to that function. Compare keyword arguments used in tests against the actual signature.
+
+**Rules**:
+- ERROR if a test calls a function with a keyword argument that no longer exists in the signature
+- WARNING if a function gained a new parameter (not default-only) and no test exercises it
+- WARNING if a function's parameter was renamed but tests still use the old name
+- INFO: report total public functions checked and how many have test coverage
+
+**How to check** (automated introspection):
+```bash
+uv run python -c "
+import inspect, importlib
+import streamtex
+# Get all public exports
+exports = [name for name in dir(streamtex) if not name.startswith('_')]
+for name in sorted(exports):
+    obj = getattr(streamtex, name)
+    if callable(obj) and not isinstance(obj, type):
+        sig = inspect.signature(obj)
+        print(f'{name}: {sig}')
+"
+```
+Then for each test file, parse function calls and compare keyword arguments against introspected signatures.
+
+### Sub-check 12c: Deprecated API in tests
+
+**Method**: Scan all `test_*.py` files for usage of deprecated patterns.
+
+**Rules**:
+- WARNING if a test imports a name that is no longer exported from `__init__.py`
+- WARNING if a test uses a deprecated parameter (same list as Check 11 cross-reference)
+- WARNING if a test mocks a function path that has been moved or renamed
+
+### Sub-check 12d: New features without tests
+
+**Method**: Compare recent git changes in `streamtex/*.py` against `tests/test_*.py`. For functions modified or added since the last release tag, check if corresponding tests exist.
+
+**Rules**:
+- WARNING if a new public function (added since last release) has zero test assertions
+- WARNING if a function with modified signature (since last release) has no test exercising the new/changed parameters
+- INFO: report functions changed since last release and their test status
+
+**How to check**:
+```bash
+# List functions changed since last release tag
+git diff $(git describe --tags --abbrev=0)..HEAD --name-only -- 'streamtex/*.py' | sort
+# Then introspect each changed module for new/modified function signatures
+```

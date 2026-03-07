@@ -26,7 +26,7 @@ class SlideBreakConfig:
         ))
     """
 
-    space: str = "100vh"
+    space: str = "60vh"
     """Vertical space after the rule (CSS value). 100vh = one full viewport."""
 
     thickness: str = "1px"

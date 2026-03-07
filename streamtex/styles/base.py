@@ -37,27 +37,29 @@ class StxStyles:
     GIANT = text.sizes.GIANT_size
     """196pt"""
     Giant = text.sizes.Giant_size
-    """128pt"""
+    """160pt"""
     giant = text.sizes.giant_size
-    """112pt"""
-    Huge = text.sizes.Huge_size
+    """128pt"""
+    HUGE = text.sizes.HUGE_size
     """96pt"""
-    huge = text.sizes.huge_size
+    Huge = text.sizes.Huge_size
     """80pt"""
-    LARGE = text.sizes.LARGE_size
+    huge = text.sizes.huge_size
     """64pt"""
-    Large = text.sizes.Large_size
+    LARGE = text.sizes.LARGE_size
     """48pt"""
-    large = text.sizes.large_size
+    Large = text.sizes.Large_size
     """32pt"""
-    big = text.sizes.big_size
+    large = text.sizes.large_size
     """24pt"""
-    medium = text.sizes.medium_size
+    big = text.sizes.big_size
     """16pt"""
-    little = text.sizes.little_size
+    medium = text.sizes.medium_size
     """12pt"""
-    small = text.sizes.small_size
+    little = text.sizes.little_size
     """8pt"""
+    small = text.sizes.small_size
+    """6pt"""
     tiny = text.sizes.tiny_size
     """4pt"""
 

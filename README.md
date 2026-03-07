@@ -1,4 +1,8 @@
-# StreamTeX
+<p align="center">
+  <img src="https://raw.githubusercontent.com/nicolasguelfi/streamtex/main/documentation/images/logo-stx-no-bckgd.png" alt="StreamTeX" width="200">
+</p>
+
+<h1 align="center">StreamTeX</h1>
 
 [![PyPI version](https://img.shields.io/pypi/v/streamtex)](https://pypi.org/project/streamtex/)
 [![Python](https://img.shields.io/pypi/pyversions/streamtex)](https://pypi.org/project/streamtex/)

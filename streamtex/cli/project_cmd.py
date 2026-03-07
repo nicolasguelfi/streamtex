@@ -21,12 +21,14 @@ def generate_book_py(name: str) -> str:
 \"\"\"StreamTeX project: {name}.\"\"\"
 
 import streamlit as st
+from importlib.resources import files as pkg_files
 
 from streamtex import st_book, TOCConfig, NumberingMode, MarkerConfig, BannerConfig, PdfConfig
 
 from blocks import registry
 
-st.set_page_config(page_title="{name}", layout="wide", initial_sidebar_state="expanded")
+_logo = str(pkg_files("streamtex.static").joinpath("logo-stx.png"))
+st.set_page_config(page_title="{name}", page_icon=_logo, layout="wide", initial_sidebar_state="expanded")
 
 # Table of Contents — numbered headings in sidebar only, up to level 2
 toc = TOCConfig(
@@ -61,10 +63,12 @@ def generate_collection_book_py(name: str) -> str:
 \"\"\"StreamTeX collection: {name}.\"\"\"
 
 import streamlit as st
+from importlib.resources import files as pkg_files
 
 from streamtex import st_collection
 
-st.set_page_config(page_title="{name}", layout="wide", initial_sidebar_state="expanded")
+_logo = str(pkg_files("streamtex.static").joinpath("logo-stx.png"))
+st.set_page_config(page_title="{name}", page_icon=_logo, layout="wide", initial_sidebar_state="expanded")
 
 st_collection(
     "{name}",

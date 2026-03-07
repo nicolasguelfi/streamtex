@@ -82,7 +82,7 @@ dev = [
 include = ["streamtex*"]
 
 [tool.setuptools.package-data]
-"streamtex.static" = ["*.css"]
+"streamtex.static" = ["*.css", "logo-stx.png"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

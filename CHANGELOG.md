@@ -42,7 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - First public release on PyPI
-- MIT license
+- BUSL-1.1 license (converts to Apache 2.0 on 2030-11-29)
 - PyPI-oriented README with installation and quick start guide
 - GitHub Actions workflow for automated publishing via Trusted Publishing
 - CHANGELOG

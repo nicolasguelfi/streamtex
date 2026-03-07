@@ -2,10 +2,11 @@
 
 [![PyPI version](https://img.shields.io/pypi/v/streamtex)](https://pypi.org/project/streamtex/)
 [![Python](https://img.shields.io/pypi/pyversions/streamtex)](https://pypi.org/project/streamtex/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/nicolasguelfi/streamtex/blob/main/LICENSE)
+[![License: BUSL-1.1](https://img.shields.io/badge/License-BUSL--1.1-blue.svg)](https://github.com/nicolasguelfi/streamtex/blob/main/LICENSE)
 [![CI](https://github.com/nicolasguelfi/streamtex/actions/workflows/ci.yml/badge.svg)](https://github.com/nicolasguelfi/streamtex/actions/workflows/ci.yml)
 [![Works with Claude Code](https://img.shields.io/badge/Works%20with-Claude%20Code-blueviolet)](https://claude.ai/claude-code)
 [![Works with Cursor](https://img.shields.io/badge/Works%20with-Cursor-blue)](https://cursor.com)
+[![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-pink)](https://github.com/sponsors/nicolasguelfi)
 
 **AI-powered content framework for Streamlit** — create presentations, courses,
 and web-books with Claude or Cursor. No coding required.
@@ -332,6 +333,11 @@ uv add streamtex --upgrade   # update the library dependency
 See [CONTRIBUTING.md](https://github.com/nicolasguelfi/streamtex/blob/main/CONTRIBUTING.md) for guidelines on code, content,
 and AI profile contributions.
 
+## Support the Project
+
+If StreamTeX is useful to you, consider [sponsoring the project](https://github.com/sponsors/nicolasguelfi) to help maintain and improve it.
+
 ## License
 
-[MIT](https://github.com/nicolasguelfi/streamtex/blob/main/LICENSE) — Copyright (c) 2026 Nicolas Guelfi
+[BUSL-1.1](https://github.com/nicolasguelfi/streamtex/blob/main/LICENSE) — Copyright (c) 2026 Nicolas Guelfi
+Converts to Apache 2.0 on 2030-11-29.

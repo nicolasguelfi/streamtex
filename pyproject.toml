@@ -8,7 +8,7 @@ version = "0.3.5"
 description = "AI-powered content framework for Streamlit — create presentations, courses, and web-books with Claude or Cursor, no coding required."
 readme = "README.md"
 requires-python = ">=3.11"
-license = "MIT"
+license = "BUSL-1.1"
 license-files = ["LICENSE"]
 authors = [
     {name = "Nicolas Guelfi", email = "nicolas.guelfi@laposte.net"},
@@ -20,6 +20,7 @@ keywords = [
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
+    "License :: OSI Approved :: Apache Software License",
     "Intended Audience :: Developers",
     "Intended Audience :: Education",
     "Intended Audience :: Science/Research",

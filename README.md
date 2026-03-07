@@ -4,6 +4,12 @@
 
 <h1 align="center">StreamTeX</h1>
 
+<p align="center">
+  <a href="https://github.com/sponsors/nicolasguelfi">
+    <img src="https://img.shields.io/badge/%E2%9D%A4%EF%B8%8F_Support_us!-Sponsor-ea4aaa?style=for-the-badge&logo=githubsponsors" alt="Support us!">
+  </a>
+</p>
+
 [![PyPI version](https://img.shields.io/pypi/v/streamtex)](https://pypi.org/project/streamtex/)
 [![Python](https://img.shields.io/pypi/pyversions/streamtex)](https://pypi.org/project/streamtex/)
 [![License: BUSL-1.1](https://img.shields.io/badge/License-BUSL--1.1-blue.svg)](https://github.com/nicolasguelfi/streamtex/blob/main/LICENSE)

@@ -540,6 +540,63 @@ indexes). Use `marker=True` to force-include a heading even when auto is off.
 
 Call `st_marker("Label", visible=True)` for visible waypoints or
 `st_marker("Label")` for invisible ones (scroll-only targets).
+Use `st_marker("Label", hidden=True)` for navigation-only markers that
+do not appear in the sidebar marker list or widget popup.
+
+### Slide breaks (presentation mode)
+
+Use `st_slide_break()` to separate presentation sections. It inserts a
+styled horizontal rule + viewport-height spacer + hidden marker so that
+PageDown stops between sections without polluting the sidebar.
+
+Customize globally via `set_slide_break_config(SlideBreakConfig(...))` in
+the project's `helpers.py`, or per-call with the `config=` parameter.
+
+### PDF export
+
+Use `export_pdf()` to convert HTML export output to PDF via Playwright (Chromium headless).
+Requires the optional `pdf` extra: `uv add "streamtex[pdf]"` + `playwright install chromium`.
+
+Two modes via `PdfMode`:
+- `CONTINUOUS` — slide breaks removed, content flows continuously
+- `PAGINATED` — page break inserted at each slide break
+
+CSS classes `.stx-slide-break-rule` and `.stx-slide-break-spacer` are targeted by
+`@media print` rules injected by `inject_print_css()`.
+
+#### PDF configuration in `st_book()`
+
+Pass a `PdfConfig` to `st_book()` to set default PDF options for the sidebar UI:
+
+```python
+from streamtex import st_book, PdfConfig, PdfMode
+
+st_book([...],
+    pdf_config=PdfConfig(
+        mode=PdfMode.PAGINATED,
+        format="A4",
+        landscape=True,
+        margin_top="10mm",
+        margin_bottom="10mm",
+        margin_left="15mm",
+        margin_right="15mm",
+        print_background=True,
+        scale=1.0,
+        page_numbers=False,
+    ),
+)
+```
+
+When `export=True` (default), the sidebar shows a "Download as..." panel where the user can
+adjust all PDF parameters before generating. The `pdf_config` values are used as defaults.
+
+#### WYSIWYG export — Width % and Zoom %
+
+The sidebar Width % and Zoom % controls are propagated to exports for WYSIWYG fidelity:
+- **HTML export**: Width % sets `max-width` on `.streamtex-page`; Zoom % sets CSS `zoom`.
+- **PDF export**: Width % is already in the HTML that Chromium renders. Zoom % is used as the
+  default value for the PDF Scale slider (overridable by the user in the export panel).
+- The export panel shows "Current view: Width X% · Zoom Y%" for transparency.
 
 ### Architecture
 

@@ -345,12 +345,61 @@ def _restore_uv_lock_if_only_dirty(repo_path: str) -> None:
         pass  # best-effort; pull will report the real error if needed
 
 
+def _depends_on_streamtex(repo_path: str) -> bool:
+    """Return True if pyproject.toml lists streamtex as a dependency."""
+    import tomllib
+
+    pyproject = os.path.join(repo_path, "pyproject.toml")
+    try:
+        with open(pyproject, "rb") as f:
+            data = tomllib.load(f)
+    except (OSError, ValueError):
+        return False
+    deps = data.get("project", {}).get("dependencies", [])
+    return any("streamtex" in d for d in deps)
+
+
+def _collect_sync_targets(
+    repos: dict,
+    ws_root: str,
+    type_filter: set[str] | None = None,
+) -> list[tuple[str, str]]:
+    """Collect (name, path) pairs for all syncable targets.
+
+    Includes repos from stx.toml AND projects under ``projects/``.
+    """
+    targets: list[tuple[str, str]] = []
+
+    # 1. Repos from stx.toml
+    for repo_name, repo_conf in repos.items():
+        repo_type = repo_conf.get("type", "")
+        if type_filter and repo_type not in type_filter:
+            continue
+        repo_path = os.path.join(ws_root, repo_conf.get("path", repo_name))
+        if os.path.isdir(repo_path) and os.path.isfile(os.path.join(repo_path, "pyproject.toml")):
+            targets.append((repo_name, repo_path))
+
+    # 2. Projects under projects/
+    projects_dir = os.path.join(ws_root, "projects")
+    if os.path.isdir(projects_dir):
+        for entry in sorted(os.listdir(projects_dir)):
+            proj_path = os.path.join(projects_dir, entry)
+            if (
+                os.path.isdir(proj_path)
+                and os.path.isfile(os.path.join(proj_path, "pyproject.toml"))
+                and not any(name == entry or path == proj_path for name, path in targets)
+            ):
+                targets.append((f"projects/{entry}", proj_path))
+
+    return targets
+
+
 def _run_uv_sync(
     repos: dict,
     ws_root: str,
     type_filter: set[str] | None = None,
 ) -> None:
-    """Run ``uv sync`` in selected repos.
+    """Run ``uv sync`` in selected repos and projects.
 
     Parameters
     ----------
@@ -366,47 +415,56 @@ def _run_uv_sync(
     synced = 0
     skipped = 0
 
-    for repo_name, repo_conf in repos.items():
-        repo_type = repo_conf.get("type", "")
-        if type_filter and repo_type not in type_filter:
-            skipped += 1
-            continue
+    targets = _collect_sync_targets(repos, ws_root, type_filter)
 
-        repo_path = os.path.join(ws_root, repo_conf.get("path", repo_name))
-        if not os.path.isdir(repo_path):
-            console.print(f"  [yellow]{repo_name}[/yellow]: not cloned — skipped")
-            skipped += 1
-            continue
+    if not targets:
+        console.print("  [yellow]No syncable targets found.[/yellow]")
+        return
 
-        # Only sync if there is a pyproject.toml
-        if not os.path.isfile(os.path.join(repo_path, "pyproject.toml")):
-            console.print(f"  [yellow]{repo_name}[/yellow]: no pyproject.toml — skipped")
-            skipped += 1
-            continue
+    for target_name, target_path in targets:
+        # Upgrade streamtex in the lock file first (skip for the library itself)
+        if _depends_on_streamtex(target_path):
+            no_src = _has_missing_local_sources(target_path)
+            lock_cmd = [uv, "lock", "--upgrade-package", "streamtex"]
+            if no_src:
+                lock_cmd.append("--no-sources")
+            lock_result = subprocess.run(
+                lock_cmd,
+                cwd=target_path,
+                capture_output=True,
+                text=True,
+                timeout=120,
+            )
+            if lock_result.returncode != 0:
+                console.print(f"  [red]{target_name}[/red]: lock upgrade failed")
+                if lock_result.stderr:
+                    console.print(f"    {lock_result.stderr.strip()}")
+                skipped += 1
+                continue
 
         # If local editable sources are missing, fall back to PyPI
         cmd = [uv, "sync"]
-        if _has_missing_local_sources(repo_path):
+        if _has_missing_local_sources(target_path):
             cmd.append("--no-sources")
-            console.print(f"  [cyan]{repo_name}[/cyan]: running uv sync --no-sources (editable source not found) …")
+            console.print(f"  [cyan]{target_name}[/cyan]: running uv sync --no-sources (editable source not found) …")
         else:
-            console.print(f"  [cyan]{repo_name}[/cyan]: running uv sync …")
+            console.print(f"  [cyan]{target_name}[/cyan]: running uv sync …")
         result = subprocess.run(
             cmd,
-            cwd=repo_path,
+            cwd=target_path,
             capture_output=True,
             text=True,
             timeout=120,
         )
         if result.returncode == 0:
-            console.print(f"  [green]{repo_name}[/green]: ok")
+            console.print(f"  [green]{target_name}[/green]: ok")
             synced += 1
             # --no-sources rewrites uv.lock (local paths → PyPI).
             # Restore the committed version so the repo stays clean.
             if "--no-sources" in cmd:
-                _restore_uv_lock_if_only_dirty(repo_path)
+                _restore_uv_lock_if_only_dirty(target_path)
         else:
-            console.print(f"  [red]{repo_name}[/red]: failed")
+            console.print(f"  [red]{target_name}[/red]: failed")
             if result.stderr:
                 console.print(f"    {result.stderr.strip()}")
             skipped += 1
@@ -823,10 +881,9 @@ def update(skip_sync, skip_profiles, dry_run, repair):
     if not skip_sync:
         _step("Syncing dependencies …")
         if dry_run:
-            for repo_name, repo_conf in repos.items():
-                repo_path = os.path.join(ws_root, repo_conf.get("path", repo_name))
-                if os.path.isdir(repo_path) and os.path.isfile(os.path.join(repo_path, "pyproject.toml")):
-                    console.print(f"  [cyan]{repo_name}[/cyan]: would uv sync")
+            for target_name, target_path in _collect_sync_targets(repos, ws_root):
+                upgrade = " (+ upgrade streamtex)" if _depends_on_streamtex(target_path) else ""
+                console.print(f"  [cyan]{target_name}[/cyan]: would uv sync{upgrade}")
         else:
             _run_uv_sync(repos, ws_root)
 

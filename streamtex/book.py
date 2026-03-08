@@ -903,6 +903,26 @@ def _inject_paginated_nav_js(current_page, total, marker_config,
         bannerPrevReady = true;
     }, 800);
 
+    /* --- Trackpad inertia cooldown ---
+       When the user scrolls to a boundary (bottom sentinel visible or
+       top of page), trackpad inertia keeps firing wheel events.  Without
+       protection these residual events can trigger an unwanted page
+       change.  The cooldown absorbs inertia events and only re-arms
+       navigation after TWO conditions are met:
+         1. At least COOLDOWN_MIN_MS since the boundary was reached
+         2. No wheel event for COOLDOWN_GAP_MS (= inertia has stopped)
+       This adapts naturally: mouse wheels (no inertia) clear quickly,
+       long trackpad gestures wait until inertia actually ends.          */
+    var COOLDOWN_MIN_MS = 400;
+    var COOLDOWN_GAP_MS = 150;
+    var nextCooldown = false;       /* bottom boundary cooldown active */
+    var nextCooldownSince = 0;      /* timestamp when bottom cooldown started */
+    var nextCooldownEnd = null;     /* timer: gap detection for bottom */
+    var prevCooldown = false;       /* top boundary cooldown active */
+    var prevCooldownSince = 0;
+    var prevCooldownEnd = null;
+    var prevCooldownDone = false;   /* true once cooldown completed (reset on leave) */
+
     /* --- Deferred element lookup (DOM may not be ready on cold start) --- */
     function prevClick() {
         if (navigating || currentPage <= 0) return;
@@ -925,9 +945,18 @@ def _inject_paginated_nav_js(current_page, total, marker_config,
             sentinel = hostDoc.getElementById('stx-banner-sentinel');
             if (sentinel && !bannerObs) {
                 bannerObs = new hostWin.IntersectionObserver(function(entries) {
+                    var wasActive = bannerNextActive;
                     bannerNextActive = entries[0].isIntersecting;
                     if (!bannerNextActive) {
                         clearTimeout(bannerNextTimer); bannerNextTimer = null;
+                        /* Reset cooldown when user scrolls away from boundary */
+                        nextCooldown = false;
+                        clearTimeout(nextCooldownEnd); nextCooldownEnd = null;
+                    } else if (!wasActive) {
+                        /* Sentinel just became visible — start cooldown */
+                        nextCooldown = true;
+                        nextCooldownSince = Date.now();
+                        clearTimeout(nextCooldownEnd); nextCooldownEnd = null;
                     }
                 }, { threshold: 0.1 });
                 bannerObs.observe(sentinel);
@@ -953,6 +982,18 @@ def _inject_paginated_nav_js(current_page, total, marker_config,
         /* Bottom: scroll down while sentinel visible → next page */
         if (e.deltaY > 0 && bannerNextActive) {
             clearTimeout(bannerPrevTimer); bannerPrevTimer = null;
+
+            /* Cooldown: absorb trackpad inertia events */
+            if (nextCooldown) {
+                if (Date.now() - nextCooldownSince < COOLDOWN_MIN_MS) return;
+                /* Min time elapsed — wait for inertia gap to end cooldown */
+                clearTimeout(nextCooldownEnd);
+                nextCooldownEnd = setTimeout(function() {
+                    nextCooldown = false;
+                }, COOLDOWN_GAP_MS);
+                return;
+            }
+
             if (!bannerNextTimer) {
                 bannerNextTimer = setTimeout(function() {
                     if (!bannerNextActive || navigating) return;
@@ -969,6 +1010,24 @@ def _inject_paginated_nav_js(current_page, total, marker_config,
         if (e.deltaY < 0 && bannerPrevReady
                 && currentPage > 0 && isAtTop()) {
             clearTimeout(bannerNextTimer); bannerNextTimer = null;
+
+            /* Cooldown: absorb trackpad inertia events.
+               prevCooldownDone stays true once cooldown has elapsed,
+               so navigation proceeds until user scrolls away and back. */
+            if (!prevCooldown && !prevCooldownDone) {
+                prevCooldown = true;
+                prevCooldownSince = Date.now();
+            }
+            if (prevCooldown) {
+                if (Date.now() - prevCooldownSince < COOLDOWN_MIN_MS) return;
+                clearTimeout(prevCooldownEnd);
+                prevCooldownEnd = setTimeout(function() {
+                    prevCooldown = false;
+                    prevCooldownDone = true;
+                }, COOLDOWN_GAP_MS);
+                return;
+            }
+
             if (!bannerPrevTimer) {
                 bannerPrevTimer = setTimeout(function() {
                     if (navigating || !isAtTop()) return;
@@ -984,6 +1043,12 @@ def _inject_paginated_nav_js(current_page, total, marker_config,
         /* Not at a boundary: cancel timers */
         clearTimeout(bannerNextTimer); bannerNextTimer = null;
         clearTimeout(bannerPrevTimer); bannerPrevTimer = null;
+        /* Reset top cooldown when user scrolls away from top */
+        if (!isAtTop()) {
+            prevCooldown = false;
+            prevCooldownDone = false;
+            clearTimeout(prevCooldownEnd); prevCooldownEnd = null;
+        }
     }
 
     /* Wheel listener — handles both top and bottom auto-trigger */
@@ -1060,6 +1125,8 @@ def _inject_paginated_nav_js(current_page, total, marker_config,
         clearTimeout(bannerNextTimer);
         clearTimeout(bannerPrevTimer);
         clearTimeout(bannerReadyTimer);
+        clearTimeout(nextCooldownEnd);
+        clearTimeout(prevCooldownEnd);
         if (prevBanner) prevBanner.removeEventListener('click', prevClick);
         if (nextBanner) nextBanner.removeEventListener('click', nextClick);
         hostDoc.removeEventListener('click', linkClick, true);
@@ -1207,8 +1274,7 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
         st.markdown(
             '<div class="stx-banner-buffer"></div>'
             "<style>"
-            ".stx-banner-buffer{padding-top:800px}"
-            "@media(max-width:800px){.stx-banner-buffer{padding-top:400px}}"
+            ".stx-banner-buffer{padding-top:0px}"
             "</style>",
             unsafe_allow_html=True,
         )

@@ -1,14 +1,24 @@
 """Marker Navigation System — opt-in slide-like navigation for StreamTeX books."""
 
+import base64
 import json
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Optional
 
 import streamlit.components.v1 as components
 
-from .constants import LINK_ACTIVE_COLOR_DARK
+from .constants import LINK_ACTIVE_COLOR_DARK, STX_CORAL, STX_HOME_URL
 from .export import _render
 from .toc import TOCRegistry
+
+# ---------------------------------------------------------------------------
+# Tiny logo for the floating nav bar (base64-encoded at import time)
+# ---------------------------------------------------------------------------
+_LOGO_TINY_PATH = Path(__file__).parent / "static" / "logo-stx-tiny.png"
+_LOGO_B64: str = ""
+if _LOGO_TINY_PATH.exists():
+    _LOGO_B64 = base64.b64encode(_LOGO_TINY_PATH.read_bytes()).decode()
 
 
 @dataclass
@@ -186,6 +196,7 @@ def inject_marker_navigation() -> None:
 
     show_ui = "block" if config.show_nav_ui else "none"
     scroll_offset = 80
+    logo_b64 = _LOGO_B64
 
     js_body = """
 (function() {
@@ -302,7 +313,10 @@ def inject_marker_navigation() -> None:
     mobileStyle.textContent = '@media (max-width: 800px) { ' +
         '#streamtex-marker-nav .stx-marker-bar { flex-wrap: wrap; justify-content: center; border-radius: 16px; } ' +
         '#streamtex-marker-nav .stx-marker-label { width: 100% !important; text-align: center; display: block !important; } ' +
-    '}';
+    '} ' +
+    /* Hide number input spinners */
+    '#streamtex-marker-nav input[type=number]::-webkit-outer-spin-button, ' +
+    '#streamtex-marker-nav input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; } ';
     hostDoc.head.appendChild(mobileStyle);
 
     /* --- Controls bar --- */
@@ -321,11 +335,50 @@ def inject_marker_navigation() -> None:
     btnPrev.onmouseleave = function() { this.style.background = 'none'; };
     btnPrev.onclick = function() { navigateTo(currentIdx - 1); };
 
-    /* Fixed-width counter (based on visible markers only) */
+    /* Fixed-width counter (based on visible markers only) — click to jump */
     var totalDigits = String(visibleMarkers.length || markers.length).length;
     var counterWidth = (totalDigits * 2 + 3) + 'ch';
     var counter = hostDoc.createElement('span');
-    counter.style.cssText = 'min-width:' + counterWidth + ';text-align:center;display:inline-block;font-variant-numeric:tabular-nums;';
+    counter.style.cssText = 'min-width:' + counterWidth + ';text-align:center;display:inline-block;font-variant-numeric:tabular-nums;cursor:pointer;';
+    counter.title = 'Click to jump to a marker number';
+
+    var counterInput = hostDoc.createElement('input');
+    counterInput.type = 'number';
+    counterInput.min = '1';
+    counterInput.max = String(visibleMarkers.length || markers.length);
+    counterInput.style.cssText = 'width:' + counterWidth + ';text-align:center;background:rgba(255,255,255,.15);color:#eee;border:1px solid rgba(255,255,255,.3);border-radius:4px;font-size:13px;font-variant-numeric:tabular-nums;outline:none;display:none;-moz-appearance:textfield;';
+    var counterEditing = false;
+
+    function showCounterInput() {
+        counterEditing = true;
+        var vPos = visiblePosition();
+        counterInput.value = String(vPos + 1);
+        counter.style.display = 'none';
+        counterInput.style.display = 'inline-block';
+        counterInput.focus();
+        counterInput.select();
+    }
+    function hideCounterInput() {
+        counterEditing = false;
+        counterInput.style.display = 'none';
+        counter.style.display = 'inline-block';
+    }
+    function commitCounterInput() {
+        var n = parseInt(counterInput.value, 10);
+        var total = visibleMarkers.length || markers.length;
+        if (n >= 1 && n <= total) {
+            var targetIdx = visibleMarkers.length ? visibleMarkers[n - 1].index : n - 1;
+            navigateTo(targetIdx);
+        }
+        hideCounterInput();
+    }
+    counter.onclick = function(e) { e.stopPropagation(); showCounterInput(); };
+    counterInput.onkeydown = function(e) {
+        e.stopPropagation();
+        if (e.key === 'Enter') { e.preventDefault(); commitCounterInput(); }
+        if (e.key === 'Escape') { e.preventDefault(); hideCounterInput(); }
+    };
+    counterInput.onblur = function() { hideCounterInput(); };
 
     var btnNext = hostDoc.createElement('button');
     btnNext.textContent = '\\u25B6';
@@ -349,9 +402,41 @@ def inject_marker_navigation() -> None:
 
     bar.appendChild(btnPrev);
     bar.appendChild(counter);
+    bar.appendChild(counterInput);
     bar.appendChild(btnNext);
     bar.appendChild(btnList);
     bar.appendChild(label);
+
+    /* --- Logo + heart branding --- */
+    var logoB64 = '__LOGO_B64__';
+    var homeUrl = '__HOME_URL__';
+    if (logoB64) {
+        var sep = hostDoc.createElement('span');
+        sep.style.cssText = 'width:1px;height:14px;background:rgba(255,255,255,.2);margin:0 4px;display:inline-block;';
+        bar.appendChild(sep);
+
+        var brand = hostDoc.createElement('a');
+        brand.href = homeUrl;
+        brand.target = '_blank';
+        brand.rel = 'noopener';
+        brand.title = 'StreamTeX';
+        brand.style.cssText = 'display:inline-flex;align-items:center;gap:3px;text-decoration:none;cursor:pointer;opacity:.85;transition:opacity .15s;';
+        brand.onmouseenter = function() { this.style.opacity = '1'; };
+        brand.onmouseleave = function() { this.style.opacity = '.85'; };
+
+        var logoImg = hostDoc.createElement('img');
+        logoImg.src = 'data:image/png;base64,' + logoB64;
+        logoImg.style.cssText = 'height:16px;width:auto;vertical-align:middle;';
+        logoImg.alt = 'STx';
+        brand.appendChild(logoImg);
+
+        var heart = hostDoc.createElement('span');
+        heart.textContent = '\\u2665';
+        heart.style.cssText = 'color:__STX_CORAL__;font-size:10px;line-height:1;';
+        brand.appendChild(heart);
+
+        bar.appendChild(brand);
+    }
 
     /* --- Popup marker list --- */
     var popup = hostDoc.createElement('div');
@@ -412,6 +497,7 @@ def inject_marker_navigation() -> None:
         return Math.max(0, visibleMarkers.length - 1);
     }
     function updateUI() {
+        if (counterEditing) return;
         var m = markers[currentIdx];
         var vPos = visiblePosition();
         var total = visibleMarkers.length || markers.length;
@@ -530,7 +616,10 @@ def inject_marker_navigation() -> None:
         .replace('__POPUP_OPEN__', 'true' if config.popup_open else 'false')
         .replace('__POS_CSS__', pos_css)
         .replace('__SHOW_UI__', show_ui)
-        .replace('__LINK_ACTIVE_COLOR__', LINK_ACTIVE_COLOR_DARK))
+        .replace('__LINK_ACTIVE_COLOR__', LINK_ACTIVE_COLOR_DARK)
+        .replace('__LOGO_B64__', logo_b64)
+        .replace('__HOME_URL__', STX_HOME_URL)
+        .replace('__STX_CORAL__', STX_CORAL))
 
     # components.html() creates a real iframe where scripts execute
     # (st.html() strips <script> tags in Streamlit 1.54+)

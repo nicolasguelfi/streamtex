@@ -311,8 +311,8 @@ def inject_marker_navigation() -> None:
     mobileStyle = hostDoc.createElement('style');
     mobileStyle.id = 'stx-marker-responsive';
     mobileStyle.textContent = '@media (max-width: 800px) { ' +
-        '#streamtex-marker-nav .stx-marker-bar { flex-wrap: wrap; justify-content: center; border-radius: 16px; } ' +
-        '#streamtex-marker-nav .stx-marker-label { width: 100% !important; text-align: center; display: block !important; } ' +
+        '#streamtex-marker-nav .stx-marker-bar { border-radius: 16px; } ' +
+        '#streamtex-marker-nav .stx-marker-label { max-width: 20ch !important; flex-shrink: 1; } ' +
     '} ' +
     /* Hide number input spinners */
     '#streamtex-marker-nav input[type=number]::-webkit-outer-spin-button, ' +

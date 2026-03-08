@@ -116,6 +116,7 @@ def st_grid(
     gap: str = None,
     responsive: bool = False,
     min_width: str | int | None = None,
+    breakpoint: str | None = None,
 ):
     """
     A context manager representing a grid layout with customizable styles for the grid and individual cells.
@@ -137,6 +138,9 @@ def st_grid(
                        using ``repeat(auto-fit, minmax(..., 1fr))``.
     :param min_width: Minimum column width for responsive mode. Int → px, str → as-is.
                       Providing this implicitly enables responsive mode when cols is an int.
+    :param breakpoint: Viewport width below which the grid collapses to a single column.
+                       Example: ``"600px"``. Injects a ``@media`` rule that overrides
+                       ``grid-template-columns`` to ``1fr``.
 
     ## Notes:
     - Cells are filled from top to bottom, left to right.
@@ -155,6 +159,13 @@ def st_grid(
         with st_grid(cols=3, responsive=True) as g:
             # Responsive: wraps to fewer columns on narrow viewports
             with g.cell(): ...
+            with g.cell(): ...
+            with g.cell(): ...
+        ```
+
+        ```
+        with st_grid(cols="25% 1fr", breakpoint="600px") as g:
+            # 25/75 on desktop, single column on narrow screens
             with g.cell(): ...
             with g.cell(): ...
         ```
@@ -218,6 +229,13 @@ def st_grid(
         div[data-testid="stVerticalBlock"]:has(> .element-container .stHtml span.{grid_id}) {{
             {str(grid_style)}
         }}
+        {"" if not breakpoint else f'''
+        @media (max-width: {breakpoint}) {{
+            div[data-testid="stVerticalBlock"]:has(> .element-container .stHtml span.{grid_id}) {{
+                grid-template-columns: 1fr !important;
+            }}
+        }}
+        '''}
     </style>
     """
     st.html(css)

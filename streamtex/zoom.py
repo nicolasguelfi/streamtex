@@ -3,16 +3,22 @@ import streamlit as st
 _PAGE_WIDTH_KEY = "_stx_page_width"
 _ZOOM_KEY = "_stx_zoom"
 
+_SENTINEL = object()
 
-def add_zoom_options(default_page_width: int = 100, default_zoom: int = 100):
+
+def add_zoom_options(default_page_width: int = 100, default_zoom: int = 100,
+                     container=_SENTINEL):
     """Adds Width% and Zoom% controls to the sidebar.
 
-    Two independent ``st.number_input`` widgets side by side:
     - **Width %**: page width as percentage of browser window (10-400%).
     - **Zoom %**: CSS zoom applied to the page content (10-400%).
 
     :param default_page_width: Initial page width percentage (default 100).
     :param default_zoom: Initial zoom percentage (default 100).
+    :param container: Streamlit container to render into.  When omitted,
+        widgets are placed in ``st.sidebar``.  Pass any container (or
+        ``st`` itself when already inside a context manager) to render
+        there instead.
     """
     # Initialize session state with defaults (don't overwrite existing values)
     if _PAGE_WIDTH_KEY not in st.session_state:
@@ -20,24 +26,21 @@ def add_zoom_options(default_page_width: int = 100, default_zoom: int = 100):
     if _ZOOM_KEY not in st.session_state:
         st.session_state[_ZOOM_KEY] = default_zoom
 
-    with st.sidebar:
-        col1, col2 = st.columns(2)
-        with col1:
-            st.number_input(
-                "Width %",
-                min_value=10,
-                max_value=400,
-                step=10,
-                key=_PAGE_WIDTH_KEY,
-            )
-        with col2:
-            st.number_input(
-                "Zoom %",
-                min_value=10,
-                max_value=400,
-                step=10,
-                key=_ZOOM_KEY,
-            )
+    ctx = st.sidebar if container is _SENTINEL else container
+    ctx.number_input(
+        "Width %",
+        min_value=10,
+        max_value=400,
+        step=10,
+        key=_PAGE_WIDTH_KEY,
+    )
+    ctx.number_input(
+        "Zoom %",
+        min_value=10,
+        max_value=400,
+        step=10,
+        key=_ZOOM_KEY,
+    )
 
     inject_zoom_logic(
         st.session_state[_PAGE_WIDTH_KEY],

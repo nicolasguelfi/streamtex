@@ -187,7 +187,7 @@ def st_code(
     _render(final_html)
 
 
-def add_wrap_all_option(default: bool = True):
+def add_wrap_all_option(default: bool = True, container=None):
     """Adds a **Wrap All** toggle to the sidebar.
 
     When toggled, all code blocks rendered by ``st_code()`` will use
@@ -196,9 +196,10 @@ def add_wrap_all_option(default: bool = True):
     a single render cycle.
 
     :param default: Initial state of the toggle (default ``True``).
+    :param container: Streamlit container to render into (default: sidebar).
     """
     if _WRAP_ALL_KEY not in st.session_state:
         st.session_state[_WRAP_ALL_KEY] = default
 
-    with st.sidebar:
-        st.toggle("Wrap All", key=_WRAP_ALL_KEY)
+    ctx = container if container is not None else st.sidebar
+    ctx.toggle("Wrap All", key=_WRAP_ALL_KEY)

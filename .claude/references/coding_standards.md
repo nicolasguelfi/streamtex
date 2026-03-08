@@ -549,8 +549,18 @@ Use `st_slide_break()` to separate presentation sections. It inserts a
 styled horizontal rule + viewport-height spacer + hidden marker so that
 PageDown stops between sections without polluting the sidebar.
 
+The `SlideBreakMode` enum controls what is rendered: `FULL` (rule + spacer),
+`RULE_ONLY`, `SPACER_ONLY`, `MARKER_ONLY`, or `HIDDEN`.
+
 Customize globally via `set_slide_break_config(SlideBreakConfig(...))` in
 the project's `helpers.py`, or per-call with the `config=` parameter.
+
+Call `add_slide_break_options()` in `book.py` alongside `add_zoom_options()`
+to add sidebar controls for enabling/disabling slide breaks, selecting the
+mode, and adjusting spacer height. The low-level `inject_slide_break_css()`
+injects CSS variables (`--stx-break-space`, `--stx-break-thickness`,
+`--stx-break-opacity`, `--stx-break-rule-display`, `--stx-break-spacer-display`)
+that `st_slide_break()` uses for runtime display and sizing control.
 
 ### PDF export
 

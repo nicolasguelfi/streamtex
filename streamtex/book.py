@@ -19,6 +19,7 @@ from .export import ExportConfig, generate_export_html, is_export_active, reset_
 from .marker import MarkerConfig, inject_marker_navigation, marker_entries, reset_marker_registry
 from .pdf_export import PdfConfig
 from .search import generate_search_input_html, generate_search_script, start_collector, stop_collector
+from .slide import add_slide_break_options
 from .space import st_br, st_space
 from .styles import Style
 from .toc import NumberingMode, TOCConfig, reset_toc_registry, toc_entries
@@ -242,17 +243,24 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
         st.session_state[_STX_THEME_TEXT_KEY] = st.get_option("theme.textColor") or "#333"
     # --- Bibliography setup ---
     _setup_bibliography(bib_sources, bib_config)
-    # --- View mode toggle (sidebar) ---
+    # --- Settings expander (sidebar) ---
     if _STX_VIEW_MODE_KEY not in st.session_state:
         st.session_state[_STX_VIEW_MODE_KEY] = "Paginated" if paginate else "Continuous"
 
     with st.sidebar:
-        st.radio(
-            "**View**",
-            options=["Paginated", "Continuous"],
-            horizontal=True,
-            key=_STX_VIEW_MODE_KEY,
-        )
+        _stx_settings = st.expander("Settings")
+        with _stx_settings:
+            _stx_settings.radio(
+                "**View**",
+                options=["Paginated", "Continuous"],
+                horizontal=True,
+                key=_STX_VIEW_MODE_KEY,
+            )
+            add_zoom_options(default_page_width=page_width, default_zoom=zoom,
+                             container=_stx_settings)
+            add_wrap_all_option(container=_stx_settings)
+            _stx_settings.divider()
+            add_slide_break_options(container=_stx_settings)
 
     if st.session_state[_STX_VIEW_MODE_KEY] == "Paginated":
         _paginated_book(module_list, toc_config, marker_config, separator,
@@ -272,10 +280,6 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
 
     # Inject bibliography hover preview if enabled
     _inject_bib_preview_if_enabled()
-
-    # Add zoom options to sidebar (BEFORE export so session_state is populated)
-    add_zoom_options(default_page_width=page_width, default_zoom=zoom)
-    add_wrap_all_option()
 
     # Initialise the export buffer (reads effective width/zoom from session_state)
     effective_pw = f"{st.session_state.get(_PAGE_WIDTH_KEY, page_width)}%"
@@ -1088,11 +1092,10 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
         return
 
     # --- Common setup ---
+    # (Settings expander already rendered by st_book before branching here)
     load_css("default.css")
     inject_link_preview_scaffold()
     _inject_bib_preview_if_enabled()
-    add_zoom_options(default_page_width=page_width, default_zoom=zoom)
-    add_wrap_all_option()
 
     # Inject inspector CSS once + reserve sidebar placeholder
     _inspector_placeholder = None

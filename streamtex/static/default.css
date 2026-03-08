@@ -120,6 +120,7 @@ a {
 
     /* Code block font size */
     --stx-code-size: 18pt;
+
 }
 
 /* Tablet breakpoint (≤1024px) */
@@ -329,5 +330,15 @@ a {
 }
 .stx-media iframe {
     max-width: 100%;
+}
+
+/* --- Slide break print rules (Ctrl+P / browser print) --- */
+@media print {
+    .stx-slide-break-rule { display: none !important; }
+    .stx-slide-break-spacer {
+        height: 0 !important;
+        page-break-after: always;
+        break-after: page;
+    }
 }
 

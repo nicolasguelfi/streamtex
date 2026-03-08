@@ -1,10 +1,32 @@
 """Slide break — presentation-mode section separator."""
 
 from dataclasses import dataclass
+from enum import Enum
 from typing import Optional
+
+import streamlit as st
 
 from .export import _render
 from .marker import st_marker
+
+
+class SlideBreakMode(Enum):
+    """Display mode for slide breaks.
+
+    Controls what is rendered by ``st_slide_break()``:
+
+    - ``FULL`` — rule + spacer + marker (default, presentation mode).
+    - ``RULE_ONLY`` — horizontal rule only, no vertical space.
+    - ``SPACER_ONLY`` — vertical space only, no visible rule.
+    - ``MARKER_ONLY`` — hidden navigation marker only (PageDown stops).
+    - ``HIDDEN`` — nothing rendered at all (disabled).
+    """
+
+    FULL = "full"
+    RULE_ONLY = "rule_only"
+    SPACER_ONLY = "spacer_only"
+    MARKER_ONLY = "marker_only"
+    HIDDEN = "hidden"
 
 
 @dataclass
@@ -16,9 +38,10 @@ class SlideBreakConfig:
 
     Example::
 
-        from streamtex import SlideBreakConfig, set_slide_break_config
+        from streamtex import SlideBreakConfig, SlideBreakMode, set_slide_break_config
 
         set_slide_break_config(SlideBreakConfig(
+            mode=SlideBreakMode.FULL,
             thickness="2px",
             color="79, 172, 254",
             opacity=0.5,
@@ -26,8 +49,14 @@ class SlideBreakConfig:
         ))
     """
 
+    mode: SlideBreakMode = SlideBreakMode.FULL
+    """Display mode (FULL, RULE_ONLY, SPACER_ONLY, MARKER_ONLY, HIDDEN)."""
+
     space: str = "60vh"
     """Vertical space after the rule (CSS value). 100vh = one full viewport."""
+
+    rule_margin_top: str = "1em"
+    """Space before the horizontal rule (CSS value, e.g. "2em", "20px")."""
 
     thickness: str = "1px"
     """Horizontal rule thickness (CSS value)."""
@@ -35,7 +64,7 @@ class SlideBreakConfig:
     color: str = "128, 128, 128"
     """Rule color as RGB values (e.g. "128, 128, 128")."""
 
-    opacity: float = 0.3
+    opacity: float = 0.5
     """Rule opacity from 0.0 (invisible) to 1.0 (fully opaque)."""
 
     marker: bool = True
@@ -65,8 +94,112 @@ def get_slide_break_config() -> SlideBreakConfig:
 
 
 # ---------------------------------------------------------------------------
+# Session state keys (used by add_slide_break_options)
+# ---------------------------------------------------------------------------
+
+_BREAK_ENABLED_KEY = "_stx_slide_break_enabled"
+_BREAK_MODE_KEY = "_stx_slide_break_mode"
+_BREAK_SPACE_KEY = "_stx_slide_break_space"
+
+# Mode label → SlideBreakMode mapping for the sidebar selectbox
+_MODE_LABELS = {
+    "Full": SlideBreakMode.FULL,
+    "Rule only": SlideBreakMode.RULE_ONLY,
+    "Spacer only": SlideBreakMode.SPACER_ONLY,
+}
+
+
+
+# ---------------------------------------------------------------------------
+# Sidebar widget (prop 5)
+# ---------------------------------------------------------------------------
+
+def add_slide_break_options(
+    default_enabled: bool = True,
+    default_mode: SlideBreakMode = SlideBreakMode.FULL,
+    default_space: int = 60,
+    container=None,
+) -> None:
+    """Add slide break controls to the sidebar.
+
+    Mirrors the pattern of :func:`add_zoom_options`: the presenter can
+    toggle breaks on/off, choose a display style, and adjust spacing.
+    Values are stored in session state and read directly by
+    :func:`st_slide_break` on each render (Python-side control).
+
+    Call once in ``book.py``, alongside ``add_zoom_options()``.
+
+    :param default_enabled: Initial toggle state (default True).
+    :param default_mode: Initial display mode (default FULL).
+    :param default_space: Initial spacing in vh (default 60).
+    :param container: Streamlit container to render into (default: sidebar).
+    """
+    if _BREAK_ENABLED_KEY not in st.session_state:
+        st.session_state[_BREAK_ENABLED_KEY] = default_enabled
+    if _BREAK_MODE_KEY not in st.session_state:
+        st.session_state[_BREAK_MODE_KEY] = next(
+            k for k, v in _MODE_LABELS.items() if v == default_mode
+        )
+    if _BREAK_SPACE_KEY not in st.session_state:
+        st.session_state[_BREAK_SPACE_KEY] = default_space
+
+    ctx = container if container is not None else st.sidebar
+    ctx.toggle("Slide breaks", key=_BREAK_ENABLED_KEY)
+    if st.session_state[_BREAK_ENABLED_KEY]:
+        ctx.selectbox(
+            "Style",
+            options=list(_MODE_LABELS.keys()),
+            key=_BREAK_MODE_KEY,
+        )
+        ctx.number_input(
+            "Space (vh)",
+            min_value=0,
+            max_value=100,
+            step=10,
+            key=_BREAK_SPACE_KEY,
+        )
+
+
+# ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+
+def _effective_config(
+    config: Optional[SlideBreakConfig],
+) -> tuple[SlideBreakConfig, bool]:
+    """Return the effective config after sidebar overrides.
+
+    CSS variables don't propagate across Streamlit Shadow DOM boundaries,
+    so the sidebar widget values are read directly from session state and
+    applied as Python-side overrides.
+
+    Returns ``(effective_config, enabled)`` where *enabled* is False when
+    the sidebar toggle is off.
+    """
+    cfg = config or _config
+    enabled_val = st.session_state.get(_BREAK_ENABLED_KEY)
+    if enabled_val is None:
+        # No sidebar widget active — use config as-is
+        return cfg, True
+
+    if not enabled_val:
+        return cfg, False
+
+    # Override mode and space from sidebar
+    mode_label = st.session_state.get(_BREAK_MODE_KEY, "Full")
+    sidebar_mode = _MODE_LABELS.get(mode_label, cfg.mode)
+    space_vh = st.session_state.get(_BREAK_SPACE_KEY, 60)
+
+    return SlideBreakConfig(
+        mode=sidebar_mode,
+        space=f"{space_vh}vh",
+        rule_margin_top=cfg.rule_margin_top,
+        thickness=cfg.thickness,
+        color=cfg.color,
+        opacity=cfg.opacity,
+        marker=cfg.marker,
+    ), True
+
 
 def st_slide_break(
     marker_label: str = "",
@@ -79,18 +212,34 @@ def st_slide_break(
     navigation marker so PageUp/PageDown stops here without appearing
     in the sidebar marker list or TOC.
 
+    When the sidebar widget :func:`add_slide_break_options` is active, its
+    values (toggle, mode, spacing) override the static config directly
+    via Python-side session state — no CSS variable propagation needed.
+
     Args:
         marker_label: Label for the hidden marker. Auto-generated if empty.
         config: Per-call config override. Falls back to the global config
                 set by set_slide_break_config().
     """
-    cfg = config or _config
+    cfg, enabled = _effective_config(config)
+
+    if not enabled or cfg.mode == SlideBreakMode.HIDDEN:
+        return
+
     rule_css = (
         f"border: none; "
-        f"border-top: {cfg.thickness} solid rgba({cfg.color}, {cfg.opacity}); "
-        f"margin: 0.5em 0;"
+        f"border-top: {cfg.thickness} solid "
+        f"rgba({cfg.color}, {cfg.opacity}); "
+        f"margin-top: {cfg.rule_margin_top}; margin-bottom: 0.5em;"
     )
-    _render(f'<hr class="stx-slide-break-rule" style="{rule_css}">')
-    _render(f'<div class="stx-slide-break-spacer" style="height: {cfg.space};"></div>')
-    if cfg.marker:
+    spacer_css = f"height: {cfg.space};"
+
+    show_rule = cfg.mode in (SlideBreakMode.FULL, SlideBreakMode.RULE_ONLY)
+    show_spacer = cfg.mode in (SlideBreakMode.FULL, SlideBreakMode.SPACER_ONLY)
+
+    if show_rule:
+        _render(f'<hr class="stx-slide-break-rule" style="{rule_css}">')
+    if show_spacer:
+        _render(f'<div class="stx-slide-break-spacer" style="{spacer_css}"></div>')
+    if cfg.marker and cfg.mode != SlideBreakMode.HIDDEN:
         st_marker(marker_label, hidden=True)

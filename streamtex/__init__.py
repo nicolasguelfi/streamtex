@@ -39,7 +39,11 @@ from .toc import reset_toc_registry, toc_entries, TOCConfig, NumberingMode
 from .marker import st_marker, MarkerConfig
 
 # Slide break (presentation mode)
-from .slide import st_slide_break, SlideBreakConfig, set_slide_break_config, get_slide_break_config
+from .slide import (
+    st_slide_break, SlideBreakConfig, SlideBreakMode,
+    set_slide_break_config, get_slide_break_config,
+    add_slide_break_options,
+)
 
 # Enums
 from .enums import Tags

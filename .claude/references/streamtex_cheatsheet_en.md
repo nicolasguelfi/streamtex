@@ -1568,15 +1568,28 @@ st_slide_break(
 )
 ```
 
+### SlideBreakMode Enum
+
+```python
+from streamtex import SlideBreakMode
+
+SlideBreakMode.FULL          # Rule + spacer + marker (default)
+SlideBreakMode.RULE_ONLY     # Rule + marker, no spacer
+SlideBreakMode.SPACER_ONLY   # Spacer + marker, no rule
+SlideBreakMode.MARKER_ONLY   # Hidden marker only (no visual)
+SlideBreakMode.HIDDEN        # Completely hidden (no marker either)
+```
+
 ### Slide Break (Presentation Mode)
 
 ```python
-from streamtex import st_slide_break, SlideBreakConfig, set_slide_break_config
+from streamtex import st_slide_break, SlideBreakConfig, SlideBreakMode, set_slide_break_config
 
 st_slide_break()            # Styled rule + 100vh spacer + hidden marker
 
 # Customize globally (in helpers.py):
 set_slide_break_config(SlideBreakConfig(
+    mode=SlideBreakMode.FULL, # Display mode (default FULL)
     space="80vh",           # Vertical space (CSS value)
     thickness="2px",        # Rule thickness
     color="79, 172, 254",   # RGB values
@@ -1585,8 +1598,37 @@ set_slide_break_config(SlideBreakConfig(
 ))
 
 # Per-call override:
-st_slide_break(config=SlideBreakConfig(space="50vh", marker=False))
+st_slide_break(config=SlideBreakConfig(mode=SlideBreakMode.RULE_ONLY, space="50vh", marker=False))
 ```
+
+### Slide Break Options (Sidebar Widget)
+
+```python
+import streamtex as stx
+
+# Slide break options are managed automatically by st_book().
+# Sidebar controls: Enable/disable slide breaks, mode selection, space %.
+
+# If calling manually:
+stx.add_slide_break_options()                           # Defaults: enabled, FULL, 60vh
+stx.add_slide_break_options(default_enabled=True, default_mode=SlideBreakMode.FULL, default_space=60)
+
+# Low-level CSS variable injection (rarely needed):
+stx.inject_slide_break_css(enabled=True, mode=SlideBreakMode.FULL, space_vh=60)
+```
+
+### Slide Break CSS Variables
+
+```css
+--stx-break-space           /* Spacer height (e.g. 60vh) */
+--stx-break-thickness       /* Rule thickness (e.g. 1px) */
+--stx-break-opacity         /* Rule opacity (0.0–1.0) */
+--stx-break-rule-display    /* Rule display: block or none */
+--stx-break-spacer-display  /* Spacer display: block or none */
+```
+
+`@media print` rules automatically hide slide break visuals (rule and spacer)
+and insert `page-break-before` for paginated PDF export.
 
 ### PDF Export
 

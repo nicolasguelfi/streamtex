@@ -1269,8 +1269,8 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
             if css and css["show_dividers"]:
                 st.divider()
             _render_banner("stx-banner-next", _next, "▸", banner_config)
-        # Buffer zone before auto-trigger sentinel
-        # Shorter on narrow viewports (mobile) so users don't scroll forever
+        # Buffer zone before auto-trigger sentinel (padding disabled —
+        # trackpad inertia cooldown in JS handles accidental navigation)
         st.markdown(
             '<div class="stx-banner-buffer"></div>'
             "<style>"

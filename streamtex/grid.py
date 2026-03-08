@@ -230,7 +230,11 @@ def st_grid(
             {str(grid_style)}
         }}
         {"" if not breakpoint else f'''
-        @media (max-width: {breakpoint}) {{
+        /* Container query: responds to actual content width, not viewport */
+        .stMainBlockContainer {{
+            container-type: inline-size;
+        }}
+        @container (max-width: {breakpoint}) {{
             div[data-testid="stVerticalBlock"]:has(> .element-container .stHtml span.{grid_id}) {{
                 grid-template-columns: 1fr !important;
             }}

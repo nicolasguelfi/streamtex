@@ -1659,7 +1659,7 @@ wheels = [
 
 [[package]]
 name = "streamtex"
-version = "0.3.6.post2"
+version = "0.3.6.post3"
 source = { editable = "." }
 dependencies = [
     { name = "beautifulsoup4" },

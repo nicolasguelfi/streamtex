@@ -58,6 +58,9 @@ class SlideBreakConfig:
     rule_margin_top: str = "1em"
     """Space before the horizontal rule (CSS value, e.g. "2em", "20px")."""
 
+    rule_margin_bottom: str = "0.5em"
+    """Space after the horizontal rule (CSS value, e.g. "2em", "20px")."""
+
     thickness: str = "1px"
     """Horizontal rule thickness (CSS value)."""
 
@@ -194,6 +197,7 @@ def _effective_config(
         mode=sidebar_mode,
         space=f"{space_vh}vh",
         rule_margin_top=cfg.rule_margin_top,
+        rule_margin_bottom=cfg.rule_margin_bottom,
         thickness=cfg.thickness,
         color=cfg.color,
         opacity=cfg.opacity,
@@ -230,7 +234,7 @@ def st_slide_break(
         f"border: none; "
         f"border-top: {cfg.thickness} solid "
         f"rgba({cfg.color}, {cfg.opacity}); "
-        f"margin-top: {cfg.rule_margin_top}; margin-bottom: 0.5em;"
+        f"margin-top: {cfg.rule_margin_top}; margin-bottom: {cfg.rule_margin_bottom};"
     )
     spacer_css = f"height: {cfg.space};"
 

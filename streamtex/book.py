@@ -688,7 +688,8 @@ def _build_paginated_sidebar(cache, current_page, total, toc_config, marker_conf
                 st.session_state[_STX_REFRESH_SEARCH_KEY] = True
                 st.rerun()
 
-        has_markers = marker_config is not None and cache.get("markers")
+        has_markers = (marker_config is not None
+                       and any(not e.get("hidden") for e in cache.get("markers", [])))
 
         if has_markers:
             tab_markers, tab_toc = st.tabs(["Markers", "Contents"])
@@ -698,7 +699,8 @@ def _build_paginated_sidebar(cache, current_page, total, toc_config, marker_conf
 
         # --- TOC ---
         cached_toc = cache.get("toc", [])
-        marker_anchors = {m["anchor"] for m in cache.get("markers", [])}
+        marker_anchors = {m["anchor"] for m in cache.get("markers", [])
+                          if not m.get("hidden")}
         indent_char = "&nbsp;"
         effective_max_level = _resolve_sidebar_max_level(toc_config, paginated=True)
 
@@ -742,18 +744,21 @@ def _build_paginated_sidebar(cache, current_page, total, toc_config, marker_conf
         # --- Markers ---
         if tab_markers is not None:
             marker_parts = []
+            visible_idx = 0
             for entry in cache.get("markers", []):
-                idx = entry["index"] + 1
+                if entry.get("hidden"):
+                    continue
+                visible_idx += 1
                 page_idx = entry.get("page_idx", 0)
                 if page_idx == current_page:
                     link = (
                         f'<a href="#{entry["anchor"]}" '
-                        f'style="color:var(--stx-link-active-color);">{idx}. {entry["label"]}</a>'
+                        f'style="color:var(--stx-link-active-color);">{visible_idx}. {entry["label"]}</a>'
                     )
                 else:
                     link = (
                         f'<a href="#stx-goto-{page_idx}" class="stx-page-link">'
-                        f'{idx}. {entry["label"]}</a>'
+                        f'{visible_idx}. {entry["label"]}</a>'
                     )
                 block_attr = f' data-stx-block="{page_idx}"' if show_search else ''
                 marker_parts.append(

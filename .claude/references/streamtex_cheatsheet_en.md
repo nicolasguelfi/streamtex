@@ -165,6 +165,42 @@ st_image(s.container.sizes.height_auto, uri="image.png")
 st_image(uri="diagram.png", light_bg=True)
 ```
 
+### AI Image Generation
+
+```python
+from streamtex import set_ai_image_config, AIImageConfig
+from streamtex import st_ai_image, st_ai_image_widget, generate_image
+
+# Configure in book.py (once)
+set_ai_image_config(AIImageConfig(
+    provider="openai",             # "openai" | "google" | "fal"
+    default_size="1024x1024",
+    output_dir="static/images/ai",
+    auto_generate=False,           # Manual mode (button) by default
+))
+
+# Declarative — in block code
+st_ai_image("a minimalist neural network diagram, flat design, dark bg",
+            width="100%", provider="openai", size="1024x1024")
+
+# Interactive — widget with prompt input + generate button
+st_ai_image_widget(default_prompt="a serene landscape", key="my_gen",
+                   show_save=True)
+
+# Programmatic — generate without displaying (e.g. Claude workflow)
+path = generate_image("a futuristic city", provider="openai")
+st_image(uri=path, width="100%")
+```
+
+**API keys** via environment variables (`.env` or Render):
+```bash
+STX_OPENAI_API_KEY=sk-...
+STX_GOOGLE_AI_KEY=AIza...
+STX_FAL_KEY=fal-...
+```
+
+**Install providers**: `uv add "streamtex[ai]"` (all) or `uv add "streamtex[ai-openai]"` (single).
+
 ### st_grid — Full Signature
 
 ```python
@@ -175,6 +211,7 @@ st_grid(
     gap=None,                           # CSS gap string (e.g. "24px") — shorthand for gap in grid_style
     responsive=False,                   # When True, auto-wraps columns using min_width
     min_width=None,                     # Min column width for responsive mode (e.g. "350px" or 350)
+    breakpoint=None,                    # Viewport width below which grid collapses to 1 column (e.g. "600px")
 )
 ```
 

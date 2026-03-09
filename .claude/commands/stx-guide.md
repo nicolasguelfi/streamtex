@@ -56,7 +56,7 @@ Si `$ARGUMENTS` correspond a un **topic** reconnu (voir liste ci-dessous) : repo
 Si `$ARGUMENTS` est une **question libre** en langage naturel : utilise toute la base de connaissances
 pour fournir une reponse contextuelle.
 
-### Topics reconnus (15)
+### Topics reconnus (16)
 
 | Topic | Description |
 |-------|-------------|
@@ -71,6 +71,7 @@ pour fournir une reponse contextuelle.
 | `blocks` | Systeme de blocks (registries, helpers, atomics) |
 | `styles` | Systeme de styles (composition, themes, grids) |
 | `book` | Orchestration book.py (TOC, markers, banners, zoom) |
+| `ai-images` | Generation d'images IA (OpenAI, Google Imagen, fal.ai) |
 | `troubleshooting` | Gotchas connus et resolution de problemes |
 | `stx-cli` | Reference complete de toutes les commandes `stx` |
 | `release` | Workflow de release complet (dev : publier + propager) |
@@ -88,6 +89,7 @@ pour fournir une reponse contextuelle.
 - "comment personnaliser le theme de mon projet avec Claude ?"
 - "comment publier une nouvelle version et propager a tous les users ?"
 - "comment mettre a jour mon workspace apres une nouvelle release ?"
+- "comment generer des images avec l'IA dans mon projet StreamTeX ?"
 
 ---
 
@@ -760,6 +762,63 @@ stx workspace init . && stx workspace update
 stx project new mon-projet
 # → derniere version PyPI + derniers profils GitHub
 ```
+
+---
+
+## Section 4b — Generation d'images IA (topic: `ai-images`)
+
+StreamTeX integre 3 providers IA pour la generation d'images a partir de prompts textuels.
+
+### Installation
+
+```bash
+uv add "streamtex[ai]"          # Tous les providers
+uv add "streamtex[ai-openai]"   # OpenAI seul
+uv add "streamtex[ai-google]"   # Google Imagen seul
+uv add "streamtex[ai-fal]"      # fal.ai seul
+```
+
+### Configuration (book.py)
+
+```python
+from streamtex import set_ai_image_config, AIImageConfig
+
+set_ai_image_config(AIImageConfig(
+    provider="openai",           # "openai" | "google" | "fal"
+    default_size="1024x1024",
+    output_dir="static/images/ai",
+    auto_generate=False,         # True = generation immediate si pas en cache
+))
+```
+
+### Cles API (.env)
+
+```bash
+STX_OPENAI_API_KEY=sk-...
+STX_GOOGLE_AI_KEY=AIza...
+STX_FAL_KEY=fal-...
+```
+
+### Utilisation
+
+```python
+# Declaratif — generer + afficher
+st_ai_image("A minimalist diagram of microservices")
+
+# Widget interactif — l'utilisateur tape le prompt dans le navigateur
+st_ai_image_widget(default_prompt="A cloud architecture diagram")
+
+# Programmatique — sauvegarder sur disque
+from streamtex import generate_image
+path = generate_image("Illustration of AI", provider="openai")
+st_image(uri=path, width="100%")
+```
+
+### Cache
+
+Les images generees sont mises en cache sur disque. La cle est un hash de
+(prompt + provider + size + quality + seed). Meme parametres = meme fichier = pas d'appel API
+lors des reruns Streamlit.
 
 ---
 

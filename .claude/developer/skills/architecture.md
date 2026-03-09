@@ -32,6 +32,13 @@ __init__.py (public API re-exports)
   +-- marker.py (MarkerConfig, st_marker) -> toc
   +-- book.py (st_book, st_include, st_toc, load_css) -> toc, marker, export, zoom
   +-- zoom.py (add_zoom_options, inject_zoom_logic) -> constants
+  +-- slide.py (SlideBreakMode, SlideBreakConfig, st_slide_break, add_slide_break_options, inject_slide_break_css) -> constants
+  |
+  +-- ai/ (AI image generation)
+  |     config.py (AIImageConfig, set/get_ai_image_config — DI singleton)
+  |     generate.py (generate_image, is_cached, _make_cache_key — file-based cache)
+  |     providers/ (registry + OpenAI, Google Imagen 4, fal.ai adapters)
+  +-- ai_image.py (st_ai_image, st_ai_image_widget) -> ai/, image
   |
   +-- blocks.py (LazyBlockRegistry, ProjectBlockRegistry, static resolution) -> independent
   +-- block_helpers.py (BlockHelper, show_code/explanation/details, DI config) -> code, container, write, styles
@@ -90,8 +97,19 @@ Both `toc.py` and `marker.py` use module-level singleton registries:
 | **Navigation** | `toc`, `marker`, `zoom` | TOC, keyboard nav, zoom |
 | **Orchestration** | `book`, `collection` | Page flow, multi-project |
 | **Export** | `export`, `export_widgets` | HTML export pipeline |
+| **AI** | `ai/`, `ai_image` | AI image generation (OpenAI, Google, fal.ai) |
 | **Infrastructure** | `blocks`, `block_helpers`, `utils`, `constants`, `enums` | DI, registries, enums |
 | **WIP** | `search` | Full-text search (not exported) |
+
+### 7. AI Image Generation (ai/, ai_image.py)
+
+3-layer architecture following the same DI pattern as GSheetConfig/LinkConfig:
+- **Presentation** (`ai_image.py`): `st_ai_image()`, `st_ai_image_widget()` — delegates to `st_image` for display
+- **Service** (`ai/generate.py`): `generate_image()`, `is_cached()` — file-based deterministic cache (hash of prompt+provider+size+quality+seed)
+- **Providers** (`ai/providers/`): Abstract base `AIImageProvider` + registry + 3 adapters (OpenAI, Google Imagen 4, fal.ai)
+
+Optional dependencies: `streamtex[ai]`, `streamtex[ai-openai]`, `streamtex[ai-google]`, `streamtex[ai-fal]`.
+Provider SDKs are imported lazily inside `generate()` — missing SDK raises a clear `ImportError` with install instructions.
 
 ## Testing Strategy
 

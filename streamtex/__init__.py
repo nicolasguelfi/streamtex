@@ -10,7 +10,7 @@ import sys as _sys
 _real_stderr = _sys.stderr
 _sys.stderr = _io.StringIO()
 
-__version__ = "0.3.9"
+__version__ = "0.4.0"
 
 # Core style system
 from .styles import Style, ListStyle, StyleGrid, StxStyles, StreamTeX_Styles, theme

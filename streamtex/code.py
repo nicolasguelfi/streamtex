@@ -147,6 +147,15 @@ def st_code(
 
     checked_attr = " checked" if wrap else ""
 
+    lineno_nowrap_css = (
+        f"#stx-wrap-{uid}:checked ~ .stx-code-{uid} .linenodiv pre {{"
+        f" white-space: pre !important;"
+        f" word-break: normal !important;"
+        f" overflow-wrap: normal !important;"
+        f" min-width: 2.5em;"
+        f"}}"
+    ) if line_numbers else ""
+
     toggle_css = (
         f"<style>"
         f"#stx-wrap-{uid} {{ display: none; }}"
@@ -155,6 +164,7 @@ def st_code(
         f" word-break: break-word !important;"
         f" overflow-wrap: break-word !important;"
         f"}}"
+        f"{lineno_nowrap_css}"
         f".stx-wlbl-{uid} {{"
         f" position: absolute; top: 4px; right: 8px;"
         f" cursor: pointer; z-index: 10;"

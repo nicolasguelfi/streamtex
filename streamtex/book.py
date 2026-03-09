@@ -588,9 +588,105 @@ _STX_THEME_TEXT_KEY = "_stx_theme_text"
 
 
 def _compute_cache_hash(module_list):
-    """Return a hash that changes when the module list changes."""
-    names = "|".join(getattr(m, '__name__', str(m)) for m in module_list)
-    return hashlib.md5(names.encode()).hexdigest()
+    """Return a hash that changes when the module list or file contents change.
+
+    The hash incorporates:
+    - Module names (detects add/remove/reorder)
+    - File modification times (detects content edits)
+    - book.py, custom/styles.py, blocks/helpers.py mtimes (detects config changes)
+    - streamtex library version (detects library upgrades)
+    """
+    parts: list[str] = []
+
+    # 1. Module names + mtimes
+    for m in module_list:
+        name = getattr(m, '__name__', str(m))
+        fpath = getattr(m, '__file__', None)
+        mtime = str(os.path.getmtime(fpath)) if fpath and os.path.isfile(fpath) else "0"
+        parts.append(f"{name}:{mtime}")
+
+    # 2. Ancillary files that affect TOC/markers/search output.
+    #    Resolve relative to the first module's directory (= the project's blocks/).
+    first_file = None
+    for m in module_list:
+        first_file = getattr(m, '__file__', None)
+        if first_file:
+            break
+    if first_file:
+        project_dir = os.path.dirname(os.path.dirname(os.path.abspath(first_file)))
+        ancillary = [
+            os.path.join(project_dir, "book.py"),
+            os.path.join(project_dir, "custom", "styles.py"),
+            os.path.join(project_dir, "blocks", "helpers.py"),
+        ]
+        for fp in ancillary:
+            if os.path.isfile(fp):
+                parts.append(f"{fp}:{os.path.getmtime(fp)}")
+
+    # 3. Library version (invalidates on upgrade)
+    try:
+        from . import __version__
+        parts.append(f"stx:{__version__}")
+    except ImportError:
+        pass
+
+    return hashlib.md5("|".join(parts).encode()).hexdigest()
+
+
+# ---------------------------------------------------------------------------
+# Persistent file cache (survives session restarts / server reruns)
+# ---------------------------------------------------------------------------
+
+_STX_FILE_CACHE_DIR = ".stx_cache"
+_STX_FILE_CACHE_NAME = "page_cache.json"
+
+
+def _resolve_cache_path(module_list) -> str | None:
+    """Return the path to the persistent cache file for this project.
+
+    The cache lives in ``<project>/.stx_cache/page_cache.json``.
+    Returns None if the project directory cannot be determined.
+    """
+    for m in module_list:
+        fpath = getattr(m, '__file__', None)
+        if fpath:
+            # blocks/ is one level below the project root
+            project_dir = os.path.dirname(os.path.dirname(os.path.abspath(fpath)))
+            return os.path.join(project_dir, _STX_FILE_CACHE_DIR, _STX_FILE_CACHE_NAME)
+    return None
+
+
+def _load_file_cache(cache_path: str, expected_hash: str) -> dict | None:
+    """Load the persistent cache from disk if it exists and the hash matches."""
+    try:
+        if not os.path.isfile(cache_path):
+            return None
+        with open(cache_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if data.get("hash") != expected_hash:
+            logger.debug("File cache hash mismatch — will rebuild.")
+            return None
+        # search_index keys are ints in memory but strings in JSON; convert back
+        si = data.get("search_index")
+        if isinstance(si, dict):
+            data["search_index"] = {int(k): v for k, v in si.items()}
+        logger.debug("Loaded page cache from %s", cache_path)
+        return data
+    except Exception:
+        logger.debug("Failed to load file cache — will rebuild.", exc_info=True)
+        return None
+
+
+def _save_file_cache(cache_path: str, cache: dict) -> None:
+    """Persist the page cache to disk (best-effort, never raises)."""
+    try:
+        cache_dir = os.path.dirname(cache_path)
+        os.makedirs(cache_dir, exist_ok=True)
+        with open(cache_path, "w", encoding="utf-8") as f:
+            json.dump(cache, f, ensure_ascii=False, separators=(",", ":"))
+        logger.debug("Saved page cache to %s", cache_path)
+    except Exception:
+        logger.debug("Failed to save file cache.", exc_info=True)
 
 
 def _get_page_titles(cache, total):
@@ -1177,8 +1273,11 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
         with st.sidebar:
             _inspector_placeholder = st.empty()
 
-    # --- Cache management ---
+    # --- Cache management (3-tier: session → file → full rebuild) ---
     cache_hash = _compute_cache_hash(module_list)
+    cache_path = _resolve_cache_path(module_list)
+
+    # Tier 1: session_state (instant — survives intra-session reruns)
     cache = st.session_state.get(_STX_CACHE_KEY)
     has_valid_cache = (
         cache is not None
@@ -1190,11 +1289,28 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
         if cache.get("search_index") is None:
             has_valid_cache = False
 
+    # Tier 2: persistent file cache (fast — survives restarts/reloads)
+    if not has_valid_cache and cache_path:
+        file_cache = _load_file_cache(cache_path, cache_hash)
+        if file_cache is not None:
+            # Extra validation: search_index must be present if search is on
+            if toc_config and toc_config.search and file_cache.get("search_index") is None:
+                file_cache = None
+            if file_cache is not None:
+                st.session_state[_STX_CACHE_KEY] = file_cache
+                cache = file_cache
+                has_valid_cache = True
+                logger.info("Restored page cache from disk (skipped full render).")
+
+    # Tier 3: full rebuild (slow — renders all blocks in hidden container)
     if not has_valid_cache:
         reset_export_buffer(ExportConfig(enabled=False))
         _build_page_cache(module_list, toc_config, marker_config,
                           separator, cache_hash, *args, **kwargs)
         cache = st.session_state[_STX_CACHE_KEY]
+        # Persist to disk for future sessions
+        if cache_path:
+            _save_file_cache(cache_path, cache)
 
     # --- Current page ---
     if _STX_PAGE_KEY not in st.session_state:

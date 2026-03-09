@@ -30,10 +30,13 @@ class TestComputeCacheHash:
         return m
 
     def test_single_module_stable(self):
+        """Same module (no __file__) produces the same hash across calls."""
         from streamtex.book import _compute_cache_hash
         m = self._make_module("block_a")
-        result = _compute_cache_hash([m])
-        assert result == self._hash("block_a")
+        h1 = _compute_cache_hash([m])
+        h2 = _compute_cache_hash([m])
+        assert h1 == h2
+        assert isinstance(h1, str) and len(h1) == 32
 
     def test_same_input_same_hash(self):
         from streamtex.book import _compute_cache_hash
@@ -53,9 +56,10 @@ class TestComputeCacheHash:
         assert h_ab != h_ba
 
     def test_empty_list(self):
+        """Empty module list produces a valid 32-char hex hash."""
         from streamtex.book import _compute_cache_hash
         result = _compute_cache_hash([])
-        assert result == hashlib.md5(b"").hexdigest()
+        assert isinstance(result, str) and len(result) == 32
 
     def test_different_modules_give_different_hash(self):
         from streamtex.book import _compute_cache_hash
@@ -81,7 +85,113 @@ class TestComputeCacheHash:
 
         obj = NoName()
         result = _compute_cache_hash([obj])
-        assert result == hashlib.md5(b"no-name-object").hexdigest()
+        assert isinstance(result, str) and len(result) == 32
+        # Same object gives same hash
+        assert result == _compute_cache_hash([obj])
+
+    def test_hash_changes_when_file_mtime_changes(self, tmp_path):
+        """Modules with __file__ include mtime — touch changes the hash."""
+        import os  # noqa: I001
+
+        from streamtex.book import _compute_cache_hash
+
+        src = tmp_path / "bck_test.py"
+        src.write_text("def build(): pass")
+
+        m = types.ModuleType("bck_test")
+        m.__file__ = str(src)
+        h1 = _compute_cache_hash([m])
+
+        # Bump mtime
+        os.utime(src, (src.stat().st_atime, src.stat().st_mtime + 10))
+        h2 = _compute_cache_hash([m])
+        assert h1 != h2
+
+    def test_hash_includes_library_version(self):
+        """Hash incorporates streamtex.__version__."""
+        from streamtex.book import _compute_cache_hash
+
+        m = types.ModuleType("bck_a")
+        with patch("streamtex.__version__", "0.1.0"):
+            h1 = _compute_cache_hash([m])
+        with patch("streamtex.__version__", "0.2.0"):
+            h2 = _compute_cache_hash([m])
+        assert h1 != h2
+
+
+# ---------------------------------------------------------------------------
+# File cache persistence (_load_file_cache / _save_file_cache)
+# ---------------------------------------------------------------------------
+
+class TestFileCache:
+    """Tests for the persistent file cache layer."""
+
+    def _sample_cache(self, h="abc123"):
+        return {
+            "hash": h,
+            "toc": [{"title": "Intro", "level": 1, "key_anchor": "intro",
+                      "section_number": "1 ", "_reg_label": "Intro",
+                      "_reg_level": "1", "page_idx": 0}],
+            "markers": [{"index": 0, "label": "m1", "anchor": "stx-marker-m1-0",
+                          "hidden": False, "page_idx": 0}],
+            "total": 1,
+            "search_index": {0: "some text"},
+        }
+
+    def test_save_and_load_roundtrip(self, tmp_path):
+        from streamtex.book import _load_file_cache, _save_file_cache
+
+        path = str(tmp_path / ".stx_cache" / "page_cache.json")
+        cache = self._sample_cache("h1")
+        _save_file_cache(path, cache)
+        loaded = _load_file_cache(path, "h1")
+
+        assert loaded is not None
+        assert loaded["hash"] == "h1"
+        assert loaded["toc"] == cache["toc"]
+        assert loaded["markers"] == cache["markers"]
+        # search_index keys are restored as ints
+        assert loaded["search_index"] == {0: "some text"}
+
+    def test_load_returns_none_on_hash_mismatch(self, tmp_path):
+        from streamtex.book import _load_file_cache, _save_file_cache
+
+        path = str(tmp_path / ".stx_cache" / "page_cache.json")
+        _save_file_cache(path, self._sample_cache("old"))
+        assert _load_file_cache(path, "new") is None
+
+    def test_load_returns_none_if_file_missing(self, tmp_path):
+        from streamtex.book import _load_file_cache
+
+        assert _load_file_cache(str(tmp_path / "nope.json"), "x") is None
+
+    def test_load_returns_none_on_corrupt_json(self, tmp_path):
+        from streamtex.book import _load_file_cache
+
+        path = tmp_path / "bad.json"
+        path.write_text("{invalid json")
+        assert _load_file_cache(str(path), "x") is None
+
+    def test_save_creates_directories(self, tmp_path):
+        from streamtex.book import _save_file_cache
+
+        deep = tmp_path / "a" / "b" / "cache.json"
+        _save_file_cache(str(deep), self._sample_cache())
+        assert deep.exists()
+
+    def test_resolve_cache_path(self, tmp_path):
+        from streamtex.book import _resolve_cache_path
+
+        # Simulate a module in project/blocks/bck_test.py
+        block_file = tmp_path / "myproject" / "blocks" / "bck_test.py"
+        block_file.parent.mkdir(parents=True)
+        block_file.write_text("def build(): pass")
+
+        m = types.ModuleType("bck_test")
+        m.__file__ = str(block_file)
+        result = _resolve_cache_path([m])
+        assert result.endswith(".stx_cache/page_cache.json")
+        assert "myproject" in result
 
 
 # ---------------------------------------------------------------------------

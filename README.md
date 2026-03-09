@@ -137,6 +137,22 @@ stx workspace upgrade developer
 stx workspace update
 ```
 
+### Optional Extras
+
+StreamTeX uses optional dependency groups so you install only what you need:
+
+```bash
+uv add "streamtex[ai]"           # AI image generation (OpenAI + Google Imagen + fal.ai)
+uv add "streamtex[ai-openai]"    # AI images — OpenAI only
+uv add "streamtex[ai-google]"    # AI images — Google Imagen only
+uv add "streamtex[ai-fal]"       # AI images — fal.ai only
+uv add "streamtex[pdf]"          # PDF export via Playwright
+uv add "streamtex[inspector]"    # Live code inspector sidebar
+uv add "streamtex[cli]"          # stx CLI (already installed as a global tool above)
+```
+
+> See the **[AI Image Generation](https://github.com/nicolasguelfi/streamtex/blob/main/AI_GUIDE.md#ai-image-generation)** section in the AI Guide for configuration and usage.
+
 ## AI-Powered Features
 
 StreamTeX ships with **22 slash commands**, **4 specialized agents**,

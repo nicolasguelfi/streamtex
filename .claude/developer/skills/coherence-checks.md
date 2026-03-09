@@ -94,8 +94,9 @@ Reference file for `/coherence:audit`. Defines 12 check categories.
 **Targets**: All `pyproject.toml` files in `streamtex-docs/`, `projects/*/`
 
 **Rules**:
+- ERROR if library version (from `pyproject.toml`) is NOT published on PyPI — Render and CI install from PyPI, so unpublished versions cause runtime crashes. Check with: `pip index versions streamtex`
 - WARNING if library version doesn't satisfy a `streamtex>=X.Y.Z` constraint
-- INFO: report current library version and all constraints found
+- INFO: report current library version, latest PyPI version, and all constraints found
 
 ---
 

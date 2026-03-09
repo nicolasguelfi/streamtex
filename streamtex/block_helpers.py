@@ -12,6 +12,7 @@ import streamlit as st
 
 import streamtex as stx
 from streamtex import st_block, st_space, st_write
+from streamtex.search import record_if_active
 from streamtex.styles import StxStyles
 from streamtex.utils import generate_key
 
@@ -36,6 +37,7 @@ def _render_md_body(body: str) -> None:
     with st.container():
         st.html(f'<span class="{uid}" style="display:none"></span>')
         st.markdown(body, unsafe_allow_html=True)
+    record_if_active(body)
 
 
 class BlockHelperConfig:

@@ -56,6 +56,10 @@ cli = [
     "playwright>=1.40",
 ]
 pdf = ["playwright>=1.40"]
+ai = ["openai>=1.0", "google-genai>=1.0", "fal-client>=0.5"]
+ai-openai = ["openai>=1.0"]
+ai-google = ["google-genai>=1.0"]
+ai-fal = ["fal-client>=0.5"]
 
 [project.urls]
 Homepage = "https://github.com/nicolasguelfi/streamtex"
@@ -76,6 +80,9 @@ dev = [
     "rich>=13.0",
     "jinja2>=3.0",
     "playwright>=1.58.0",
+    "openai>=2.26.0",
+    "google-genai>=1.66.0",
+    "fal-client>=0.13.1",
 ]
 
 [tool.setuptools.packages.find]
@@ -87,6 +94,10 @@ include = ["streamtex*"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+addopts = "-m 'not live'"
+markers = [
+    "live: tests that call external APIs (OpenAI, Google, fal.ai) — run with: uv run pytest -m live",
+]
 
 [tool.uv]
 default-groups = ["dev"]

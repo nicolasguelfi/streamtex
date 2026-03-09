@@ -115,6 +115,14 @@ from .bib import (
 # Link behavior configuration
 from .link_config import LinkConfig, set_link_config, get_link_config
 
+# AI image generation
+from .ai import (
+    AIImageConfig, AIImageError, AIImageResult,
+    set_ai_image_config, get_ai_image_config,
+    generate_image, is_cached, list_providers,
+)
+from .ai_image import st_ai_image, st_ai_image_widget
+
 # Block Inspector (opt-in)
 from .inspector import InspectorConfig, FileCategoryRegistry
 

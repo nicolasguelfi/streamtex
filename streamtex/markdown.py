@@ -4,6 +4,7 @@ import streamlit as st
 
 from .container import st_block
 from .export import export_append, is_export_active
+from .search import record_if_active
 from .styles import StxStyles, Style
 from .utils import resolve_content
 
@@ -43,6 +44,7 @@ def st_markdown(
             st.markdown(text, unsafe_allow_html=True)
     else:
         st.markdown(text, unsafe_allow_html=True)
+    record_if_active(text)
 
     if is_export_active():
         try:

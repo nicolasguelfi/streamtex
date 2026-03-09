@@ -1,0 +1,22 @@
+"""StreamTeX AI image generation module.
+
+Provides integration with external AI providers (OpenAI, Google Imagen,
+fal.ai) for generating images and inserting them into StreamTeX presentations.
+"""
+
+from .config import AIImageConfig, get_ai_image_config, set_ai_image_config
+from .generate import AIImageError, generate_image, is_cached
+from .providers import list_providers
+from .providers.base import AIImageProvider, AIImageResult
+
+__all__ = [
+    "AIImageConfig",
+    "AIImageError",
+    "AIImageProvider",
+    "AIImageResult",
+    "generate_image",
+    "get_ai_image_config",
+    "is_cached",
+    "list_providers",
+    "set_ai_image_config",
+]

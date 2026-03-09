@@ -54,6 +54,28 @@ stx claude install project .
 uv run streamlit run book.py
 ```
 
+### Full Setup (all optional features)
+
+Everything above, plus AI image generation, PDF export, and live inspector:
+
+```bash
+uv tool install "streamtex[cli]" -U
+mkdir streamtex-dev && cd streamtex-dev
+stx workspace init .
+stx workspace update
+stx project new my-project --template project
+cd projects/my-project
+stx claude install project .
+uv add "streamtex[ai]"           # AI image generation (OpenAI, Google Imagen, fal.ai)
+uv add "streamtex[pdf]"          # PDF export via Playwright
+uv add "streamtex[inspector]"    # Live code inspector sidebar
+uv run streamlit run book.py
+```
+
+> **AI image generation** requires API keys in your `.env` file:
+> `STX_OPENAI_API_KEY`, `STX_GOOGLE_AI_KEY`, `STX_FAL_KEY` (only the providers you use).
+> See the [AI Guide](https://github.com/nicolasguelfi/streamtex/blob/main/AI_GUIDE.md#ai-image-generation) for configuration details.
+
 **Prerequisites**: Python 3.11+, git, [uv](https://docs.astral.sh/uv/).
 
 ### Zero-Code with Claude or Cursor

@@ -20,6 +20,7 @@ tokens.md
 # === Generated ===
 html_exports/
 test.html
+.stx_cache/
 
 # === Maintenance (internal notes, not published) ===
 documentation/maintenance/

@@ -29,6 +29,9 @@ from .zoom import _PAGE_WIDTH_KEY, _ZOOM_KEY, add_zoom_options
 
 logger = logging.getLogger(__name__)
 
+# Warmup mode flag — set by CLI ``stx cache warmup`` for headless cache build.
+_warmup_mode = False
+
 
 def _is_pdf_available() -> bool:
     """Return True if playwright is installed (PDF export possible)."""
@@ -235,6 +238,12 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
         banner_config = BannerConfig(color=monties_color)
     else:
         banner_config = BannerConfig(color=banner_color)
+    # --- Headless warmup: build + save cache, then return ---
+    if _warmup_mode:
+        _warmup_build_cache(module_list, toc_config, marker_config,
+                            separator, *args, **kwargs)
+        return
+
     # --- Password gate (env-driven, no-op locally) ---
     _password_gate()
     # --- Cache theme colors (once, early, in guaranteed Streamlit context) ---
@@ -734,7 +743,14 @@ def _build_page_cache(module_list, toc_config, marker_config, separator,
             if collector is not None:
                 collector.set_block(i)
 
-            st_include(module, *args, **kwargs)
+            if _warmup_mode:
+                try:
+                    st_include(module, *args, **kwargs)
+                except Exception:
+                    name = getattr(module, '__name__', str(module))
+                    logger.warning("Warmup: block %s raised — skipping.", name)
+            else:
+                st_include(module, *args, **kwargs)
 
             # Tag new TOC entries with their page index
             if toc_config:
@@ -761,6 +777,27 @@ def _build_page_cache(module_list, toc_config, marker_config, separator,
         "total": len(module_list),
         "search_index": search_index,
     }
+
+
+def _warmup_build_cache(module_list, toc_config, marker_config, separator,
+                        *args, **kwargs):
+    """Build and persist the page cache without Streamlit UI (headless).
+
+    Called by ``st_book()`` when ``_warmup_mode`` is True.
+    Skips all sidebar / banner / page rendering — only builds the cache
+    (TOC, markers, search index) and writes it to disk.
+    """
+    cache_hash = _compute_cache_hash(module_list)
+    cache_path = _resolve_cache_path(module_list)
+    reset_export_buffer(ExportConfig(enabled=False))
+    _build_page_cache(module_list, toc_config, marker_config,
+                      separator, cache_hash, *args, **kwargs)
+    cache = st.session_state.get(_STX_CACHE_KEY)
+    if cache and cache_path:
+        _save_file_cache(cache_path, cache)
+        logger.info("Warmup: saved page cache to %s", cache_path)
+    elif not cache_path:
+        logger.warning("Warmup: could not determine cache path.")
 
 
 _STX_REFRESH_SEARCH_KEY = "_stx_refresh_search"

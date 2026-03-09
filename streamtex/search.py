@@ -22,12 +22,15 @@ class TextCollector:
     def record(self, html: str) -> None:
         if not self._active or self._current_block is None:
             return
-        text = strip_html(html).strip()
-        if text:
-            self._blocks.setdefault(self._current_block, []).append(text)
+        # Store raw HTML — strip_html is deferred to get_index() for batching.
+        self._blocks.setdefault(self._current_block, []).append(html)
 
     def get_index(self) -> dict[int, str]:
-        return {k: " ".join(v).lower() for k, v in self._blocks.items()}
+        # Strip HTML once per block (batch) instead of once per fragment.
+        return {
+            k: strip_html(" ".join(v)).strip().lower()
+            for k, v in self._blocks.items()
+        }
 
 
 # ---------------------------------------------------------------------------

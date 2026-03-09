@@ -26,7 +26,7 @@ class TestStBlockBasic:
             pass
 
         # Verify st.html was called for CSS injection
-        assert mock_streamlit["html"].call_count >= 2
+        assert mock_streamlit["html"].call_count >= 1
 
         # First call should be CSS injection
         css_call = mock_streamlit["html"].call_args_list[0]
@@ -45,7 +45,7 @@ class TestStBlockBasic:
             pass
 
         # Verify st.html was called
-        assert mock_streamlit["html"].call_count >= 2
+        assert mock_streamlit["html"].call_count >= 1
         css_call = mock_streamlit["html"].call_args_list[0]
         css_content = css_call[0][0]
 
@@ -165,7 +165,7 @@ class TestStSpanBasic:
             pass
 
         # Verify st.html was called for CSS injection
-        assert mock_streamlit["html"].call_count >= 2
+        assert mock_streamlit["html"].call_count >= 1
 
         # First call should be CSS injection
         css_call = mock_streamlit["html"].call_args_list[0]
@@ -184,7 +184,7 @@ class TestStSpanBasic:
             pass
 
         # Verify st.html was called
-        assert mock_streamlit["html"].call_count >= 2
+        assert mock_streamlit["html"].call_count >= 1
         css_call = mock_streamlit["html"].call_args_list[0]
         css_content = css_call[0][0]
 
@@ -504,7 +504,7 @@ class TestStBlockEdgeCases:
             pass
 
         # Should still generate CSS without errors
-        assert mock_streamlit["html"].call_count >= 2
+        assert mock_streamlit["html"].call_count >= 1
 
     def test_st_block_complex_style(self, mock_streamlit):
         """st_block should handle complex multi-property styles."""
@@ -562,7 +562,7 @@ class TestStSpanEdgeCases:
             pass
 
         # Should still generate CSS without errors
-        assert mock_streamlit["html"].call_count >= 2
+        assert mock_streamlit["html"].call_count >= 1
 
     def test_st_span_complex_style(self, mock_streamlit):
         """st_span should handle complex multi-property styles."""
@@ -609,8 +609,8 @@ class TestStSpanEdgeCases:
             with st_span(span_style):
                 pass
 
-        # Should have multiple st.html calls (CSS for block, CSS for span, marker, marker)
-        assert mock_streamlit["html"].call_count >= 4
+        # Should have st.html calls (fused CSS+marker for block + fused CSS+marker for span)
+        assert mock_streamlit["html"].call_count >= 2
 
 
 class TestContainerCssStructure:

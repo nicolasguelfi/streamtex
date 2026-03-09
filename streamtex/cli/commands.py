@@ -7,6 +7,7 @@ import click
 __version__ = version("streamtex")
 
 from .bib_cmd import generate_stubs
+from .cache_cmd import warmup as cache_warmup
 from .claude_cmd import check_cmd as claude_check
 from .claude_cmd import diff_cmd as claude_diff
 from .claude_cmd import install as claude_install
@@ -125,3 +126,13 @@ def publish():
 
 publish.add_command(publish_check)
 publish.add_command(publish_pypi)
+
+
+# --- Cache subgroup -------------------------------------------------------
+
+@cli.group()
+def cache():
+    """Manage the page cache."""
+
+
+cache.add_command(cache_warmup)

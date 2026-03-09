@@ -6,8 +6,8 @@ Link preview utilities re-exported from link_preview.py.
 """
 
 import inspect
+import itertools
 import re
-import uuid
 from pathlib import Path
 
 # Re-export image utilities (backward compat for `from .utils import __is_url` etc.)
@@ -23,16 +23,21 @@ from .link_preview import contain_link  # noqa: F401
 from .link_preview import inject_link_preview_scaffold  # noqa: F401
 
 
+_STRIP_HTML_RE = re.compile(r'<.*?>')
+
+# Monotonic counter — avoids os.urandom syscall from uuid4 on every call.
+# Thread-safe under CPython GIL (next() on itertools.count is atomic).
+_key_counter = itertools.count()
+
+
 def strip_html(html_string):
     """Remove all HTML tags from a string and return plain text."""
-    html_tag_pattern = re.compile(r'<.*?>')
-    plain_text = re.sub(html_tag_pattern, '', html_string)
-    return plain_text
+    return _STRIP_HTML_RE.sub('', html_string)
 
 
 def generate_key(prefix: str = "block"):
     """Generate a unique key with the given prefix."""
-    return f"{prefix}-{uuid.uuid4().hex}"
+    return f"{prefix}-{next(_key_counter)}"
 
 
 def exec_static(

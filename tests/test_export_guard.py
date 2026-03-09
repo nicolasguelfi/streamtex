@@ -15,7 +15,7 @@ from pathlib import Path
 # Content calls MUST use st_html() from export.py instead.
 EXPECTED_ST_HTML_COUNTS = {
     "export.py": 1,         # st_html() — the only authorised bridge
-    "container.py": 4,      # 2 CSS injections + 2 hidden markers
+    "container.py": 2,      # 2 fused CSS+marker calls (1 per st_block, 1 per st_span)
     "grid.py": 2,           # 1 CSS + 1 hidden marker
     "list.py": 4,           # 2 CSS injections + 2 hidden markers
     "zoom.py": 1,           # CSS injection

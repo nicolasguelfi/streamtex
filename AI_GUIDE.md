@@ -277,7 +277,7 @@ StreamTeX provides 4 installable AI profiles via
 ## Block Blueprint Catalog
 
 When you create blocks with `/designer:block-new` or `/project:project-init`,
-the agent matches your description against these 10 templates:
+the agent matches your description against these 12 templates:
 
 | # | Blueprint | Use case |
 |:-:|-----------|----------|
@@ -291,9 +291,84 @@ the agent matches your description against these 10 templates:
 | 8 | **Quote** (`bck_quote`) | Highlighted citation or key message |
 | 9 | **Gallery** (`bck_gallery`) | Grid of images or visual elements |
 | 10 | **Conclusion** (`bck_conclusion`) | Synthesis of key takeaways |
+| 11 | **AI Image + Text** (`bck_ai_image`) | AI-generated image alongside text (requires `streamtex[ai]`) |
+| 12 | **Interactive Image Lab** (`bck_ai_lab`) | Widget for live AI image generation in the browser |
 
 You don't need to know these names — just describe what you want, and the
 agent selects the best template automatically.
+
+---
+
+## AI Image Generation
+
+StreamTeX can generate images from text prompts using external AI providers.
+Images are cached on disk — same parameters produce the same file, no API cost
+on Streamlit reruns.
+
+### Installation
+
+```bash
+uv add "streamtex[ai]"           # All 3 providers
+uv add "streamtex[ai-openai]"    # OpenAI GPT-Image only
+uv add "streamtex[ai-google]"    # Google Imagen 4 only
+uv add "streamtex[ai-fal]"       # fal.ai Stable Diffusion only
+```
+
+### Configuration
+
+Add to your `book.py`:
+
+```python
+from streamtex import set_ai_image_config, AIImageConfig
+
+set_ai_image_config(AIImageConfig(
+    provider="openai",           # "openai" | "google" | "fal"
+    default_size="1024x1024",
+    output_dir="static/images/ai",
+    auto_generate=False,         # True = generate immediately if not cached
+))
+```
+
+### API Keys
+
+Set in your `.env` file (or as Render env vars for deployment):
+
+```bash
+STX_OPENAI_API_KEY=sk-...
+STX_GOOGLE_AI_KEY=AIza...
+STX_FAL_KEY=fal-...
+```
+
+### Usage in Blocks
+
+```python
+# Declarative — generate and display
+st_ai_image("A minimalist illustration of cloud architecture")
+
+# With provider/size override
+st_ai_image("A futuristic dashboard", provider="google", size="1024x1024")
+
+# Interactive widget — user types prompt in the browser
+st_ai_image_widget(default_prompt="A modern diagram")
+
+# Programmatic — save to file, then display
+from streamtex import generate_image
+path = generate_image("Illustration of AI concepts", provider="openai")
+st_image(uri=path, width="100%")
+```
+
+### Supported Providers
+
+| Provider | Model | Strengths |
+|----------|-------|-----------|
+| **OpenAI** | GPT-Image (gpt-image-1) | High quality, prompt interpretation with `revised_prompt` feedback |
+| **Google** | Imagen 4 (imagen-4.0-generate-001) | Photorealistic output, strong text-in-image rendering |
+| **fal.ai** | Stable Diffusion v3.5 Large | Open-source, fast generation, customizable parameters |
+
+### Manual vs Auto Mode
+
+- **Manual** (`auto_generate=False`, default): Shows a placeholder with a **Generate** button. No API call until you click.
+- **Auto** (`auto_generate=True`): Generates immediately if not cached. Use for batch generation or scripted workflows.
 
 ---
 

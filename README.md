@@ -204,6 +204,7 @@ stx claude install project ./my-project
 - **Block containers** — `st_block` / `st_span` context managers
 - **Lists** — `st_list` with ul/ol, custom bullets, centered alignment
 - **Images** — `st_image` with base64 encoding and MIME detection
+- **AI image generation** — `st_ai_image` / `st_ai_image_widget` with OpenAI, Google Imagen, fal.ai
 - **Code blocks** — `st_code` with Pygments syntax highlighting
 - **Diagrams** — Mermaid, PlantUML, TikZ with pan/zoom
 - **LaTeX** — math formulas and full documents
@@ -225,6 +226,7 @@ stx claude install project ./my-project
 - [All manuals (hub)](https://streamtex.onrender.com)
 - [Introduction](https://streamtex-intro.onrender.com)
 - [Advanced](https://streamtex-advanced.onrender.com)
+- [AI & Claude](https://streamtex-ai.onrender.com)
 - [Deployment Guide](https://streamtex-deploy.onrender.com)
 - [Developer Guide](https://streamtex-developer.onrender.com)
 
@@ -281,8 +283,13 @@ uv add streamtex
 Optional extras:
 
 ```bash
-uv add "streamtex[inspector]"    # Live code inspector sidebar
 uv add "streamtex[cli]"          # stx CLI commands
+uv add "streamtex[inspector]"    # Live code inspector sidebar
+uv add "streamtex[ai]"           # AI image generation (OpenAI + Google Imagen + fal.ai)
+uv add "streamtex[ai-openai]"    # AI images — OpenAI only
+uv add "streamtex[ai-google]"    # AI images — Google Imagen only
+uv add "streamtex[ai-fal]"       # AI images — fal.ai only
+uv add "streamtex[pdf]"          # PDF export via Playwright
 ```
 
 ### Prerequisites

@@ -68,8 +68,18 @@ cd projects/my-project
 stx claude install project .
 uv add "streamtex[ai]"           # AI image generation (OpenAI, Google Imagen, fal.ai)
 uv add "streamtex[pdf]"          # PDF export via Playwright
+uv run playwright install chromium  # Download Chromium browser for PDF export
 uv add "streamtex[inspector]"    # Live code inspector sidebar
 uv run streamlit run book.py
+```
+
+Each `uv add` installs optional features into the **current project's environment**.
+Pick only what you need — or install individual AI providers:
+
+```bash
+uv add "streamtex[ai-openai]"    # OpenAI only
+uv add "streamtex[ai-google]"    # Google Imagen only
+uv add "streamtex[ai-fal]"       # fal.ai only
 ```
 
 > **AI image generation** requires API keys in your `.env` file:

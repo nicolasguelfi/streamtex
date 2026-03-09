@@ -79,6 +79,17 @@ def list_profiles(claude_repo: str) -> list[dict]:
     return profiles
 
 
+def _make_writable(directory: str) -> None:
+    """Make all files in *directory* writable (undo read-only protection)."""
+    if not os.path.isdir(directory):
+        return
+    for root, _dirs, files in os.walk(directory):
+        for f in files:
+            fpath = os.path.join(root, f)
+            st = os.stat(fpath)
+            os.chmod(fpath, st.st_mode | 0o200)
+
+
 def install_profile(claude_repo: str, profile: str, target: str) -> list[str]:
     """Install a Claude profile into *target* project.
 
@@ -94,6 +105,9 @@ def install_profile(claude_repo: str, profile: str, target: str) -> list[str]:
     target = os.path.abspath(target)
     claude_dir = os.path.join(target, ".claude")
     os.makedirs(claude_dir, exist_ok=True)
+
+    # Unlock any previously read-only files so copytree can overwrite them
+    _make_writable(claude_dir)
 
     # 1. Copy profile contents into .claude/ (except CLAUDE.md and manifest.toml)
     for entry in os.listdir(profile_dir):

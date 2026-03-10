@@ -25,6 +25,9 @@ test.html
 # === Maintenance (internal notes, not published) ===
 documentation/maintenance/
 
+# === Communication (private) ===
+communication/
+
 # === Large files ===
 /big/
 /data/models/

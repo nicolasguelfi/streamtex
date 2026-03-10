@@ -84,9 +84,9 @@ pour fournir une reponse contextuelle.
 - "quelle difference entre ProjectBlockRegistry et LazyBlockRegistry ?"
 - "comment deployer sur Render avec plusieurs manuels ?"
 - "comment creer des styles personnalises ?"
-- "comment utiliser /project:project-init pour generer un cours ?"
+- "comment utiliser /stx-designer:init pour generer un cours ?"
 - "quels sont les blueprints disponibles pour les blocks ?"
-- "comment personnaliser le theme de mon projet avec Claude ?"
+- "comment personnaliser le theme de mon projet avec /stx-designer:update ?"
 - "comment publier une nouvelle version et propager a tous les users ?"
 - "comment mettre a jour mon workspace apres une nouvelle release ?"
 - "comment generer des images avec l'IA dans mon projet StreamTeX ?"
@@ -344,41 +344,63 @@ cd projects/stx-mon-projet/
 uv run streamlit run book.py
 ```
 
-### 4.2b Initialisation assistee par Claude (commandes du profil project)
+### 4.2b Assistance Claude — commandes stx-designer
 
 Apres avoir scaffold un projet, Claude peut le personnaliser interactivement
-grace aux nouvelles commandes du profil `project` :
+grace aux 5 commandes `stx-designer` du profil `project` :
 
 ```bash
 cd projects/stx-mon-projet/
 claude
 
 # Initialiser un projet complet depuis une description en langage naturel
-> /project:project-init "cours Docker pour debutants, 8 slides, style sombre"
+> /stx-designer:init cours Docker pour debutants, 8 slides, style sombre
 # → Claude propose la structure (8 blocks avec blueprints), demande confirmation,
 #   puis genere tous les fichiers (book.py, blocks/bck_01_*.py ... bck_08_*.py,
 #   custom/styles.py adapte)
 
-# Personnaliser un projet existant
-> /project:project-customize "passer en theme clair, palette verte, gros texte amphi"
-# → Claude lit la config actuelle, propose un diff, applique apres confirmation
+# Avec un template specifique (presentation live, collection, cours)
+> /stx-designer:init --presentation conference AI4SE, 12 slides, palette bleu/violet
+> /stx-designer:init --collection hub de cours avec 3 sous-projets
+> /stx-designer:init --course Python fundamentals, 6 chapitres avec exercices
 
-# Creer un block en utilisant les blueprints (10 modeles disponibles)
-> /designer:block-new "slide comparaison VM vs Containers, grille 2 colonnes"
-# → Claude consulte block-blueprints.md, utilise le Blueprint 4 (comparaison)
-#   comme base et l'adapte au contexte
+# Ajouter du contenu a un projet existant
+> /stx-designer:update ajouter un bloc comparaison VM vs Containers
+> /stx-designer:update ajouter 3 slides sur la securite
+
+# Personnaliser un projet existant
+> /stx-designer:update passer en theme clair, palette verte, gros texte amphi
+
+# Migrer du HTML vers StreamTeX
+> /stx-designer:update --migrate convertir intro.html
+
+# Auditer la qualite
+> /stx-designer:audit --all
+> /stx-designer:audit --target bck_04_text_styles conformite projection
+
+# Corriger automatiquement les problemes
+> /stx-designer:fix --all
+> /stx-designer:fix --target styles refactorer les doublons
+
+# Outils specialises
+> /stx-designer:tool survey-convert temp/Screenshot_IDE.png
+
+# Aide
+> /stx-designer:init --help    # affiche le cheatsheet complet
 ```
 
-**Commandes Claude disponibles dans le profil `project` (27 elements)** :
+**Commandes Claude disponibles dans le profil `project`** :
 
-| Categorie | Commandes |
-|-----------|-----------|
-| Designer (7) | block-new, block-preview, slide-new, slide-audit, slide-fix, style-audit, style-refactor |
-| Project (5) | project-init, project-customize, project-upgrade, collection-new, course-generate |
-| Migration (5) | html-migrate, html-convert-block, html-convert-batch, html-export, conversion-audit |
-| Developer (2) | test-run, lint |
-| Skills (5) | visual-design-rules, style-conventions, streamtex-quick-reference, block-blueprints, testing-patterns |
-| Agents (3) | slide-designer, slide-reviewer, project-architect |
+| Categorie | Commandes | Description |
+|-----------|-----------|-------------|
+| stx-designer (5) | init, update, audit, fix, tool | Cycle de vie complet du projet |
+| Developer (2) | test-run, lint | Tests et linting |
+| Skills (6) | visual-design-rules, slide-design-rules, style-conventions, streamtex-quick-reference, block-blueprints, testing-patterns | Regles de conception |
+| Agents (3) | slide-designer, slide-reviewer, project-architect | Agents specialises |
+| Templates (4) | project, presentation, collection, course | Templates pour init |
+| Tools (1) | survey-convert | Outils specialises |
+
+**Cycle de vie** : `init` → `update` → `audit` → `fix` → `update` → ...
 
 ### 4.3 Deploiement Docker
 

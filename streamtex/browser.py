@@ -1,6 +1,6 @@
 """Browser detection banner — recommends Chrome for best performance."""
 
-from .export import _render
+import streamlit.components.v1 as _components
 
 _CHROME_BANNER_JS = """\
 <script>
@@ -45,4 +45,4 @@ def st_chrome_banner() -> None:
     Called automatically by ``st_book()`` (``chrome_banner=True`` by default).
     Can also be called manually in ``book.py``.
     """
-    _render(_CHROME_BANNER_JS)
+    _components.html(_CHROME_BANNER_JS, height=0)

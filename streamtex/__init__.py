@@ -129,6 +129,9 @@ from .ai.history import list_versions as list_image_versions, rollback as rollba
 from .ai.history import rename_image
 from .ai.metadata import ImageMetadata
 
+# Browser recommendation banner
+from .browser import st_chrome_banner
+
 # Block Inspector (opt-in)
 from .inspector import InspectorConfig, FileCategoryRegistry
 

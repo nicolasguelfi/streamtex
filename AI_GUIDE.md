@@ -1,5 +1,7 @@
 # StreamTeX AI Guide
 
+[![Best on Chrome](https://img.shields.io/badge/Best%20on-Chrome-4285F4?logo=googlechrome&logoColor=white)](https://www.google.com/chrome/)
+
 Use StreamTeX with **Claude Code** or **Cursor** to create presentations, courses,
 and web-books — without writing Python code.
 

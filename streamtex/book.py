@@ -1,3 +1,4 @@
+import contextlib
 import copy
 import hashlib
 import importlib.resources as resources
@@ -9,10 +10,12 @@ import time
 import streamlit as st
 import streamlit.components.v1 as components
 from streamlit.delta_generator import DeltaGenerator as Delta
+from streamlit.runtime.scriptrunner_utils.script_run_context import get_script_run_ctx
 
 from . import toc as _toc_mod
 from .auth import _password_gate
 from .banner import BannerConfig, BannerMode, _render_banner, _render_loop_banner
+from .browser import st_chrome_banner
 from .code import add_wrap_all_option
 from .enums import Tags
 from .export import ExportConfig, generate_export_html, is_export_active, reset_export_buffer
@@ -207,6 +210,7 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
             banner: BannerConfig = None,
             bib_sources=None, bib_config=None,
             inspector=None,
+            chrome_banner: bool = True,
             page_width: int = 90,
             zoom: int = 100,
             *args, monties_color: str = None, **kwargs):
@@ -246,6 +250,9 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
 
     # --- Password gate (env-driven, no-op locally) ---
     _password_gate()
+    # --- Chrome recommendation banner (JS-injected, no block flow impact) ---
+    if chrome_banner:
+        st_chrome_banner()
     # --- Cache theme colors (once, early, in guaranteed Streamlit context) ---
     if _STX_THEME_BG_KEY not in st.session_state:
         st.session_state[_STX_THEME_BG_KEY] = st.get_option("theme.backgroundColor") or "#fff"
@@ -701,7 +708,7 @@ def _save_file_cache(cache_path: str, cache: dict) -> None:
 def _get_page_titles(cache, total):
     """Extract page title for each page.
 
-    When markers are available, numbering is derived from the visible marker
+    When markers are available, numbering is derived from the global marker
     index (consistent with the sidebar Markers tab and the floating bar).
     Falls back to TOC section numbers when no markers are configured.
     """
@@ -710,14 +717,13 @@ def _get_page_titles(cache, total):
     # Prefer marker-based titles (matches sidebar Markers tab & floating bar)
     markers = cache.get("markers", [])
     if markers:
-        visible_idx = 0
         for entry in markers:
             if entry.get("hidden"):
                 continue
-            visible_idx += 1
+            marker_num = entry["index"] + 1
             idx = entry.get("page_idx", 0)
             if idx < total and titles[idx].startswith("Section "):
-                titles[idx] = f"{visible_idx} {entry['label']}"
+                titles[idx] = f"{marker_num} {entry['label']}"
         return titles
 
     # Fallback: TOC titles (includes section number from register_entry)
@@ -744,6 +750,29 @@ def _preseed_toc_registry(cached_toc, current_page):
         registry.register_entry(entry["_reg_label"], entry["_reg_level"])
 
 
+@contextlib.contextmanager
+def _isolate_widget_keys():
+    """Isolate widget key registration during cache build.
+
+    Saves the current key-tracking sets, lets the cache build register
+    keys freely, then restores the original sets.  This way the real
+    render pass sees no keys from the cache build and avoids
+    ``StreamlitDuplicateElementKey`` errors for blocks that use
+    hardcoded widget keys.
+    """
+    ctx = get_script_run_ctx()
+    if ctx is None:
+        yield
+        return
+    saved_user_keys = ctx.widget_user_keys_this_run.copy()
+    saved_ids = ctx.widget_ids_this_run.copy()
+    try:
+        yield
+    finally:
+        ctx.widget_user_keys_this_run = saved_user_keys
+        ctx.widget_ids_this_run = saved_ids
+
+
 def _build_page_cache(module_list, toc_config, marker_config, separator,
                       cache_hash, *args, **kwargs):
     """Execute all blocks inside st.empty() to collect TOC/markers, then cache."""
@@ -755,7 +784,7 @@ def _build_page_cache(module_list, toc_config, marker_config, separator,
     collector = start_collector() if use_search else None
 
     hidden = st.empty()
-    with hidden.container():
+    with hidden.container(), _isolate_widget_keys():
         for i, module in enumerate(module_list):
             toc_before = len(toc_entries()) if toc_config else 0
             markers_before = len(marker_entries()) if marker_config else 0
@@ -897,21 +926,20 @@ def _build_paginated_sidebar(cache, current_page, total, toc_config, marker_conf
         # --- Markers ---
         if tab_markers is not None:
             marker_parts = []
-            visible_idx = 0
             for entry in cache.get("markers", []):
                 if entry.get("hidden"):
                     continue
-                visible_idx += 1
+                marker_num = entry["index"] + 1
                 page_idx = entry.get("page_idx", 0)
                 if page_idx == current_page:
                     link = (
                         f'<a href="#{entry["anchor"]}" '
-                        f'style="color:var(--stx-link-active-color);">{visible_idx}. {entry["label"]}</a>'
+                        f'style="color:var(--stx-link-active-color);">{marker_num}. {entry["label"]}</a>'
                     )
                 else:
                     link = (
                         f'<a href="#stx-goto-{page_idx}" class="stx-page-link">'
-                        f'{visible_idx}. {entry["label"]}</a>'
+                        f'{marker_num}. {entry["label"]}</a>'
                     )
                 block_attr = f' data-stx-block="{page_idx}"' if show_search else ''
                 marker_parts.append(
@@ -1427,6 +1455,7 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
                     "index": entry["index"],
                     "label": entry["label"],
                     "anchor": entry["anchor"],
+                    "hidden": entry.get("hidden", False),
                     "page": entry.get("page_idx", 0),
                 })
 
@@ -1513,6 +1542,7 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
                     "index": entry["index"],
                     "label": entry["label"],
                     "anchor": entry["anchor"],
+                    "hidden": entry.get("hidden", False),
                     "page": entry.get("page_idx", 0),
                 })
 

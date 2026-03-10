@@ -17,6 +17,7 @@
 [![Works with Claude Code](https://img.shields.io/badge/Works%20with-Claude%20Code-blueviolet)](https://claude.ai/claude-code)
 [![Works with Cursor](https://img.shields.io/badge/Works%20with-Cursor-blue)](https://cursor.com)
 [![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-pink)](https://github.com/sponsors/nicolasguelfi)
+[![Best on Chrome](https://img.shields.io/badge/Best%20on-Chrome-4285F4?logo=googlechrome&logoColor=white)](https://www.google.com/chrome/)
 
 **AI-powered content framework for Streamlit** — create presentations, courses,
 and web-books with Claude or Cursor. No coding required.
@@ -392,6 +393,19 @@ uv add streamtex --upgrade   # update the library dependency
 ```
 
 > Use `/stx-guide update` inside Claude Code for guided assistance.
+
+## Report Issues & Feedback
+
+Found a bug? Have a suggestion? We'd love to hear from you.
+
+- **Bug report**: [Open a bug report](https://github.com/nicolasguelfi/streamtex/issues/new?template=bug_report.md) — include the error message, steps to reproduce, and your environment
+- **Feature request**: [Request a feature](https://github.com/nicolasguelfi/streamtex/issues/new?template=feature_request.md) — describe the problem and your proposed solution
+- **Questions & discussions**: [GitHub Discussions](https://github.com/nicolasguelfi/streamtex/discussions) — ask questions, share ideas, show your projects
+
+When reporting a bug, please include:
+1. The **full error traceback** (copy-paste from the terminal)
+2. The **command** you ran (e.g. `stx project new`, `/stx-designer:init`, `uv run streamlit run book.py`)
+3. Your **StreamTeX version** (`uv pip show streamtex | grep Version`)
 
 ## Contributing
 

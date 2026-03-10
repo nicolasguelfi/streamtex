@@ -23,6 +23,7 @@ def generate_book_py(name: str) -> str:
 import streamlit as st
 from importlib.resources import files as pkg_files
 
+import streamtex as stx
 from streamtex import st_book, TOCConfig, NumberingMode, MarkerConfig, BannerConfig, PdfConfig
 
 from blocks import registry

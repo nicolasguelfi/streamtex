@@ -55,10 +55,10 @@ class SlideBreakConfig:
     space: str = "60vh"
     """Vertical space after the rule (CSS value). 100vh = one full viewport."""
 
-    rule_margin_top: str = "1em"
+    rule_margin_top: str = "5em"
     """Space before the horizontal rule (CSS value, e.g. "2em", "20px")."""
 
-    rule_margin_bottom: str = "0.5em"
+    rule_margin_bottom: str = "5em"
     """Space after the horizontal rule (CSS value, e.g. "2em", "20px")."""
 
     thickness: str = "1px"
@@ -117,10 +117,21 @@ _MODE_LABELS = {
 # Sidebar widget (prop 5)
 # ---------------------------------------------------------------------------
 
+def _parse_space_vh(space: str) -> int:
+    """Extract the integer vh value from a CSS space string like '60vh'."""
+    s = space.strip().lower()
+    if s.endswith("vh"):
+        s = s[:-2]
+    try:
+        return int(float(s))
+    except (ValueError, TypeError):
+        return 60
+
+
 def add_slide_break_options(
     default_enabled: bool = True,
     default_mode: SlideBreakMode = SlideBreakMode.FULL,
-    default_space: int = 60,
+    default_space: Optional[int] = None,
     container=None,
 ) -> None:
     """Add slide break controls to the sidebar.
@@ -134,9 +145,14 @@ def add_slide_break_options(
 
     :param default_enabled: Initial toggle state (default True).
     :param default_mode: Initial display mode (default FULL).
-    :param default_space: Initial spacing in vh (default 60).
+    :param default_space: Initial spacing in vh. When ``None`` (the
+        default), the value is read from the global
+        :class:`SlideBreakConfig` set by ``set_slide_break_config()``.
     :param container: Streamlit container to render into (default: sidebar).
     """
+    if default_space is None:
+        default_space = _parse_space_vh(_config.space)
+
     if _BREAK_ENABLED_KEY not in st.session_state:
         st.session_state[_BREAK_ENABLED_KEY] = default_enabled
     if _BREAK_MODE_KEY not in st.session_state:

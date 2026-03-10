@@ -143,6 +143,14 @@ st_image(
     link="",                        # Optional hyperlink URL wrapping the image
     hover=True,                     # Enable hover effect on linked images
     light_bg=False,                 # Force white background (dark-mode compatibility)
+    *,                              # --- keyword-only below ---
+    editable=False,                 # Enable inline editing panel (prompt + regenerate)
+    name="",                        # Managed image name (for versioning/save)
+    prompt=None,                    # AI generation prompt (enables AI features)
+    provider=None,                  # AI provider ("openai", "google", "fal")
+    model=None,                     # AI model override
+    ai_size=None,                   # AI image size (e.g. "1024x1024")
+    quality="standard",             # AI quality ("standard" or "hd")
 )
 ```
 
@@ -163,6 +171,11 @@ st_image(s.container.sizes.height_auto, uri="image.png")
 
 # Image with light background (adds white bg for dark-mode compatibility)
 st_image(uri="diagram.png", light_bg=True)
+
+# Editable AI image — unified st_image with editing panel
+st_image(uri="ai/concept.png", editable=True, name="concept",
+         prompt="a minimalist neural network, flat design, dark bg",
+         provider="openai")
 ```
 
 ### AI Image Generation
@@ -491,6 +504,7 @@ st_book(
     page_width=90,                  # Page width as % of browser width (default 90)
     zoom=100,                       # Default zoom level as % (default 100)
     pdf_config=None,                # PdfConfig for PDF export defaults
+    chrome_banner=True,             # Show browser recommendation banner (Chrome/Edge)
     banner_color="rgba(211,47,47,0.8)",  # Legacy — use banner=BannerConfig(...) instead
     monties_color=None,             # Legacy — use banner=BannerConfig(...) instead
 )

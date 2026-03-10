@@ -46,9 +46,12 @@ def st_ai_image(
 ) -> Optional[str]:
     """Generate an AI image and display it.
 
+    .. deprecated::
+        Use ``st_image(prompt=..., editable=True)`` instead.
+        This function is kept for backwards compatibility.
+
     In **manual mode** (``auto_generate=False``, the default), if the image
     is not yet cached, a placeholder with a "Generate" button is shown.
-    The image is only generated when the user clicks the button.
 
     In **auto mode** (``auto_generate=True``), the image is generated
     immediately if not cached.
@@ -83,7 +86,6 @@ def st_ai_image(
     )
 
     if already_cached:
-        # Display cached image directly
         file_path = generate_image(
             prompt, provider=prov_name, size=img_size,
             quality=quality, api_key=api_key, model=model,
@@ -91,12 +93,14 @@ def st_ai_image(
         )
         st_image(style=style, width=width, height=height,
                  uri=file_path, alt=alt or prompt, link=link,
-                 hover=hover, light_bg=light_bg)
+                 hover=hover, light_bg=light_bg,
+                 editable=True, name="", prompt=prompt,
+                 provider=prov_name, model=model,
+                 ai_size=img_size, quality=quality)
         return file_path
 
     # Not cached — behaviour depends on auto_generate
     if cfg.auto_generate:
-        # Auto mode: generate immediately
         try:
             file_path = generate_image(
                 prompt, provider=prov_name, size=img_size,
@@ -105,7 +109,10 @@ def st_ai_image(
             )
             st_image(style=style, width=width, height=height,
                      uri=file_path, alt=alt or prompt, link=link,
-                     hover=hover, light_bg=light_bg)
+                     hover=hover, light_bg=light_bg,
+                     editable=True, name="", prompt=prompt,
+                     provider=prov_name, model=model,
+                     ai_size=img_size, quality=quality)
             return file_path
         except AIImageError as e:
             if st is not None:

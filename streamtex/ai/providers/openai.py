@@ -17,6 +17,10 @@ class OpenAIProvider(AIImageProvider):
 
     name = "openai"
 
+    @classmethod
+    def available_models(cls) -> list[str]:
+        return ["gpt-image-1", "dall-e-3"]
+
     def generate(
         self,
         prompt: str,
@@ -25,6 +29,7 @@ class OpenAIProvider(AIImageProvider):
         quality: str = "standard",
         api_key: Optional[str] = None,
         model: Optional[str] = None,
+        base_image: Optional[bytes] = None,
         **kwargs,
     ) -> AIImageResult:
         try:
@@ -52,14 +57,25 @@ class OpenAIProvider(AIImageProvider):
         quality_map = {"standard": "auto", "hd": "high"}
         resolved_quality = quality_map.get(quality, quality)
 
-        response = client.images.generate(
-            model=model_id,
-            prompt=prompt,
-            size=size,
-            quality=resolved_quality,
-            n=1,
-            **kwargs,
-        )
+        if base_image:
+            # Image-to-image editing
+            response = client.images.edit(
+                model=model_id,
+                image=base_image,
+                prompt=prompt,
+                size=size,
+                n=1,
+                **kwargs,
+            )
+        else:
+            response = client.images.generate(
+                model=model_id,
+                prompt=prompt,
+                size=size,
+                quality=resolved_quality,
+                n=1,
+                **kwargs,
+            )
 
         image_data = response.data[0]
 

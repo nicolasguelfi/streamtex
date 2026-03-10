@@ -119,9 +119,15 @@ from .link_config import LinkConfig, set_link_config, get_link_config
 from .ai import (
     AIImageConfig, AIImageError, AIImageResult,
     set_ai_image_config, get_ai_image_config,
-    generate_image, is_cached, list_providers,
+    generate_image, is_cached, list_providers, get_available_models,
 )
 from .ai_image import st_ai_image, st_ai_image_widget
+
+# Image management (history, metadata)
+from .ai.history import save_version as save_image_version, get_current as get_current_image
+from .ai.history import list_versions as list_image_versions, rollback as rollback_image
+from .ai.history import rename_image
+from .ai.metadata import ImageMetadata
 
 # Block Inspector (opt-in)
 from .inspector import InspectorConfig, FileCategoryRegistry

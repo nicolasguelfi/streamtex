@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 import os
+from typing import Optional
 
 from .blocks import get_static_sources
 from .export import _render
@@ -12,6 +15,11 @@ from .utils import (
     contain_link,
 )
 
+try:
+    import streamlit as _st
+except ImportError:
+    _st = None
+
 _static_image_base = "app/static/images"
 
 
@@ -23,10 +31,19 @@ def configure_image_path(base_path: str):
 def st_image(
     style: Style = StxStyles.none,
     width="100%", height="auto",
-    uri: str="", alt:str="",
-    link:str="", hover:bool=True,
+    uri: str="", alt: str="",
+    link: str="", hover: bool=True,
     light_bg: bool = False,
-):
+    *,
+    # --- New: editing support ---
+    editable: bool = False,
+    name: str = "",
+    prompt: Optional[str] = None,
+    provider: Optional[str] = None,
+    model: Optional[str] = None,
+    ai_size: Optional[str] = None,
+    quality: str = "standard",
+) -> Optional[str]:
     """
     Generates an HTML `img` tag based on the image URI, with optional styles, link wrapping, and hover effects.
 
@@ -66,7 +83,7 @@ def st_image(
             f'Image not found: {uri}</div>'
         )
         _render(placeholder)
-        return
+        return None
 
     # 4. Construct the CSS style string
     css_style = f"{str(style)} width: {width}; height: {height};"
@@ -80,6 +97,29 @@ def st_image(
     # 7. Render (pass light_bg to force a white background inside the
     #    iframe — useful for SVG diagrams designed for light mode)
     _render(html_content, light_bg=light_bg)
+
+    # --- Editable panel ---
+    if editable and _st is not None:
+        # Import editor panel lazily to avoid circular imports
+        from .image_editor import _render_editor_panel
+        _render_editor_panel(
+            uri=uri,
+            name=name,
+            prompt=prompt,
+            provider=provider,
+            model=model,
+            ai_size=ai_size,
+            quality=quality,
+            style=style,
+            width=width,
+            height=height,
+            alt=alt,
+            link=link,
+            hover=hover,
+            light_bg=light_bg,
+        )
+
+    return uri if img_src else None
 
 def get_image_src(uri: str) -> str:
     """

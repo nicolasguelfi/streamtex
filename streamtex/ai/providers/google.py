@@ -16,6 +16,10 @@ class GoogleProvider(AIImageProvider):
 
     name = "google"
 
+    @classmethod
+    def available_models(cls) -> list[str]:
+        return ["imagen-4.0-generate-001", "imagen-3.0-generate-002"]
+
     def generate(
         self,
         prompt: str,
@@ -24,6 +28,7 @@ class GoogleProvider(AIImageProvider):
         quality: str = "standard",
         api_key: Optional[str] = None,
         model: Optional[str] = None,
+        base_image: Optional[bytes] = None,
         **kwargs,
     ) -> AIImageResult:
         try:
@@ -46,13 +51,25 @@ class GoogleProvider(AIImageProvider):
         client = genai.Client(api_key=key)
         model_id = model or "imagen-4.0-generate-001"
 
-        response = client.models.generate_images(
-            model=model_id,
-            prompt=prompt,
-            config=genai.types.GenerateImagesConfig(
-                number_of_images=1,
-            ),
-        )
+        if base_image:
+            from google.genai.types import EditImageConfig, RawReferenceImage
+            response = client.models.edit_image(
+                model=model_id,
+                prompt=prompt,
+                reference_images=[RawReferenceImage(
+                    reference_image=genai.types.Image(image_bytes=base_image),
+                    reference_id=0,
+                )],
+                config=EditImageConfig(number_of_images=1),
+            )
+        else:
+            response = client.models.generate_images(
+                model=model_id,
+                prompt=prompt,
+                config=genai.types.GenerateImagesConfig(
+                    number_of_images=1,
+                ),
+            )
 
         if not response.generated_images:
             raise RuntimeError("Google Imagen returned no images.")

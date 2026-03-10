@@ -16,6 +16,10 @@ class FalProvider(AIImageProvider):
 
     name = "fal"
 
+    @classmethod
+    def available_models(cls) -> list[str]:
+        return ["fal-ai/stable-diffusion-v35-large", "fal-ai/flux/dev/image-to-image"]
+
     def generate(
         self,
         prompt: str,
@@ -24,6 +28,7 @@ class FalProvider(AIImageProvider):
         quality: str = "standard",
         api_key: Optional[str] = None,
         model: Optional[str] = None,
+        base_image: Optional[bytes] = None,
         **kwargs,
     ) -> AIImageResult:
         try:
@@ -61,6 +66,13 @@ class FalProvider(AIImageProvider):
             "num_images": 1,
             **kwargs,
         }
+
+        if base_image:
+            import base64 as b64
+            arguments["image_url"] = f"data:image/png;base64,{b64.b64encode(base_image).decode()}"
+            # Use img2img model if default model is used
+            if not model:
+                model_id = "fal-ai/flux/dev/image-to-image"
 
         result = fal_client.subscribe(model_id, arguments=arguments)
 

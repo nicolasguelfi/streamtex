@@ -28,6 +28,11 @@ class AIImageProvider:
 
     name: str = "base"
 
+    @classmethod
+    def available_models(cls) -> list[str]:
+        """Return the list of supported model identifiers."""
+        return []
+
     def generate(
         self,
         prompt: str,
@@ -36,6 +41,7 @@ class AIImageProvider:
         quality: str = "standard",
         api_key: Optional[str] = None,
         model: Optional[str] = None,
+        base_image: Optional[bytes] = None,
         **kwargs,
     ) -> AIImageResult:
         """Generate an image from *prompt*.
@@ -46,6 +52,7 @@ class AIImageProvider:
             quality: Quality level ("standard" or "hd").
             api_key: Provider API key. If None, resolved from env vars.
             model: Model identifier override.
+            base_image: Optional image bytes to use as a starting point (image-to-image editing).
 
         Returns:
             AIImageResult with the generated image bytes.

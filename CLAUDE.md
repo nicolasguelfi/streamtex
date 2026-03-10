@@ -55,8 +55,11 @@ streamtex/
 ├── ai/                      # AI image generation (OpenAI, Google, fal.ai)
 │   ├── config.py            # AIImageConfig + DI (set/get_ai_image_config)
 │   ├── generate.py          # generate_image() + cache + is_cached()
+│   ├── history.py           # Versioned image archive (save, rollback, rename)
+│   ├── metadata.py          # JSON sidecar metadata for managed images
 │   └── providers/           # OpenAI, Google Imagen, fal.ai adapters
 ├── ai_image.py              # st_ai_image, st_ai_image_widget
+├── image_editor.py          # Image editor panel (editable=True UI)
 ├── inspector.py             # Live code editor
 ├── export.py                # HTML export + st_html bridge
 ├── export_widgets.py        # Export-aware widget wrappers

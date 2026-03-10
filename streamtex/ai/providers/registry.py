@@ -42,3 +42,12 @@ def list_providers() -> List[str]:
     """Return the names of all registered providers."""
     _register_builtin_providers()
     return sorted(_PROVIDERS)
+
+
+def get_available_models(provider_name: str) -> list[str]:
+    """Return available models for the named provider."""
+    _register_builtin_providers()
+    cls = _PROVIDERS.get(provider_name)
+    if cls is None:
+        return []
+    return cls.available_models()

@@ -23,7 +23,8 @@ def _make_cache_key(prompt: str, provider: str, size: str, **kwargs) -> str:
     seed = kwargs.get("seed", "")
     quality = kwargs.get("quality", "standard")
     model = kwargs.get("model", "")
-    payload = f"{provider}|{model}|{prompt}|{size}|{quality}|{seed}"
+    has_base = "base" if kwargs.get("base_image") else ""
+    payload = f"{provider}|{model}|{prompt}|{size}|{quality}|{seed}|{has_base}"
     return hashlib.sha256(payload.encode()).hexdigest()[:16]
 
 
@@ -55,6 +56,7 @@ def generate_image(
     model: Optional[str] = None,
     config: Optional[AIImageConfig] = None,
     save: bool = True,
+    base_image: Optional[bytes] = None,
     **kwargs,
 ) -> str:
     """Generate an image and save it to disk. Returns the file path.
@@ -104,6 +106,7 @@ def generate_image(
             quality=quality,
             api_key=key,
             model=model,
+            base_image=base_image,
             **kwargs,
         )
     except Exception as e:

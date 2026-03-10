@@ -5,6 +5,59 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.5] — 2026-03-10
+
+### Added
+- AI image project root detection: images save relative to `book.py` instead of `os.getcwd()`
+- Managed image versioning: `st_image(editable=True, name=)` checks for managed versions before rendering
+- Rename collision guard: `rename_image()` raises `FileExistsError` instead of silently overwriting
+- Coherence check 17: Claude component counter verification across profiles
+
+### Changed
+- Default `SlideBreakConfig.space` changed from `60vh` to `5vh`
+- Default `rule_margin_top` and `rule_margin_bottom` set to `5em`
+- `add_slide_break_options()` sidebar widget reads default space from project config instead of hardcoded 60
+
+## [0.4.1] — 2026-03-09
+
+### Fixed
+- `stx claude install` no longer fails on read-only shared files
+
+## [0.4.0] — 2026-03-09
+
+### Added
+- **AI image generation** (`streamtex.ai`): generate images with OpenAI (gpt-image-1), Google Imagen, and fal.ai (Stable Diffusion) directly in slides
+- `st_ai_image(prompt)` — generate and display an AI image
+- `st_ai_image_widget()` — interactive generation widget with provider/model selection
+- `st_image(editable=True, name=, prompt=)` — unified image editing panel with AI generation
+- `AIImageConfig` with DI pattern (`set_ai_image_config()` / `get_ai_image_config()`)
+- Deterministic cache: `hash(prompt + provider + size + quality + seed)` avoids duplicate API calls
+- Image history with versioned archive (`save_version`, `rollback`, `rename_image`)
+- JSON sidecar metadata for full traceability (prompt, provider, model, timestamps)
+- Optional extras: `streamtex[ai]`, `streamtex[ai-openai]`, `streamtex[ai-google]`, `streamtex[ai-fal]`
+
+## [0.3.9] — 2026-03-08
+
+### Changed
+- `stx workspace update` now upgrades streamtex in all projects
+
+## [0.3.8] — 2026-03-08
+
+### Added
+- `st_grid(breakpoint=)` — responsive breakpoint parameter using container queries
+- Mobile navigation bar layout fix
+
+## [0.3.7] — 2026-03-08
+
+### Added
+- Floating navigation bar with branding and logo support
+- Trackpad inertia cooldown for paginated navigation
+- Headless cache warmup mode for faster first-load
+
+### Fixed
+- LFS checkout in CI/publish workflow
+- Logo packaging for PyPI distribution
+
 ## [0.3.6] — 2026-03-07
 
 ### Changed

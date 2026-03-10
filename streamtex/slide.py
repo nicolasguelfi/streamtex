@@ -52,7 +52,7 @@ class SlideBreakConfig:
     mode: SlideBreakMode = SlideBreakMode.FULL
     """Display mode (FULL, RULE_ONLY, SPACER_ONLY, MARKER_ONLY, HIDDEN)."""
 
-    space: str = "60vh"
+    space: str = "5vh"
     """Vertical space after the rule (CSS value). 100vh = one full viewport."""
 
     rule_margin_top: str = "5em"

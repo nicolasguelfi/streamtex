@@ -39,7 +39,7 @@ class TestSlideBreakConfig:
     def test_defaults(self):
         cfg = SlideBreakConfig()
         assert cfg.mode == SlideBreakMode.FULL
-        assert cfg.space == "60vh"
+        assert cfg.space == "5vh"
         assert cfg.thickness == "1px"
         assert cfg.color == "128, 128, 128"
         assert cfg.opacity == 0.5
@@ -147,7 +147,7 @@ class TestStSlideBreak:
              patch("streamtex.slide.st_marker"):
             st_slide_break(config=cfg)
             spacer_html = mock_render.call_args_list[1][0][0]
-            assert "60vh" in spacer_html
+            assert "5vh" in spacer_html
 
     def test_renders_hidden_marker_by_default(self):
         with patch("streamtex.slide._render"), \

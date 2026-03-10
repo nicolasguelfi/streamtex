@@ -214,12 +214,23 @@ def rename_image(
 ) -> Optional[str]:
     """Rename a managed image (current + all versions).
 
-    Returns the new current path, or None if old_name not found.
+    Returns the new current path, or ``None`` if *old_name* not found.
+
+    Raises:
+        FileExistsError: If *new_name* already exists in the managed directory.
     """
     d = _resolve_managed_dir(managed_dir)
     current = get_current(old_name, managed_dir=d)
     if not current:
         return None
+
+    # Guard: refuse to overwrite an existing managed image
+    existing_target = get_current(new_name, managed_dir=d)
+    if existing_target:
+        raise FileExistsError(
+            f"Cannot rename '{old_name}' → '{new_name}': "
+            f"an image named '{new_name}' already exists"
+        )
 
     ext = get_extension(current)
 

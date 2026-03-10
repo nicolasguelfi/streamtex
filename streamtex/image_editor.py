@@ -159,11 +159,14 @@ def _render_source_tab(
     # Rename (if name changed)
     if new_name and new_name != current_name and current_name:
         if st.button("Rename", key=f"{key_base}_rename"):
-            from .ai.history import rename_image
-            result = rename_image(current_name, new_name)
-            if result:
-                st.success(f"Renamed to: {new_name}")
-                st.rerun()
+            try:
+                from .ai.history import rename_image
+                result = rename_image(current_name, new_name)
+                if result:
+                    st.success(f"Renamed to: {new_name}")
+                    st.rerun()
+            except FileExistsError as e:
+                st.error(str(e))
 
 
 def _render_ai_tab(

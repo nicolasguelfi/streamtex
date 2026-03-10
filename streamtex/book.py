@@ -12,7 +12,7 @@ from streamlit.delta_generator import DeltaGenerator as Delta
 
 from . import toc as _toc_mod
 from .auth import _password_gate
-from .banner import BannerConfig, BannerMode, _render_banner
+from .banner import BannerConfig, BannerMode, _render_banner, _render_loop_banner
 from .code import add_wrap_all_option
 from .enums import Tags
 from .export import ExportConfig, generate_export_html, is_export_active, reset_export_buffer
@@ -699,8 +699,28 @@ def _save_file_cache(cache_path: str, cache: dict) -> None:
 
 
 def _get_page_titles(cache, total):
-    """Extract the first TOC title for each page (fallback to 'Section N')."""
+    """Extract page title for each page.
+
+    When markers are available, numbering is derived from the visible marker
+    index (consistent with the sidebar Markers tab and the floating bar).
+    Falls back to TOC section numbers when no markers are configured.
+    """
     titles = [f"Section {i + 1}" for i in range(total)]
+
+    # Prefer marker-based titles (matches sidebar Markers tab & floating bar)
+    markers = cache.get("markers", [])
+    if markers:
+        visible_idx = 0
+        for entry in markers:
+            if entry.get("hidden"):
+                continue
+            visible_idx += 1
+            idx = entry.get("page_idx", 0)
+            if idx < total and titles[idx].startswith("Section "):
+                titles[idx] = f"{visible_idx} {entry['label']}"
+        return titles
+
+    # Fallback: TOC titles (includes section number from register_entry)
     for entry in cache.get("toc", []):
         idx = entry.get("page_idx", 0)
         if idx < total and titles[idx].startswith("Section "):
@@ -912,7 +932,7 @@ def _build_paginated_sidebar(cache, current_page, total, toc_config, marker_conf
 
 
 def _inject_paginated_nav_js(current_page, total, marker_config,
-                             page_marker_info=None):
+                             page_marker_info=None, last_named_page=None):
     """Inject JS for cross-page navigation via hidden buttons.
 
     Navigation mechanisms:
@@ -928,6 +948,7 @@ def _inject_paginated_nav_js(current_page, total, marker_config,
     var hostWin = hostDoc.defaultView || parent;
     var currentPage = __CURRENT_PAGE__;
     var totalPages = __TOTAL_PAGES__;
+    var lastNamedPage = __LAST_NAMED_PAGE__;
     var pageFirstMarker = __PAGE_FIRST_MARKER__;
     var pageLastMarker  = __PAGE_LAST_MARKER__;
 
@@ -1070,8 +1091,16 @@ def _inject_paginated_nav_js(current_page, total, marker_config,
         navigateToPage(pp);
     }
     function nextClick() {
-        if (navigating || currentPage >= totalPages - 1) return;
-        var np = currentPage + 1;
+        if (navigating) return;
+        var np;
+        if (currentPage >= lastNamedPage) {
+            /* Loop back to first page */
+            np = 0;
+        } else if (currentPage >= totalPages - 1) {
+            return;
+        } else {
+            np = currentPage + 1;
+        }
         hostWin._stxMarkerStartIdx =
             pageFirstMarker[np] !== undefined ? pageFirstMarker[np] : 0;
         navigateToPage(np);
@@ -1135,7 +1164,7 @@ def _inject_paginated_nav_js(current_page, total, marker_config,
             if (!bannerNextTimer) {
                 bannerNextTimer = setTimeout(function() {
                     if (!bannerNextActive || navigating) return;
-                    var np = currentPage + 1;
+                    var np = currentPage >= lastNamedPage ? 0 : currentPage + 1;
                     hostWin._stxMarkerStartIdx =
                         pageFirstMarker[np] !== undefined ? pageFirstMarker[np] : 0;
                     navigateToPage(np);
@@ -1215,8 +1244,15 @@ def _inject_paginated_nav_js(current_page, total, marker_config,
     };
 
     hostWin._stxMarkerBoundary = function(direction) {
-        if (direction === 'next' && currentPage < totalPages - 1) {
-            var np = currentPage + 1;
+        if (direction === 'next') {
+            var np;
+            if (currentPage >= lastNamedPage) {
+                np = 0;  /* Loop back to first page */
+            } else if (currentPage < totalPages - 1) {
+                np = currentPage + 1;
+            } else {
+                return;
+            }
             hostWin._stxMarkerStartIdx =
                 pageFirstMarker[np] !== undefined ? pageFirstMarker[np] : 0;
             navigateToPage(np);
@@ -1276,9 +1312,11 @@ def _inject_paginated_nav_js(current_page, total, marker_config,
 """
     pmi_first = json.dumps(page_marker_info["first"]) if page_marker_info else "{}"
     pmi_last = json.dumps(page_marker_info["last"]) if page_marker_info else "{}"
+    _lnp = last_named_page if last_named_page is not None else total - 1
     js_body = (js_body
                .replace("__CURRENT_PAGE__", str(current_page))
                .replace("__TOTAL_PAGES__", str(total))
+               .replace("__LAST_NAMED_PAGE__", str(_lnp))
                .replace("__PAGE_FIRST_MARKER__", pmi_first)
                .replace("__PAGE_LAST_MARKER__", pmi_last))
     components.html(js_body, height=0)
@@ -1396,12 +1434,14 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
     page_titles = _get_page_titles(cache, total)
 
     # Banner — top (previous section, clickable via JS)
+    # Skip banner for unnamed pages (e.g., footer blocks without markers/TOC)
     if current_page > 0 and banner_config.mode != BannerMode.HIDDEN:
         _prev = page_titles[current_page - 1]
-        _render_banner("stx-banner-prev", _prev, "◂", banner_config)
-        css = banner_config._resolve()
-        if css and css["show_dividers"]:
-            st.divider()
+        if not _prev.startswith("Section "):
+            _render_banner("stx-banner-prev", _prev, "◂", banner_config)
+            css = banner_config._resolve()
+            if css and css["show_dividers"]:
+                st.divider()
 
     # --- Render current block ---
     st_include(module_list[current_page], *args, _inspector_config=inspector, **kwargs)
@@ -1419,14 +1459,24 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
                 components.html(
                     generate_search_script(cache["search_index"]), height=0)
 
-    # Banner — bottom (next section, clickable via JS)
+    # Banner — bottom (next section or loop-back to first)
     if current_page < total - 1:
         _next = page_titles[current_page + 1]
+        _next_is_named = not _next.startswith("Section ")
         if banner_config.mode != BannerMode.HIDDEN:
             css = banner_config._resolve()
-            if css and css["show_dividers"]:
-                st.divider()
-            _render_banner("stx-banner-next", _next, "▸", banner_config)
+            if _next_is_named:
+                # Normal next-page banner
+                if css and css["show_dividers"]:
+                    st.divider()
+                _render_banner("stx-banner-next", _next, "▸", banner_config)
+            else:
+                # Next page is unnamed (footer) → loop back to first page
+                _first = page_titles[0]
+                if not _first.startswith("Section ") and css:
+                    if css["show_dividers"]:
+                        st.divider()
+                    _render_loop_banner(_first, banner_config)
         # Buffer zone before auto-trigger sentinel (padding disabled —
         # trackpad inertia cooldown in JS handles accidental navigation)
         st.markdown(
@@ -1436,6 +1486,14 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
             "</style>",
             unsafe_allow_html=True,
         )
+    elif banner_config.mode != BannerMode.HIDDEN:
+        # Last page (including footer) → loop back to first page
+        _first = page_titles[0]
+        css = banner_config._resolve()
+        if not _first.startswith("Section ") and css:
+            if css["show_dividers"]:
+                st.divider()
+            _render_loop_banner(_first, banner_config)
     # Sentinel always rendered (even in HIDDEN mode) for auto-scroll JS
     if current_page < total - 1:
         st.markdown(
@@ -1459,7 +1517,11 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
                 })
 
     # --- Marker navigation widget (ALL markers, cross-page aware) ---
-    if marker_config is not None:
+    # Skip the widget if the current page has no markers (e.g. footer)
+    _page_has_markers = any(
+        e.get("page_idx", 0) == current_page for e in cache.get("markers", [])
+    )
+    if marker_config is not None and _page_has_markers:
         inject_marker_navigation()
 
     # --- Hidden navigation buttons (one per page, clickable by JS) ---
@@ -1480,8 +1542,16 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
             page_last[pg] = entry["index"]
         page_marker_info = {"first": page_first, "last": page_last}
 
+    # --- Compute last named page (for loop-back on overscroll) ---
+    _last_named = total - 1
+    for i in range(total - 1, -1, -1):
+        if not page_titles[i].startswith("Section "):
+            _last_named = i
+            break
+
     # --- Paginated navigation JS (finds & hides buttons, overscroll, callbacks) ---
-    _inject_paginated_nav_js(current_page, total, marker_config, page_marker_info)
+    _inject_paginated_nav_js(current_page, total, marker_config, page_marker_info,
+                             last_named_page=_last_named)
 
     # --- Export downloads ---
     if is_export_active():

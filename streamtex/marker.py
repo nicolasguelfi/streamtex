@@ -209,6 +209,7 @@ def inject_marker_navigation() -> None:
     var prevKeys = __PREV_KEYS__;
     var OFFSET = __OFFSET__;
     var currentIdx = 0;
+    var _navigating = false;
     var popupOpen = __POPUP_OPEN__;
 
     if (!markers.length) return;
@@ -283,13 +284,18 @@ def inject_marker_navigation() -> None:
             idx = markers.length - 1;
         }
         currentIdx = idx;
+        _navigating = true;
         var m = markers[idx];
         var target = findMarkerElement(m.anchor);
         if (target) {
             scrollToTarget(target);
+            setTimeout(function() { _navigating = false; }, 300);
         } else if (m.page !== undefined && hostWin._stxMarkerGoToPage) {
             hostWin._stxMarkerStartIdx = idx;
             hostWin._stxMarkerGoToPage(m.page);
+            _navigating = false;
+        } else {
+            _navigating = false;
         }
         updateUI();
     }
@@ -335,8 +341,8 @@ def inject_marker_navigation() -> None:
     btnPrev.onmouseleave = function() { this.style.background = 'none'; };
     btnPrev.onclick = function() { navigateTo(currentIdx - 1); };
 
-    /* Fixed-width counter (based on visible markers only) — click to jump */
-    var totalDigits = String(visibleMarkers.length || markers.length).length;
+    /* Fixed-width counter (global marker index) — click to jump */
+    var totalDigits = String(markers.length).length;
     var counterWidth = (totalDigits * 2 + 3) + 'ch';
     var counter = hostDoc.createElement('span');
     counter.style.cssText = 'min-width:' + counterWidth + ';text-align:center;display:inline-block;font-variant-numeric:tabular-nums;cursor:pointer;';
@@ -345,14 +351,13 @@ def inject_marker_navigation() -> None:
     var counterInput = hostDoc.createElement('input');
     counterInput.type = 'number';
     counterInput.min = '1';
-    counterInput.max = String(visibleMarkers.length || markers.length);
+    counterInput.max = String(markers.length);
     counterInput.style.cssText = 'width:' + counterWidth + ';text-align:center;background:rgba(255,255,255,.15);color:#eee;border:1px solid rgba(255,255,255,.3);border-radius:4px;font-size:13px;font-variant-numeric:tabular-nums;outline:none;display:none;-moz-appearance:textfield;';
     var counterEditing = false;
 
     function showCounterInput() {
         counterEditing = true;
-        var vPos = visiblePosition();
-        counterInput.value = String(vPos + 1);
+        counterInput.value = String(currentIdx + 1);
         counter.style.display = 'none';
         counterInput.style.display = 'inline-block';
         counterInput.focus();
@@ -365,10 +370,8 @@ def inject_marker_navigation() -> None:
     }
     function commitCounterInput() {
         var n = parseInt(counterInput.value, 10);
-        var total = visibleMarkers.length || markers.length;
-        if (n >= 1 && n <= total) {
-            var targetIdx = visibleMarkers.length ? visibleMarkers[n - 1].index : n - 1;
-            navigateTo(targetIdx);
+        if (n >= 1 && n <= markers.length) {
+            navigateTo(n - 1);
         }
         hideCounterInput();
     }
@@ -449,7 +452,7 @@ def inject_marker_navigation() -> None:
         row.dataset.idx = String(globalIdx);
         row.dataset.visIdx = String(vi);
         row.style.cssText = 'padding:7px 16px;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border-left:3px solid transparent;transition:background .1s;';
-        row.textContent = (vi + 1) + '. ' + visibleMarkers[vi].label;
+        row.textContent = (globalIdx + 1) + '. ' + visibleMarkers[vi].label;
         row.onmouseenter = function() { this.style.background = 'rgba(128,128,128,.25)'; };
         row.onmouseleave = function() {
             if (parseInt(this.dataset.idx) !== currentIdx) this.style.background = 'transparent';
@@ -489,22 +492,19 @@ def inject_marker_navigation() -> None:
     }
     hostDoc.addEventListener('click', outsideClick);
 
-    /* --- Update UI (counter/label based on visible markers only) --- */
-    function visiblePosition() {
+    /* --- Update UI (counter/label based on global marker index) --- */
+    function nearestVisibleLabel() {
         for (var i = 0; i < visibleMarkers.length; i++) {
-            if (visibleMarkers[i].index >= currentIdx) return i;
+            if (visibleMarkers[i].index >= currentIdx) return visibleMarkers[i].label;
         }
-        return Math.max(0, visibleMarkers.length - 1);
+        return visibleMarkers.length ? visibleMarkers[visibleMarkers.length - 1].label : '';
     }
     function updateUI() {
         if (counterEditing) return;
         var m = markers[currentIdx];
-        var vPos = visiblePosition();
-        var total = visibleMarkers.length || markers.length;
-        var padded = String(vPos + 1).padStart(totalDigits, '\\u2007');
-        counter.textContent = padded + ' / ' + total;
-        var visLabel = visibleMarkers[vPos] ? visibleMarkers[vPos].label : (m ? m.label : '');
-        label.textContent = visLabel;
+        var padded = String(currentIdx + 1).padStart(totalDigits, '\\u2007');
+        counter.textContent = padded + ' / ' + markers.length;
+        label.textContent = m ? (m.label || nearestVisibleLabel()) : '';
         if (popupOpen) highlightPopup();
     }
 
@@ -562,11 +562,10 @@ def inject_marker_navigation() -> None:
                 var d = Math.abs(t.getBoundingClientRect().top - OFFSET);
                 if (d < bestDist) { bestDist = d; best = i; }
             }
-            /* Only update if at least one marker was found in the DOM.
-               When no markers are found (iframes still loading after a
-               page navigation), keep the current index unchanged to
-               avoid resetting to a wrong default.                     */
-            if (best >= 0 && best !== currentIdx) {
+            /* Only update if at least one marker was found in the DOM
+               and we are not in the middle of a programmatic scroll
+               (navigateTo sets _navigating=true for 300ms).           */
+            if (best >= 0 && best !== currentIdx && !_navigating) {
                 currentIdx = best; updateUI();
             }
         }, 150);

@@ -178,3 +178,43 @@ def _render_banner(banner_id: str, label: str, arrow: str, config: BannerConfig)
         f'<div id="{banner_id}" style="{style}">{inner}</div>',
         unsafe_allow_html=True,
     )
+
+
+def _render_loop_banner(label: str, config: BannerConfig) -> None:
+    """Render a loop-back banner that navigates to the first page.
+
+    Uses an ``<a href="#stx-goto-0">`` link so the existing paginated-nav
+    JS ``linkClick`` handler intercepts the click and calls
+    ``navigateToPage(0)``.
+    """
+    css = config._resolve()
+    if css is None:
+        return
+
+    parts: list[str] = []
+    if css["show_arrows"]:
+        parts.append("↩&ensp;")
+    if css["show_title"]:
+        parts.append(label)
+    if css["show_arrows"]:
+        parts.append("&ensp;▸")
+    inner = "".join(parts)
+
+    style = (
+        f'background:{css["color"]};'
+        f'color:{css["text_color"]};'
+        f'font-weight:{css["font_weight"]};'
+        f'font-size:{css["font_size"]};'
+        f'padding:{css["padding"]};'
+        f"text-align:center;"
+        f"cursor:pointer;"
+        f'border-radius:{css["border_radius"]};'
+        f"user-select:none;"
+        f"text-decoration:none;"
+    )
+
+    st.markdown(
+        f'<a href="#stx-goto-0" class="stx-page-link" '
+        f'style="{style};display:block;">{inner}</a>',
+        unsafe_allow_html=True,
+    )

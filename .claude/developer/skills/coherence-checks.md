@@ -1,6 +1,6 @@
 # Coherence Check Rules
 
-Reference file for `/coherence:audit`. Defines 12 check categories.
+Reference file for `/coherence:audit`. Defines 16 check categories.
 
 ---
 
@@ -18,9 +18,13 @@ Reference file for `/coherence:audit`. Defines 12 check categories.
 
 **Known exceptions** (not expected in blocks):
 - Low-level exports: `export_append`, `export_push_wrapper`, `export_pop_wrapper`, `generate_export_html`, `reset_export_buffer`, `is_export_active`
-- Config internals: `get_block_helper_config`, `get_bib_config`, `get_gsheet_config`, `get_link_config`, `get_bib_registry`, `reset_bib_registry`
+- Config internals: `get_block_helper_config`, `get_bib_config`, `get_gsheet_config`, `get_link_config`, `get_bib_registry`, `reset_bib_registry`, `get_ai_image_config`, `get_slide_break_config`
 - Parser internals: `parse_bibtex_string`, `parse_ris_string`, `register_bib_parser`
-- Utility re-exports: `generate_bib_stubs`, `export_bibtex`
+- Utility re-exports: `generate_bib_stubs`, `export_bibtex`, `load_css`, `exec_static`, `resolve_content`, `inject_link_preview_scaffold`, `add_wrap_all_option`, `add_slide_break_options`
+- Error/result types: `AIImageError`, `AIImageResult`, `BibParseError`, `GSheetError`
+- AI image internals: `is_cached`, `list_providers`
+- Registry internals: `FileCategoryRegistry`
+- Style internals: `StreamTeX_Styles`
 
 ---
 
@@ -70,10 +74,12 @@ Reference file for `/coherence:audit`. Defines 12 check categories.
 |--------|--------|
 | `streamtex-claude/shared/references/coding_standards.md` | `streamtex/.claude/references/`, `streamtex-docs/.claude/references/`, `streamtex-docs/references/`, `projects/*/.claude/references/` |
 | `streamtex-claude/shared/references/streamtex_cheatsheet_en.md` | Same locations as above |
-| `streamtex-claude/profiles/project/commands/designer/*.md` | `projects/*/.claude/commands/designer/` |
+| `streamtex-claude/profiles/project/commands/stx-designer/*.md` | `projects/*/.claude/commands/stx-designer/` |
 | `streamtex-claude/profiles/project/designer/agents/*.md` | `projects/*/.claude/designer/agents/` |
 | `streamtex-claude/profiles/project/designer/skills/*.md` | `projects/*/.claude/designer/skills/` |
-| `streamtex-claude/profiles/documentation/commands/designer/*.md` | `streamtex-docs/.claude/commands/designer/` |
+| `streamtex-claude/profiles/project/designer/templates/*.md` | `projects/*/.claude/designer/templates/` |
+| `streamtex-claude/profiles/project/designer/tools/*.md` | `projects/*/.claude/designer/tools/` |
+| `streamtex-claude/profiles/documentation/commands/stx-designer/*.md` | `streamtex-docs/.claude/commands/stx-designer/` |
 | `streamtex-claude/profiles/documentation/designer/agents/*.md` | `streamtex-docs/.claude/designer/agents/` |
 | `streamtex-claude/shared/commands/stx-guide.md` | `streamtex/.claude/commands/`, `streamtex-docs/.claude/commands/`, `projects/*/.claude/commands/` |
 
@@ -94,9 +100,8 @@ Reference file for `/coherence:audit`. Defines 12 check categories.
 **Targets**: All `pyproject.toml` files in `streamtex-docs/`, `projects/*/`
 
 **Rules**:
-- ERROR if library version (from `pyproject.toml`) is NOT published on PyPI — Render and CI install from PyPI, so unpublished versions cause runtime crashes. Check with: `pip index versions streamtex`
 - WARNING if library version doesn't satisfy a `streamtex>=X.Y.Z` constraint
-- INFO: report current library version, latest PyPI version, and all constraints found
+- INFO: report current library version and all constraints found
 
 ---
 
@@ -213,7 +218,7 @@ Reference file for `/coherence:audit`. Defines 12 check categories.
 
 **Goal**: All Python code examples in Claude artifacts (skills, agents, commands) use correct, current StreamTeX API.
 
-**Why this check is critical**: Users generate most of their project code via Claude artifacts (`/designer:block-new`, `/project:project-init`, agents). If these artifacts contain incorrect API usage, every generated project inherits the bugs.
+**Why this check is critical**: Users generate most of their project code via Claude artifacts (`/stx-designer:update`, `/stx-designer:init`, agents). If these artifacts contain incorrect API usage, every generated project inherits the bugs.
 
 **Scope**: All `.md` files containing Python code blocks in:
 - `streamtex-claude/profiles/**/skills/**/*.md`
@@ -347,3 +352,175 @@ Then for each test file, parse function calls and compare keyword arguments agai
 git diff $(git describe --tags --abbrev=0)..HEAD --name-only -- 'streamtex/*.py' | sort
 # Then introspect each changed module for new/modified function signatures
 ```
+
+---
+
+## Check 13: Manual Blocks → Library API Existence (scope: docs, all)
+
+**Goal**: Every `st_*` / `stx.*` function call in manual block **rendered code** must exist in the current library API. This is the reverse of Check 1.
+
+**Why this check is critical**: Manuals are the user-facing documentation. If a block calls a function that was renamed, removed, or restructured in the library, the manual will crash at runtime — or worse, silently show nothing.
+
+**Scope**: `streamtex-docs/manuals/**/blocks/**/*.py`
+
+**What to check**: Rendered code ONLY — skip example strings inside `show_code()`, `show_explanation()`, `show_details()`.
+
+**Method**:
+1. Build the list of all valid exports: read `streamtex/streamtex/__init__.py`, extract all names
+2. For each block file, extract all `st_*` and `stx.*` function calls at **block indentation level** (outside triple-quoted strings)
+3. Verify each call exists in the exports list
+
+**How to distinguish rendered vs example code**:
+- Code **inside** `show_code("""...""")`, `show_explanation("""...""")`, `show_details("""...""")` string arguments → SKIP (example only, shown to user)
+- Code **inside** `show_code(file="...")` → SKIP (example loaded from file)
+- `st_*()` calls at block indentation level (inside `def build():`) → CHECK (executed at runtime)
+- Calls inside `with st_block(...)`, `with st_grid(...)`, `with st_list(...)` → CHECK
+
+**Rules**:
+- ERROR if a rendered `st_*()` call references a function not in `__init__.py` exports
+- ERROR if a rendered call uses `stx.<name>` where `<name>` is not an attribute of the `streamtex` module
+- WARNING if a block imports a submodule path that no longer exists (e.g., `from streamtex.foo import bar`)
+- INFO: report total rendered calls checked, how many are valid, how many blocks scanned
+
+**How to check** (automated introspection):
+```bash
+uv run python -c "
+import streamtex
+exports = [n for n in dir(streamtex) if not n.startswith('_')]
+print('\n'.join(sorted(exports)))
+"
+```
+Then for each block, parse rendered `st_*()` calls and verify against the exports list.
+
+---
+
+## Check 14: Manual Examples Signature Coherence (scope: docs, all)
+
+**Goal**: Function call signatures used in manual `show_code()` examples must match the current library function signatures (parameter names, parameter existence).
+
+**Why this check is critical**: Users copy-paste code from `show_code()` examples. If an example uses a parameter that was renamed or removed, the user's code breaks. This erodes trust in the documentation.
+
+**Scope**: `streamtex-docs/manuals/**/blocks/**/*.py` — specifically the content inside `show_code()` string arguments.
+
+**Method**:
+1. Introspect the library to get current signatures for all major `st_*` functions
+2. For each block file, extract code from `show_code("""...""")` string arguments
+3. Parse `st_*()` function calls within those strings
+4. Compare keyword arguments against the actual function signature
+
+**Rules**:
+- ERROR if an example uses a keyword argument that does not exist in the function signature
+  - Example: `st_image(caption="...")` but `st_image` has no `caption` parameter
+  - Example: `st_list(items=[...])` but `st_list` has no `items` parameter
+- ERROR if an example calls a function that no longer exists in the library
+- WARNING if an example uses a deprecated parameter (even if still accepted for backward compat)
+- WARNING if an example shows a context manager usage for a non-context-manager function, or vice versa
+  - Example: `with st_write(...)` — `st_write` is NOT a context manager
+  - Example: `st_list(style, items=[...])` — `st_list` IS a context manager
+- WARNING if an example shows positional arguments in the wrong order vs the signature
+- INFO: report total examples checked, total `st_*` calls in examples, issues found
+
+**How to check** (automated introspection):
+```bash
+uv run python -c "
+import inspect
+from streamtex import st_list, st_image, st_grid, st_write, st_code, st_space, st_block, st_span
+from streamtex import st_book, st_collection, st_markdown, st_mermaid, st_plantuml, st_tikz, st_latex
+from streamtex import st_ai_image, st_ai_image_widget, st_slide_break, st_br, st_overlay
+from streamtex import show_code, show_explanation, show_details, show_code_inline
+for fn in [st_list, st_image, st_grid, st_write, st_code, st_space, st_block, st_span,
+           st_book, st_collection, st_markdown, st_mermaid, st_plantuml, st_tikz, st_latex,
+           st_ai_image, st_ai_image_widget, st_slide_break, st_br, st_overlay,
+           show_code, show_explanation, show_details, show_code_inline]:
+    print(f'{fn.__name__}: {inspect.signature(fn)}')
+"
+```
+Then for each `show_code()` string, parse function calls and verify keyword arguments.
+
+**Interaction with Check 11**: Check 11 validates code in Claude artifacts (skills, agents, commands). Check 14 validates code in manual `show_code()` examples. Together they cover all user-facing code examples in the ecosystem.
+
+---
+
+## Check 15: Manual Enum & Constant Coherence (scope: docs, all)
+
+**Goal**: All enum members, class attributes, and constant values referenced in manual blocks (both rendered and examples) must exist in the current library.
+
+**Why this check is critical**: Enums and constants are frequently refactored (renamed, reorganized, deprecated). A block using `ListTypes.ul` when the correct member is `ListTypes.unordered` will crash silently or raise an AttributeError at runtime.
+
+**Scope**: `streamtex-docs/manuals/**/blocks/**/*.py` (both rendered code and `show_code()` examples)
+
+**Method**:
+1. Introspect the library to get valid members for all key enums and classes
+2. For each block file, extract all attribute accesses on known types
+3. Verify each attribute exists
+
+**Enums and classes to validate**:
+
+| Import | Variable | Valid members (introspect to get full list) |
+|--------|----------|---------------------------------------------|
+| `from streamtex.enums import ListTypes` | `lt` | `unordered`, `ordered`, `custom`, ... |
+| `from streamtex.enums import Tags` | `t` | `div`, `span`, `p`, `h1`-`h6`, ... |
+| `from streamtex.enums import SpaceDir` | — | `horizontal`, `vertical` |
+| `from streamtex import PdfMode` | — | `CONTINUOUS`, `PAGINATED` |
+| `from streamtex import PdfConfig` | — | `mode`, `format`, `landscape`, `scale`, `margins`, ... |
+| `from streamtex import ExportConfig` | — | Constructor parameters |
+| `from streamtex import BannerConfig` | — | Constructor parameters |
+| `from streamtex import AIImageConfig` | — | Constructor parameters |
+| `from custom.styles import Styles` | `s` | Project-specific (skip — not library) |
+
+**Rules**:
+- ERROR if code accesses `lt.<member>` where `<member>` is not in `dir(ListTypes)`
+- ERROR if code accesses `t.<member>` where `<member>` is not in `dir(Tags)`
+- ERROR if code accesses `PdfMode.<member>` where `<member>` is not a valid variant
+- ERROR if code constructs `PdfConfig(...)` or `ExportConfig(...)` with invalid keyword arguments
+- WARNING if code uses an enum member that exists but is deprecated
+- INFO: report total enum/constant references checked and validation results
+
+**How to check** (automated introspection):
+```bash
+uv run python -c "
+from streamtex.enums import ListTypes, Tags, SpaceDir
+from streamtex import PdfMode, PdfConfig, ExportConfig, BannerConfig
+import inspect
+for cls in [ListTypes, Tags, SpaceDir, PdfMode]:
+    members = [x for x in dir(cls) if not x.startswith('_')]
+    print(f'{cls.__name__}: {members}')
+for cls in [PdfConfig, ExportConfig, BannerConfig]:
+    print(f'{cls.__name__}: {inspect.signature(cls)}')
+"
+```
+
+---
+
+## Check 16: Static File Existence (scope: docs, blocks, all)
+
+**Goal**: Every file referenced by a rendered call in manual blocks must exist on disk.
+
+**Scope**: `streamtex-docs/manuals/**/blocks/**/*.py`
+
+**What to check**: Scan block files for runtime file references (NOT inside `show_code()` strings — those are examples). Specifically:
+
+1. **Images**: `st_image(uri="<path>")` where `<path>` is NOT a URL (`https://` or `http://`). Resolve against the manual's `static/images/` directory (or the path set by `configure_image_path()`).
+2. **show_code(file="<path>")**: Resolve against the manual's `static/` directory.
+3. **open() calls**: e.g., `open(text_path)` where path is built with `os.path.join(_static_dir, ...)`. Verify the target file exists.
+4. **st_audio() / st_video()**: Local file paths (not URLs). Resolve against `static/`.
+5. **Repo-level files**: Blocks reading files from `_repo_root` or similar variables. Verify the file exists at the repo root.
+
+**How to distinguish example vs rendered code**:
+- Code inside `show_code("""...""")` string arguments → SKIP (example only)
+- Code inside `show_code(file="...")` → CHECK the `file=` path (it's loaded at runtime)
+- Bare `st_image()`, `open()`, `st_audio()`, `st_video()` calls at block indentation level → CHECK
+
+**Resolution rules**:
+- Each manual has its own `static/` directory at `manuals/<manual_name>/static/`
+- `configure_image_path("app/static/images")` → files served by Streamlit at `static/images/<file>`
+- `set_static_sources([...])` in `book.py` adds additional search paths
+- `resolve_static("path")` uses the block registry's static sources
+
+**Rules**:
+- ERROR if a rendered `st_image(uri=)` references a local file that does not exist
+- ERROR if a `show_code(file=)` references a file that does not exist
+- ERROR if an `open()` call references a file that does not exist
+- WARNING if `st_audio()` or `st_video()` references a missing local file
+- WARNING if a repo-level file reference (Dockerfile, CI config, etc.) does not exist
+- INFO: report total static references checked and how many are valid

@@ -7,6 +7,22 @@ from dataclasses import dataclass, field
 from typing import Dict, Optional
 
 
+def _detect_project_root() -> str:
+    """Detect the project root from the main Streamlit script.
+
+    Falls back to ``os.getcwd()`` when the main script cannot be determined.
+    """
+    try:
+        import __main__
+
+        main_file = getattr(__main__, "__file__", None)
+        if main_file:
+            return os.path.dirname(os.path.abspath(main_file))
+    except Exception:
+        pass
+    return os.getcwd()
+
+
 @dataclass
 class AIImageConfig:
     """Configuration for AI image generation.
@@ -21,12 +37,21 @@ class AIImageConfig:
         api_keys: Optional dict of provider-specific API keys.
             Keys: "openai", "google", "fal". Values: API key strings.
             If not provided, keys are resolved from environment variables.
+        project_root: Absolute path to the project root. When ``None``
+            (the default), the directory of the main Streamlit script
+            (``book.py``) is used, so that relative paths like
+            ``output_dir`` resolve correctly regardless of ``os.getcwd()``.
     """
     provider: str = "openai"
     default_size: str = "1024x1024"
     output_dir: str = "static/images/ai"
     auto_generate: bool = False
     api_keys: Dict[str, str] = field(default_factory=dict)
+    project_root: Optional[str] = None
+
+    def get_project_root(self) -> str:
+        """Return the project root, detecting it if not explicitly set."""
+        return self.project_root or _detect_project_root()
 
     def resolve_api_key(self, provider: Optional[str] = None) -> Optional[str]:
         """Resolve the API key for the given provider.

@@ -72,6 +72,17 @@ def st_image(
     if isinstance(height, int):
         height = f"{height}px"
 
+    # 1b. If editable with a name, prefer the managed version (AI-generated
+    #     or replaced via the editor panel) over the original URI.
+    if editable and name:
+        try:
+            from .ai.history import get_current
+            managed = get_current(name)
+            if managed:
+                uri = managed
+        except Exception:
+            pass
+
     # 2. Get the source (URL or Base64)
     img_src = get_image_src(uri)
 

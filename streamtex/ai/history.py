@@ -7,6 +7,7 @@ import os
 import shutil
 from typing import Optional
 
+from .config import _detect_project_root
 from .metadata import ImageMetadata, load_metadata, metadata_path_for, save_metadata
 
 # Default managed images directory (relative to project root)
@@ -14,8 +15,13 @@ MANAGED_DIR = "static/images/managed"
 
 
 def _resolve_managed_dir(base_dir: Optional[str] = None) -> str:
-    """Resolve and create the managed images directory."""
-    d = base_dir or os.path.join(os.getcwd(), MANAGED_DIR)
+    """Resolve and create the managed images directory.
+
+    When *base_dir* is ``None``, the path is resolved relative to the
+    project root (the directory containing the main ``book.py``), **not**
+    ``os.getcwd()``.
+    """
+    d = base_dir or os.path.join(_detect_project_root(), MANAGED_DIR)
     os.makedirs(d, exist_ok=True)
     return d
 

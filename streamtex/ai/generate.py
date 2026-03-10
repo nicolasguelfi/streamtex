@@ -29,10 +29,14 @@ def _make_cache_key(prompt: str, provider: str, size: str, **kwargs) -> str:
 
 
 def _resolve_output_dir(config: AIImageConfig) -> str:
-    """Resolve and create the output directory."""
+    """Resolve and create the output directory.
+
+    Relative paths are resolved against the project root (the directory
+    containing the main ``book.py``), **not** ``os.getcwd()``.
+    """
     output_dir = config.output_dir
     if not os.path.isabs(output_dir):
-        output_dir = os.path.join(os.getcwd(), output_dir)
+        output_dir = os.path.join(config.get_project_root(), output_dir)
     os.makedirs(output_dir, exist_ok=True)
     return output_dir
 

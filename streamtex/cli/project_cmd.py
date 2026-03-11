@@ -136,8 +136,23 @@ base = "dark"
 """
 
 
-def generate_pyproject_toml(name: str) -> str:
-    """Generate pyproject.toml for a StreamTeX project."""
+def generate_pyproject_toml(name: str, extras: list[str] | None = None) -> str:
+    """Generate pyproject.toml for a StreamTeX project.
+
+    Parameters
+    ----------
+    name:
+        Project name.
+    extras:
+        Optional list of streamtex extras (e.g. ``["pdf", "ai", "inspector"]``).
+        When provided, the streamtex dependency becomes ``streamtex[pdf,ai,inspector]>=0.3.0``.
+    """
+    if extras:
+        extras_str = ",".join(extras)
+        stx_dep = f'"streamtex[{extras_str}]>=0.3.0"'
+    else:
+        stx_dep = '"streamtex>=0.3.0"'
+
     return f"""\
 [project]
 name = "{name}"
@@ -145,7 +160,7 @@ version = "0.1.0"
 description = "StreamTeX project: {name}"
 requires-python = ">=3.11"
 dependencies = [
-    "streamtex>=0.3.0",
+    {stx_dep},
     "streamlit>=1.54.0",
 ]
 
@@ -214,9 +229,20 @@ name = "{name}"
 
 
 def scaffold_project(
-    target_dir: str, name: str, *, collection: bool = False
+    target_dir: str,
+    name: str,
+    *,
+    collection: bool = False,
+    extras: list[str] | None = None,
 ) -> list[str]:
-    """Create all scaffold files. Return the list of relative paths created."""
+    """Create all scaffold files. Return the list of relative paths created.
+
+    Parameters
+    ----------
+    extras:
+        Optional list of streamtex extras to include in pyproject.toml
+        (e.g. ``["pdf", "ai", "inspector"]``).
+    """
     created: list[str] = []
 
     def _write(rel_path: str, content: str) -> None:
@@ -244,7 +270,7 @@ def scaffold_project(
     _write(".streamlit/config.toml", generate_streamlit_config())
 
     # Root files
-    _write("pyproject.toml", generate_pyproject_toml(name))
+    _write("pyproject.toml", generate_pyproject_toml(name, extras=extras))
     _write("setup.py", generate_setup_py(name))
     _write(".gitignore", generate_gitignore())
     _write(".pre-commit-config.yaml", generate_pre_commit_config())
@@ -449,7 +475,7 @@ def _copy_rich_template(
     if ws_root is None:
         raise click.ClickException(
             "--template requires a StreamTeX workspace.\n"
-            "Run: stx workspace init . --preset standard"
+            "Run: stx install --preset standard"
         )
 
     src = os.path.join(ws_root, "streamtex-docs", "templates", f"template_{template_name}")
@@ -457,7 +483,7 @@ def _copy_rich_template(
         raise click.ClickException(
             f"Template not found: {src}\n"
             "streamtex-docs is required. "
-            "Run: stx workspace upgrade standard && stx workspace update"
+            "Run: stx install --preset standard"
         )
 
     copied: list[str] = []

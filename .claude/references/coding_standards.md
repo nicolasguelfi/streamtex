@@ -320,7 +320,7 @@ uv run pre-commit install     # Activates the git hook
 
 **Workspace-wide install:**
 ```bash
-stx workspace update           # Installs hooks in all repos + projects/
+stx update                     # Installs hooks in all repos + projects/
 ```
 
 `stx project new` automatically generates `.pre-commit-config.yaml` and installs hooks.

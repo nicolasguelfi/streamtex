@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.6] — 2026-03-11
+
+### Changed
+- **CLI refactoring**: `stx workspace` subcommands replaced by top-level commands
+  - `stx workspace init . [--preset X]` → `stx install [--preset X]`
+  - `stx workspace update` → `stx update`
+  - `stx workspace upgrade X` → `stx install --preset X` (in existing workspace)
+  - `stx workspace status` → `stx status`
+- **New preset**: `power` added between `standard` and `developer` (repos: docs + claude, forces `--project`, extras: pdf, ai, inspector)
+- **New options**: `stx install --project NAME --template TEMPLATE` for creating a project during install
+- **Extras per preset** (when `--project` is used): basic/user get pdf; standard gets pdf + ai; power/developer get pdf + ai + inspector
+- **Removed deprecated commands**: `stx workspace clone`, `stx workspace sync`, `stx workspace link`, `stx workspace hooks`
+
 ## [0.4.5] — 2026-03-10
 
 ### Added
@@ -39,7 +52,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.3.9] — 2026-03-08
 
 ### Changed
-- `stx workspace update` now upgrades streamtex in all projects
+- `stx update` (formerly `stx workspace update`) now upgrades streamtex in all projects
 
 ## [0.3.8] — 2026-03-08
 
@@ -67,13 +80,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.3.3] — 2026-03-05
 
 ### Added
-- `stx workspace update` — single command for all workspace operations: git pull, clone missing repos, uv sync, install pre-commit hooks, update Claude profiles, install global commands. Adds `--dry-run` and `--repair` flags
-- `stx workspace update --repair` — detects and fixes broken `.venv`, missing `__init__.py`, broken `[tool.uv.sources]` paths
+- `stx update` (formerly `stx workspace update`) — single command for all workspace operations: git pull, clone missing repos, uv sync, install pre-commit hooks, update Claude profiles, install global commands. Adds `--dry-run` and `--repair` flags
+- `stx update --repair` — detects and fixes broken `.venv`, missing `__init__.py`, broken `[tool.uv.sources]` paths
 
 ### Changed
-- `stx workspace clone/sync/link/hooks` — deprecated with warning, redirects to `stx workspace update`
-- `stx workspace upgrade` output now says `stx workspace update` instead of `stx workspace clone`
-- User update workflow simplified from 5 commands to 2: `uv tool install "streamtex[cli]" -U` then `stx workspace update`
+- `stx workspace clone/sync/link/hooks` — deprecated with warning, redirects to `stx update`
+- `stx install --preset` output now says `stx update` instead of `stx workspace clone`
+- User update workflow simplified from 5 commands to 2: `uv tool install "streamtex[cli]" -U` then `stx update`
 - `stx deploy env-sync` — synchronize env vars from `render.yaml` to live Render services via the Render API (`--dry-run`, `--service` options, interactive redeploy prompt)
 - `.github/workflows/render-deploy.yml` — GitHub Actions workflow for auto-deploying all Render services on push to `main` (bypasses Render's GitHub App, reads service names from `render.yaml`)
 - `AI_GUIDE.md` — complete zero-code workflow guide for Claude/Cursor users (22 commands, 4 agents, 10 blueprints, 4 profiles, FAQ)

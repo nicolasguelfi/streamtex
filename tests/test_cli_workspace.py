@@ -1,4 +1,4 @@
-"""Tests for stx workspace init/update/status/upgrade commands (+ deprecated clone/link/sync/hooks)."""
+"""Tests for stx install / update / status commands and workspace helpers."""
 
 import os
 import tomllib
@@ -66,19 +66,53 @@ def test_load_stx_toml_missing(tmp_path):
         load_stx_toml(str(tmp_path))
 
 
-def test_init_creates_stx_toml(tmp_path):
+# ---------------------------------------------------------------------------
+# stx install — workspace creation
+# ---------------------------------------------------------------------------
+
+def _mock_subprocess_and_uv():
+    """Return context managers that mock subprocess.run and shutil.which for uv."""
+    return (
+        patch("streamtex.cli.install_cmd.subprocess.run", _fake_run),
+        patch("streamtex.cli.workspace_cmd.subprocess.run", _fake_run),
+        patch("streamtex.cli.workspace_cmd.shutil.which", return_value="/usr/bin/uv"),
+        patch("streamtex.cli.install_cmd.shutil.which", return_value="/usr/bin/uv"),
+    )
+
+
+def _fake_run(cmd, **_kwargs):
+    class _R:
+        returncode = 0
+        stdout = "Already up to date."
+        stderr = ""
+    return _R()
+
+
+def test_install_creates_workspace(tmp_path):
+    """stx install --preset standard creates stx.toml and projects/."""
     target = tmp_path / "my-workspace"
-    runner = CliRunner()
-    result = runner.invoke(cli, ["workspace", "init", str(target)])
-    assert result.exit_code == 0
+    target.mkdir()
+
+    patches = _mock_subprocess_and_uv()
+    with patches[0], patches[1], patches[2], patches[3]:
+        runner = CliRunner()
+        os.chdir(target)
+        result = runner.invoke(cli, ["install", "--preset", "standard"])
+
+    assert result.exit_code == 0, result.output
     assert (target / "stx.toml").is_file()
     assert (target / "projects").is_dir()
 
 
-def test_init_toml_valid(tmp_path):
+def test_install_toml_valid(tmp_path):
     target = tmp_path / "ws"
-    runner = CliRunner()
-    runner.invoke(cli, ["workspace", "init", str(target)])
+    target.mkdir()
+
+    patches = _mock_subprocess_and_uv()
+    with patches[0], patches[1], patches[2], patches[3]:
+        runner = CliRunner()
+        os.chdir(target)
+        runner.invoke(cli, ["install", "--preset", "standard"])
 
     with open(target / "stx.toml", "rb") as f:
         data = tomllib.load(f)
@@ -86,145 +120,288 @@ def test_init_toml_valid(tmp_path):
     assert "repos" in data
     assert "deploy" in data
     assert "claude" in data
-    # Default preset is standard: docs + claude
     assert data["workspace"]["preset"] == "standard"
     assert "streamtex-docs" in data["repos"]
     assert "streamtex-claude" in data["repos"]
     assert "streamtex" not in data["repos"]
 
 
-def test_init_custom_name(tmp_path):
-    target = tmp_path / "ws"
-    runner = CliRunner()
-    runner.invoke(cli, ["workspace", "init", str(target), "--name", "custom-name"])
-
-    with open(target / "stx.toml", "rb") as f:
-        data = tomllib.load(f)
-    assert data["workspace"]["name"] == "custom-name"
-
-
-def test_init_default_name(tmp_path):
-    target = tmp_path / "my-project"
-    runner = CliRunner()
-    runner.invoke(cli, ["workspace", "init", str(target)])
-
-    with open(target / "stx.toml", "rb") as f:
-        data = tomllib.load(f)
-    assert data["workspace"]["name"] == "my-project"
-
-
-def test_init_creates_directory(tmp_path):
-    target = tmp_path / "new" / "nested" / "ws"
-    runner = CliRunner()
-    result = runner.invoke(cli, ["workspace", "init", str(target)])
-    assert result.exit_code == 0
-    assert target.is_dir()
-
-
-def test_init_refuses_existing(tmp_path):
+def test_install_preset_basic(tmp_path):
     target = tmp_path / "ws"
     target.mkdir()
-    (target / "stx.toml").write_text("[workspace]\nname = 'old'\n")
+
+    patches = _mock_subprocess_and_uv()
+    with patches[0], patches[1], patches[2], patches[3]:
+        runner = CliRunner()
+        os.chdir(target)
+        result = runner.invoke(cli, ["install", "--preset", "basic"])
+
+    assert result.exit_code == 0, result.output
+    with open(target / "stx.toml", "rb") as f:
+        data = tomllib.load(f)
+    assert data["workspace"]["preset"] == "basic"
+    assert len(data["repos"]) == 0
+
+
+def test_install_preset_power_requires_project(tmp_path):
+    """--preset power without --project should fail."""
+    target = tmp_path / "ws"
+    target.mkdir()
 
     runner = CliRunner()
-    result = runner.invoke(cli, ["workspace", "init", str(target)])
+    os.chdir(target)
+    result = runner.invoke(cli, ["install", "--preset", "power"])
+
     assert result.exit_code != 0
-    assert "already exists" in result.output
+    assert "--project" in result.output
+
+
+def test_install_with_project(tmp_path):
+    """stx install --preset standard --project hello creates the project."""
+    target = tmp_path / "ws"
+    target.mkdir()
+
+    patches = _mock_subprocess_and_uv()
+    with patches[0], patches[1], patches[2], patches[3]:
+        runner = CliRunner()
+        os.chdir(target)
+        result = runner.invoke(cli, ["install", "--preset", "standard", "--project", "hello"])
+
+    assert result.exit_code == 0, result.output
+    assert (target / "projects" / "hello" / "book.py").is_file()
+    assert (target / "projects" / "hello" / "pyproject.toml").is_file()
+
+    # Check extras are in pyproject.toml (standard = pdf, ai)
+    with open(target / "projects" / "hello" / "pyproject.toml", "rb") as f:
+        data = tomllib.load(f)
+    deps = data["project"]["dependencies"]
+    stx_dep = [d for d in deps if "streamtex" in d][0]
+    assert "pdf" in stx_dep
+    assert "ai" in stx_dep
+
+
+def test_install_power_with_project(tmp_path):
+    """stx install --preset power --project demo includes inspector extra."""
+    target = tmp_path / "ws"
+    target.mkdir()
+
+    patches = _mock_subprocess_and_uv()
+    with patches[0], patches[1], patches[2], patches[3]:
+        runner = CliRunner()
+        os.chdir(target)
+        result = runner.invoke(cli, ["install", "--preset", "power", "--project", "demo"])
+
+    assert result.exit_code == 0, result.output
+    assert (target / "projects" / "demo" / "book.py").is_file()
+
+    with open(target / "projects" / "demo" / "pyproject.toml", "rb") as f:
+        data = tomllib.load(f)
+    deps = data["project"]["dependencies"]
+    stx_dep = [d for d in deps if "streamtex" in d][0]
+    assert "pdf" in stx_dep
+    assert "ai" in stx_dep
+    assert "inspector" in stx_dep
+
+
+def test_install_basic_project_has_pdf_only(tmp_path):
+    """Basic preset project should only include pdf extra."""
+    target = tmp_path / "ws"
+    target.mkdir()
+
+    patches = _mock_subprocess_and_uv()
+    with patches[0], patches[1], patches[2], patches[3]:
+        runner = CliRunner()
+        os.chdir(target)
+        result = runner.invoke(cli, ["install", "--preset", "basic", "--project", "hello"])
+
+    assert result.exit_code == 0, result.output
+    with open(target / "projects" / "hello" / "pyproject.toml", "rb") as f:
+        data = tomllib.load(f)
+    deps = data["project"]["dependencies"]
+    stx_dep = [d for d in deps if "streamtex" in d][0]
+    assert "pdf" in stx_dep
+    assert "ai" not in stx_dep
+    assert "inspector" not in stx_dep
+
+
+def test_install_shows_playwright_hint(tmp_path):
+    """Install with project should show playwright installation hint."""
+    target = tmp_path / "ws"
+    target.mkdir()
+
+    patches = _mock_subprocess_and_uv()
+    with patches[0], patches[1], patches[2], patches[3]:
+        runner = CliRunner()
+        os.chdir(target)
+        result = runner.invoke(cli, ["install", "--preset", "basic", "--project", "hello"])
+
+    assert "playwright install chromium" in result.output
+
+
+def test_install_project_only_in_existing_workspace(tmp_path):
+    """stx install --project myapp in existing workspace creates project only."""
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    (ws / "stx.toml").write_text(generate_stx_toml("ws", "2026-01-01T00:00:00Z", preset="standard"))
+    (ws / "projects").mkdir()
+
+    patches = _mock_subprocess_and_uv()
+    with patches[0], patches[1], patches[2], patches[3]:
+        runner = CliRunner()
+        os.chdir(ws)
+        result = runner.invoke(cli, ["install", "--project", "newapp"])
+
+    assert result.exit_code == 0, result.output
+    assert (ws / "projects" / "newapp" / "book.py").is_file()
+
+
+def test_install_existing_workspace_no_args_gives_hint(tmp_path):
+    """stx install with no args in existing workspace suggests options."""
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    (ws / "stx.toml").write_text(generate_stx_toml("ws", "2026-01-01T00:00:00Z"))
+
+    runner = CliRunner()
+    os.chdir(ws)
+    result = runner.invoke(cli, ["install"])
+
+    assert result.exit_code != 0
+    assert "--project" in result.output
+
+
+def test_install_skips_existing_project(tmp_path):
+    """Re-running install with same project name skips project creation."""
+    ws = tmp_path / "ws"
+    ws.mkdir()
+
+    patches = _mock_subprocess_and_uv()
+    with patches[0], patches[1], patches[2], patches[3]:
+        runner = CliRunner()
+        os.chdir(ws)
+        # First install
+        result1 = runner.invoke(cli, ["install", "--preset", "basic", "--project", "hello"])
+        assert result1.exit_code == 0
+
+        # Clear state file so we can re-run
+        state_file = ws / ".stx-install.json"
+        if state_file.exists():
+            state_file.unlink()
+
+        # Second install (project already exists)
+        result2 = runner.invoke(cli, ["install", "--project", "hello"])
+        assert result2.exit_code == 0
+        assert "already exists" in result2.output
+
+
+def test_install_state_file_resume(tmp_path):
+    """Install creates a state file that allows resuming."""
+    ws = tmp_path / "ws"
+    ws.mkdir()
+
+    import json
+
+    # Write a state file simulating a partial install
+    state = {
+        "started": "2026-01-01T00:00:00Z",
+        "preset": "basic",
+        "project": None,
+        "template": None,
+        "steps": {"init": "done", "clone": "done"},
+    }
+    (ws / "stx.toml").write_text(generate_stx_toml("ws", "2026-01-01T00:00:00Z", preset="basic"))
+    (ws / "projects").mkdir()
+    (ws / ".stx-install.json").write_text(json.dumps(state))
+
+    patches = _mock_subprocess_and_uv()
+    with patches[0], patches[1], patches[2], patches[3]:
+        runner = CliRunner()
+        os.chdir(ws)
+        result = runner.invoke(cli, ["install", "--preset", "basic"])
+
+    assert result.exit_code == 0, result.output
+    assert "Resuming" in result.output
+    # State file should be cleaned up
+    assert not (ws / ".stx-install.json").exists()
 
 
 # ---------------------------------------------------------------------------
-# status
+# stx install — preset upgrade
+# ---------------------------------------------------------------------------
+
+def test_install_upgrade_preset(tmp_path):
+    """stx install --preset developer in a standard workspace upgrades."""
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    (ws / "stx.toml").write_text(generate_stx_toml("ws", "2026-01-01T00:00:00Z", preset="standard"))
+    (ws / "projects").mkdir()
+
+    patches = _mock_subprocess_and_uv()
+    with patches[0], patches[1], patches[2], patches[3]:
+        runner = CliRunner()
+        os.chdir(ws)
+        result = runner.invoke(cli, ["install", "--preset", "developer"])
+
+    assert result.exit_code == 0, result.output
+    assert "Upgraded" in result.output
+
+    with open(ws / "stx.toml", "rb") as f:
+        data = tomllib.load(f)
+    assert data["workspace"]["preset"] == "developer"
+    assert "streamtex" in data["repos"]
+
+
+def test_install_refuses_downgrade(tmp_path):
+    """stx install --preset basic in developer workspace fails."""
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    (ws / "stx.toml").write_text(generate_stx_toml("ws", "2026-01-01T00:00:00Z", preset="developer"))
+
+    runner = CliRunner()
+    os.chdir(ws)
+    result = runner.invoke(cli, ["install", "--preset", "basic"])
+
+    assert result.exit_code != 0
+    assert "Cannot downgrade" in result.output
+
+
+def test_install_same_preset_with_project(tmp_path):
+    """stx install --preset standard --project x in standard workspace creates the project."""
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    (ws / "stx.toml").write_text(generate_stx_toml("ws", "2026-01-01T00:00:00Z", preset="standard"))
+    (ws / "projects").mkdir()
+
+    patches = _mock_subprocess_and_uv()
+    with patches[0], patches[1], patches[2], patches[3]:
+        runner = CliRunner()
+        os.chdir(ws)
+        result = runner.invoke(cli, ["install", "--preset", "standard", "--project", "x"])
+
+    assert result.exit_code == 0, result.output
+    assert (ws / "projects" / "x" / "book.py").is_file()
+
+
+# ---------------------------------------------------------------------------
+# stx status (top-level)
 # ---------------------------------------------------------------------------
 
 def test_status_outside_workspace(tmp_path):
     runner = CliRunner()
     with runner.isolated_filesystem(temp_dir=tmp_path):
-        result = runner.invoke(cli, ["workspace", "status"])
+        result = runner.invoke(cli, ["status"])
     assert result.exit_code != 0
     assert "stx.toml" in result.output
 
 
 # ---------------------------------------------------------------------------
-# clone
+# stx update (top-level)
 # ---------------------------------------------------------------------------
 
-def _write_stx_toml(ws: os.PathLike, preset: str = "standard") -> None:
+def _write_stx_toml(ws, preset="standard"):
     """Write a stx.toml into *ws* with the given preset."""
     content = generate_stx_toml("test-ws", "2026-01-01T00:00:00Z", preset=preset)
-    (ws / "stx.toml").write_text(content)  # type: ignore[union-attr]
+    (ws / "stx.toml").write_text(content)
 
-
-def test_clone_clones_repos(tmp_path):
-    """Default standard preset has 2 repos to clone."""
-    ws = tmp_path / "ws"
-    ws.mkdir()
-    _write_stx_toml(ws)
-
-    calls: list[list[str]] = []
-
-    def fake_run(cmd, **_kwargs):
-        calls.append(cmd)
-
-        class _R:
-            returncode = 0
-            stdout = ""
-            stderr = ""
-        return _R()
-
-    with patch("streamtex.cli.workspace_cmd.subprocess.run", side_effect=fake_run):
-        runner = CliRunner()
-        with runner.isolated_filesystem(temp_dir=ws):
-            os.chdir(ws)
-            result = runner.invoke(cli, ["workspace", "clone"])
-
-    assert result.exit_code == 0
-    git_calls = [c for c in calls if c[0] == "git"]
-    assert len(git_calls) == 2  # streamtex-docs + streamtex-claude (standard)
-    assert "cloned" in result.output
-
-
-def test_clone_skips_existing(tmp_path):
-    ws = tmp_path / "ws"
-    ws.mkdir()
-    _write_stx_toml(ws)
-
-    # Pre-create one repo directory
-    (ws / "streamtex-docs").mkdir()
-
-    calls: list[list[str]] = []
-
-    def fake_run(cmd, **_kwargs):
-        calls.append(cmd)
-
-        class _R:
-            returncode = 0
-            stdout = ""
-            stderr = ""
-        return _R()
-
-    with patch("streamtex.cli.workspace_cmd.subprocess.run", side_effect=fake_run):
-        runner = CliRunner()
-        with runner.isolated_filesystem(temp_dir=ws):
-            os.chdir(ws)
-            result = runner.invoke(cli, ["workspace", "clone"])
-
-    assert result.exit_code == 0
-    git_calls = [c for c in calls if c[0] == "git"]
-    assert len(git_calls) == 1  # streamtex-docs skipped, only streamtex-claude
-    assert "already exists" in result.output
-
-
-def test_clone_outside_workspace(tmp_path):
-    runner = CliRunner()
-    with runner.isolated_filesystem(temp_dir=tmp_path):
-        result = runner.invoke(cli, ["workspace", "clone"])
-    assert result.exit_code != 0
-    assert "stx.toml" in result.output
-
-
-# ---------------------------------------------------------------------------
-# link / sync
-# ---------------------------------------------------------------------------
 
 def _create_workspace_with_repos(tmp_path, preset="developer"):
     """Create a workspace with fake repo directories and pyproject.toml files."""
@@ -246,69 +423,94 @@ def _create_workspace_with_repos(tmp_path, preset="developer"):
     return ws
 
 
-def test_link_runs_uv_sync(tmp_path):
-    ws = _create_workspace_with_repos(tmp_path, preset="developer")
-
-    sync_dirs: list[str] = []
-
-    def fake_run(cmd, **kwargs):
-        if cmd[-1] == "sync":
-            sync_dirs.append(kwargs.get("cwd", ""))
-
-        class _R:
-            returncode = 0
-            stdout = ""
-            stderr = ""
-        return _R()
+def test_update_dry_run(tmp_path):
+    """--dry-run shows steps without executing."""
+    ws = _create_workspace_with_repos(tmp_path, preset="standard")
+    for repo_dir in [ws / "streamtex-docs", ws / "streamtex-claude"]:
+        (repo_dir / ".git").mkdir()
 
     with (
-        patch("streamtex.cli.workspace_cmd.subprocess.run", side_effect=fake_run),
+        patch("streamtex.cli.workspace_cmd.subprocess.run") as mock_run,
         patch("streamtex.cli.workspace_cmd.shutil.which", return_value="/usr/bin/uv"),
     ):
+        mock_run.return_value.returncode = 0
+        mock_run.return_value.stdout = ""
+        mock_run.return_value.stderr = ""
         runner = CliRunner()
         os.chdir(ws)
-        result = runner.invoke(cli, ["workspace", "link"])
+        result = runner.invoke(cli, ["update", "--dry-run"])
 
     assert result.exit_code == 0
-    # link only syncs docs and project repos (not library or claude)
-    assert len(sync_dirs) == 1  # only streamtex-docs (type=docs)
-    assert sync_dirs[0].endswith("streamtex-docs")
+    assert "dry run" in result.output.lower()
+    assert "would git pull" in result.output
 
 
-def test_sync_runs_all_repos(tmp_path):
-    ws = _create_workspace_with_repos(tmp_path, preset="developer")
-
-    sync_dirs: list[str] = []
-
-    def fake_run(cmd, **kwargs):
-        if cmd[-1] == "sync":
-            sync_dirs.append(kwargs.get("cwd", ""))
-
-        class _R:
-            returncode = 0
-            stdout = ""
-            stderr = ""
-        return _R()
+def test_update_runs_all_steps(tmp_path):
+    """Update runs all steps: pull, clone, sync, global commands, profiles, hooks."""
+    ws = _create_workspace_with_repos(tmp_path, preset="standard")
+    for repo_dir in [ws / "streamtex-docs", ws / "streamtex-claude"]:
+        (repo_dir / ".git").mkdir()
 
     with (
-        patch("streamtex.cli.workspace_cmd.subprocess.run", side_effect=fake_run),
+        patch("streamtex.cli.workspace_cmd.subprocess.run") as mock_run,
         patch("streamtex.cli.workspace_cmd.shutil.which", return_value="/usr/bin/uv"),
     ):
+        mock_run.return_value.returncode = 0
+        mock_run.return_value.stdout = "Already up to date."
+        mock_run.return_value.stderr = ""
         runner = CliRunner()
         os.chdir(ws)
-        result = runner.invoke(cli, ["workspace", "sync"])
+        result = runner.invoke(cli, ["update"])
 
     assert result.exit_code == 0
-    # sync runs in ALL repos (developer = 3)
-    assert len(sync_dirs) == 3
+    assert "Workspace update complete" in result.output
+    assert "Step 1/" in result.output
+    assert "Step 2/" in result.output
 
 
-def test_sync_outside_workspace(tmp_path):
-    runner = CliRunner()
-    with runner.isolated_filesystem(temp_dir=tmp_path):
-        result = runner.invoke(cli, ["workspace", "sync"])
-    assert result.exit_code != 0
-    assert "stx.toml" in result.output
+def test_update_skip_sync(tmp_path):
+    """--skip-sync skips the uv sync step."""
+    ws = _create_workspace_with_repos(tmp_path, preset="standard")
+    for repo_dir in [ws / "streamtex-docs", ws / "streamtex-claude"]:
+        (repo_dir / ".git").mkdir()
+
+    with (
+        patch("streamtex.cli.workspace_cmd.subprocess.run") as mock_run,
+        patch("streamtex.cli.workspace_cmd.shutil.which", return_value="/usr/bin/uv"),
+    ):
+        mock_run.return_value.returncode = 0
+        mock_run.return_value.stdout = "Already up to date."
+        mock_run.return_value.stderr = ""
+        runner = CliRunner()
+        os.chdir(ws)
+        result = runner.invoke(cli, ["update", "--skip-sync"])
+
+    assert result.exit_code == 0
+    assert "Syncing dependencies" not in result.output
+
+
+def test_update_repair_finds_missing_init(tmp_path):
+    """--repair detects missing custom/__init__.py."""
+    ws = _create_workspace_with_repos(tmp_path, preset="standard")
+    for repo_dir in [ws / "streamtex-docs", ws / "streamtex-claude"]:
+        (repo_dir / ".git").mkdir()
+    custom_dir = ws / "streamtex-docs" / "custom"
+    custom_dir.mkdir()
+
+    with (
+        patch("streamtex.cli.workspace_cmd.subprocess.run") as mock_run,
+        patch("streamtex.cli.workspace_cmd.shutil.which", return_value="/usr/bin/uv"),
+    ):
+        mock_run.return_value.returncode = 0
+        mock_run.return_value.stdout = "Already up to date."
+        mock_run.return_value.stderr = ""
+        runner = CliRunner()
+        os.chdir(ws)
+        result = runner.invoke(cli, ["update", "--repair"])
+
+    assert result.exit_code == 0
+    assert "custom/__init__.py" in result.output
+    assert (custom_dir / "__init__.py").is_file()
 
 
 # ---------------------------------------------------------------------------
@@ -344,6 +546,18 @@ def test_generate_stx_toml_preset_standard():
     assert data["claude"]["source"] == "streamtex-claude"
 
 
+def test_generate_stx_toml_preset_power():
+    """Power preset has docs + claude (same repos as standard)."""
+    content = generate_stx_toml("ws", "2026-01-01T00:00:00Z", preset="power")
+    data = tomllib.loads(content)
+    assert data["workspace"]["preset"] == "power"
+    repos = data["repos"]
+    assert "streamtex-docs" in repos
+    assert "streamtex-claude" in repos
+    assert "streamtex" not in repos
+    assert data["claude"]["source"] == "streamtex-claude"
+
+
 def test_generate_stx_toml_preset_developer():
     content = generate_stx_toml("ws", "2026-01-01T00:00:00Z", preset="developer")
     data = tomllib.loads(content)
@@ -357,333 +571,76 @@ def test_generate_stx_toml_preset_developer():
     assert data["claude"]["source"] == "streamtex-claude"
 
 
-def test_init_default_preset_is_standard(tmp_path):
+# ---------------------------------------------------------------------------
+# Extras in pyproject.toml
+# ---------------------------------------------------------------------------
+
+def test_generate_pyproject_toml_no_extras():
+    from streamtex.cli.project_cmd import generate_pyproject_toml
+    content = generate_pyproject_toml("test-proj")
+    assert '"streamtex>=0.3.0"' in content
+    assert "[" not in content.split("streamtex")[1].split(">=")[0]  # no extras brackets
+
+
+def test_generate_pyproject_toml_with_extras():
+    from streamtex.cli.project_cmd import generate_pyproject_toml
+    content = generate_pyproject_toml("test-proj", extras=["pdf", "ai", "inspector"])
+    assert '"streamtex[pdf,ai,inspector]>=0.3.0"' in content
+
+
+def test_scaffold_project_with_extras(tmp_path):
+    from streamtex.cli.project_cmd import scaffold_project
+    target = tmp_path / "proj"
+    target.mkdir()
+    scaffold_project(str(target), "proj", extras=["pdf", "ai"])
+
+    with open(target / "pyproject.toml", "rb") as f:
+        data = tomllib.load(f)
+    deps = data["project"]["dependencies"]
+    stx_dep = [d for d in deps if "streamtex" in d][0]
+    assert "pdf" in stx_dep
+    assert "ai" in stx_dep
+
+
+# ---------------------------------------------------------------------------
+# PRESET_EXTRAS mapping
+# ---------------------------------------------------------------------------
+
+def test_preset_extras_mapping():
+    from streamtex.cli.workspace_cmd import PRESET_EXTRAS
+    assert PRESET_EXTRAS["basic"] == ["pdf"]
+    assert PRESET_EXTRAS["user"] == ["pdf"]
+    assert PRESET_EXTRAS["standard"] == ["pdf", "ai"]
+    assert PRESET_EXTRAS["power"] == ["pdf", "ai", "inspector"]
+    assert PRESET_EXTRAS["developer"] == ["pdf", "ai", "inspector"]
+
+
+# ---------------------------------------------------------------------------
+# Template availability
+# ---------------------------------------------------------------------------
+
+def test_available_templates():
+    from streamtex.cli.install_cmd import AVAILABLE_TEMPLATES
+    assert "project" in AVAILABLE_TEMPLATES
+    assert "collection" in AVAILABLE_TEMPLATES
+
+
+def test_install_unavailable_template_prompts_fallback(tmp_path):
+    """Unavailable template should prompt to use 'project' instead."""
     target = tmp_path / "ws"
-    runner = CliRunner()
-    result = runner.invoke(cli, ["workspace", "init", str(target)])
-    assert result.exit_code == 0
+    target.mkdir()
 
-    with open(target / "stx.toml", "rb") as f:
-        data = tomllib.load(f)
-    assert data["workspace"]["preset"] == "standard"
-    assert len(data["repos"]) == 2
-
-
-def test_init_preset_basic(tmp_path):
-    target = tmp_path / "ws"
-    runner = CliRunner()
-    result = runner.invoke(cli, ["workspace", "init", str(target), "--preset", "basic"])
-    assert result.exit_code == 0
-
-    with open(target / "stx.toml", "rb") as f:
-        data = tomllib.load(f)
-    assert data["workspace"]["preset"] == "basic"
-    assert len(data["repos"]) == 0
-
-
-def test_clone_user_preset_clones_one_repo(tmp_path):
-    ws = tmp_path / "ws"
-    ws.mkdir()
-    _write_stx_toml(ws, preset="user")
-
-    calls: list[list[str]] = []
-
-    def fake_run(cmd, **_kwargs):
-        calls.append(cmd)
-
-        class _R:
-            returncode = 0
-            stdout = ""
-            stderr = ""
-        return _R()
-
-    with patch("streamtex.cli.workspace_cmd.subprocess.run", side_effect=fake_run):
+    patches = _mock_subprocess_and_uv()
+    with patches[0], patches[1], patches[2], patches[3]:
         runner = CliRunner()
-        with runner.isolated_filesystem(temp_dir=ws):
-            os.chdir(ws)
-            result = runner.invoke(cli, ["workspace", "clone"])
+        os.chdir(target)
+        # Simulate user saying "yes" to fallback template, then "no" to cloning docs
+        result = runner.invoke(
+            cli,
+            ["install", "--preset", "basic", "--project", "hello", "--template", "presentation"],
+            input="y\nn\n",
+        )
 
-    assert result.exit_code == 0
-    git_calls = [c for c in calls if c[0] == "git"]
-    assert len(git_calls) == 1  # only streamtex-claude
-
-
-# ---------------------------------------------------------------------------
-# Upgrade tests
-# ---------------------------------------------------------------------------
-
-def test_upgrade_basic_to_user(tmp_path):
-    ws = tmp_path / "ws"
-    ws.mkdir()
-    _write_stx_toml(ws, preset="basic")
-
-    runner = CliRunner()
-    os.chdir(ws)
-    result = runner.invoke(cli, ["workspace", "upgrade", "user"])
-
-    assert result.exit_code == 0
-    assert "Upgraded" in result.output
-    assert "streamtex-claude" in result.output
-
-    with open(ws / "stx.toml", "rb") as f:
-        data = tomllib.load(f)
-    assert data["workspace"]["preset"] == "user"
-    assert "streamtex-claude" in data["repos"]
-
-
-def test_upgrade_user_to_standard(tmp_path):
-    ws = tmp_path / "ws"
-    ws.mkdir()
-    _write_stx_toml(ws, preset="user")
-
-    runner = CliRunner()
-    os.chdir(ws)
-    result = runner.invoke(cli, ["workspace", "upgrade", "standard"])
-
-    assert result.exit_code == 0
-    assert "Upgraded" in result.output
-
-    with open(ws / "stx.toml", "rb") as f:
-        data = tomllib.load(f)
-    assert data["workspace"]["preset"] == "standard"
-    assert "streamtex-docs" in data["repos"]
-    assert "streamtex-claude" in data["repos"]
-
-
-def test_upgrade_standard_to_developer(tmp_path):
-    ws = tmp_path / "ws"
-    ws.mkdir()
-    _write_stx_toml(ws, preset="standard")
-
-    runner = CliRunner()
-    os.chdir(ws)
-    result = runner.invoke(cli, ["workspace", "upgrade", "developer"])
-
-    assert result.exit_code == 0
-    assert "Upgraded" in result.output
-
-    with open(ws / "stx.toml", "rb") as f:
-        data = tomllib.load(f)
-    assert data["workspace"]["preset"] == "developer"
-    assert "streamtex" in data["repos"]
-    assert "streamtex-docs" in data["repos"]
-    assert "streamtex-claude" in data["repos"]
-
-
-def test_upgrade_refuses_downgrade(tmp_path):
-    ws = tmp_path / "ws"
-    ws.mkdir()
-    _write_stx_toml(ws, preset="developer")
-
-    runner = CliRunner()
-    os.chdir(ws)
-    result = runner.invoke(cli, ["workspace", "upgrade", "user"])
-
-    assert result.exit_code != 0
-    assert "Cannot downgrade" in result.output
-
-
-def test_upgrade_same_preset_noop(tmp_path):
-    ws = tmp_path / "ws"
-    ws.mkdir()
-    _write_stx_toml(ws, preset="standard")
-
-    runner = CliRunner()
-    os.chdir(ws)
-    result = runner.invoke(cli, ["workspace", "upgrade", "standard"])
-
-    assert result.exit_code == 0
-    assert "Already at" in result.output
-
-
-def test_upgrade_output_says_update(tmp_path):
-    """Upgrade output should say 'stx workspace update', not 'clone'."""
-    ws = tmp_path / "ws"
-    ws.mkdir()
-    _write_stx_toml(ws, preset="basic")
-
-    runner = CliRunner()
-    os.chdir(ws)
-    result = runner.invoke(cli, ["workspace", "upgrade", "user"])
-
-    assert result.exit_code == 0
-    assert "stx workspace update" in result.output
-    assert "stx workspace clone" not in result.output
-
-
-# ---------------------------------------------------------------------------
-# Deprecation warnings
-# ---------------------------------------------------------------------------
-
-def test_clone_shows_deprecation_warning(tmp_path):
-    ws = tmp_path / "ws"
-    ws.mkdir()
-    _write_stx_toml(ws)
-
-    with patch("streamtex.cli.workspace_cmd.subprocess.run") as mock_run:
-        mock_run.return_value.returncode = 0
-        mock_run.return_value.stdout = ""
-        mock_run.return_value.stderr = ""
-        runner = CliRunner()
-        os.chdir(ws)
-        result = runner.invoke(cli, ["workspace", "clone"])
-
-    assert "deprecated" in result.output.lower()
-    assert "stx workspace update" in result.output
-
-
-def test_sync_shows_deprecation_warning(tmp_path):
-    ws = _create_workspace_with_repos(tmp_path, preset="standard")
-
-    with (
-        patch("streamtex.cli.workspace_cmd.subprocess.run") as mock_run,
-        patch("streamtex.cli.workspace_cmd.shutil.which", return_value="/usr/bin/uv"),
-    ):
-        mock_run.return_value.returncode = 0
-        mock_run.return_value.stdout = ""
-        mock_run.return_value.stderr = ""
-        runner = CliRunner()
-        os.chdir(ws)
-        result = runner.invoke(cli, ["workspace", "sync"])
-
-    assert "deprecated" in result.output.lower()
-    assert "stx workspace update" in result.output
-
-
-def test_link_shows_deprecation_warning(tmp_path):
-    ws = _create_workspace_with_repos(tmp_path, preset="developer")
-
-    with (
-        patch("streamtex.cli.workspace_cmd.subprocess.run") as mock_run,
-        patch("streamtex.cli.workspace_cmd.shutil.which", return_value="/usr/bin/uv"),
-    ):
-        mock_run.return_value.returncode = 0
-        mock_run.return_value.stdout = ""
-        mock_run.return_value.stderr = ""
-        runner = CliRunner()
-        os.chdir(ws)
-        result = runner.invoke(cli, ["workspace", "link"])
-
-    assert "deprecated" in result.output.lower()
-    assert "stx workspace update" in result.output
-
-
-def test_hooks_shows_deprecation_warning(tmp_path):
-    ws = tmp_path / "ws"
-    ws.mkdir()
-    _write_stx_toml(ws, preset="standard")
-
-    with (
-        patch("streamtex.cli.workspace_cmd.subprocess.run") as mock_run,
-        patch("streamtex.cli.workspace_cmd.shutil.which", return_value="/usr/bin/uv"),
-    ):
-        mock_run.return_value.returncode = 0
-        mock_run.return_value.stdout = ""
-        mock_run.return_value.stderr = ""
-        runner = CliRunner()
-        os.chdir(ws)
-        result = runner.invoke(cli, ["workspace", "hooks"])
-
-    assert "deprecated" in result.output.lower()
-    assert "stx workspace update" in result.output
-
-
-# ---------------------------------------------------------------------------
-# update command tests
-# ---------------------------------------------------------------------------
-
-def test_update_dry_run(tmp_path):
-    """--dry-run shows steps without executing."""
-    ws = _create_workspace_with_repos(tmp_path, preset="standard")
-    # Create .git dirs so pull step finds them
-    for repo_dir in [ws / "streamtex-docs", ws / "streamtex-claude"]:
-        (repo_dir / ".git").mkdir()
-
-    with (
-        patch("streamtex.cli.workspace_cmd.subprocess.run") as mock_run,
-        patch("streamtex.cli.workspace_cmd.shutil.which", return_value="/usr/bin/uv"),
-    ):
-        mock_run.return_value.returncode = 0
-        mock_run.return_value.stdout = ""
-        mock_run.return_value.stderr = ""
-        runner = CliRunner()
-        os.chdir(ws)
-        result = runner.invoke(cli, ["workspace", "update", "--dry-run"])
-
-    assert result.exit_code == 0
-    assert "dry run" in result.output.lower()
-    assert "would git pull" in result.output
-    # subprocess.run should NOT have been called for git pull
-    git_pull_calls = [c for c in mock_run.call_args_list if "pull" in str(c)]
-    assert len(git_pull_calls) == 0
-
-
-def test_update_runs_all_steps(tmp_path):
-    """Update runs all steps: pull, clone, sync, global commands, profiles, hooks."""
-    ws = _create_workspace_with_repos(tmp_path, preset="standard")
-    for repo_dir in [ws / "streamtex-docs", ws / "streamtex-claude"]:
-        (repo_dir / ".git").mkdir()
-
-    with (
-        patch("streamtex.cli.workspace_cmd.subprocess.run") as mock_run,
-        patch("streamtex.cli.workspace_cmd.shutil.which", return_value="/usr/bin/uv"),
-    ):
-        mock_run.return_value.returncode = 0
-        mock_run.return_value.stdout = "Already up to date."
-        mock_run.return_value.stderr = ""
-        runner = CliRunner()
-        os.chdir(ws)
-        result = runner.invoke(cli, ["workspace", "update"])
-
-    assert result.exit_code == 0
-    assert "Workspace update complete" in result.output
-    # Should show step numbers
-    assert "Step 1/" in result.output
-    assert "Step 2/" in result.output
-
-
-def test_update_skip_sync(tmp_path):
-    """--skip-sync skips the uv sync step."""
-    ws = _create_workspace_with_repos(tmp_path, preset="standard")
-    for repo_dir in [ws / "streamtex-docs", ws / "streamtex-claude"]:
-        (repo_dir / ".git").mkdir()
-
-    with (
-        patch("streamtex.cli.workspace_cmd.subprocess.run") as mock_run,
-        patch("streamtex.cli.workspace_cmd.shutil.which", return_value="/usr/bin/uv"),
-    ):
-        mock_run.return_value.returncode = 0
-        mock_run.return_value.stdout = "Already up to date."
-        mock_run.return_value.stderr = ""
-        runner = CliRunner()
-        os.chdir(ws)
-        result = runner.invoke(cli, ["workspace", "update", "--skip-sync"])
-
-    assert result.exit_code == 0
-    assert "Syncing dependencies" not in result.output
-
-
-def test_update_repair_finds_missing_init(tmp_path):
-    """--repair detects missing custom/__init__.py."""
-    ws = _create_workspace_with_repos(tmp_path, preset="standard")
-    for repo_dir in [ws / "streamtex-docs", ws / "streamtex-claude"]:
-        (repo_dir / ".git").mkdir()
-    # Create a custom/ dir without __init__.py in one repo
-    custom_dir = ws / "streamtex-docs" / "custom"
-    custom_dir.mkdir()
-
-    with (
-        patch("streamtex.cli.workspace_cmd.subprocess.run") as mock_run,
-        patch("streamtex.cli.workspace_cmd.shutil.which", return_value="/usr/bin/uv"),
-    ):
-        mock_run.return_value.returncode = 0
-        mock_run.return_value.stdout = "Already up to date."
-        mock_run.return_value.stderr = ""
-        runner = CliRunner()
-        os.chdir(ws)
-        result = runner.invoke(cli, ["workspace", "update", "--repair"])
-
-    assert result.exit_code == 0
-    assert "custom/__init__.py" in result.output
-    # File should have been created
-    assert (custom_dir / "__init__.py").is_file()
+    assert result.exit_code == 0, result.output
+    assert "not yet available" in result.output
+    assert "expanding our template catalog" in result.output

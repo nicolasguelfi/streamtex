@@ -19,12 +19,14 @@ from .deploy_cmd import huggingface_cmd as deploy_huggingface
 from .deploy_cmd import preflight as deploy_preflight
 from .deploy_cmd import render_cmd as deploy_render
 from .deploy_cmd import status_cmd as deploy_status
+from .install_cmd import install as stx_install
 from .project_cmd import new as project_new
 from .project_cmd import validate as project_validate
 from .publish_cmd import check_cmd as publish_check
 from .publish_cmd import pypi_cmd as publish_pypi
 from .shortcuts import run_lint, run_test
-from .workspace_cmd import clone, hooks, init, link, status, sync, update, upgrade
+from .workspace_cmd import status as workspace_status
+from .workspace_cmd import update as workspace_update
 
 
 @click.group()
@@ -33,7 +35,12 @@ def cli():
     """StreamTeX CLI — manage workspaces, run tests, and more."""
 
 
-# --- Top-level shortcuts ---------------------------------------------------
+# --- Top-level commands ----------------------------------------------------
+
+cli.add_command(stx_install)
+cli.add_command(workspace_update, name="update")
+cli.add_command(workspace_status, name="status")
+
 
 @cli.command()
 @click.option("-v", "--verbose", is_flag=True, help="Verbose output.")
@@ -48,23 +55,6 @@ def test(verbose, extra_args):
 def lint(extra_args):
     """Run the linter (shortcut for ruff check)."""
     run_lint(extra_args=extra_args)
-
-
-# --- Workspace subgroup ----------------------------------------------------
-
-@cli.group()
-def workspace():
-    """Manage StreamTeX workspaces."""
-
-
-workspace.add_command(init)
-workspace.add_command(clone)
-workspace.add_command(link)
-workspace.add_command(status)
-workspace.add_command(sync)
-workspace.add_command(update)
-workspace.add_command(upgrade)
-workspace.add_command(hooks)
 
 
 # --- Claude subgroup -------------------------------------------------------

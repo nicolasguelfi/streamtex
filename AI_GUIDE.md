@@ -25,8 +25,8 @@ and web-books — without writing Python code.
 
 ```bash
 mkdir my-workspace && cd my-workspace
-stx workspace init .        # default: standard preset (docs + claude)
-stx workspace update         # clones repos, syncs deps, installs commands globally
+stx install                  # default: standard preset (docs + claude)
+stx update                   # clones repos, syncs deps, installs commands globally
 ```
 
 > After cloning, shared commands (like `/stx-guide`) are copied to `~/.claude/commands/`
@@ -428,7 +428,7 @@ Update everything at once from the workspace root:
 
 ```bash
 cd streamtex-dev/
-stx workspace update         # pulls repos, syncs deps, updates all profiles
+stx update                   # pulls repos, syncs deps, updates all profiles
 ```
 
 For a single project:

@@ -47,8 +47,8 @@ Full workspace with rich templates, documentation, and Claude AI profiles:
 ```bash
 uv tool install "streamtex[cli]" -U
 mkdir streamtex-dev && cd streamtex-dev
-stx workspace init .
-stx workspace update
+stx install
+stx update
 stx project new my-project --template project
 cd projects/my-project
 stx claude install project .
@@ -62,16 +62,17 @@ Everything above, plus AI image generation, PDF export, and live inspector:
 ```bash
 uv tool install "streamtex[cli]" -U
 mkdir streamtex-dev && cd streamtex-dev
-stx workspace init .
-stx workspace update
-stx project new my-project --template project
+stx install --preset power --project my-project --template project
+stx update
 cd projects/my-project
-stx claude install project .
-uv add "streamtex[ai]"           # AI image generation (OpenAI, Google Imagen, fal.ai)
-uv add "streamtex[pdf]"          # PDF export via Playwright
-uv run playwright install chromium  # Download Chromium browser for PDF export
-uv add "streamtex[inspector]"    # Live code inspector sidebar
 uv run streamlit run book.py
+```
+
+The `power` preset automatically installs PDF export, AI image generation, and the live
+inspector into your project. To add Playwright for PDF export, run:
+
+```bash
+uv run playwright install chromium
 ```
 
 Each `uv add` installs optional features into the **current project's environment**.
@@ -96,7 +97,7 @@ Install StreamTeX and a Claude AI profile, then let the AI build your project:
 ```bash
 uv tool install "streamtex[cli]" -U
 mkdir streamtex-dev && cd streamtex-dev
-stx workspace init . && stx workspace update
+stx install && stx update
 stx project new my-project
 cd projects/my-project
 stx claude install project .
@@ -148,26 +149,28 @@ uv run streamlit run book.py
 
 ### Workspace Presets
 
-The `stx workspace init` command supports 4 presets:
+The `stx install` command supports 5 presets:
 
-| Preset | Repos | Use case |
-|--------|-------|----------|
-| `basic` | none | Workspace only, upgrade later |
-| `user` | streamtex-claude | + Claude AI profiles |
-| `standard` (default) | streamtex-docs + streamtex-claude | + rich templates + local docs |
-| `developer` | all 3 repos | + library source + editable install |
+| Preset | Repos | Extras (with --project) | Use case |
+|--------|-------|------------------------|----------|
+| `basic` | none | pdf | Workspace only, upgrade later |
+| `user` | streamtex-claude | pdf | + Claude AI profiles |
+| `standard` (default) | streamtex-docs + streamtex-claude | pdf, ai | + rich templates + local docs |
+| `power` | streamtex-docs + streamtex-claude | pdf, ai, inspector | + all extras, requires --project |
+| `developer` | all 3 repos | pdf, ai, inspector | + library source + editable install |
 
 ```bash
-stx workspace init . --preset user       # Claude profiles only
-stx workspace init .                     # standard (default)
-stx workspace init . --preset developer  # full developer setup
+stx install --preset user       # Claude profiles only
+stx install                     # standard (default)
+stx install --preset developer  # full developer setup
+stx install --preset power --project my-project  # all extras with a project
 ```
 
-Upgrade an existing workspace:
+Upgrade an existing workspace to a higher preset:
 
 ```bash
-stx workspace upgrade developer
-stx workspace update
+stx install --preset developer
+stx update
 ```
 
 ### Optional Extras
@@ -376,13 +379,13 @@ uv tool install "streamtex[cli]" -U
 
 ```bash
 cd streamtex-dev/
-stx workspace update         # pulls repos, syncs deps, updates profiles
+stx update                   # pulls repos, syncs deps, updates profiles
 ```
 
 Fine-grained control:
 ```bash
-stx workspace update --skip-sync      # skip uv sync
-stx workspace update --skip-profiles  # skip Claude profile update
+stx update --skip-sync      # skip uv sync
+stx update --skip-profiles  # skip Claude profile update
 ```
 
 ### Update a standalone project (no workspace)

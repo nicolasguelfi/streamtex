@@ -19,10 +19,20 @@ PRESET_REPOS = {
     "basic": [],
     "user": ["claude"],
     "standard": ["docs", "claude"],
+    "power": ["docs", "claude"],
     "developer": ["library", "docs", "claude"],
 }
 
-PRESET_ORDER = ["basic", "user", "standard", "developer"]
+PRESET_ORDER = ["basic", "user", "standard", "power", "developer"]
+
+# Extras automatically added to projects based on preset level
+PRESET_EXTRAS = {
+    "basic": ["pdf"],
+    "user": ["pdf"],
+    "standard": ["pdf", "ai"],
+    "power": ["pdf", "ai", "inspector"],
+    "developer": ["pdf", "ai", "inspector"],
+}
 
 ALL_REPOS = {
     "library": {
@@ -219,7 +229,7 @@ def status():
         repo_path = os.path.join(ws_root, repo_conf.get("path", repo_name))
         if not os.path.isdir(repo_path):
             table.add_row(repo_name, "-", "[red]not cloned[/red]", "-")
-            hints.append(f"  [yellow]{repo_name}[/yellow]: run [bold]stx workspace update[/bold] to clone")
+            hints.append(f"  [yellow]{repo_name}[/yellow]: run [bold]stx update[/bold] to clone")
             continue
         info = get_repo_status(repo_path)
         status_text = "[green]clean[/green]" if info["clean"] else "[red]dirty[/red]"
@@ -231,7 +241,7 @@ def status():
             if dirty_files == ["uv.lock"]:
                 hints.append(
                     f"  [yellow]{repo_name}[/yellow]: uv.lock modified locally"
-                    " — run [bold]stx workspace update[/bold] to fix"
+                    " — run [bold]stx update[/bold] to fix"
                 )
             else:
                 file_list = ", ".join(dirty_files[:5])
@@ -244,7 +254,7 @@ def status():
         if info["behind"]:
             hints.append(
                 f"  [yellow]{repo_name}[/yellow]: {info['behind']} commit(s) behind remote"
-                " — run [bold]stx workspace update[/bold] to pull"
+                " — run [bold]stx update[/bold] to pull"
             )
         if info["ahead"]:
             hints.append(
@@ -509,8 +519,8 @@ def _deprecation_warning(old_cmd: str, new_cmd: str) -> None:
     """Print a deprecation warning directing users to the new command."""
     console = get_console()
     console.print(
-        f"\n[yellow]⚠ 'stx workspace {old_cmd}' is deprecated. "
-        f"Use 'stx workspace {new_cmd}' instead.[/yellow]\n"
+        f"\n[yellow]'stx workspace {old_cmd}' is deprecated. "
+        f"Use 'stx {new_cmd}' instead.[/yellow]\n"
     )
 
 
@@ -1012,7 +1022,7 @@ def upgrade(preset):
     console.print(f"[green]Upgraded from '{current}' to '{preset}'.[/green]")
     for repo_key in sorted(to_add):
         console.print(f"  + {ALL_REPOS[repo_key]['name']}")
-    console.print("\nRun [bold]stx workspace update[/bold] to clone the new repos.")
+    console.print("\nRun [bold]stx update[/bold] to clone the new repos.")
 
 
 # ---------------------------------------------------------------------------

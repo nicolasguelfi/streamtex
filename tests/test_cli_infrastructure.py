@@ -21,12 +21,20 @@ def test_cli_version():
     assert __version__ in result.output
 
 
-def test_workspace_group_exists():
+def test_top_level_commands_exist():
+    """stx install, stx update, stx status are top-level commands."""
     runner = CliRunner()
-    result = runner.invoke(cli, ["workspace", "--help"])
+
+    result = runner.invoke(cli, ["install", "--help"])
     assert result.exit_code == 0
-    assert "init" in result.output
-    assert "status" in result.output
+    assert "--preset" in result.output
+    assert "--project" in result.output
+
+    result = runner.invoke(cli, ["update", "--help"])
+    assert result.exit_code == 0
+
+    result = runner.invoke(cli, ["status", "--help"])
+    assert result.exit_code == 0
 
 
 def test_bib_group_exists():

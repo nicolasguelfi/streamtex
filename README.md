@@ -49,7 +49,7 @@ uv tool install "streamtex[cli]" -U
 mkdir streamtex-dev && cd streamtex-dev
 stx install
 stx update
-stx project new my-project --template project
+stx project new my-project --template project   # templates: project, presentation, collection, course
 cd projects/my-project
 stx claude install project .
 uv run streamlit run book.py
@@ -386,6 +386,18 @@ Fine-grained control:
 ```bash
 stx update --skip-sync      # skip uv sync
 stx update --skip-profiles  # skip Claude profile update
+```
+
+### Check workspace status
+
+```bash
+stx status                   # show preset, repos, profiles, project list
+```
+
+### Upgrade a project
+
+```bash
+stx project upgrade          # upgrade project deps and extras to match current preset
 ```
 
 ### Update a standalone project (no workspace)

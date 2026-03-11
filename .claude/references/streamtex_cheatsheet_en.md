@@ -214,6 +214,67 @@ STX_FAL_KEY=fal-...
 
 **Install providers**: `uv add "streamtex[ai]"` (all) or `uv add "streamtex[ai-openai]"` (single).
 
+### AI Image — Models & Providers
+
+```python
+from streamtex import get_available_models
+
+# List available models for a provider
+models = get_available_models("openai")   # e.g. ["gpt-image-1"]
+models = get_available_models("google")   # e.g. ["imagen-3.0-generate-002"]
+models = get_available_models("fal")      # e.g. ["sd-v3.5"]
+```
+
+### AI Image — History & Versioning
+
+```python
+from streamtex import (
+    save_image_version, get_current_image, list_image_versions,
+    rollback_image, rename_image, ImageMetadata,
+)
+
+# Save a new version of a managed image
+path = save_image_version(
+    "hero_intro",                    # Semantic name
+    "static/images/hero.png",       # Source image path
+    source_type="ai_generated",     # "local" | "url" | "ai_generated"
+    prompt="a futuristic skyline",  # AI prompt (optional)
+    provider="openai",              # AI provider (optional)
+    model="gpt-image-1",           # AI model (optional)
+    size="1024x1024",              # AI size (optional)
+    quality="standard",            # AI quality (optional)
+)
+
+# Get current version path (None if not found)
+current = get_current_image("hero_intro")
+
+# List all versions — returns list of (version_number, ImageMetadata)
+versions = list_image_versions("hero_intro")
+
+# Rollback to a previous version (archives current first)
+restored = rollback_image("hero_intro", version=2)
+
+# Rename a managed image (current + all archived versions)
+new_path = rename_image("hero_intro", "hero_welcome")
+```
+
+`ImageMetadata` — dataclass for image version metadata:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | `str` | Semantic name (e.g. `"hero_intro"`) |
+| `version` | `int` | Version number (default `1`) |
+| `timestamp` | `str` | ISO 8601 creation time |
+| `source_type` | `str` | `"local"`, `"url"`, or `"ai_generated"` |
+| `original_path` | `str` | Original source path or URL |
+| `prompt` | `str \| None` | AI prompt |
+| `provider` | `str \| None` | AI provider name |
+| `model` | `str \| None` | AI model identifier |
+| `size` | `str \| None` | AI generation size |
+| `quality` | `str \| None` | AI generation quality |
+| `base_image` | `str \| None` | Base image path for img2img |
+| `revised_prompt` | `str \| None` | Provider-revised prompt |
+
 ### st_grid — Full Signature
 
 ```python
@@ -508,6 +569,18 @@ st_book(
     banner_color="rgba(211,47,47,0.8)",  # Legacy — use banner=BannerConfig(...) instead
     monties_color=None,             # Legacy — use banner=BannerConfig(...) instead
 )
+```
+
+### st_chrome_banner — Browser Recommendation
+
+```python
+from streamtex import st_chrome_banner
+
+# Show a dismissible banner recommending Chrome if the browser is not Chrome.
+# Injects a fixed-position banner in the parent Streamlit frame — does not
+# create a component in the block flow (no effect on TOC or block numbering).
+# Called automatically by st_book() when chrome_banner=True (the default).
+st_chrome_banner()
 ```
 
 ### BannerConfig — Paginated Navigation Banners

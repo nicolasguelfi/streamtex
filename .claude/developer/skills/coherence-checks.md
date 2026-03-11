@@ -524,3 +524,17 @@ for cls in [PdfConfig, ExportConfig, BannerConfig]:
 - WARNING if `st_audio()` or `st_video()` references a missing local file
 - WARNING if a repo-level file reference (Dockerfile, CI config, etc.) does not exist
 - INFO: report total static references checked and how many are valid
+
+---
+
+## Check 17: CHANGELOG Freshness (scope: library, all)
+
+**Goal**: The CHANGELOG.md accurately reflects the current library version and recent changes.
+
+**Source**: `streamtex/CHANGELOG.md` + `streamtex/pyproject.toml` (version)
+
+**Rules**:
+- ERROR if the library version in `pyproject.toml` has no matching `## [X.Y.Z]` entry in CHANGELOG.md
+- WARNING if the latest CHANGELOG entry has no `### Added`, `### Changed`, `### Fixed`, or `### Removed` subsection
+- WARNING if CHANGELOG entries are not in reverse chronological order
+- INFO: report current library version and latest CHANGELOG version

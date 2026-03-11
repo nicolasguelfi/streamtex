@@ -5,14 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.4.6] — 2026-03-11
+## [0.4.8] — 2026-03-11
 
 ### Added
 - **Project migration system** (`stx project upgrade`): versioned structural migrations with AST-based compatibility checking
   - `--check` for compatibility verification only (no modifications)
   - `--dry-run` to preview changes before applying
   - `--skip-sync` / `--skip-claude` to skip post-upgrade steps
+  - Migration v0.4.0: adds ruff lint config + pyright extraPaths + pre-commit
+  - Migration v0.4.6: adds preset extras to dependencies + static/images/ + setup.py
   - `/stx-migrate` Claude skill for assisted code fixes when breaking changes are detected
+- **40 new tests** for migration system, compatibility checker, and upgrade CLI
+- **10 undocumented exports** now covered in manual blocks: `BlockImportError`, `BlockNotFoundError`, `toc_entries`, `st_chrome_banner`, `PdfMode`, `export_pdf`, `format_entry`, `set_bib_config`, `get_available_models`, `ImageMetadata`
+- **New block** `bck_pdf_export.py` in advanced manual (PdfMode + export_pdf + PdfConfig)
+- **Cheatsheet updated** with 8 missing exports (AI models, image history, st_chrome_banner)
+
+### Fixed
+- 8 incorrect `st_list()` examples in `bck_list_styles.py` (now use context manager pattern)
+- `banner_config=` → `banner=` and removed invalid `link_preview=` in `bck_arch_book.py` show_code examples
+- Removed invalid `editable=True` on `st_ai_image_widget()` in Claude profile artifacts
+- Missing `static/pdf/sample_document.pdf` — added graceful fallback in `bck_static_assets.py`
+- `stx-guide.md` synchronized across all 7 copies (was 3 different versions)
+- Unused variables in `run-manuals.py` (`patterns`, `defaults`)
+
+## [0.4.7] — 2026-03-11
 
 ### Changed
 - **CLI refactoring**: `stx workspace` subcommands replaced by top-level commands
@@ -22,8 +38,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `stx workspace status` → `stx status`
 - **New preset**: `power` added between `standard` and `developer` (repos: docs + claude, forces `--project`, extras: pdf, ai, inspector)
 - **New options**: `stx install --project NAME --template TEMPLATE` for creating a project during install
+  - Templates: project (default), presentation, collection, course
 - **Extras per preset** (when `--project` is used): basic/user get pdf; standard gets pdf + ai; power/developer get pdf + ai + inspector
-- **Removed deprecated commands**: `stx workspace clone`, `stx workspace sync`, `stx workspace link`, `stx workspace hooks`
+- **35 new tests** for install/update/status commands
+
+### Removed
+- `stx workspace` command group (no existing users — replaced by `stx install`/`stx update`/`stx status`)
+- Deprecated subcommands: `stx workspace clone`, `stx workspace sync`, `stx workspace link`, `stx workspace hooks`
+
+## [0.4.6] — 2026-03-10
+
+### Added
+- Preset extras mapping (`PRESET_EXTRAS`) for automatic dependency management per preset
 
 ## [0.4.5] — 2026-03-10
 

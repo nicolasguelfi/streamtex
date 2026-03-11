@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.4.6] — 2026-03-11
 
+### Added
+- **Project migration system** (`stx project upgrade`): versioned structural migrations with AST-based compatibility checking
+  - `--check` for compatibility verification only (no modifications)
+  - `--dry-run` to preview changes before applying
+  - `--skip-sync` / `--skip-claude` to skip post-upgrade steps
+  - `/stx-migrate` Claude skill for assisted code fixes when breaking changes are detected
+
 ### Changed
 - **CLI refactoring**: `stx workspace` subcommands replaced by top-level commands
   - `stx workspace init . [--preset X]` → `stx install [--preset X]`

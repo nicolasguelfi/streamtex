@@ -174,13 +174,13 @@ stx lint                    # Lance ruff check streamtex/
 stx lint -- --fix           # Auto-fix des problemes de lint
 ```
 
-### Workspace (3 commandes essentielles)
+### Workspace (4 commandes essentielles)
 
 ```bash
 stx install                       # Initialise un workspace (cree stx.toml + projects/)
   --preset PRESET                 # Preset: basic, user, standard (defaut), power, developer
-  --project NAME                  # Cree un projet dans le workspace
-  --template TEMPLATE             # Template pour le projet (project, collection, course, presentation)
+  --project NAME                  # Cree un projet avec ce nom
+  --template TEMPLATE             # Template du projet (project, collection, presentation, course)
 
 stx update                        # Pull + clone + sync + hooks + profiles + global commands
   --skip-sync                     # Skip uv sync
@@ -189,10 +189,15 @@ stx update                        # Pull + clone + sync + hooks + profiles + glo
   --repair                        # Active les checks de reparation (venv, __init__.py, paths)
 
 stx status                        # Git status de tous les repos (branche, clean/dirty, ahead/behind)
+
+stx install --preset PRESET       # Upgrade le workspace vers un preset superieur
+                                  # PRESET: basic, user, standard, power, developer
+                                  # Ajoute les repos manquants dans stx.toml
+                                  # Ne permet pas de downgrade
 ```
 
-> Pour upgrader un workspace existant vers un preset superieur, utiliser `stx install --preset <preset>`.
-> Les extras (pdf, ai, inspector) sont installes automatiquement selon le preset quand `--project` est utilise.
+> **Commandes deprecees** : `clone`, `sync`, `link`, `hooks` fonctionnent encore
+> mais affichent un avertissement et redirigent vers `stx update`.
 
 ### Claude profiles
 
@@ -231,6 +236,15 @@ stx project validate [PATH]       # Valide la structure d'un projet (10 checks)
                                   # .streamlit/config.toml, enableStaticServing,
                                   # pyproject.toml, .claude/, CLAUDE.md,
                                   # static/images/, block files def build
+
+stx project upgrade [PATH]        # Upgrade un projet vers la version courante de StreamTeX
+  --check                         # Verification de compatibilite seulement (pas de modifications)
+  --dry-run                       # Affiche les changements sans les appliquer
+  --skip-sync                     # Skip uv sync apres l'upgrade
+  --skip-claude                   # Skip la mise a jour du profil Claude
+                                  # Systeme de migrations versionnees (structurelles)
+                                  # + verification de compatibilite AST-based
+                                  # Utiliser /stx-migrate pour l'assistance Claude sur les fixes
 ```
 
 ### Deploy
@@ -302,7 +316,7 @@ stx bib generate-stubs SOURCES... # Genere un module BibRefs type pour l'IDE
 mkdir streamtex-dev && cd streamtex-dev
 
 # 2. Initialiser le workspace
-stx install
+stx install .
 
 # 3. Tout installer (clone + sync + hooks + profiles + global commands)
 stx update
@@ -776,7 +790,7 @@ stx claude check             # doit afficher "up to date" pour chaque projet
 
 ```bash
 uv tool install "streamtex[cli]"
-stx install && stx update
+stx install . && stx update
 stx project new mon-projet
 # → derniere version PyPI + derniers profils GitHub
 ```
@@ -895,13 +909,15 @@ lors des reruns Streamlit.
 
 | Tache | Commande |
 |-------|----------|
-| Initialiser un workspace | `stx install` |
+| Initialiser un workspace | `stx install .` |
 | Tout mettre a jour | `stx update` |
 | Etat du workspace | `stx status` |
 | Upgrader le preset | `stx install --preset developer` |
 | Creer un projet (minimal) | `stx project new <name>` |
 | Creer un projet (template riche) | `stx project new <name> --template project` |
 | Valider un projet | `stx project validate .` |
+| Upgrader un projet | `stx project upgrade .` |
+| Verifier compatibilite | `stx project upgrade . --check` |
 | Lancer les tests | `stx test -v` |
 | Lancer le linter | `stx lint` |
 | Installer un profil Claude | `stx claude install <profile> .` |

@@ -25,6 +25,7 @@ from .project_cmd import validate as project_validate
 from .publish_cmd import check_cmd as publish_check
 from .publish_cmd import pypi_cmd as publish_pypi
 from .shortcuts import run_lint, run_test
+from .upgrade_cmd import upgrade as project_upgrade
 from .workspace_cmd import status as workspace_status
 from .workspace_cmd import update as workspace_update
 
@@ -90,6 +91,7 @@ def project():
 
 project.add_command(project_new)
 project.add_command(project_validate)
+project.add_command(project_upgrade)
 
 
 # --- Deploy subgroup -------------------------------------------------------

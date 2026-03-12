@@ -1,6 +1,6 @@
 # Coherence Check Rules
 
-Reference file for `/stx-coherence:audit`. Defines 20 check categories.
+Reference file for `/stx-coherence:audit`. Defines 21 check categories.
 
 ---
 
@@ -632,7 +632,7 @@ for cls in [PdfConfig, ExportConfig, BannerConfig]:
 - `streamtex/.github/ISSUE_TEMPLATE/` → bug_report.md, feature_request.md, question.md, docs.md
 - `streamtex-docs/.github/ISSUE_TEMPLATE/` → same 4 files
 - `streamtex-claude/.github/ISSUE_TEMPLATE/` → same 4 files
-- `streamtex-claude/profiles/*/manifest.toml` → `[commands] project = ["issue.md"]`
+- `streamtex-claude/profiles/*/manifest.toml` → `[commands] stx-project = ["issue.md"]`
 - `streamtex-claude/profiles/*/commands/stx-project/issue.md` → command file
 
 **Method**:
@@ -651,3 +651,29 @@ for cls in [PdfConfig, ExportConfig, BannerConfig]:
 - WARNING if issue templates differ between repos (content should be consistent)
 - WARNING if stx-guide.md does not reference `/stx-issue`
 - INFO: report template existence status across all repos and profiles
+
+---
+
+## Check 21: Command Namespace stx- Prefix Convention (scope: profiles, all)
+
+**What**: All command namespace directories and their references must use the `stx-` prefix convention. No bare namespace directories (e.g. `developer/`, `project/`, `designer/`) should exist under `commands/`.
+
+**Why**: Consistent `stx-` prefix avoids user confusion — if `/stx-designer:init` exists, users expect `/stx-project:issue`, not `/project:issue`.
+
+**Source files**:
+- `streamtex-claude/profiles/*/commands/` → directory names
+- `streamtex-claude/profiles/*/manifest.toml` → `[commands]` keys
+- All `.md`, `.j2`, `.py` files across the 3 repos → slash command references
+
+**Method**:
+1. Scan all `profiles/*/commands/` directories — every subdirectory name must start with `stx-`
+2. Scan all `manifest.toml` `[commands]` keys — every key must start with `stx-`
+3. Grep all 3 repos for bare namespace patterns: `/project:`, `/designer:`, `/developer:`, `/migration:`, `/coherence:`, `/presentation:` (without `stx-` prefix)
+4. Grep for old path references: `commands/project/`, `commands/developer/`, `commands/designer/`, `commands/migration/`, `commands/coherence/`, `commands/presentation/`
+
+**Rules**:
+- ERROR if a command directory under `commands/` does not start with `stx-`
+- ERROR if a manifest `[commands]` key does not start with `stx-`
+- ERROR if any file contains a bare namespace slash command reference (e.g. `/developer:test-run` instead of `/stx-developer:test-run`)
+- WARNING if any file contains a bare namespace path reference (e.g. `commands/project/` instead of `commands/stx-project/`)
+- INFO: report all namespace directories found and their prefix status

@@ -414,7 +414,7 @@ claude
 |-----------|-----------|-------------|
 | stx-designer (5) | init, update, audit, fix, tool | Cycle de vie complet du projet |
 | Developer (2) | test-run, lint | Tests et linting |
-| Skills (6) | visual-design-rules, slide-design-rules, style-conventions, streamtex-quick-reference, block-blueprints, testing-patterns | Regles de conception |
+| Skills (8) | visual-design-rules, slide-design-rules, style-conventions, streamtex-quick-reference, block-blueprints, testing-patterns, stx-migrate, docs-lookup | Regles de conception |
 | Agents (3) | slide-designer, slide-reviewer, project-architect | Agents specialises |
 | Templates (4) | project, presentation, collection, course | Templates pour init |
 | Tools (1) | survey-convert | Outils specialises |

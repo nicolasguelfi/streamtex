@@ -533,9 +533,19 @@ marker_config = MarkerConfig(
 st_book([...], toc_config=toc, marker_config=marker_config)
 ```
 
-Optional widget customization: `draggable=True` lets users drag the floating
-nav widget anywhere on screen, `collapsible=True` adds a ⋮ button to
-collapse/expand it. Both states persist in localStorage.
+### MarkerConfig fields
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `show_nav_ui` | `bool` | `True` | Show/hide the floating navigation widget |
+| `auto_marker_on_toc` | `int \| bool` | `False` | Bridge TOC headings to markers (True=all, int N=up to level N) |
+| `nav_position` | `str` | `"bottom-right"` | Widget position: `"bottom-right"` or `"bottom-center"` |
+| `nav_label_chars` | `int` | `40` | Max characters for current marker label (0 to hide) |
+| `popup_open` | `bool` | `False` | Initial state of the marker popup list |
+| `next_keys` | `list[str]` | `["PageDown"]` | Keys to navigate forward (supports modifier syntax) |
+| `prev_keys` | `list[str]` | `["PageUp"]` | Keys to navigate backward |
+| `draggable` | `bool` | `False` | Allow dragging the widget anywhere (position in localStorage) |
+| `collapsible` | `bool` | `False` | Show ⋮ button to collapse/expand (state in localStorage) |
 
 ### Per-heading overrides
 
@@ -603,6 +613,11 @@ st_book([...],
 )
 ```
 
+All PdfConfig fields: `mode` (PdfMode), `format` ("A4"), `landscape` (True),
+`margin_top/bottom/left/right` ("10mm"/"15mm"), `print_background` (True),
+`scale` (1.0), `header_template`/`footer_template` (""), `page_numbers` (False),
+`theme_bg` ("#fff"), `theme_text` ("#333").
+
 When `export=True` (default), the sidebar shows a "Download as..." panel where the user can
 adjust all PDF parameters before generating. The `pdf_config` values are used as defaults.
 
@@ -662,6 +677,21 @@ BannerConfig(
     show_arrows=False,
 )
 ```
+
+### BannerConfig fields
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `mode` | `BannerMode` | `FULL` | `FULL`, `COMPACT`, or `HIDDEN` |
+| `color` | `str` | `"rgba(211,47,47,0.8)"` | Background color |
+| `text_color` | `str` | `"white"` | Text color |
+| `font_size` | `str \| None` | `None` | Font size (auto if None) |
+| `font_weight` | `str \| None` | `None` | Font weight (auto if None) |
+| `padding` | `str \| None` | `None` | CSS padding (auto if None) |
+| `border_radius` | `str \| None` | `None` | CSS border-radius (auto if None) |
+| `show_title` | `bool` | `True` | Show block title in banner |
+| `show_arrows` | `bool` | `True` | Show prev/next arrows |
+| `show_dividers` | `bool \| None` | `None` | Show separators (auto per mode if None) |
 
 Fields set to `None` use mode-specific auto values.
 Explicit values always override auto defaults.

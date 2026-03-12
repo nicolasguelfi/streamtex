@@ -400,6 +400,8 @@ marker_config = MarkerConfig(
     auto_marker_on_toc=1,          # Level-1 TOC headings become markers
     next_keys=["PageDown"],        # Navigate forward
     prev_keys=["PageUp"],          # Navigate backward
+    draggable=True,                # User can drag the widget anywhere on screen
+    collapsible=True,              # ⋮ button to collapse/expand the widget
 )
 st_book([...], marker_config=marker_config)
 ```

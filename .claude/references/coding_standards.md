@@ -533,6 +533,10 @@ marker_config = MarkerConfig(
 st_book([...], toc_config=toc, marker_config=marker_config)
 ```
 
+Optional widget customization: `draggable=True` lets users drag the floating
+nav widget anywhere on screen, `collapsible=True` adds a ⋮ button to
+collapse/expand it. Both states persist in localStorage.
+
 ### Per-heading overrides
 
 Use `marker=False` on `st_write()` to exclude specific headings (appendices,

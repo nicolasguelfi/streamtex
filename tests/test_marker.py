@@ -234,3 +234,116 @@ class TestAutoMarkerOnToc:
         _handle_toc("Forced", toc_lvl="1", marker=True)
         assert marker_count() == 1
         assert marker_entries()[0]["label"] == "Forced"
+
+
+class TestMarkerDraggableCollapsible:
+    """Tests for draggable and collapsible features in MarkerConfig."""
+
+    def setup_method(self):
+        marker_mod._registry = None
+
+    # --- MarkerConfig defaults ---
+
+    def test_draggable_default_false(self):
+        cfg = MarkerConfig()
+        assert cfg.draggable is False
+
+    def test_collapsible_default_false(self):
+        cfg = MarkerConfig()
+        assert cfg.collapsible is False
+
+    # --- MarkerConfig accepts True ---
+
+    def test_draggable_true(self):
+        cfg = MarkerConfig(draggable=True)
+        assert cfg.draggable is True
+
+    def test_collapsible_true(self):
+        cfg = MarkerConfig(collapsible=True)
+        assert cfg.collapsible is True
+
+    def test_both_draggable_and_collapsible(self):
+        cfg = MarkerConfig(draggable=True, collapsible=True)
+        assert cfg.draggable is True
+        assert cfg.collapsible is True
+
+    # --- JavaScript placeholder replacement ---
+
+    @patch("streamlit.components.v1.html")
+    def test_draggable_placeholder_true(self, mock_html):
+        """__DRAGGABLE__ placeholder should be replaced with 'true' when draggable=True."""
+        reset_marker_registry(MarkerConfig(draggable=True))
+        register_marker("A", "a-1")
+        from streamtex.marker import inject_marker_navigation
+        inject_marker_navigation()
+        js_output = mock_html.call_args[0][0]
+        assert "var draggable = true;" in js_output
+
+    @patch("streamlit.components.v1.html")
+    def test_draggable_placeholder_false(self, mock_html):
+        """__DRAGGABLE__ placeholder should be replaced with 'false' when draggable=False."""
+        reset_marker_registry(MarkerConfig(draggable=False))
+        register_marker("A", "a-1")
+        from streamtex.marker import inject_marker_navigation
+        inject_marker_navigation()
+        js_output = mock_html.call_args[0][0]
+        assert "var draggable = false;" in js_output
+
+    @patch("streamlit.components.v1.html")
+    def test_collapsible_placeholder_true(self, mock_html):
+        """__COLLAPSIBLE__ placeholder should be replaced with 'true' when collapsible=True."""
+        reset_marker_registry(MarkerConfig(collapsible=True))
+        register_marker("A", "a-1")
+        from streamtex.marker import inject_marker_navigation
+        inject_marker_navigation()
+        js_output = mock_html.call_args[0][0]
+        assert "var collapsible = true;" in js_output
+
+    @patch("streamlit.components.v1.html")
+    def test_collapsible_placeholder_false(self, mock_html):
+        """__COLLAPSIBLE__ placeholder should be replaced with 'false' when collapsible=False."""
+        reset_marker_registry(MarkerConfig(collapsible=False))
+        register_marker("A", "a-1")
+        from streamtex.marker import inject_marker_navigation
+        inject_marker_navigation()
+        js_output = mock_html.call_args[0][0]
+        assert "var collapsible = false;" in js_output
+
+    # --- JavaScript behavior code presence ---
+
+    @patch("streamlit.components.v1.html")
+    def test_draggable_true_contains_drag_code(self, mock_html):
+        """When draggable=True, JS output should contain drag-related event handling."""
+        reset_marker_registry(MarkerConfig(draggable=True))
+        register_marker("A", "a-1")
+        from streamtex.marker import inject_marker_navigation
+        inject_marker_navigation()
+        js_output = mock_html.call_args[0][0]
+        assert "cursor = 'grab'" in js_output or "cursor = \\'grab\\'" in js_output or "grab" in js_output
+        assert "mousedown" in js_output
+        assert "mousemove" in js_output
+        assert "mouseup" in js_output
+        assert "stx-marker-pos" in js_output
+
+    @patch("streamlit.components.v1.html")
+    def test_collapsible_true_contains_collapse_code(self, mock_html):
+        """When collapsible=True, JS output should contain collapse-related code."""
+        reset_marker_registry(MarkerConfig(collapsible=True))
+        register_marker("A", "a-1")
+        from streamtex.marker import inject_marker_navigation
+        inject_marker_navigation()
+        js_output = mock_html.call_args[0][0]
+        assert "btnCollapse" in js_output
+        assert "stx-marker-collapsed" in js_output
+        assert "applyCollapsed" in js_output
+
+    @patch("streamlit.components.v1.html")
+    def test_no_leftover_placeholders(self, mock_html):
+        """Ensure __DRAGGABLE__ and __COLLAPSIBLE__ placeholders are fully replaced."""
+        reset_marker_registry(MarkerConfig(draggable=True, collapsible=True))
+        register_marker("A", "a-1")
+        from streamtex.marker import inject_marker_navigation
+        inject_marker_navigation()
+        js_output = mock_html.call_args[0][0]
+        assert "__DRAGGABLE__" not in js_output
+        assert "__COLLAPSIBLE__" not in js_output

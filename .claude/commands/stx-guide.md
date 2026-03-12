@@ -140,6 +140,24 @@ streamtex-dev/                  # Workspace root
     stx-modelsward/
 ```
 
+### Ports des manuels (run-manuals.sh)
+
+| Manuel | Port |
+|--------|------|
+| Collection hub | 8501 |
+| Introduction | 8502 |
+| Advanced | 8503 |
+| Deploy | 8504 |
+| Developer | 8505 |
+| AI | 8506 |
+
+```bash
+./run-manuals.sh --all        # Lance les 6 manuels
+./run-manuals.sh --intro      # Lance seulement l'intro
+./run-manuals.sh --developer  # Lance seulement le developer
+./run-manuals.sh --ai         # Lance seulement l'AI
+```
+
 ### Flux de dependances
 
 ```
@@ -417,7 +435,8 @@ claude
 |-----------|-----------|-------------|
 | stx-designer (5) | init, update, audit, fix, tool | Cycle de vie complet du projet |
 | Developer (2) | test-run, lint | Tests et linting |
-| Project (1) | issue | Creer des issues GitHub avec metadata |
+| Project (5) | collection-new, course-generate, project-customize, project-init, project-upgrade | Gestion de projets |
+| stx-issue (6) | bug, feature, question, docs, comment, list | Issues GitHub (shared) |
 | Skills (8) | visual-design-rules, slide-design-rules, style-conventions, streamtex-quick-reference, block-blueprints, testing-patterns, stx-migrate, docs-lookup | Regles de conception |
 | Agents (3) | slide-designer, slide-reviewer, project-architect | Agents specialises |
 | Templates (4) | project, presentation, collection, course | Templates pour init |
@@ -1150,8 +1169,8 @@ class Styles(StxStyles):
 
 ## Section 4e — Issues GitHub (topic: `issues`)
 
-La commande `/stx-issue` permet de creer des issues GitHub directement depuis Claude,
-avec collecte automatique des metadata d'environnement.
+Le namespace `/stx-issue` regroupe 6 commandes pour la gestion d'issues GitHub,
+disponibles dans tous les profils (project, library, documentation).
 
 ### Prerequis
 
@@ -1166,33 +1185,42 @@ gh auth login
 gh auth status
 ```
 
-### Usage
+### Commandes de creation d'issues
 
 ```bash
 # Reporter un bug
-> /stx-issue bug st_grid ne s'affiche pas quand cols="1fr 2fr" sur mobile
+> /stx-issue:bug st_grid ne s'affiche pas quand cols="1fr 2fr" sur mobile
 
 # Demander une feature
-> /stx-issue feature Ajouter un toggle dark mode dans la sidebar st_book
+> /stx-issue:feature Ajouter un toggle dark mode dans la sidebar st_book
 
 # Poser une question
-> /stx-issue question Comment utiliser st_collection avec des routes custom ?
+> /stx-issue:question Comment utiliser st_collection avec des routes custom ?
 
 # Ameliorer la documentation
-> /stx-issue docs Ajouter un exemple pour st_overlay positioning
+> /stx-issue:docs Ajouter un exemple pour st_overlay positioning
+```
 
-# Aide
-> /stx-issue --help
+### Commandes de gestion d'issues
+
+```bash
+# Commenter une issue existante
+> /stx-issue:comment 42 Fixed in v0.3.1, please verify
+
+# Lister les issues
+> /stx-issue:list
+> /stx-issue:list --state all
+> /stx-issue:list --repo nicolasguelfi/streamtex --state closed
 ```
 
 ### Types d'issues
 
-| Type | Label GitHub | Fallback titre |
-|------|-------------|----------------|
-| `bug` | `bug` | `[Bug]` |
-| `feature` | `enhancement` | `[Feature]` |
-| `question` | `question` | `[Question]` |
-| `docs` | `documentation` | `[Docs]` |
+| Commande | Label GitHub | Fallback titre |
+|----------|-------------|----------------|
+| `/stx-issue:bug` | `bug` | `[Bug]` |
+| `/stx-issue:feature` | `enhancement` | `[Feature]` |
+| `/stx-issue:question` | `question` | `[Question]` |
+| `/stx-issue:docs` | `documentation` | `[Docs]` |
 
 ### Metadata collectees automatiquement
 
@@ -1202,7 +1230,7 @@ gh auth status
 
 ### Routage automatique
 
-La commande detecte le repo cible automatiquement :
+Les commandes de creation detectent le repo cible automatiquement :
 - Bugs sur l'API (`st_*`, erreurs Python) → `streamtex`
 - Issues sur la documentation (manuels, blocs) → `streamtex-docs`
 - Issues sur les profils Claude (commandes, installation) → `streamtex-claude`
@@ -1315,11 +1343,12 @@ Ces templates sont utilises aussi depuis l'interface web GitHub.
 
 | Tache | Commande |
 |-------|----------|
-| Reporter un bug | `/stx-issue bug <description>` |
-| Demander une feature | `/stx-issue feature <description>` |
-| Poser une question | `/stx-issue question <description>` |
-| Ameliorer la doc | `/stx-issue docs <description>` |
-| Aide | `/stx-issue --help` |
+| Reporter un bug | `/stx-issue:bug <description>` |
+| Demander une feature | `/stx-issue:feature <description>` |
+| Poser une question | `/stx-issue:question <description>` |
+| Ameliorer la doc | `/stx-issue:docs <description>` |
+| Commenter une issue | `/stx-issue:comment <id> <text>` |
+| Lister les issues | `/stx-issue:list [--repo] [--state]` |
 
 ### Commandes Claude (coherence)
 
@@ -1331,6 +1360,42 @@ Ces templates sont utilises aussi depuis l'interface web GitHub.
 | Audit sync profils + stx-guide | `/stx-coherence:audit profiles` |
 | Audit blocs + structure + templates | `/stx-coherence:audit blocks` |
 | Audit langue anglaise | `/stx-coherence:audit language` |
+
+### Commandes Claude (developer)
+
+| Tache | Commande |
+|-------|----------|
+| Lancer les tests | `/stx-developer:test-run` |
+| Lancer le linter | `/stx-developer:lint` |
+| Deployer (profil library) | `/stx-developer:deploy` |
+
+### Commandes Claude (project)
+
+| Tache | Commande |
+|-------|----------|
+| Initialiser un projet | `/stx-project:project-init <description>` |
+| Personnaliser un projet | `/stx-project:project-customize <description>` |
+| Upgrader un projet | `/stx-project:project-upgrade` |
+| Creer une collection | `/stx-project:collection-new <description>` |
+| Generer un cours | `/stx-project:course-generate` |
+
+### Commandes Claude (migration)
+
+| Tache | Commande |
+|-------|----------|
+| Migrer du HTML vers StreamTeX | `/stx-migration:html-migrate <description>` |
+| Convertir un bloc HTML | `/stx-migration:html-convert-block <description>` |
+| Conversion batch HTML | `/stx-migration:html-convert-batch` |
+| Exporter en HTML | `/stx-migration:html-export` |
+| Auditer une conversion | `/stx-migration:conversion-audit` |
+
+### Commandes Claude (presentation)
+
+| Tache | Commande |
+|-------|----------|
+| Auditer la projection | `/stx-presentation:presentation-audit` |
+| Corriger les violations | `/stx-presentation:presentation-fix` |
+| Convertir un sondage | `/stx-presentation:survey-convert` |
 
 ### Commandes GitHub CLI (gh)
 

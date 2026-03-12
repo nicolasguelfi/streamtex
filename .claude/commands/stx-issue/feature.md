@@ -1,24 +1,20 @@
-Create a GitHub issue with auto-collected environment metadata.
+Create a GitHub **feature request** with auto-collected environment metadata.
 
-Arguments: $ARGUMENTS (format: `<type> <description>` or `--help`)
+Arguments: $ARGUMENTS (format: `<description>` or `--help`)
 
 ## Argument Parsing
 
 Parse `$ARGUMENTS`:
-- First token = **type**: `bug`, `feature`, `question`, `docs`
-- Remaining tokens = **description** (free text)
+- All tokens = **description** (free text describing the feature)
 - `--help` → show the help section below and stop
 
-If type is missing or invalid, ask the user to provide one.
+If description is missing, ask the user to describe the feature.
 
-## Supported Types
+## Issue Type
 
 | Type | GitHub Label | Title Prefix (fallback) |
 |------|-------------|------------------------|
-| `bug` | `bug` | `[Bug]` |
 | `feature` | `enhancement` | `[Feature]` |
-| `question` | `question` | `[Question]` |
-| `docs` | `documentation` | `[Docs]` |
 
 ## Workflow
 
@@ -78,10 +74,10 @@ Determine the most appropriate repo based on context:
 
 2. If the remote is a StreamTeX ecosystem repo, use it directly.
 
-3. If NOT in a StreamTeX repo (user project), route by issue type:
-   - Bug about library API, `st_*` functions, Python errors → `streamtex`
-   - Bug about documentation, manuals, blocks → `streamtex-docs`
-   - Bug about Claude profiles, commands, installation → `streamtex-claude`
+3. If NOT in a StreamTeX repo (user project), route intelligently:
+   - Feature for library API, new `st_*` functions → `streamtex`
+   - Feature for documentation, manuals → `streamtex-docs`
+   - Feature for Claude profiles, commands → `streamtex-claude`
    - If ambiguous, ask the user.
 
 4. Extract the owner/repo from the remote URL. If no remote, ask the user which repo to target.
@@ -93,21 +89,14 @@ gh repo view <owner>/<repo> --json viewerPermission -q '.viewerPermission'
 ```
 
 - `WRITE` or `ADMIN` → labels will be applied
-- `READ` → skip labels, use title prefix `[Bug]`, `[Feature]`, etc.
+- `READ` → skip labels, use title prefix `[Feature]`
 - No access → stop with error message
 
 ### Step 5 — Gather additional details
 
-**For `bug` type**, ask the user:
-1. Steps to reproduce (numbered list)
-2. Expected behavior
-3. Actual behavior
-
-**For `feature` type**, ask the user:
+Ask the user:
 1. Motivation / use case
 2. Proposed solution (optional)
-
-**For `question` and `docs`**, the description is sufficient.
 
 ### Step 6 — Choose language
 
@@ -121,27 +110,16 @@ Build the issue title and body:
 
 **Title**: concise summary from the description (max 80 chars)
 
-**Body template** (adapt based on type):
+**Body template**:
 
 ```markdown
 ## Description
 <user's description>
 
-## Steps to Reproduce   <!-- bug only -->
-1. ...
-2. ...
-3. ...
-
-## Expected Behavior    <!-- bug only -->
+## Motivation
 ...
 
-## Actual Behavior      <!-- bug only -->
-...
-
-## Motivation           <!-- feature only -->
-...
-
-## Proposed Solution    <!-- feature only, if provided -->
+## Proposed Solution
 ...
 
 ## Environment
@@ -172,12 +150,12 @@ Based on permissions detected in Step 4:
 
 **With write access:**
 ```bash
-gh issue create --repo <owner>/<repo> --title "<title>" --body "<body>" --label "<label>"
+gh issue create --repo <owner>/<repo> --title "<title>" --body "<body>" --label "enhancement"
 ```
 
 **Without write access (read-only):**
 ```bash
-gh issue create --repo <owner>/<repo> --title "[Type] <title>" --body "<body>"
+gh issue create --repo <owner>/<repo> --title "[Feature] <title>" --body "<body>"
 ```
 
 ### Step 10 — Report
@@ -200,19 +178,15 @@ Display:
 When `$ARGUMENTS` is `--help`, display:
 
 ```
-/stx-issue — Create GitHub issues with auto-collected metadata
+/stx-issue:feature — Request a feature with auto-collected metadata
 
 Usage:
-  /stx-issue bug <description>        Report a bug
-  /stx-issue feature <description>    Request a feature
-  /stx-issue question <description>   Ask a question
-  /stx-issue docs <description>       Documentation improvement
+  /stx-issue:feature <description>
 
 Examples:
-  /stx-issue bug st_grid does not render when cols="1fr 2fr" on mobile
-  /stx-issue feature Add dark mode toggle to st_book sidebar
-  /stx-issue question How to use st_collection with custom routes?
-  /stx-issue docs Add example for st_overlay positioning
+  /stx-issue:feature Add dark mode toggle to st_book sidebar
+  /stx-issue:feature Support for custom color palettes in st_grid
+  /stx-issue:feature Export to PPTX format
 
 Metadata collected automatically:
   StreamTeX version, Python version, OS, uv version,

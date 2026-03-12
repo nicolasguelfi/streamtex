@@ -56,7 +56,7 @@ Si `$ARGUMENTS` correspond a un **topic** reconnu (voir liste ci-dessous) : repo
 Si `$ARGUMENTS` est une **question libre** en langage naturel : utilise toute la base de connaissances
 pour fournir une reponse contextuelle.
 
-### Topics reconnus (16)
+### Topics reconnus (17)
 
 | Topic | Description |
 |-------|-------------|
@@ -72,6 +72,7 @@ pour fournir une reponse contextuelle.
 | `styles` | Systeme de styles (composition, themes, grids) |
 | `book` | Orchestration book.py (TOC, markers, banners, zoom) |
 | `ai-images` | Generation d'images IA (OpenAI, Google Imagen, fal.ai) |
+| `presentation` | Mode presentation fullscreen 16/9 |
 | `troubleshooting` | Gotchas connus et resolution de problemes |
 | `stx-cli` | Reference complete de toutes les commandes `stx` |
 | `release` | Workflow de release complet (dev : publier + propager) |
@@ -180,7 +181,7 @@ stx lint -- --fix           # Auto-fix des problemes de lint
 stx install                       # Initialise un workspace (cree stx.toml + projects/)
   --preset PRESET                 # Preset: basic, user, standard (defaut), power, developer
   --project NAME                  # Cree un projet avec ce nom
-  --template TEMPLATE             # Template du projet (project, collection, presentation, course)
+  --template TEMPLATE             # Template CLI du projet (project, collection, slides)
 
 stx update                        # Pull + clone + sync + hooks + profiles + global commands
   --skip-sync                     # Skip uv sync
@@ -225,7 +226,7 @@ stx claude check                  # Verifie la synchronisation de tous les profi
 stx project new NAME              # Scaffold un nouveau projet StreamTeX
   --profile PROFILE               # Profil Claude (defaut: "project")
   --collection                    # Mode collection (st_collection au lieu de st_book)
-  --template [project|collection] # Copie un template riche depuis streamtex-docs/templates/
+  --template [project|collection|slides]  # Copie un template riche depuis streamtex-docs/templates/
                                   # (requiert un workspace avec streamtex-docs clone)
   --no-git                        # Skip git init
   --no-sync                       # Skip uv sync
@@ -342,6 +343,9 @@ stx project new mon-projet --template project
 #   book.py, blocks/, custom/, .streamlit/, pyproject.toml, setup.py, .gitignore
 #   + git init + uv sync + profil Claude "project"
 
+# Presentation slides (fullscreen 16/9, footer, navigation)
+stx project new ma-presentation --template slides
+
 # Mode collection (hub multi-projets)
 stx project new mon-hub --collection
 stx project new mon-hub --template collection    # version riche
@@ -353,6 +357,11 @@ stx project validate projects/stx-mon-projet/
 cd projects/stx-mon-projet/
 uv run streamlit run book.py
 ```
+
+> **Note** : les templates CLI (`--template project|collection|slides`) sont des repertoires
+> physiques copies depuis `streamtex-docs/templates/`. Les templates stx-designer
+> (`/stx-designer:init --template presentation|course`) sont des blueprints Claude AI
+> qui generent le projet interactivement.
 
 ### 4.2b Assistance Claude — commandes stx-designer
 
@@ -366,11 +375,11 @@ claude
 # Initialiser un projet complet depuis une description en langage naturel
 > /stx-designer:init cours Docker pour debutants, 8 slides, style sombre
 # → Claude propose la structure (8 blocks avec blueprints), demande confirmation,
-#   puis genere tous les fichiers (book.py, blocks/bck_01_*.py ... bck_08_*.py,
+#   puis genere tous les fichiers (book.py, blocks/bck_title.py ... bck_conclusion.py,
 #   custom/styles.py adapte)
 
 # Avec un template specifique (presentation live, collection, cours)
-> /stx-designer:init --presentation conference AI4SE, 12 slides, palette bleu/violet
+> /stx-designer:init --presentation conference AI4SE, 12 slides, palette bleu/violet, PresentationConfig fullscreen
 > /stx-designer:init --collection hub de cours avec 3 sous-projets
 > /stx-designer:init --course Python fundamentals, 6 chapitres avec exercices
 
@@ -386,7 +395,7 @@ claude
 
 # Auditer la qualite
 > /stx-designer:audit --all
-> /stx-designer:audit --target bck_04_text_styles conformite projection
+> /stx-designer:audit --target bck_text_styles conformite projection
 
 # Corriger automatiquement les problemes
 > /stx-designer:fix --all
@@ -635,6 +644,10 @@ uv run pre-commit run --all-files
 
 ### 4.9 Travailler avec les blocks
 
+> **Convention de nommage** : les fichiers block utilisent des noms descriptifs
+> (`bck_title.py`, `bck_containers.py`), jamais de prefixes numeriques (`bck_01_*`).
+> L'ordre est defini par `st_book([...])` dans `book.py`.
+
 **Structure d'un block (`blocks/bck_example.py`)** :
 
 ```python
@@ -854,6 +867,75 @@ lors des reruns Streamlit.
 
 ---
 
+## Section 4c — Mode Presentation Fullscreen (topic: `presentation`)
+
+StreamTeX offre un mode presentation fullscreen 16/9 pour creer des slides
+directement dans Streamlit, sans paginate.
+
+### Configuration (book.py)
+
+```python
+from streamtex import (
+    st_book, PresentationConfig, set_presentation_config,
+    SlideBreakConfig, SlideBreakMode, set_slide_break_config,
+    MarkerConfig, add_presentation_options, st_presentation_footer,
+)
+
+# 1. Configurer le mode presentation
+set_presentation_config(PresentationConfig(
+    title="My Presentation",
+    aspect_ratio="16/9",
+    footer=True,
+    center_content=True,
+    hide_streamlit_header=True,
+))
+
+# 2. Configurer les slide breaks en mode fullscreen
+set_slide_break_config(SlideBreakConfig(
+    fullscreen=True,
+    mode=SlideBreakMode.HIDDEN,
+    marker=True,
+))
+
+# 3. Ajouter les options de presentation dans la sidebar
+add_presentation_options()
+
+# 4. Orchestrer le book (SANS paginate)
+marker_config = MarkerConfig(
+    auto_marker_on_toc=1,
+    next_keys=["PageDown"],
+    prev_keys=["PageUp"],
+)
+st_book([blocks.bck_title, blocks.bck_content, ...],
+        paginate=False, marker_config=marker_config)
+```
+
+### Footer de presentation
+
+`st_presentation_footer()` affiche un pied de page avec le numero de slide,
+le total et le titre de la presentation :
+
+```python
+st_presentation_footer(current_slide=3, total_slides=12, title="My Talk")
+```
+
+### Options de presentation (sidebar)
+
+`add_presentation_options()` ajoute des controles dans la sidebar pour
+le presentateur : activer/desactiver le mode fullscreen, ajuster les marges,
+et controler l'affichage du footer.
+
+### Navigation clavier
+
+- **PageDown** : slide suivante
+- **PageUp** : slide precedente
+
+> **Important** : `PresentationConfig` est incompatible avec `paginate=True`.
+> Le mode fullscreen utilise le mode continu avec `st_slide_break()` pour
+> separer les slides visuellement.
+
+---
+
 ## Section 5 — Gotchas connus
 
 ### 1. `from streamtex import *` masque `list()`
@@ -901,6 +983,10 @@ lors des reruns Streamlit.
 **Solution** : utiliser des URLs absolues vers GitHub (`https://github.com/nicolasguelfi/streamtex/blob/main/AI_GUIDE.md`).
 `stx publish check` detecte automatiquement les liens relatifs (check "README links").
 
+### 12. PresentationConfig + paginate=True = conflit
+**Probleme** : le mode presentation fullscreen necessite le mode continu (defilement vertical avec slide breaks), pas le mode pagine.
+**Solution** : toujours utiliser `paginate=False` (defaut) avec `PresentationConfig`. Le mode fullscreen utilise `st_slide_break()` pour separer les slides visuellement, avec navigation clavier (PageDown/PageUp).
+
 ---
 
 ## Section 6 — Carte de reference rapide
@@ -915,6 +1001,7 @@ lors des reruns Streamlit.
 | Upgrader le preset | `stx install --preset developer` |
 | Creer un projet (minimal) | `stx project new <name>` |
 | Creer un projet (template riche) | `stx project new <name> --template project` |
+| Creer une presentation (slides 16/9) | `stx project new <name> --template slides` |
 | Valider un projet | `stx project validate .` |
 | Upgrader un projet | `stx project upgrade .` |
 | Verifier compatibilite | `stx project upgrade . --check` |
@@ -941,7 +1028,7 @@ lors des reruns Streamlit.
 
 | Tache | Commande |
 |-------|----------|
-| Audit complet (10 checks) | `/coherence:audit` ou `/coherence:audit all` |
+| Audit complet (19 checks) | `/coherence:audit` ou `/coherence:audit all` |
 | Audit API + cheatsheet | `/coherence:audit library` |
 | Audit blocs + manuels | `/coherence:audit docs` |
 | Audit sync profils + stx-guide | `/coherence:audit profiles` |

@@ -4,9 +4,10 @@ Arguments: $ARGUMENTS (target: "docker", "huggingface", or "gcp")
 
 ## Pre-Deployment Checks (all targets)
 
-1. **Read configuration**: Read `Dockerfile`, `pyproject.toml`, and the active project's `.streamlit/config.toml`.
-2. **Run tests**: Execute `uv run pytest tests/ -v` and abort if any fail.
-3. **Verify requirements**:
+1. **Update CHANGELOG.md**: Read `CHANGELOG.md` and verify it has an entry for the current version being deployed. If missing, add one following [Keep a Changelog](https://keepachangelog.com/) format with `Added`, `Changed`, `Fixed`, `Removed` sections as appropriate.
+2. **Read configuration**: Read `Dockerfile`, `pyproject.toml`, and the active project's `.streamlit/config.toml`.
+3. **Run tests**: Execute `uv run pytest tests/ -v` and abort if any fail.
+4. **Verify requirements**:
    - `streamlit>=1.54.0` is in `pyproject.toml` dependencies
    - `.streamlit/config.toml` has `enableStaticServing = true`
    - All image assets referenced in blocks exist in `static/images/`

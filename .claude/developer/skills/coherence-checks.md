@@ -1,6 +1,6 @@
 # Coherence Check Rules
 
-Reference file for `/coherence:audit`. Defines 16 check categories.
+Reference file for `/coherence:audit`. Defines 19 check categories.
 
 ---
 
@@ -16,9 +16,11 @@ Reference file for `/coherence:audit`. Defines 16 check categories.
 - INFO if an export appears in blocks but has no `show_code()` example
 - SKIP internal names (prefixed with `_`), type aliases, and re-exports of enums
 
+**Presentation exports to verify**: `PresentationConfig`, `set_presentation_config`, `get_presentation_config`, `st_presentation_footer`, `add_presentation_options`
+
 **Known exceptions** (not expected in blocks):
 - Low-level exports: `export_append`, `export_push_wrapper`, `export_pop_wrapper`, `generate_export_html`, `reset_export_buffer`, `is_export_active`
-- Config internals: `get_block_helper_config`, `get_bib_config`, `get_gsheet_config`, `get_link_config`, `get_bib_registry`, `reset_bib_registry`, `get_ai_image_config`, `get_slide_break_config`
+- Config internals: `get_block_helper_config`, `get_bib_config`, `get_gsheet_config`, `get_link_config`, `get_bib_registry`, `reset_bib_registry`, `get_ai_image_config`, `get_slide_break_config`, `get_presentation_config`
 - Parser internals: `parse_bibtex_string`, `parse_ris_string`, `register_bib_parser`
 - Utility re-exports: `generate_bib_stubs`, `export_bibtex`, `load_css`, `exec_static`, `resolve_content`, `inject_link_preview_scaffold`, `add_wrap_all_option`, `add_slide_break_options`
 - Error/result types: `AIImageError`, `AIImageResult`, `BibParseError`, `GSheetError`
@@ -34,7 +36,7 @@ Reference file for `/coherence:audit`. Defines 16 check categories.
 
 **Source files**:
 - `streamtex/streamtex/__init__.py` (exports)
-- Key module files: `write.py`, `code.py`, `book.py`, `grid.py`, `list.py`, `container.py`, `block_helpers.py`
+- Key module files: `write.py`, `code.py`, `book.py`, `grid.py`, `list.py`, `container.py`, `block_helpers.py`, `presentation.py`
 
 **Target files**:
 - `streamtex-claude/shared/references/streamtex_cheatsheet_en.md`
@@ -44,6 +46,7 @@ Reference file for `/coherence:audit`. Defines 16 check categories.
 - WARNING if a function's signature (new parameter) is not reflected in the cheatsheet
 - ERROR if the coding standards recommend a pattern that contradicts current library behavior
 - WARNING if the cheatsheet documents a function that no longer exists in `__init__.py`
+- WARNING if `presentation.py` signatures (`PresentationConfig`, `set_presentation_config`, `get_presentation_config`, `st_presentation_footer`, `add_presentation_options`) are missing from the cheatsheet
 
 **How to check signatures**: For each major function, read the `def` line in the source module. Compare parameter names with those listed in the cheatsheet.
 
@@ -79,13 +82,13 @@ Reference file for `/coherence:audit`. Defines 16 check categories.
 | `streamtex-claude/profiles/project/designer/skills/*.md` | `projects/*/.claude/designer/skills/` |
 | `streamtex-claude/profiles/project/designer/templates/*.md` | `projects/*/.claude/designer/templates/` |
 | `streamtex-claude/profiles/project/designer/tools/*.md` | `projects/*/.claude/designer/tools/` |
-| `streamtex-claude/profiles/documentation/commands/stx-designer/*.md` | `streamtex-docs/.claude/commands/stx-designer/` |
 | `streamtex-claude/profiles/documentation/designer/agents/*.md` | `streamtex-docs/.claude/designer/agents/` |
 | `streamtex-claude/shared/commands/stx-guide.md` | `streamtex/.claude/commands/`, `streamtex-docs/.claude/commands/`, `projects/*/.claude/commands/` |
 
-**Method**: Read both files, compare content. If different, report as ERROR.
+**Method**: First verify source existence, then read both files, compare content. If different, report as ERROR.
 
 **Rules**:
+- ERROR if a source file declared in a manifest `[shared]` section does not exist in `shared/references/` or `shared/commands/` (source existence guard)
 - ERROR if file content differs between source and copy
 - WARNING if a source file exists but has no copy in an expected location
 - INFO: report total files checked and sync status
@@ -153,6 +156,10 @@ Reference file for `/coherence:audit`. Defines 16 check categories.
 - WARNING if a profile listed by `install.py --list` is missing from stx-guide
 - WARNING if a manual in `streamtex-docs/manuals/` is missing from Section 2 layout
 - WARNING if a gotcha in Section 5 references deprecated behavior
+- WARNING if topic "presentation" is missing from the topics table or does not document PresentationConfig
+- WARNING if CLI templates documented in stx-guide do not match `AVAILABLE_TEMPLATES` in `install_cmd.py`
+- WARNING if presets documented in stx-guide do not match `PRESET_ORDER` in `workspace_cmd.py`
+- WARNING if the distinction between CLI templates and stx-designer templates is not documented
 - INFO: report stx-guide line count and last-known sync date
 
 ---
@@ -296,6 +303,7 @@ Then for each code block, parse function calls and verify parameter names and en
 
 **Rules**:
 - WARNING if a source module with public functions has no corresponding test file
+- WARNING if `test_presentation.py` does not exist (presentation module must have dedicated tests)
 - INFO: report module → test file mapping and coverage ratio
 
 **Known exceptions** (modules not expected to have dedicated test files):
@@ -466,6 +474,7 @@ Then for each `show_code()` string, parse function calls and verify keyword argu
 | `from streamtex import ExportConfig` | — | Constructor parameters |
 | `from streamtex import BannerConfig` | — | Constructor parameters |
 | `from streamtex import AIImageConfig` | — | Constructor parameters |
+| `from streamtex import PresentationConfig` | — | Constructor parameters (`title`, `aspect_ratio`, `footer`, `center_content`, `hide_streamlit_header`, `enforce_ratio`) |
 | `from custom.styles import Styles` | `s` | Project-specific (skip — not library) |
 
 **Rules**:
@@ -538,3 +547,73 @@ for cls in [PdfConfig, ExportConfig, BannerConfig]:
 - WARNING if the latest CHANGELOG entry has no `### Added`, `### Changed`, `### Fixed`, or `### Removed` subsection
 - WARNING if CHANGELOG entries are not in reverse chronological order
 - INFO: report current library version and latest CHANGELOG version
+
+---
+
+## Check 18: Manifest File Existence (scope: profiles, all)
+
+**Goal**: Every file declared in a profile's `manifest.toml` must physically exist at the path resolved by `install.py`'s `CATEGORY_PATHS` mapping.
+
+**Why this check is critical**: The CI (`validate.yml`) catches this on push, but catching it locally before pushing avoids broken CI runs. A manifest that declares files which don't exist means `install.py` will silently skip them, and users won't get the expected commands/skills/agents.
+
+**Scope**: `streamtex-claude/profiles/*/manifest.toml`
+
+**Method**:
+1. For each profile directory in `streamtex-claude/profiles/`:
+   - Read `manifest.toml`
+   - For each category (`[commands]`, `[skills]`, `[agents]`, `[templates]`, `[tools]`):
+     - Resolve the subdirectory using `CATEGORY_PATHS` mapping:
+       - `commands.<subdir>` → `commands/<subdir>/`
+       - `skills.designer` → `designer/skills/`
+       - `skills.developer` → `developer/skills/`
+       - `agents.designer` → `designer/agents/`
+       - `templates.designer` → `designer/templates/`
+       - `tools.designer` → `designer/tools/`
+     - For each file in the list, verify `profiles/<profile>/<resolved_path>/<file>` exists
+   - For `[shared]`:
+     - `references` → verify each file exists in `shared/references/`
+     - `commands` → verify each file exists in `shared/commands/`
+
+**Rules**:
+- ERROR if a declared file does not exist at the resolved path
+- ERROR if a `[shared]` reference file does not exist in `shared/references/` or `shared/commands/`
+- WARNING if a profile has no `manifest.toml`
+- INFO: report total files declared vs found per profile
+
+**Example of what this catches**:
+- `documentation/manifest.toml` declares `stx-designer = ["init.md", ...]` but `documentation/commands/stx-designer/` does not exist → 5 ERRORS
+- `project/manifest.toml` declares `shared.references = ["presentation_cheatsheet_en.md"]` but `shared/references/presentation_cheatsheet_en.md` is missing → 1 ERROR
+
+---
+
+## Check 19: CLI Template Registry Sync (scope: profiles, all)
+
+**Goal**: The CLI template registry, the `click.Choice` validator, the template directories on disk, and the documentation are all synchronized.
+
+**Why this check is critical**: A template can be added to `AVAILABLE_TEMPLATES` but forgotten in `click.Choice` (users get a rejection error), or a template directory can be created but never registered (users can't use it). The documentation may also list incorrect templates, confusing users.
+
+**Source files**:
+- `streamtex/streamtex/cli/install_cmd.py` → `AVAILABLE_TEMPLATES` list
+- `streamtex/streamtex/cli/project_cmd.py` → `click.Choice([...])` in `--template` option
+- `streamtex-docs/templates/` → directories matching `template_*/`
+- `streamtex-claude/shared/commands/stx-guide.md` → CLI template references
+- `streamtex/README.md` → template references in Quick Start section
+
+**Method**:
+1. Extract `AVAILABLE_TEMPLATES` from `install_cmd.py` (parse the Python list literal)
+2. Extract the `click.Choice` list from `project_cmd.py` (parse the list in `type=click.Choice([...])`)
+3. List directories matching `streamtex-docs/templates/template_*/`, extract names (strip `template_` prefix)
+4. Extract template names mentioned in stx-guide.md CLI sections (look for `--template` references with `[...|...|...]` syntax)
+5. Extract template names mentioned in README.md (look for `--template` in code blocks)
+
+**Rules**:
+- ERROR if `AVAILABLE_TEMPLATES` differs from the `click.Choice` list (these MUST be identical)
+- ERROR if a directory `template_<name>` exists in `streamtex-docs/templates/` but `<name>` is not in `AVAILABLE_TEMPLATES`
+- ERROR if a name is in `AVAILABLE_TEMPLATES` but no `template_<name>` directory exists
+- WARNING if stx-guide.md CLI template list differs from `AVAILABLE_TEMPLATES`
+- WARNING if README.md template list differs from `AVAILABLE_TEMPLATES`
+- INFO: report all 4 sets and their alignment status
+
+**Important distinction** (do NOT flag as errors):
+- stx-designer templates (`/stx-designer:init --template`) are Claude AI blueprints stored in `profiles/project/designer/templates/`. These are a DIFFERENT system from CLI templates and should NOT be compared to `AVAILABLE_TEMPLATES`.
+- Only flag mismatches for CLI template references (identified by `stx project new --template` or `stx install --template` context).

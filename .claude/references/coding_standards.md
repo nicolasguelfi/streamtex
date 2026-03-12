@@ -51,6 +51,7 @@ import blocks
 ## 5. sx vs st — When to Use What
 - **ALL layout and content** -> `stx.*`: st_write, st_image, st_grid, st_list, st_block, st_span, st_space, st_br, st_overlay, st_html
 - **AI image generation** -> `stx.*`: st_ai_image, st_ai_image_widget, generate_image (requires `streamtex[ai]`)
+- **Presentation mode** -> `stx.*`: st_presentation_footer, add_presentation_options
 - **Data visualization (export-aware)** -> `stx.*`: st_dataframe, st_table, st_metric, st_json, st_graphviz, st_line_chart, st_bar_chart, st_area_chart, st_scatter_chart, st_audio, st_video
 - **ONLY interactivity** -> `st.*`: buttons, inputs, sliders, forms, selectbox, checkbox
 
@@ -169,7 +170,7 @@ def build():
 ```
 
 ## 8. Naming Conventions
-- **Block files**: `bck_[description]_[suffix].py`
+- **Block files**: `bck_<descriptive_topic>.py` — never use numeric prefixes (`bck_01_`, `bck_02_`). Slide order is defined in `st_book([...])`, not by filename.
 - **Image assets**: `[block_filename_no_ext]_image_[00index].[ext]`
 - **Style names**: English-only, generic, descriptive (`title_giant_green`, `subtitle_blue_01`)
 - **Style classes**: `BlockStyles` or `BStyles`, aliased as `bs = BlockStyles`

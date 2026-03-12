@@ -75,3 +75,11 @@ uv run ruff check streamtex/ --fix  # Auto-fix lint issues
 1. **Testing** -> `uv run pytest tests/ -v` (`/developer:test-run`)
 2. **Linting** -> `uv run ruff check streamtex/` (`/developer:lint`)
 3. **Deploy** -> Publish to PyPI (`/developer:deploy`)
+
+## CHANGELOG (MANDATORY)
+**ALWAYS update `CHANGELOG.md`** when making changes to the library:
+- **Before any version bump**, add an entry under the new version heading
+- Use [Keep a Changelog](https://keepachangelog.com/) format: `Added`, `Changed`, `Fixed`, `Removed`
+- Group related changes under clear subsections
+- Include CLI command changes, new exports, bug fixes, documentation updates
+- The CHANGELOG is the user-facing record of what changed — if it's worth committing, it's worth documenting

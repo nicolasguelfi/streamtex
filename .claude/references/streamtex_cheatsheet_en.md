@@ -536,8 +536,8 @@ marker_config = MarkerConfig(auto_marker_on_toc=1, next_keys=["PageDown"], prev_
 # Orchestrate blocks
 st_book(
     [
-        blocks.bck_01_welcome,
-        blocks.bck_02_content,
+        blocks.bck_welcome,
+        blocks.bck_content,
     ],
     toc_config=toc,
     marker_config=marker_config,
@@ -1704,6 +1704,43 @@ SlideBreakMode.MARKER_ONLY   # Hidden marker only (no visual)
 SlideBreakMode.HIDDEN        # Completely hidden (no marker either)
 ```
 
+### Presentation Config (Fullscreen 16:9)
+
+```python
+from streamtex import (
+    set_presentation_config, PresentationConfig,
+    st_presentation_footer, add_presentation_options,
+)
+
+# Configure in book.py (before st_book call)
+set_presentation_config(PresentationConfig(
+    title="My Presentation",
+    aspect_ratio="16/9",       # 16:9 viewport fitting
+    footer=True,               # Auto footer via st_presentation_footer()
+    center_content=True,       # Center slide content vertically
+    hide_streamlit_header=True, # Hide Streamlit hamburger menu
+))
+
+# Footer is rendered automatically when footer=True.
+# To render manually (rare): st_presentation_footer()
+
+# Sidebar options for presentation mode:
+add_presentation_options()     # Adds fullscreen toggle + aspect ratio selector
+```
+
+### SlideBreakConfig — Fullscreen Mode
+
+```python
+from streamtex import set_slide_break_config, SlideBreakConfig, SlideBreakMode
+
+# Fullscreen presentation: hidden breaks with marker navigation
+set_slide_break_config(SlideBreakConfig(
+    mode=SlideBreakMode.HIDDEN,  # No visible rule/spacer
+    fullscreen=True,             # Each slide = 100vh viewport
+    marker=True,                 # Hidden marker for PageDown nav
+))
+```
+
 ### Slide Break (Presentation Mode)
 
 ```python
@@ -1786,6 +1823,50 @@ config = PdfConfig(
 # Pass pdf_config to st_book() — sets defaults for the sidebar PDF options:
 st_book([...], pdf_config=PdfConfig(format="A4", landscape=True, page_numbers=True))
 ```
+
+## Presentation Mode (Fullscreen 16/9)
+
+### PresentationConfig
+
+```python
+from streamtex import PresentationConfig, set_presentation_config
+
+set_presentation_config(PresentationConfig(
+    title="My Presentation",
+    aspect_ratio="16/9",
+    footer=True,
+    center_content=True,
+    hide_streamlit_header=True,
+))
+```
+
+### st_presentation_footer()
+
+```python
+from streamtex import st_presentation_footer
+
+st_presentation_footer(current_slide=3, total_slides=12, title="My Talk")
+```
+
+### add_presentation_options()
+
+```python
+from streamtex import add_presentation_options
+
+add_presentation_options()  # Sidebar controls for presenter
+```
+
+### SlideBreakConfig (fullscreen)
+
+```python
+from streamtex import SlideBreakConfig, SlideBreakMode, set_slide_break_config
+
+set_slide_break_config(SlideBreakConfig(fullscreen=True, mode=SlideBreakMode.HIDDEN, marker=True))
+```
+
+> **Important**: `PresentationConfig` requires `paginate=False` (default). Fullscreen mode
+> uses continuous scrolling with `st_slide_break()` for visual slide separation and
+> PageDown/PageUp keyboard navigation.
 
 ### Containers
 

@@ -8,7 +8,7 @@ Thank you for your interest in contributing to StreamTeX!
 
 1. Fork the repository and create a feature branch
 2. Install dependencies: `uv sync`
-3. Make your changes following [coding standards](.claude/references/coding_standards.md)
+3. Make your changes following [coding standards](https://github.com/nicolasguelfi/streamtex/blob/main/.claude/references/coding_standards.md)
 4. Run tests: `uv run pytest tests/ -v`
 5. Run linter: `uv run ruff check streamtex/`
 6. Submit a Pull Request

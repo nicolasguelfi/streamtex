@@ -41,6 +41,16 @@ class ListType:
     def __repr__(self):
         return self.order
 
+    def __eq__(self, other):
+        if isinstance(other, ListType):
+            return self.order == other.order
+        if isinstance(other, str):
+            return self.order == other
+        return NotImplemented
+
+    def __hash__(self):
+        return hash(self.order)
+
 
 class ListTypes:
     ordered = ListType("ol")

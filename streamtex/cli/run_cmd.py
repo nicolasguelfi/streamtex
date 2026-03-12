@@ -2,6 +2,7 @@
 
 import os
 import platform
+import signal
 import subprocess
 import sys
 import time
@@ -27,6 +28,8 @@ _BROWSER_COMMANDS = {
         "edge": ["start", "msedge"],
     },
 }
+
+_DEFAULT_PORT = 8501
 
 
 def _get_os_key() -> str:
@@ -73,6 +76,76 @@ def _find_book(book: str | None) -> str:
     )
 
 
+def _read_port_from_config() -> int | None:
+    """Read server port from .streamlit/config.toml if it exists."""
+    config_path = os.path.join(".streamlit", "config.toml")
+    if not os.path.isfile(config_path):
+        return None
+    try:
+        import tomllib
+
+        with open(config_path, "rb") as f:
+            data = tomllib.load(f)
+        return data.get("server", {}).get("port")
+    except (OSError, ValueError, KeyError):
+        return None
+
+
+def _kill_port(port: int) -> bool:
+    """Kill the process listening on the given port. Returns True if a process was killed."""
+    console = get_console()
+    os_key = _get_os_key()
+
+    if os_key == "windows":
+        # Windows: netstat + taskkill
+        try:
+            result = subprocess.run(
+                ["netstat", "-ano"],
+                capture_output=True, text=True, timeout=5,
+            )
+            for line in result.stdout.splitlines():
+                if f":{port}" in line and "LISTENING" in line:
+                    pid = line.strip().split()[-1]
+                    subprocess.run(["taskkill", "/F", "/PID", pid], timeout=5)
+                    console.print(f"[yellow]Killed process {pid} on port {port}[/yellow]")
+                    return True
+        except (subprocess.TimeoutExpired, OSError):
+            pass
+        return False
+
+    # macOS / Linux: lsof
+    try:
+        result = subprocess.run(
+            ["lsof", "-ti", f":{port}"],
+            capture_output=True, text=True, timeout=5,
+        )
+        pids = result.stdout.strip().splitlines()
+        if not pids:
+            return False
+        for pid_str in pids:
+            try:
+                pid = int(pid_str.strip())
+                os.kill(pid, signal.SIGTERM)
+                console.print(f"[yellow]Killed process {pid} on port {port}[/yellow]")
+            except (ValueError, ProcessLookupError, PermissionError):
+                continue
+        # Give the process time to release the port
+        time.sleep(1)
+        return True
+    except (subprocess.TimeoutExpired, OSError):
+        return False
+
+
+def _resolve_port(port_arg: int | None) -> int:
+    """Resolve the effective port: CLI arg > config file > default."""
+    if port_arg:
+        return port_arg
+    config_port = _read_port_from_config()
+    if config_port:
+        return config_port
+    return _DEFAULT_PORT
+
+
 @click.command(name="run")
 @click.argument("book", required=False, default=None)
 @click.option("-p", "--port", type=int, default=None, help="Server port (default: Streamlit auto).")
@@ -83,17 +156,24 @@ def _find_book(book: str | None) -> str:
     help="Browser to open (default: system default).",
 )
 @click.option("--headless", is_flag=True, help="Don't open any browser.")
+@click.option("-f", "--force", is_flag=True, help="Kill any process using the target port before starting.")
 @click.argument("extra_args", nargs=-1, type=click.UNPROCESSED)
-def run(book, port, browser, headless, extra_args):
+def run(book, port, browser, headless, force, extra_args):
     """Run a StreamTeX project (shortcut for streamlit run)."""
     console = get_console()
     entry = _find_book(book)
 
+    actual_port = _resolve_port(port)
+
+    # Kill existing process on the port if --force
+    if force:
+        _kill_port(actual_port)
+
     # Build streamlit command
     cmd = [sys.executable, "-m", "streamlit", "run", entry]
 
-    if port:
-        cmd.extend(["--server.port", str(port)])
+    if port or _read_port_from_config():
+        cmd.extend(["--server.port", str(actual_port)])
 
     # If a specific browser is requested or headless, run in headless mode
     # and open the browser manually
@@ -102,7 +182,6 @@ def run(book, port, browser, headless, extra_args):
 
     cmd.extend(extra_args)
 
-    actual_port = port or 8501
     url = f"http://localhost:{actual_port}"
 
     if browser and browser != "none" and not headless:

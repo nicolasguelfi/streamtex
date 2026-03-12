@@ -53,6 +53,12 @@ class MarkerConfig:
     """Keys to navigate to the previous marker.
     Supports modifier syntax: ``"Ctrl+ArrowLeft"``."""
 
+    draggable: bool = False
+    """Allow the floating nav widget to be dragged anywhere on screen."""
+
+    collapsible: bool = False
+    """Show a ⋮ button to collapse/expand the nav widget."""
+
 
 class MarkerRegistry:
     """Registry that collects markers during a book render pass."""
@@ -410,6 +416,105 @@ def inject_marker_navigation() -> None:
     bar.appendChild(btnList);
     bar.appendChild(label);
 
+    /* --- Collapsible ⋮ button --- */
+    var collapsible = __COLLAPSIBLE__;
+    var collapsed = false;
+    var btnCollapse = null;
+    var barChildren = [];  /* elements to hide/show on collapse */
+
+    if (collapsible) {
+        /* Restore collapsed state from localStorage */
+        try { collapsed = localStorage.getItem('stx-marker-collapsed') === '1'; } catch(e) {}
+
+        btnCollapse = hostDoc.createElement('button');
+        btnCollapse.textContent = '\\u22EE';  /* ⋮ */
+        btnCollapse.title = 'Collapse / expand navigation bar';
+        btnCollapse.style.cssText = btnStyle + 'font-size:16px;font-weight:bold;letter-spacing:0;';
+        btnCollapse.onmouseenter = function() { this.style.background = btnHover; };
+        btnCollapse.onmouseleave = function() { this.style.background = 'none'; };
+
+        /* Collect all bar children BEFORE adding collapse button */
+        for (var ci = 0; ci < bar.childNodes.length; ci++) {
+            barChildren.push(bar.childNodes[ci]);
+        }
+
+        bar.appendChild(btnCollapse);
+
+        function applyCollapsed() {
+            var disp = collapsed ? 'none' : '';
+            for (var ci = 0; ci < barChildren.length; ci++) {
+                barChildren[ci].style.display = disp;
+                /* restore inline-block for counter when expanding */
+                if (!collapsed && barChildren[ci] === counter) barChildren[ci].style.display = 'inline-block';
+                if (!collapsed && barChildren[ci] === counterInput) barChildren[ci].style.display = 'none';
+            }
+            bar.style.padding = collapsed ? '6px 8px' : '6px 14px';
+            bar.style.borderRadius = collapsed ? '8px' : '24px';
+            if (collapsed && popupOpen) togglePopup(false);
+            try { localStorage.setItem('stx-marker-collapsed', collapsed ? '1' : '0'); } catch(e) {}
+        }
+
+        btnCollapse.onclick = function(e) {
+            e.stopPropagation();
+            collapsed = !collapsed;
+            applyCollapsed();
+        };
+
+        applyCollapsed();
+    }
+
+    /* --- Draggable --- */
+    var draggable = __DRAGGABLE__;
+    if (draggable) {
+        nav.style.cursor = 'grab';
+        var _dragStartX, _dragStartY, _dragNavX, _dragNavY, _dragging = false;
+
+        /* Restore saved position from localStorage */
+        try {
+            var savedPos = JSON.parse(localStorage.getItem('stx-marker-pos'));
+            if (savedPos && savedPos.x !== undefined) {
+                nav.style.left = savedPos.x + 'px';
+                nav.style.top = savedPos.y + 'px';
+                nav.style.right = 'auto';
+                nav.style.bottom = 'auto';
+                nav.style.transform = 'none';
+            }
+        } catch(e) {}
+
+        nav.addEventListener('mousedown', function(e) {
+            if (e.target.tagName === 'BUTTON' || e.target.tagName === 'A' ||
+                e.target.tagName === 'INPUT' || e.target.tagName === 'IMG') return;
+            _dragging = true;
+            _dragStartX = e.clientX;
+            _dragStartY = e.clientY;
+            var rect = nav.getBoundingClientRect();
+            _dragNavX = rect.left;
+            _dragNavY = rect.top;
+            nav.style.cursor = 'grabbing';
+            e.preventDefault();
+        });
+        hostDoc.addEventListener('mousemove', function(e) {
+            if (!_dragging) return;
+            var dx = e.clientX - _dragStartX;
+            var dy = e.clientY - _dragStartY;
+            nav.style.left = (_dragNavX + dx) + 'px';
+            nav.style.top = (_dragNavY + dy) + 'px';
+            nav.style.right = 'auto';
+            nav.style.bottom = 'auto';
+            nav.style.transform = 'none';
+        });
+        hostDoc.addEventListener('mouseup', function() {
+            if (!_dragging) return;
+            _dragging = false;
+            nav.style.cursor = 'grab';
+            /* Persist position */
+            try {
+                var rect = nav.getBoundingClientRect();
+                localStorage.setItem('stx-marker-pos', JSON.stringify({x: rect.left, y: rect.top}));
+            } catch(e) {}
+        });
+    }
+
     /* --- Logo + heart branding --- */
     var logoB64 = '__LOGO_B64__';
     var homeUrl = '__HOME_URL__';
@@ -586,6 +691,7 @@ def inject_marker_navigation() -> None:
         if (el) el.remove();
         var ms = hostDoc.getElementById('stx-marker-responsive');
         if (ms) ms.remove();
+        /* Note: localStorage positions and collapsed state persist intentionally */
     };
 
     /* --- Init --- */
@@ -618,7 +724,9 @@ def inject_marker_navigation() -> None:
         .replace('__LINK_ACTIVE_COLOR__', LINK_ACTIVE_COLOR_DARK)
         .replace('__LOGO_B64__', logo_b64)
         .replace('__HOME_URL__', STX_HOME_URL)
-        .replace('__STX_CORAL__', STX_CORAL))
+        .replace('__STX_CORAL__', STX_CORAL)
+        .replace('__DRAGGABLE__', 'true' if config.draggable else 'false')
+        .replace('__COLLAPSIBLE__', 'true' if config.collapsible else 'false'))
 
     # components.html() creates a real iframe where scripts execute
     # (st.html() strips <script> tags in Streamlit 1.54+)

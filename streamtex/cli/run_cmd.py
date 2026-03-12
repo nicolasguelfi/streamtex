@@ -2,6 +2,7 @@
 
 import os
 import platform
+import shutil
 import signal
 import subprocess
 import sys
@@ -169,8 +170,13 @@ def run(book, port, browser, headless, force, extra_args):
     if force:
         _kill_port(actual_port)
 
-    # Build streamlit command
-    cmd = [sys.executable, "-m", "streamlit", "run", entry]
+    # Build streamlit command — use `uv run` so Streamlit runs inside the
+    # project's .venv (not the uv-tool Python that hosts the CLI).
+    uv = shutil.which("uv")
+    if uv:
+        cmd = [uv, "run", "streamlit", "run", entry]
+    else:
+        cmd = [sys.executable, "-m", "streamlit", "run", entry]
 
     if port or _read_port_from_config():
         cmd.extend(["--server.port", str(actual_port)])

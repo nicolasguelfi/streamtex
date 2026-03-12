@@ -10,6 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **`stx run` uses project `.venv` via `uv run`**: `stx run` now delegates to `uv run streamlit run` instead of `sys.executable -m streamlit`, so project-specific extras (`streamtex[ai]`, `streamtex[pdf]`, etc.) are available at runtime (fixes #1)
 
+### Changed
+- **Command namespace `stx-` prefix convention**: All Claude command namespaces renamed to use `stx-` prefix — `/developer:` → `/stx-developer:`, `/project:` → `/stx-project:`, `/designer:` merged into `/stx-designer:`, `/migration:` → `/stx-migration:`, `/coherence:` → `/stx-coherence:`, `/presentation:` → `/stx-presentation:` (streamtex-claude#1)
+- Updated all cross-references in AI_GUIDE.md, README.md, CONTRIBUTING.md, CLAUDE.md, and installed `.claude/` profile copies
+
 ## [0.4.16] — 2026-03-12
 
 ### Added

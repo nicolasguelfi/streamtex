@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.16] — 2026-03-12
+
+### Added
+- **Test coverage**: 53 new tests — `test_bib_preview` (5), `test_link_config` (6), `test_link_preview` (13), `test_image_utils` (13), `test_image_editor` (10)
+- **GitHub issue templates**: Bug report, feature request, question, and docs templates in `.github/ISSUE_TEMPLATE/`
+
 ## [0.4.15] — 2026-03-12
 
 ### Added

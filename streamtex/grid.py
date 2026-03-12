@@ -222,6 +222,8 @@ def st_grid(
         div[data-testid="stVerticalBlock"]:has(> .element-container .stHtml span.{grid_id}) > .stVerticalBlock {{
             width: auto !important; /* Override Streamlit's width logic */
             min-width: 0; /* Prevent grid blowout from large images */
+            overflow-wrap: break-word; /* Wrap long words inside cells */
+            word-break: break-word; /* Fallback for older browsers */
         }}
 
         /* Apply Wrapper Style to the grid container itself if needed,

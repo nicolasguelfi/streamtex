@@ -1553,6 +1553,15 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
                     "page": entry.get("page_idx", 0),
                 })
 
+    # --- Presentation footer (auto-rendered when PresentationConfig is active) ---
+    _pres_cfg = get_presentation_config()
+    if _pres_cfg is not None and _pres_cfg.footer:
+        st_presentation_footer(
+            current_slide=current_page + 1,
+            total_slides=total,
+            config=_pres_cfg,
+        )
+
     # --- Marker navigation widget (ALL markers, cross-page aware) ---
     # Skip the widget if the current page has no markers (e.g. footer)
     _page_has_markers = any(

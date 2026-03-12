@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.11] — 2026-03-12
+
+### Fixed
+- **Presentation footer in paginated mode**: `st_presentation_footer()` was not called in `_paginated_book()` — footer with slide counter and title now renders correctly in paginated mode
+- **Grid cell text overflow**: added `overflow-wrap: break-word` to `st_grid` cell CSS so long text wraps instead of overflowing cell boundaries
+
 ## [0.4.10] — 2026-03-12
 
 ### Added

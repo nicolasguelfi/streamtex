@@ -499,7 +499,20 @@ def _install_global_commands(ws_root: str, config: dict, console) -> None:
             count = 0
             for fname in os.listdir(shared_cmd_dir):
                 src = os.path.join(shared_cmd_dir, fname)
-                if os.path.isfile(src):
+                if os.path.isdir(src):
+                    dst_dir = os.path.join(global_claude_cmd, fname)
+                    if os.path.exists(dst_dir):
+                        # Remove read-only on existing files before overwrite
+                        for root, _dirs, files in os.walk(dst_dir):
+                            for f in files:
+                                os.chmod(os.path.join(root, f), 0o644)
+                        shutil.rmtree(dst_dir)
+                    shutil.copytree(src, dst_dir)
+                    for root, _dirs, files in os.walk(dst_dir):
+                        for f in files:
+                            os.chmod(os.path.join(root, f), 0o444)
+                            count += 1
+                elif os.path.isfile(src):
                     dst = os.path.join(global_claude_cmd, fname)
                     # Remove read-only before overwrite
                     if os.path.exists(dst):

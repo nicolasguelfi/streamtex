@@ -8,19 +8,19 @@ Quick reference for creating presentations with StreamTeX + Claude AI skills.
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│  /project:project-init "description..."             │  ← Generate full project
+│  /stx-project:project-init "description..."             │  ← Generate full project
 │           ↓                                         │
-│  /designer:slide-audit                              │  ← Validate all slides
+│  /stx-designer:slide-audit                              │  ← Validate all slides
 │           ↓                                         │
-│  /designer:slide-fix                                │  ← Auto-fix violations
+│  /stx-designer:slide-fix                                │  ← Auto-fix violations
 │           ↓                                         │
-│  /designer:slide-new "bck_name — description..."     │  ← Refine one slide
+│  /stx-designer:slide-new "bck_name — description..."     │  ← Refine one slide
 │           ↓                                         │
 │  stx run                                            │  ← Preview
 │           ↓                                         │
-│  /project:project-customize "changes..."            │  ← Adjust theme/fonts
+│  /stx-project:project-customize "changes..."            │  ← Adjust theme/fonts
 │           ↓                                         │
-│  /designer:style-audit + style-refactor             │  ← Ensure consistency
+│  /stx-designer:style-audit + style-refactor             │  ← Ensure consistency
 └─────────────────────────────────────────────────────┘
 ```
 
@@ -31,7 +31,7 @@ Quick reference for creating presentations with StreamTeX + Claude AI skills.
 ### Create a full project
 
 ```bash
-/project:project-init "Short presentation 'Discover StreamTeX'
+/stx-project:project-init "Short presentation 'Discover StreamTeX'
   for a general audience. 5 slides, dark theme. Slides:
   1) Title, 2) The Problem, 3) The Solution, 4) Demo, 5) Getting Started.
   Use L1/L2/L3 grid. Generate image prompts."
@@ -40,7 +40,7 @@ Quick reference for creating presentations with StreamTeX + Claude AI skills.
 ### Create or refine a single slide
 
 ```bash
-/designer:slide-new "bck_solution — StreamTeX presentation with
+/stx-designer:slide-new "bck_solution — StreamTeX presentation with
   responsive 2-column grid: left = illustration, right = 4 keyword
   bullets. Headline in L1, transition question in L3."
 ```
@@ -48,18 +48,18 @@ Quick reference for creating presentations with StreamTeX + Claude AI skills.
 ### Audit and fix
 
 ```bash
-/designer:slide-audit       # Check all blocks against design rules
-/designer:slide-fix         # Auto-fix violations (spacing, line length, styles)
-/designer:style-audit       # Check style consistency across all blocks
-/designer:style-refactor    # Extract inline CSS into reusable styles
-/designer:block-preview     # Validate block structure (imports, BlockStyles, build)
+/stx-designer:slide-audit       # Check all blocks against design rules
+/stx-designer:slide-fix         # Auto-fix violations (spacing, line length, styles)
+/stx-designer:style-audit       # Check style consistency across all blocks
+/stx-designer:style-refactor    # Extract inline CSS into reusable styles
+/stx-designer:block-preview     # Validate block structure (imports, BlockStyles, build)
 ```
 
 ### Customize the project
 
 ```bash
-/project:project-customize "Switch to teal/orange palette, 48pt body for auditorium"
-/project:project-upgrade    # Upgrade to latest StreamTeX conventions
+/stx-project:project-customize "Switch to teal/orange palette, 48pt body for auditorium"
+/stx-project:project-upgrade    # Upgrade to latest StreamTeX conventions
 ```
 
 ### Run
@@ -436,16 +436,16 @@ Style: telegraphic keywords, bold colored accents.
 
 | Command | What it does |
 |---|---|
-| `/project:project-init` | Generate full project from description |
-| `/project:project-customize` | Adjust theme, fonts, colors |
-| `/project:project-upgrade` | Upgrade to latest conventions |
-| `/designer:slide-new` | Create or regenerate one slide |
-| `/designer:slide-audit` | Validate all slides |
-| `/designer:slide-fix` | Auto-fix violations |
-| `/designer:style-audit` | Check style consistency |
-| `/designer:style-refactor` | Extract/optimize styles |
-| `/designer:block-new` | Create block from blueprint |
-| `/designer:block-preview` | Validate block structure |
+| `/stx-project:project-init` | Generate full project from description |
+| `/stx-project:project-customize` | Adjust theme, fonts, colors |
+| `/stx-project:project-upgrade` | Upgrade to latest conventions |
+| `/stx-designer:slide-new` | Create or regenerate one slide |
+| `/stx-designer:slide-audit` | Validate all slides |
+| `/stx-designer:slide-fix` | Auto-fix violations |
+| `/stx-designer:style-audit` | Check style consistency |
+| `/stx-designer:style-refactor` | Extract/optimize styles |
+| `/stx-designer:block-new` | Create block from blueprint |
+| `/stx-designer:block-preview` | Validate block structure |
 
 ---
 

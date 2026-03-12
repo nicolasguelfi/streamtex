@@ -106,7 +106,7 @@ stx claude install project .
 Open in Claude Code or Cursor, then use slash commands:
 
 ```
-/project:project-init
+/stx-project:project-init
 > "Create a Docker course with 12 slides, dark theme,
 >  table of contents and page navigation"
 ```
@@ -198,27 +198,27 @@ and **10 block templates** for AI-assisted development.
 
 | Command | What it does |
 |---------|-------------|
-| `/project:project-init` | Create a complete project from a natural-language description |
-| `/project:project-customize` | Change theme, typography, navigation without editing code |
-| `/project:course-generate` | Generate `book.py` structure from a CSV block list |
-| `/project:collection-new` | Create a multi-project hub |
+| `/stx-project:project-init` | Create a complete project from a natural-language description |
+| `/stx-project:project-customize` | Change theme, typography, navigation without editing code |
+| `/stx-project:course-generate` | Generate `book.py` structure from a CSV block list |
+| `/stx-project:collection-new` | Create a multi-project hub |
 
 ### Design & Content
 
 | Command | What it does |
 |---------|-------------|
-| `/designer:slide-new` | Create slides from descriptions |
-| `/designer:slide-audit` | Validate design rules (font sizes, line lengths, spacing) |
-| `/designer:slide-fix` | Auto-fix design violations |
-| `/designer:style-audit` | Check styles for consistency |
+| `/stx-designer:slide-new` | Create slides from descriptions |
+| `/stx-designer:slide-audit` | Validate design rules (font sizes, line lengths, spacing) |
+| `/stx-designer:slide-fix` | Auto-fix design violations |
+| `/stx-designer:style-audit` | Check styles for consistency |
 
 ### Migration
 
 | Command | What it does |
 |---------|-------------|
-| `/migration:html-migrate` | Convert HTML (Google Docs) to StreamTeX blocks |
-| `/migration:html-convert-batch` | Batch conversion of multiple files |
-| `/migration:conversion-audit` | Audit conversion quality |
+| `/stx-migration:html-migrate` | Convert HTML (Google Docs) to StreamTeX blocks |
+| `/stx-migration:html-convert-batch` | Batch conversion of multiple files |
+| `/stx-migration:conversion-audit` | Audit conversion quality |
 
 ### AI Agents
 

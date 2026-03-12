@@ -1,6 +1,6 @@
 # Coherence Check Rules
 
-Reference file for `/coherence:audit`. Defines 20 check categories.
+Reference file for `/stx-coherence:audit`. Defines 20 check categories.
 
 ---
 
@@ -633,7 +633,7 @@ for cls in [PdfConfig, ExportConfig, BannerConfig]:
 - `streamtex-docs/.github/ISSUE_TEMPLATE/` → same 4 files
 - `streamtex-claude/.github/ISSUE_TEMPLATE/` → same 4 files
 - `streamtex-claude/profiles/*/manifest.toml` → `[commands] project = ["issue.md"]`
-- `streamtex-claude/profiles/*/commands/project/issue.md` → command file
+- `streamtex-claude/profiles/*/commands/stx-project/issue.md` → command file
 
 **Method**:
 1. For each repo (streamtex, streamtex-docs, streamtex-claude):
@@ -641,7 +641,7 @@ for cls in [PdfConfig, ExportConfig, BannerConfig]:
    - Verify all 4 template files exist: `bug_report.md`, `feature_request.md`, `question.md`, `docs.md`
    - Verify templates have correct YAML frontmatter (name, about, labels)
 2. For each profile that declares `project = ["issue.md"]` in its manifest:
-   - Verify `commands/project/issue.md` exists in the profile directory
+   - Verify `commands/stx-project/issue.md` exists in the profile directory
 3. Verify stx-guide.md references `/stx-issue` in topics table and Section 6
 
 **Rules**:

@@ -62,7 +62,7 @@ You now have access to all slash commands and agents.
 In Claude Code or Cursor, type:
 
 ```
-/project:project-init
+/stx-project:project-init
 ```
 
 Then describe what you want in natural language:
@@ -115,24 +115,24 @@ Your project opens in the browser, ready to use.
 ### Pathway 1 — Create a presentation from scratch
 
 ```
-/project:project-init          → Describe your project
-/designer:slide-new            → Add or refine individual slides
-/designer:slide-audit          → Check design rule compliance
-/designer:slide-fix            → Auto-fix violations
+/stx-project:project-init          → Describe your project
+/stx-designer:slide-new            → Add or refine individual slides
+/stx-designer:slide-audit          → Check design rule compliance
+/stx-designer:slide-fix            → Auto-fix violations
 ```
 
 ### Pathway 2 — Convert Google Docs to StreamTeX
 
 ```
-/migration:html-migrate        → Convert one HTML file
-/migration:html-convert-batch  → Convert all HTML files in a directory
-/migration:conversion-audit    → Verify conversion quality
+/stx-migration:html-migrate        → Convert one HTML file
+/stx-migration:html-convert-batch  → Convert all HTML files in a directory
+/stx-migration:conversion-audit    → Verify conversion quality
 ```
 
 ### Pathway 3 — Customize an existing project
 
 ```
-/project:project-customize     → Describe changes in natural language
+/stx-project:project-customize     → Describe changes in natural language
 ```
 
 Example: *"Switch to light theme, add green accent color, enable TOC sidebar"*
@@ -142,7 +142,7 @@ The agent proposes a diff preview, then applies changes safely.
 ### Pathway 4 — Generate a course from a CSV plan
 
 ```
-/project:course-generate       → Generate book.py from blocks.csv
+/stx-project:course-generate       → Generate book.py from blocks.csv
 ```
 
 Prepare a `blocks.csv` file listing block names and order,
@@ -156,41 +156,41 @@ then let the agent generate the full `book.py` configuration.
 
 | Command | What it does |
 |---------|-------------|
-| `/project:project-init` | Create a complete project from a natural-language description. The Project Architect agent proposes structure, blocks, colors, and features — generates all files after your approval. |
-| `/project:project-customize` | Modify theme, colors, typography, navigation, or features of an existing project. Reads current configuration, proposes a diff preview, applies changes safely without deleting content. |
-| `/project:course-generate` | Generate `book.py` from a `blocks.csv` file listing block names and order. |
-| `/project:collection-new` | Create a multi-project collection hub with TOML configuration. |
-| `/project:project-upgrade` | Upgrade project boilerplate files to the latest template structure. |
+| `/stx-project:project-init` | Create a complete project from a natural-language description. The Project Architect agent proposes structure, blocks, colors, and features — generates all files after your approval. |
+| `/stx-project:project-customize` | Modify theme, colors, typography, navigation, or features of an existing project. Reads current configuration, proposes a diff preview, applies changes safely without deleting content. |
+| `/stx-project:course-generate` | Generate `book.py` from a `blocks.csv` file listing block names and order. |
+| `/stx-project:collection-new` | Create a multi-project collection hub with TOML configuration. |
+| `/stx-project:project-upgrade` | Upgrade project boilerplate files to the latest template structure. |
 
 ### Designer Commands (7)
 
 | Command | What it does |
 |---------|-------------|
-| `/designer:slide-new` | Create a new slide following visual design rules. Enforces ~45-char lines, 32pt body text, proper structure (explanation, code, demo, details). |
-| `/designer:block-new` | Create a content block with automatic blueprint matching. Matches your description against 10 block templates and generates appropriate structure. |
-| `/designer:slide-audit` | Validate a slide against design rules. Checks line lengths, font sizes, imports, structure, TOC entries. Reports errors and warnings with line numbers. |
-| `/designer:slide-fix` | Auto-fix all design violations found by audit. Breaks long lines, adds `show_code()`, corrects font sizes, fixes spacing. |
-| `/designer:style-audit` | Check styles for consistency. Detects raw HTML/CSS, hardcoded colors, duplicate styles, non-English names, dark mode issues. |
-| `/designer:style-refactor` | Extract repeated style patterns into `BlockStyles` or `custom/styles.py`. Optimizes naming and composition. |
-| `/designer:block-preview` | Validate block structure, image assets, style references, and TOC entries without running the app. |
+| `/stx-designer:slide-new` | Create a new slide following visual design rules. Enforces ~45-char lines, 32pt body text, proper structure (explanation, code, demo, details). |
+| `/stx-designer:block-new` | Create a content block with automatic blueprint matching. Matches your description against 10 block templates and generates appropriate structure. |
+| `/stx-designer:slide-audit` | Validate a slide against design rules. Checks line lengths, font sizes, imports, structure, TOC entries. Reports errors and warnings with line numbers. |
+| `/stx-designer:slide-fix` | Auto-fix all design violations found by audit. Breaks long lines, adds `show_code()`, corrects font sizes, fixes spacing. |
+| `/stx-designer:style-audit` | Check styles for consistency. Detects raw HTML/CSS, hardcoded colors, duplicate styles, non-English names, dark mode issues. |
+| `/stx-designer:style-refactor` | Extract repeated style patterns into `BlockStyles` or `custom/styles.py`. Optimizes naming and composition. |
+| `/stx-designer:block-preview` | Validate block structure, image assets, style references, and TOC entries without running the app. |
 
 ### Migration Commands (5)
 
 | Command | What it does |
 |---------|-------------|
-| `/migration:html-migrate` | Convert HTML content (e.g., Google Docs export) to a StreamTeX block. Analyzes colors, layout, and formatting — generates clean block with styles. |
-| `/migration:html-convert-batch` | Batch convert all HTML files in a directory. Supports `--all`, `--filter`, `--dry-run`, `--force`, `--limit`. |
-| `/migration:html-convert-block` | Convert a single saved HTML block with detailed color mapping and style consolidation. |
-| `/migration:html-export` | Configure HTML export in `book.py` and audit widgets for export compatibility. |
-| `/migration:conversion-audit` | Verify a converted block for color fidelity, proper components, and no residual raw HTML/CSS. |
+| `/stx-migration:html-migrate` | Convert HTML content (e.g., Google Docs export) to a StreamTeX block. Analyzes colors, layout, and formatting — generates clean block with styles. |
+| `/stx-migration:html-convert-batch` | Batch convert all HTML files in a directory. Supports `--all`, `--filter`, `--dry-run`, `--force`, `--limit`. |
+| `/stx-migration:html-convert-block` | Convert a single saved HTML block with detailed color mapping and style consolidation. |
+| `/stx-migration:html-export` | Configure HTML export in `book.py` and audit widgets for export compatibility. |
+| `/stx-migration:conversion-audit` | Verify a converted block for color fidelity, proper components, and no residual raw HTML/CSS. |
 
 ### Developer Commands (3)
 
 | Command | What it does |
 |---------|-------------|
-| `/developer:test-run` | Run the test suite with `pytest`. Analyzes failures and reports pass/fail counts. |
-| `/developer:lint` | Run `ruff` linter. Auto-fixes where possible, reports remaining manual issues. |
-| `/developer:deploy` | Deploy to Docker, Hugging Face Spaces, or GCP. Runs pre-deployment checks (tests, lint, requirements, git status). |
+| `/stx-developer:test-run` | Run the test suite with `pytest`. Analyzes failures and reports pass/fail counts. |
+| `/stx-developer:lint` | Run `ruff` linter. Auto-fixes where possible, reports remaining manual issues. |
+| `/stx-developer:deploy` | Deploy to Docker, Hugging Face Spaces, or GCP. Runs pre-deployment checks (tests, lint, requirements, git status). |
 
 ### Presentation-Only Commands (3)
 
@@ -198,9 +198,9 @@ then let the agent generate the full `book.py` configuration.
 
 | Command | What it does |
 |---------|-------------|
-| `/designer:presentation-audit` | Check slide for live projection compliance: font sizes (48pt+ body), keyword length (5-7 words), contrast, spacing. |
-| `/designer:presentation-fix` | Auto-fix font sizes, text length, contrast, and visual anchor issues for live projection. |
-| `/designer:survey-convert` | Convert survey screenshots (e.g., Stack Overflow Developer Survey) into code-generated presentation blocks. |
+| `/stx-designer:presentation-audit` | Check slide for live projection compliance: font sizes (48pt+ body), keyword length (5-7 words), contrast, spacing. |
+| `/stx-designer:presentation-fix` | Auto-fix font sizes, text length, contrast, and visual anchor issues for live projection. |
+| `/stx-designer:survey-convert` | Convert survey screenshots (e.g., Stack Overflow Developer Survey) into code-generated presentation blocks. |
 
 ---
 
@@ -213,14 +213,14 @@ StreamTeX includes 4 specialized AI agents that work autonomously within their d
 - **Role**: Design project structure from natural language descriptions
 - **Principles**: One block = one idea, max 15 blocks, logical ordering (intro, concepts, demos, synthesis, conclusion)
 - **Output**: Proposed plan with block list, features, color palette — requires your confirmation
-- **Trigger**: Activated automatically by `/project:project-init`
+- **Trigger**: Activated automatically by `/stx-project:project-init`
 
 ### Slide Designer
 
 - **Role**: Create visually polished, pedagogically structured slides
 - **Principles**: ~45-char lines, 32pt body text, canonical structure (explanation, code, demo, details)
 - **Anti-patterns detected**: String concatenation, missing `show_code()`, code without demo, unclear error boxes
-- **Trigger**: Activated by `/designer:slide-new`
+- **Trigger**: Activated by `/stx-designer:slide-new`
 
 ### Slide Reviewer
 
@@ -278,7 +278,7 @@ StreamTeX provides 4 installable AI profiles via
 
 ## Block Blueprint Catalog
 
-When you create blocks with `/designer:block-new` or `/project:project-init`,
+When you create blocks with `/stx-designer:block-new` or `/stx-project:project-init`,
 the agent matches your description against these 12 templates:
 
 | # | Blueprint | Use case |
@@ -378,20 +378,20 @@ st_image(uri=path, width="100%")
 
 ### Iterating with AI
 
-- Start with `/project:project-init` for the overall structure
-- Use `/designer:slide-new` to refine individual slides
-- Run `/designer:slide-audit` periodically to catch design issues
-- Use `/project:project-customize` to adjust theme and navigation at any time
+- Start with `/stx-project:project-init` for the overall structure
+- Use `/stx-designer:slide-new` to refine individual slides
+- Run `/stx-designer:slide-audit` periodically to catch design issues
+- Use `/stx-project:project-customize` to adjust theme and navigation at any time
 
 ### Combining commands
 
 Commands can be chained in a natural conversation:
 
 > "Create a new slide about Docker volumes with a code example"
-> → agent uses `/designer:slide-new` + blueprint #6 (code demo)
+> → agent uses `/stx-designer:slide-new` + blueprint #6 (code demo)
 
 > "Audit all my slides for design compliance"
-> → agent runs `/designer:slide-audit` on each block file
+> → agent runs `/stx-designer:slide-audit` on each block file
 
 ### When to switch to code
 
@@ -446,7 +446,7 @@ Commands are simple markdown files with instructions for the AI assistant.
 ### How do I deploy my project?
 
 ```bash
-/developer:deploy
+/stx-developer:deploy
 ```
 
 The deploy command supports Docker, Hugging Face Spaces, and GCP targets.

@@ -18,7 +18,7 @@ Thank you for your interest in contributing to StreamTeX!
 You don't need to write Python code to contribute content:
 
 1. Install a Claude profile from [streamtex-claude](https://github.com/nicolasguelfi/streamtex-claude)
-2. Create example projects using `/project:project-init`
+2. Create example projects using `/stx-project:project-init`
 3. Submit interesting projects as example repositories
 
 ### As a Claude Profile Developer

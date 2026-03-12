@@ -1325,12 +1325,12 @@ Ces templates sont utilises aussi depuis l'interface web GitHub.
 
 | Tache | Commande |
 |-------|----------|
-| Audit complet (19 checks) | `/coherence:audit` ou `/coherence:audit all` |
-| Audit API + cheatsheet | `/coherence:audit library` |
-| Audit blocs + manuels | `/coherence:audit docs` |
-| Audit sync profils + stx-guide | `/coherence:audit profiles` |
-| Audit blocs + structure + templates | `/coherence:audit blocks` |
-| Audit langue anglaise | `/coherence:audit language` |
+| Audit complet (19 checks) | `/stx-coherence:audit` ou `/stx-coherence:audit all` |
+| Audit API + cheatsheet | `/stx-coherence:audit library` |
+| Audit blocs + manuels | `/stx-coherence:audit docs` |
+| Audit sync profils + stx-guide | `/stx-coherence:audit profiles` |
+| Audit blocs + structure + templates | `/stx-coherence:audit blocks` |
+| Audit langue anglaise | `/stx-coherence:audit language` |
 
 ### Commandes GitHub CLI (gh)
 

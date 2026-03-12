@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.10] — 2026-03-12
+
+### Added
+- **Coherence audit checks 18-19**: Manifest File Existence (validates all manifest.toml declarations against filesystem) and CLI Template Registry Sync (ensures AVAILABLE_TEMPLATES, click.Choice, template directories, and documentation are aligned)
+- **Improved Check 4**: Source existence guard — verifies shared reference files exist before comparing copies
+- **Improved Check 8**: Template and preset documentation validation against CLI code
+
+### Fixed
+- **Documentation profile manifest**: removed incorrect `stx-designer` command declarations (files never existed in this profile)
+- **`presentation_cheatsheet_en.md`**: added missing source file to `shared/references/`
+- **CLI `--template` sync**: `click.Choice` in `project_cmd.py` now matches `AVAILABLE_TEMPLATES` (was missing `slides`)
+- **Documentation**: corrected CLI template lists across README, stx-guide, and install_cmd help text (was listing stx-designer templates instead of CLI templates)
+
 ## [0.4.9] — 2026-03-12
 
 ### Added

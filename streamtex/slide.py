@@ -73,6 +73,9 @@ class SlideBreakConfig:
     marker: bool = True
     """Create a hidden navigation marker so PageDown stops at this break."""
 
+    fullscreen: bool = False
+    """When True, force space='100vh' so each slide fills the viewport."""
+
 
 # ---------------------------------------------------------------------------
 # Global config — overridable per project via set_slide_break_config()
@@ -218,6 +221,7 @@ def _effective_config(
         color=cfg.color,
         opacity=cfg.opacity,
         marker=cfg.marker,
+        fullscreen=cfg.fullscreen,
     ), True
 
 
@@ -244,7 +248,13 @@ def st_slide_break(
     cfg, enabled = _effective_config(config)
 
     if not enabled or cfg.mode == SlideBreakMode.HIDDEN:
+        # Even when hidden, fullscreen marker is still needed for navigation
+        if cfg.fullscreen and cfg.marker:
+            st_marker(marker_label, hidden=True)
         return
+
+    # Fullscreen mode forces 100vh spacing
+    effective_space = "100vh" if cfg.fullscreen else cfg.space
 
     rule_css = (
         f"border: none; "
@@ -252,7 +262,7 @@ def st_slide_break(
         f"rgba({cfg.color}, {cfg.opacity}); "
         f"margin-top: {cfg.rule_margin_top}; margin-bottom: {cfg.rule_margin_bottom};"
     )
-    spacer_css = f"height: {cfg.space};"
+    spacer_css = f"height: {effective_space};"
 
     show_rule = cfg.mode in (SlideBreakMode.FULL, SlideBreakMode.RULE_ONLY)
     show_spacer = cfg.mode in (SlideBreakMode.FULL, SlideBreakMode.SPACER_ONLY)

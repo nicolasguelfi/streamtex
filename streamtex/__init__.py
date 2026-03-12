@@ -45,6 +45,13 @@ from .slide import (
     add_slide_break_options,
 )
 
+# Presentation mode (fullscreen 16/9)
+from .presentation import (
+    PresentationConfig,
+    set_presentation_config, get_presentation_config,
+    st_presentation_footer, add_presentation_options,
+)
+
 # Enums
 from .enums import Tags
 

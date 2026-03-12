@@ -21,6 +21,7 @@ from .enums import Tags
 from .export import ExportConfig, generate_export_html, is_export_active, reset_export_buffer
 from .marker import MarkerConfig, inject_marker_navigation, marker_entries, reset_marker_registry
 from .pdf_export import PdfConfig
+from .presentation import get_presentation_config, st_presentation_footer
 from .search import generate_search_input_html, generate_search_script, start_collector, stop_collector
 from .slide import add_slide_break_options
 from .space import st_br, st_space
@@ -393,6 +394,12 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
     # Inject marker navigation JS (only if markers were registered)
     if marker_config is not None:
         inject_marker_navigation()
+
+    # Presentation footer (auto-rendered when PresentationConfig is active)
+    _pres_cfg = get_presentation_config()
+    if _pres_cfg is not None and _pres_cfg.footer:
+        _total = len(module_list)
+        st_presentation_footer(current_slide=1, total_slides=_total, config=_pres_cfg)
 
     # Offer export downloads when export is active
     if is_export_active():

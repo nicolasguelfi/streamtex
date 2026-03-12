@@ -623,6 +623,7 @@ def test_available_templates():
     from streamtex.cli.install_cmd import AVAILABLE_TEMPLATES
     assert "project" in AVAILABLE_TEMPLATES
     assert "collection" in AVAILABLE_TEMPLATES
+    assert "slides" in AVAILABLE_TEMPLATES
 
 
 def test_install_unavailable_template_prompts_fallback(tmp_path):

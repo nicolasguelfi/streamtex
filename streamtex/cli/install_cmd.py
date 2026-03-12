@@ -31,7 +31,7 @@ from .workspace_cmd import (
 # Available templates (static list — extended over time)
 # ---------------------------------------------------------------------------
 
-AVAILABLE_TEMPLATES = ["project", "collection"]
+AVAILABLE_TEMPLATES = ["project", "collection", "slides"]
 
 # ---------------------------------------------------------------------------
 # Install state file helpers
@@ -158,7 +158,7 @@ def _maybe_clone_docs_for_template(
 @click.option(
     "--template",
     default=None,
-    help="Project template (project, collection, presentation, course, ...).",
+    help="Project template (project, collection, slides).",
 )
 def install(preset, project, template):
     """Install or update a StreamTeX workspace, optionally creating a project.

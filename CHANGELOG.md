@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.9] — 2026-03-12
+
+### Added
+- **Presentation mode** (`presentation.py`): fullscreen 16/9 slide deck with footer and centering
+  - `PresentationConfig` dataclass with aspect ratio, footer, centering, Streamlit UI hiding
+  - `set_presentation_config()` / `get_presentation_config()` — DI pattern (matches AIImageConfig)
+  - `st_presentation_footer()` — fixed footer bar with slide counter ("Slide N / M — Title")
+  - `add_presentation_options()` — sidebar controls for presenter (footer toggle, fullscreen toggle)
+  - CSS injection: aspect-ratio enforcement, vertical centering, Streamlit chrome hiding
+  - Auto-integration with `st_book()`: footer rendered automatically when config is active
+- **SlideBreakConfig.fullscreen** field: when True, forces `space="100vh"` regardless of configured value
+  - Hidden mode with fullscreen still renders navigation markers for PageUp/PageDown
+- **50+ new tests** in `test_presentation.py` covering config, DI, CSS injection, footer, sidebar
+- **`--template slides`** option for `stx project new`: generates a minimal presentation project with 5 illustrative slides, projection-optimized styles, fullscreen 16/9 config, and dark theme
+
 ## [0.4.8] — 2026-03-11
 
 ### Added

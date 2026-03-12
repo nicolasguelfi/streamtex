@@ -521,7 +521,7 @@ def _copy_rich_template(
 @click.option(
     "--template",
     default=None,
-    type=click.Choice(["project", "collection"]),
+    type=click.Choice(["project", "collection", "slides"]),
     help="Use a rich template from streamtex-docs/templates/.",
 )
 @click.option("--no-git", is_flag=True, help="Skip git init.")

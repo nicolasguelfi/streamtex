@@ -49,7 +49,7 @@ uv tool install "streamtex[cli]" -U
 mkdir streamtex-dev && cd streamtex-dev
 stx install
 stx update
-stx project new my-project --template project   # templates: project, presentation, collection, course
+stx project new my-project --template project   # CLI templates: project, collection, slides
 cd projects/my-project
 stx claude install project .
 uv run streamlit run book.py

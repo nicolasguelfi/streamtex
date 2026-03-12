@@ -19,6 +19,7 @@ EXPECTED_ST_HTML_COUNTS = {
     "grid.py": 2,           # 1 CSS + 1 hidden marker
     "list.py": 4,           # 2 CSS injections + 2 hidden markers
     "zoom.py": 1,           # CSS injection
+    "presentation.py": 1,  # CSS injection (presentation mode)
     "link_preview.py": 2,   # CSS + JS scaffold
     "bib_preview.py": 1,    # CSS only (JS via components.html)
     "book.py": 3,           # 1 load_css + 1 populate_toc (no-search branch) + 1 populate_markers

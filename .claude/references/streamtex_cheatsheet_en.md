@@ -194,11 +194,13 @@ set_ai_image_config(AIImageConfig(
 
 # Declarative — in block code
 st_ai_image("a minimalist neural network diagram, flat design, dark bg",
-            width="100%", provider="openai", size="1024x1024")
+            width="100%", provider="openai", size="1024x1024",
+            api_key=None)  # Per-call API key override (bypasses config/env)
 
 # Interactive — widget with prompt input + generate button
 st_ai_image_widget(default_prompt="a serene landscape", key="my_gen",
-                   show_save=True)
+                   show_save=True,
+                   api_key=None)  # Per-call API key override (bypasses config/env)
 
 # Programmatic — generate without displaying (e.g. Claude workflow)
 path = generate_image("a futuristic city", provider="openai")
@@ -1840,6 +1842,14 @@ set_presentation_config(PresentationConfig(
     center_content=True,
     hide_streamlit_header=True,
 ))
+```
+
+### get_presentation_config()
+
+```python
+from streamtex import get_presentation_config
+
+config = get_presentation_config()  # -> PresentationConfig | None
 ```
 
 ### st_presentation_footer()

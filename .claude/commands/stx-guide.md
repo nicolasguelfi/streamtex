@@ -56,7 +56,7 @@ Si `$ARGUMENTS` correspond a un **topic** reconnu (voir liste ci-dessous) : repo
 Si `$ARGUMENTS` est une **question libre** en langage naturel : utilise toute la base de connaissances
 pour fournir une reponse contextuelle.
 
-### Topics reconnus (17)
+### Topics reconnus (18)
 
 | Topic | Description |
 |-------|-------------|
@@ -73,6 +73,7 @@ pour fournir une reponse contextuelle.
 | `book` | Orchestration book.py (TOC, markers, banners, zoom) |
 | `ai-images` | Generation d'images IA (OpenAI, Google Imagen, fal.ai) |
 | `presentation` | Mode presentation fullscreen 16/9 |
+| `issues` | Creer des issues GitHub avec metadata auto-collectees |
 | `troubleshooting` | Gotchas connus et resolution de problemes |
 | `stx-cli` | Reference complete de toutes les commandes `stx` |
 | `release` | Workflow de release complet (dev : publier + propager) |
@@ -91,6 +92,8 @@ pour fournir une reponse contextuelle.
 - "comment publier une nouvelle version et propager a tous les users ?"
 - "comment mettre a jour mon workspace apres une nouvelle release ?"
 - "comment generer des images avec l'IA dans mon projet StreamTeX ?"
+- "comment reporter un bug dans StreamTeX ?"
+- "comment creer une issue GitHub depuis Claude ?"
 
 ---
 
@@ -414,6 +417,7 @@ claude
 |-----------|-----------|-------------|
 | stx-designer (5) | init, update, audit, fix, tool | Cycle de vie complet du projet |
 | Developer (2) | test-run, lint | Tests et linting |
+| Project (1) | issue | Creer des issues GitHub avec metadata |
 | Skills (8) | visual-design-rules, slide-design-rules, style-conventions, streamtex-quick-reference, block-blueprints, testing-patterns, stx-migrate, docs-lookup | Regles de conception |
 | Agents (3) | slide-designer, slide-reviewer, project-architect | Agents specialises |
 | Templates (4) | project, presentation, collection, course | Templates pour init |
@@ -936,6 +940,289 @@ et controler l'affichage du footer.
 
 ---
 
+## Section 4d — Systeme de styles (topic: `styles`)
+
+StreamTeX utilise un systeme de styles compose de la classe `Style` qui encapsule
+du CSS inline, avec composition par operateurs et surcharge par themes.
+
+### Architecture
+
+```
+Style("css", "style_id")       # Classe de base — encapsule du CSS + un identifiant theme
+ListStyle(css, style_id, symbols)  # Extension pour listes avec symboles custom
+StyleGrid(css_grid)            # Matrice de styles pour cellules de grids/tables
+```
+
+**Organisation des styles integres** (accessible via `from streamtex.styles import Style as ns`) :
+
+| Categorie | Acces | Contenu |
+|-----------|-------|---------|
+| Tailles texte | `ns.text.sizes` | `GIANT`..`tiny` (pt, px, em) + factory `size()` |
+| Couleurs texte | `ns.text.colors` | 150+ couleurs CSS nommees |
+| Polices | `ns.text.fonts` | `font_arial`, `font_georgia`, `font_monospace`... |
+| Poids | `ns.text.weights` | `bold_weight`, `light_weight`, `normal_weight` |
+| Decorations | `ns.text.decors` | `italic_text`, `underline_text`, `strike_text` |
+| Alignements | `ns.text.alignments` | `center_align`, `right_align`, `justify_align` |
+| Fonds | `ns.container.bg_colors` | 150+ couleurs de fond |
+| Paddings | `ns.container.paddings` | `tiny`..`Giant` (pt, em) + factory `size()` |
+| Margins | `ns.container.margins` | `tiny`..`Giant` (pt, em) + factory `size()` |
+| Bordures | `ns.container.borders` | styles + epaisseurs + factory `size()`, `color()` |
+| Layouts | `ns.container.layouts` | `inline`, `center`, `span`, `col_layout`, `row_layout` |
+| Flex | `ns.container.flex` | `row_flex`, `col_flex`, `center_flex`, `wrap_flex` |
+| Grids | `ns.container.grid` | `gap_0`..`gap_48` |
+| Positions | `ns.container.positions` | `relative`, `absolute`, `sticky` + `top()`, `left()`... |
+
+**Raccourcis StxStyles** (via `from streamtex import *`, alias `s`) :
+
+```python
+s.bold, s.italic, s.center_txt          # Style de base
+s.GIANT, s.Huge, s.LARGE, s.Large       # Tailles rapides (196pt..32pt)
+s.large, s.big, s.medium, s.small       # (24pt..6pt)
+```
+
+### Creer un style personnalise
+
+```python
+from streamtex.styles import Style
+
+# Style CSS arbitraire — n'importe quelle propriete CSS
+heading = Style("font-size: 40px; font-weight: bold;", "heading")
+st_write(heading, "Mon Titre")
+
+# Via factory method (plus idiomatique)
+heading = s.text.sizes.size(40) + s.bold
+st_write(heading, "Mon Titre")
+
+# Taille en px au lieu de pt
+heading_px = s.text.sizes.size("40px")
+
+# Padding custom (convention CSS : 1 a 4 valeurs)
+pad = s.container.paddings.size(12, 24)       # 12pt top/bottom, 24pt left/right
+
+# Margin custom
+centered = s.container.margins.size("auto")   # margin: auto
+
+# Bordure avec couleur
+border = s.container.borders.solid_border + s.container.borders.size(2) + s.container.borders.color(s.text.colors.blue)
+```
+
+### Composition de styles (operateurs + et -)
+
+```python
+# Combiner des styles avec +
+title_style = s.bold + s.LARGE + s.center_txt + Style("color: #4A90D9;", "blue")
+
+# Retirer des proprietes avec -
+no_bold = title_style - s.bold   # retire font-weight du style compose
+
+# Combiner avec du CSS brut (string)
+custom = s.bold + "letter-spacing: 2px;"
+```
+
+### Styles de projet (`custom/styles.py`)
+
+Chaque projet definit ses styles reutilisables dans `custom/styles.py` :
+
+```python
+from streamtex.styles import Style, StxStyles
+
+class Styles(StxStyles):
+    # Styles composes reutilisables
+    heading = Style("font-size: 40px; font-weight: bold; color: #4A90D9;", "heading")
+    subheading = Style("font-size: 28px; font-weight: 300; color: #666;", "subheading")
+    accent = Style("color: #E74C3C; font-weight: bold;", "accent")
+    card = Style("background-color: #f8f9fa; padding: 24px; border-radius: 8px;", "card")
+```
+
+Utilisation dans les blocks :
+
+```python
+from custom.styles import Styles as s
+
+class BlockStyles:
+    title = s.heading + s.center_txt
+    body = s.Large + s.center_txt
+bs = BlockStyles
+
+def build():
+    with st_block(s.card):
+        st_write(bs.title, "Titre", tag=t.div, toc_lvl="1")
+        st_write(bs.body, "Contenu")
+```
+
+### Themes (surcharge globale par `style_id`)
+
+Le dictionnaire global `theme` permet de surcharger n'importe quel style par son `style_id` :
+
+```python
+from streamtex.styles.core import theme
+
+# Definir un theme sombre
+dark_theme = {
+    "heading": "font-size: 40px; font-weight: bold; color: #E0E0E0;",
+    "card": "background-color: #1a1a2e; padding: 24px; border-radius: 8px;",
+    "LARGE_size": "font-size: 42pt;",   # Surcharge une taille integree
+}
+
+# Activer le theme
+theme.update(dark_theme)
+```
+
+Quand un `Style` est rendu, il cherche d'abord dans `theme[style_id]` avant
+d'utiliser son CSS par defaut. Le `style_id` est la cle.
+
+**Creer un style "themable"** avec `Style.create()` :
+
+```python
+# Style.create() copie le CSS mais assigne un nouveau style_id
+my_title = Style.create(s.bold + s.Large, "my_title")
+
+# Maintenant on peut surcharger "my_title" via le theme
+theme["my_title"] = "font-size: 48px; font-weight: 900; color: gold;"
+```
+
+### Variables CSS (tailles responsives)
+
+Les tailles integrees utilisent des variables CSS avec fallback :
+
+```python
+s.Large  # → font-size: var(--stx-Large-size, 32pt);
+s.huge   # → font-size: var(--stx-huge-size, 64pt);
+```
+
+On peut redefinir ces variables dans `.streamlit/config.toml` ou via CSS inject
+pour adapter toutes les tailles d'un coup sans toucher au code Python.
+
+### ListStyle (symboles de listes)
+
+```python
+from streamtex.styles.core import ListStyle
+
+# Symboles custom qui cyclent selon le niveau d'imbrication
+arrows = ListStyle(symbols=["→", "◦", "■"])
+with st_list(list_style=arrows) as l:
+    with l.item(): st_write("Niveau 1 → ")
+    with l.item():
+        st_write("Niveau 1 → ")
+        with st_list(list_style=arrows) as l2:
+            with l2.item(): st_write("Niveau 2 ◦ ")
+```
+
+### StyleGrid (styles par cellule dans les grids)
+
+```python
+from streamtex.styles.core import StyleGrid
+
+# Notation Excel — appliquer un style a une plage de cellules
+header_grid = StyleGrid.create("A1:C1", s.bold + s.center_txt)
+accent_grid = StyleGrid.create("A2:A4", Style("color: red;", "accent"))
+
+# Combiner des grids
+combined = header_grid + accent_grid
+
+# Utilisation avec st_grid
+st_grid(data, cols=3, cell_styles=combined)
+```
+
+Operateurs StyleGrid : `+` (combiner), `-` (retirer), `*` (remplacer).
+
+### Resume — comment repondre a "je veux un heading en 40px"
+
+```python
+# Methode 1 : Style direct
+st_write(Style("font-size: 40px; font-weight: bold;", "h1"), "Mon Titre")
+
+# Methode 2 : Factory + composition
+st_write(s.text.sizes.size("40px") + s.bold, "Mon Titre")
+
+# Methode 3 : Style reutilisable dans custom/styles.py
+class Styles(StxStyles):
+    h1 = Style("font-size: 40px; font-weight: bold;", "h1")
+# puis: st_write(s.h1, "Mon Titre")
+
+# Methode 4 : Themable
+class Styles(StxStyles):
+    h1 = Style.create(s.text.sizes.size("40px") + s.bold, "h1")
+# theme["h1"] = "font-size: 48px; ..." pour surcharger globalement
+```
+
+---
+
+## Section 4e — Issues GitHub (topic: `issues`)
+
+La commande `/stx-issue` permet de creer des issues GitHub directement depuis Claude,
+avec collecte automatique des metadata d'environnement.
+
+### Prerequis
+
+```bash
+# Installer GitHub CLI
+brew install gh          # macOS
+
+# S'authentifier
+gh auth login
+
+# Verifier
+gh auth status
+```
+
+### Usage
+
+```bash
+# Reporter un bug
+> /stx-issue bug st_grid ne s'affiche pas quand cols="1fr 2fr" sur mobile
+
+# Demander une feature
+> /stx-issue feature Ajouter un toggle dark mode dans la sidebar st_book
+
+# Poser une question
+> /stx-issue question Comment utiliser st_collection avec des routes custom ?
+
+# Ameliorer la documentation
+> /stx-issue docs Ajouter un exemple pour st_overlay positioning
+
+# Aide
+> /stx-issue --help
+```
+
+### Types d'issues
+
+| Type | Label GitHub | Fallback titre |
+|------|-------------|----------------|
+| `bug` | `bug` | `[Bug]` |
+| `feature` | `enhancement` | `[Feature]` |
+| `question` | `question` | `[Question]` |
+| `docs` | `documentation` | `[Docs]` |
+
+### Metadata collectees automatiquement
+
+- Version StreamTeX, Python, OS, uv
+- Nom du projet, preset du workspace, profil Claude
+- Branche git et dernier commit
+
+### Routage automatique
+
+La commande detecte le repo cible automatiquement :
+- Bugs sur l'API (`st_*`, erreurs Python) → `streamtex`
+- Issues sur la documentation (manuels, blocs) → `streamtex-docs`
+- Issues sur les profils Claude (commandes, installation) → `streamtex-claude`
+- En cas d'ambiguite, la commande demande de choisir
+
+### Securite
+
+- Preview complete avant chaque creation (confirmation obligatoire)
+- Pas de donnees sensibles dans le body (cles API, tokens filtres)
+- Labels appliques seulement si l'utilisateur a les droits d'ecriture
+- Langue par defaut : anglais (francais sur demande explicite)
+
+### GitHub Issue Templates
+
+Les 3 repos StreamTeX incluent des templates d'issues (`.github/ISSUE_TEMPLATE/`)
+pour les bug reports, feature requests, questions et ameliorations de documentation.
+Ces templates sont utilises aussi depuis l'interface web GitHub.
+
+---
+
 ## Section 5 — Gotchas connus
 
 ### 1. `from streamtex import *` masque `list()`
@@ -1023,6 +1310,16 @@ et controler l'affichage du footer.
 | Publier sur PyPI (CI) | `gh release create vX.Y.Z` (OIDC) |
 | Generer stubs bib | `stx bib generate-stubs refs.bib` |
 | Lancer un projet | `stx run` |
+
+### Commandes Claude (issues)
+
+| Tache | Commande |
+|-------|----------|
+| Reporter un bug | `/stx-issue bug <description>` |
+| Demander une feature | `/stx-issue feature <description>` |
+| Poser une question | `/stx-issue question <description>` |
+| Ameliorer la doc | `/stx-issue docs <description>` |
+| Aide | `/stx-issue --help` |
 
 ### Commandes Claude (coherence)
 

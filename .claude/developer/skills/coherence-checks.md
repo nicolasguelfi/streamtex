@@ -626,6 +626,8 @@ for cls in [PdfConfig, ExportConfig, BannerConfig]:
 
 **Goal**: All three StreamTeX repositories have consistent GitHub issue templates, and the `/stx-issue` command file exists in all profiles that declare it.
 
+**Why this check is critical**: Issue templates ensure a consistent experience for users creating issues via the web or via `/stx-issue`. Missing templates in one repo but not others creates confusion. Missing command files cause silent installation failures.
+
 **Source files**:
 - `streamtex/.github/ISSUE_TEMPLATE/` → bug_report.md, feature_request.md, question.md, docs.md
 - `streamtex-docs/.github/ISSUE_TEMPLATE/` → same 4 files
@@ -633,10 +635,19 @@ for cls in [PdfConfig, ExportConfig, BannerConfig]:
 - `streamtex-claude/profiles/*/manifest.toml` → `[commands] project = ["issue.md"]`
 - `streamtex-claude/profiles/*/commands/project/issue.md` → command file
 
+**Method**:
+1. For each repo (streamtex, streamtex-docs, streamtex-claude):
+   - Verify `.github/ISSUE_TEMPLATE/` directory exists
+   - Verify all 4 template files exist: `bug_report.md`, `feature_request.md`, `question.md`, `docs.md`
+   - Verify templates have correct YAML frontmatter (name, about, labels)
+2. For each profile that declares `project = ["issue.md"]` in its manifest:
+   - Verify `commands/project/issue.md` exists in the profile directory
+3. Verify stx-guide.md references `/stx-issue` in topics table and Section 6
+
 **Rules**:
 - ERROR if a repo is missing `.github/ISSUE_TEMPLATE/` directory
 - ERROR if any of the 4 template files is missing from a repo
 - ERROR if a manifest declares `issue.md` but the file does not exist
-- WARNING if issue templates differ between repos
+- WARNING if issue templates differ between repos (content should be consistent)
 - WARNING if stx-guide.md does not reference `/stx-issue`
 - INFO: report template existence status across all repos and profiles

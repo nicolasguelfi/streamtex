@@ -37,7 +37,7 @@ From zero to a running project in 3 commands:
 ```bash
 uv tool install "streamtex[cli]" -U
 stx project new my-project
-cd my-project && uv sync && uv run streamlit run book.py
+cd my-project && uv sync && stx run
 ```
 
 ### Standard Setup (recommended)
@@ -52,7 +52,7 @@ stx update
 stx project new my-project --template project   # CLI templates: project, collection, slides
 cd projects/my-project
 stx claude install project .
-uv run streamlit run book.py
+stx run
 ```
 
 ### Full Setup (all optional features)
@@ -65,7 +65,7 @@ mkdir streamtex-dev && cd streamtex-dev
 stx install --preset power --project my-project --template project
 stx update
 cd projects/my-project
-uv run streamlit run book.py
+stx run
 ```
 
 The `power` preset automatically installs PDF export, AI image generation, and the live
@@ -115,7 +115,7 @@ The AI agent designs the project structure, proposes it for your approval,
 and generates all files — blocks, styles, book.py — ready to run:
 
 ```bash
-uv run streamlit run book.py
+stx run
 ```
 
 See the **[AI Guide](https://github.com/nicolasguelfi/streamtex/blob/main/AI_GUIDE.md)** for all commands, agents, and workflows.
@@ -134,7 +134,7 @@ sx.st_write(style, "Hello StreamTeX!")
 ```
 
 ```bash
-uv run streamlit run app.py
+stx run app.py
 ```
 
 ### Manual Installation (without stx CLI)
@@ -144,7 +144,7 @@ pip install streamtex
 git clone https://github.com/nicolasguelfi/streamtex-claude.git
 mkdir my-project && cd my-project
 python ../streamtex-claude/install.py project .
-uv run streamlit run book.py
+stx run
 ```
 
 ### Workspace Presets
@@ -291,7 +291,7 @@ to study the examples:
 git clone https://github.com/nicolasguelfi/streamtex-docs
 cd streamtex-docs
 uv sync
-uv run streamlit run manuals/stx_manual_intro/book.py
+cd manuals/stx_manual_intro && stx run
 ```
 
 See [streamtex-docs](https://github.com/nicolasguelfi/streamtex-docs)
@@ -419,7 +419,7 @@ Found a bug? Have a suggestion? We'd love to hear from you.
 
 When reporting a bug, please include:
 1. The **full error traceback** (copy-paste from the terminal)
-2. The **command** you ran (e.g. `stx project new`, `/stx-designer:init`, `uv run streamlit run book.py`)
+2. The **command** you ran (e.g. `stx project new`, `/stx-designer:init`, `stx run`)
 3. Your **StreamTeX version** (`uv pip show streamtex | grep Version`)
 
 ## Contributing

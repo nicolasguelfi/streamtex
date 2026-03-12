@@ -362,7 +362,7 @@ def install(preset, project, template):
     if has_project:
         proj_path = os.path.join("projects", project)
         console.print("\n  To run your project:")
-        console.print(f"    cd {proj_path} && uv run streamlit run book.py")
+        console.print(f"    cd {proj_path} && stx run")
         console.print("\n  To enable PDF export, install Playwright (~150 MB, up to 5 min):")
         console.print(f"    cd {proj_path} && uv run playwright install chromium")
 

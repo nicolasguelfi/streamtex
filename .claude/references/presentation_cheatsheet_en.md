@@ -16,7 +16,7 @@ Quick reference for creating presentations with StreamTeX + Claude AI skills.
 │           ↓                                         │
 │  /designer:slide-new "bck_name — description..."     │  ← Refine one slide
 │           ↓                                         │
-│  uv run streamlit run book.py                       │  ← Preview
+│  stx run                                            │  ← Preview
 │           ↓                                         │
 │  /project:project-customize "changes..."            │  ← Adjust theme/fonts
 │           ↓                                         │
@@ -65,7 +65,7 @@ Quick reference for creating presentations with StreamTeX + Claude AI skills.
 ### Run
 
 ```bash
-uv run streamlit run book.py
+stx run
 ```
 
 ---

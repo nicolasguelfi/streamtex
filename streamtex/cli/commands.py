@@ -24,6 +24,7 @@ from .project_cmd import new as project_new
 from .project_cmd import validate as project_validate
 from .publish_cmd import check_cmd as publish_check
 from .publish_cmd import pypi_cmd as publish_pypi
+from .run_cmd import run as stx_run
 from .shortcuts import run_lint, run_test
 from .upgrade_cmd import upgrade as project_upgrade
 from .workspace_cmd import status as workspace_status
@@ -39,6 +40,7 @@ def cli():
 # --- Top-level commands ----------------------------------------------------
 
 cli.add_command(stx_install)
+cli.add_command(stx_run)
 cli.add_command(workspace_update, name="update")
 cli.add_command(workspace_status, name="status")
 

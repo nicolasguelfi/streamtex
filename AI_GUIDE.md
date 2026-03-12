@@ -103,7 +103,7 @@ my-project/
 
 ```bash
 uv sync
-uv run streamlit run book.py
+stx run
 ```
 
 Your project opens in the browser, ready to use.

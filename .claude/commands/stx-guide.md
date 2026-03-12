@@ -355,7 +355,7 @@ stx project validate projects/stx-mon-projet/
 
 # Lancer le projet
 cd projects/stx-mon-projet/
-uv run streamlit run book.py
+stx run
 ```
 
 > **Note** : les templates CLI (`--template project|collection|slides`) sont des repertoires
@@ -1022,7 +1022,7 @@ et controler l'affichage du footer.
 | Publier sur PyPI (local) | `stx publish pypi .` (lit `.env` auto) |
 | Publier sur PyPI (CI) | `gh release create vX.Y.Z` (OIDC) |
 | Generer stubs bib | `stx bib generate-stubs refs.bib` |
-| Lancer un projet | `uv run streamlit run book.py` |
+| Lancer un projet | `stx run` |
 
 ### Commandes Claude (coherence)
 

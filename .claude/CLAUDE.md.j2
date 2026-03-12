@@ -9,8 +9,9 @@ When the user says **"stream"**, **"la librairie"**, **"st"**, or **"stx"**, the
 
 ## Environment (MANDATORY)
 This project uses **uv** for dependency management. You MUST:
-- **ALWAYS** prefix Python commands with `uv run` (e.g. `uv run pytest`, `uv run streamlit run ...`)
+- **ALWAYS** prefix Python commands with `uv run` (e.g. `uv run pytest`)
 - **NEVER** call `python`, `pip`, `pytest`, `streamlit`, or `ruff` directly — always go through `uv run`
+- Use `stx run` to launch projects (shortcut for `uv run streamlit run book.py`)
 - Use `uv add <package>` to add dependencies, `uv add --group dev <package>` for dev deps
 - Run `uv sync` if `uv.lock` or `pyproject.toml` changed
 

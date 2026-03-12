@@ -236,17 +236,17 @@ with st_grid(cols=2, grid_style=grid_gap):
 
 ## 10. Running the App
 ```bash
-# Single project
-uv run streamlit run projects/<project_name>/book.py
+# Single project (from project directory)
+stx run                                       # auto-detects book.py
+stx run --port 8510 --browser chrome          # custom port + browser
 
-# Manual projects (documentation/manuals/)
-uv run streamlit run documentation/manuals/stx_manual_intro/book.py
-uv run streamlit run documentation/manuals/stx_manual_advanced/book.py
-uv run streamlit run documentation/manuals/stx_manuals_collection/book.py
+# Manual projects (from manual directory)
+cd manuals/stx_manual_intro && stx run
+cd manuals/stx_manual_advanced && stx run
 
 # Multiple projects simultaneously (different ports)
-./run-test-projects.sh --intro --advanced --collection
-./run-test-projects.sh --all                  # Launch all 3 projects
+./run-manuals.sh --intro --advanced --collection
+./run-manuals.sh --all                        # Launch all manuals
 ```
 
 ## 11. Deployment

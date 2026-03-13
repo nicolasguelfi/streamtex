@@ -431,6 +431,10 @@ and AI profile contributions.
 
 If StreamTeX is useful to you, consider [sponsoring the project](https://github.com/sponsors/nicolasguelfi) to help maintain and improve it.
 
+## Acknowledgments
+
+- **[Armando](https://github.com/Fre-Ar)** — A huge thank you to Armando, who worked alongside me to design and build the very first exploratory prototype that ultimately gave birth to StreamTeX. This project wouldn't be what it is today without that early collaboration.
+
 ## License
 
 [BUSL-1.1](https://github.com/nicolasguelfi/streamtex/blob/main/LICENSE) — Copyright (c) 2026 Nicolas Guelfi

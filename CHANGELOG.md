@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.20] — 2026-03-17
+
+### Fixed
+- **Draggable marker navigation — viewport clamping**: the floating navigation bar can no longer be lost off-screen; a centralized `clampNav()` function clamps position to the visible viewport on restore, during drag (continuous, no snap), on `mouseup`, on window resize, and after collapse/expand toggle
+- **HTML export lists**: ordered and unordered lists now render correctly in exported HTML — added `display: list-item`, `list-style-type`, and proper `padding-left` rules in `default.css` so `<ol>`/`<ul>`/`<li>` elements display with native browser list formatting instead of flowing inline
+
 ## [0.4.19] — 2026-03-16
 
 ### Fixed

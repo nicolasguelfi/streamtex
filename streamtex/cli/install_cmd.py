@@ -198,21 +198,7 @@ def install(preset, project, template):
 
         effective_preset = preset or "standard"
 
-        # Validate: power requires --project
-        if effective_preset == "power" and project is None:
-            raise click.ClickException(
-                "--preset power requires --project <name>.\n"
-                "Example: stx install --preset power --project helloworld"
-            )
-
         ws_root = os.path.abspath(".")
-
-    # Validate: power requires --project
-    if effective_preset == "power" and project is None:
-        raise click.ClickException(
-            "--preset power requires --project <name>.\n"
-            "Example: stx install --preset power --project helloworld"
-        )
 
     # --- Load or create state file ---
     state = _load_state(ws_root)

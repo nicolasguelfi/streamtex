@@ -143,8 +143,8 @@ def test_install_preset_basic(tmp_path):
     assert len(data["repos"]) == 0
 
 
-def test_install_preset_power_requires_project(tmp_path):
-    """--preset power without --project should fail."""
+def test_install_preset_power_without_project(tmp_path):
+    """--preset power without --project should succeed (workspace only)."""
     target = tmp_path / "ws"
     target.mkdir()
 
@@ -152,8 +152,8 @@ def test_install_preset_power_requires_project(tmp_path):
     os.chdir(target)
     result = runner.invoke(cli, ["install", "--preset", "power"])
 
-    assert result.exit_code != 0
-    assert "--project" in result.output
+    assert result.exit_code == 0
+    assert (target / "stx.toml").exists()
 
 
 def test_install_with_project(tmp_path):

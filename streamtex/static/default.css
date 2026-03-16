@@ -247,6 +247,19 @@ a {
     }
 }
 
+/* --- Export list styles --- */
+ol, ul {
+    display: block;
+    padding-left: 2em;
+    margin: 0.3em 0;
+}
+ol { list-style-type: decimal; }
+ul { list-style-type: disc; }
+li {
+    display: list-item;
+    margin-bottom: 0.3em;
+}
+
 /* --- Export widget styles --- */
 
 .stx-table {

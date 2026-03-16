@@ -458,6 +458,8 @@ def inject_marker_navigation() -> None:
             e.stopPropagation();
             collapsed = !collapsed;
             applyCollapsed();
+            /* Re-clamp after size change (clampNav defined in Draggable block) */
+            if (typeof clampNav === 'function') clampNav();
         };
 
         applyCollapsed();
@@ -469,7 +471,24 @@ def inject_marker_navigation() -> None:
         nav.style.cursor = 'grab';
         var _dragStartX, _dragStartY, _dragNavX, _dragNavY, _dragging = false;
 
-        /* Restore saved position from localStorage */
+        /* Clamp nav position to visible viewport */
+        function clampNav() {
+            var rect = nav.getBoundingClientRect();
+            var vw = hostWin.innerWidth || hostDoc.documentElement.clientWidth;
+            var vh = hostWin.innerHeight || hostDoc.documentElement.clientHeight;
+            var cx = Math.max(0, Math.min(rect.left, vw - rect.width));
+            var cy = Math.max(0, Math.min(rect.top, vh - rect.height));
+            if (cx !== rect.left || cy !== rect.top) {
+                nav.style.left = cx + 'px';
+                nav.style.top = cy + 'px';
+                nav.style.right = 'auto';
+                nav.style.bottom = 'auto';
+                nav.style.transform = 'none';
+            }
+            return {x: cx, y: cy};
+        }
+
+        /* Restore saved position, then clamp to current viewport */
         try {
             var savedPos = JSON.parse(localStorage.getItem('stx-marker-pos'));
             if (savedPos && savedPos.x !== undefined) {
@@ -478,6 +497,11 @@ def inject_marker_navigation() -> None:
                 nav.style.right = 'auto';
                 nav.style.bottom = 'auto';
                 nav.style.transform = 'none';
+                var clamped = clampNav();
+                if (clamped.x !== savedPos.x || clamped.y !== savedPos.y) {
+                    localStorage.setItem('stx-marker-pos',
+                        JSON.stringify(clamped));
+                }
             }
         } catch(e) {}
 
@@ -502,15 +526,23 @@ def inject_marker_navigation() -> None:
             nav.style.right = 'auto';
             nav.style.bottom = 'auto';
             nav.style.transform = 'none';
+            clampNav();
         });
         hostDoc.addEventListener('mouseup', function() {
             if (!_dragging) return;
             _dragging = false;
             nav.style.cursor = 'grab';
-            /* Persist position */
             try {
-                var rect = nav.getBoundingClientRect();
-                localStorage.setItem('stx-marker-pos', JSON.stringify({x: rect.left, y: rect.top}));
+                var pos = clampNav();
+                localStorage.setItem('stx-marker-pos', JSON.stringify(pos));
+            } catch(e) {}
+        });
+
+        /* Re-clamp on viewport resize (window resize, sidebar toggle, etc.) */
+        hostWin.addEventListener('resize', function() {
+            var pos = clampNav();
+            try {
+                localStorage.setItem('stx-marker-pos', JSON.stringify(pos));
             } catch(e) {}
         });
     }

@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.19] — 2026-03-16
+
+### Fixed
+- **PDF export on Render**: `_is_pdf_available()` now checks for the actual Chromium binary, not just the `playwright` import — prevents a non-functional PDF checkbox from appearing when the browser is missing
+- **Full document PDF export in paginated mode**: Added "Full document" / "Current section" scope selector so users can export the entire book without switching to continuous view mode
+- **Full export HTML always available**: When cache is restored from disk (Tier 2), a dedicated export pass now captures the full-book HTML automatically
+
+### Changed
+- **Export UI refactored**: "Download as..." panel reorganised with clear Content / PDF layout sections; format checkboxes (HTML/PDF) moved outside the form for dynamic show/hide of PDF options; radios replace truncated selectboxes for Scope and Section breaks
+- **Section breaks terminology**: "Slide breaks: Paginated/Continuous" renamed to "Section breaks: Page break between sections / Continuous flow" — clearer and avoids confusion with the view mode
+- **PDF margins**: `number_input` (integers, mm) replaces free-text input — prevents invalid CSS values
+- **Dockerfile**: Added `playwright install --with-deps chromium` to install Chromium and system dependencies for PDF export on Render
+
 ## [0.4.18] — 2026-03-13
 
 ### Changed

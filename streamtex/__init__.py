@@ -1,16 +1,30 @@
 """StreamTeX — A Streamlit wrapper for styled content rendering."""
 
+# ── Python version gate (must run before any other import) ──────────────
+# StreamTeX requires Python ≥ 3.11.  If the interpreter is too old, print a
+# clear diagnostic and exit immediately — before the stderr redirect below
+# swallows import errors.
+import sys as _sys
+
+if _sys.version_info < (3, 11):
+    print(
+        f"Error: StreamTeX requires Python >= 3.11 (found {_sys.version}).\n"
+        "Fix:  uv python install 3.13 && "
+        'uv tool install "streamtex[cli]" -U --python 3.13',
+        file=_sys.stderr,
+    )
+    _sys.exit(1)
+
 # Suppress Streamlit "No runtime found" warnings when imported outside a
 # Streamlit app (e.g. from the stx CLI).  Streamlit creates per-module loggers
 # with their own StreamHandler(stderr) at import time, so we must redirect
 # stderr during the initial import cascade.
 import io as _io
-import sys as _sys
 
 _real_stderr = _sys.stderr
 _sys.stderr = _io.StringIO()
 
-__version__ = "0.4.18"
+__version__ = "0.4.19"
 
 # Core style system
 from .styles import Style, ListStyle, StyleGrid, StxStyles, StreamTeX_Styles, theme

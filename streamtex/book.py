@@ -38,20 +38,34 @@ _warmup_mode = False
 
 
 def _is_pdf_available() -> bool:
-    """Return True if playwright is installed (PDF export possible)."""
+    """Return True if playwright is installed AND Chromium browser is present."""
     try:
-        import playwright  # noqa: F401
-        return True
-    except ImportError:
+        from playwright.sync_api import sync_playwright
+        with sync_playwright() as p:
+            path = p.chromium.executable_path
+            if not path:
+                return False
+            import os
+            return os.path.isfile(path)
+    except Exception:
         return False
 
 
-def _offer_export_downloads(html: str, base_name: str,
-                            pdf_config: PdfConfig | None = None) -> None:
-    """Render a 'Download as...' expander with format selection and download buttons.
+def _margin_mm(css_value: str) -> int:
+    """Extract the integer millimetre value from a CSS margin string."""
+    import re as _re
+    m = _re.match(r"^([0-9]+)", css_value.strip())
+    return int(m.group(1)) if m else 0
 
-    Uses st.form so that toggling options does NOT trigger a full page rerun.
-    Files are generated on submit and cached in session_state.
+
+def _offer_export_downloads(html: str, base_name: str,
+                            pdf_config: PdfConfig | None = None,
+                            paginated: bool = False) -> None:
+    """Render a 'Download as...' expander with export options and download buttons.
+
+    Format checkboxes (HTML / PDF) live **outside** the form so they trigger
+    a rerun, allowing the PDF layout section to appear/disappear dynamically.
+    The form contains only the configuration options and the Generate button.
     """
     from .pdf_export import PdfMode, export_pdf
 
@@ -59,84 +73,135 @@ def _offer_export_downloads(html: str, base_name: str,
     state_key = f"_stx_export_{base_name}"
     defaults = pdf_config or PdfConfig()
 
-    with st.expander("Download as..."):
-        with st.form(key=f"_stx_export_form_{base_name}"):
-            want_html = st.checkbox("HTML", value=True)
-            want_pdf = False
-            if pdf_available:
-                want_pdf = st.checkbox("PDF", value=False)
+    # Full-book HTML available from paginated cache build
+    full_book_html = st.session_state.get(_STX_FULL_EXPORT_HTML_KEY) if paginated else None
 
-                # --- PDF options (single column for narrow sidebar) ---
+    _BREAK_PAGE = "Page break between sections"
+    _BREAK_CONTINUOUS = "Continuous flow"
+
+    with st.expander("Download as..."):
+
+        # ── Format checkboxes — outside form for dynamic rerun ────
+        want_html = st.checkbox("HTML", value=True,
+                                key=f"_stx_want_html_{base_name}")
+        want_pdf = False
+        if pdf_available:
+            want_pdf = st.checkbox("PDF", value=False,
+                                   key=f"_stx_want_pdf_{base_name}")
+        else:
+            st.caption("PDF requires `streamtex[pdf]`")
+
+        # ── Form — configuration + Generate ──────────────────────
+        with st.form(key=f"_stx_export_form_{base_name}"):
+
+            # ── Content (applies to both formats) ────────────────
+            st.markdown("**Content**")
+
+            # Scope (paginated view only)
+            export_scope = "Full document"
+            if paginated:
+                if full_book_html:
+                    export_scope = st.radio(
+                        "Scope",
+                        options=["Full document", "Current section"],
+                        index=0,
+                        key=f"_stx_export_scope_{base_name}",
+                    )
+                else:
+                    export_scope = "Current section"
+                    st.caption("Exporting current section")
+
+            # Section breaks
+            _view = st.session_state.get(_STX_VIEW_MODE_KEY, "Paginated")
+            _break_default = 0 if _view == "Paginated" else 1
+            section_breaks = st.radio(
+                "Section breaks",
+                options=[_BREAK_PAGE, _BREAK_CONTINUOUS],
+                index=_break_default,
+                key=f"_stx_export_breaks_{base_name}",
+            )
+
+            # ── PDF layout (only when PDF is checked) ────────────
+            # Variables with safe defaults for the submit handler
+            pdf_format = defaults.format
+            pdf_landscape = defaults.landscape
+            pdf_background = defaults.print_background
+            pdf_page_numbers = defaults.page_numbers
+            pdf_scale = defaults.scale
+            m_top = _margin_mm(defaults.margin_top)
+            m_bottom = _margin_mm(defaults.margin_bottom)
+            m_left = _margin_mm(defaults.margin_left)
+            m_right = _margin_mm(defaults.margin_right)
+
+            if want_pdf:
                 _cur_w = st.session_state.get(_PAGE_WIDTH_KEY, 100)
                 _cur_z = st.session_state.get(_ZOOM_KEY, 100)
+                st.markdown("**PDF layout**")
                 st.caption(f"Current view: Width {_cur_w}% · Zoom {_cur_z}%")
-                st.markdown("**PDF options**")
                 pdf_format = st.selectbox(
-                    "Page format",
+                    "Page size",
                     options=["A4", "A3", "Letter", "Legal", "Tabloid"],
                     index=["A4", "A3", "Letter", "Legal", "Tabloid"].index(defaults.format)
                     if defaults.format in ["A4", "A3", "Letter", "Legal", "Tabloid"] else 0,
                     key=f"_stx_pdf_format_{base_name}",
                 )
-                # Default to the current view mode (Paginated/Continuous radio)
-                _view = st.session_state.get(_STX_VIEW_MODE_KEY, "Paginated")
-                _mode_default = 0 if _view == "Paginated" else 1
-                pdf_mode = st.selectbox(
-                    "Slide breaks",
-                    options=["Paginated", "Continuous"],
-                    index=_mode_default,
-                    key=f"_stx_pdf_mode_{base_name}",
-                )
                 pdf_landscape = st.checkbox("Landscape", value=defaults.landscape,
                                             key=f"_stx_pdf_land_{base_name}")
-                pdf_background = st.checkbox("Print background", value=defaults.print_background,
+                pdf_background = st.checkbox("Backgrounds", value=defaults.print_background,
                                              key=f"_stx_pdf_bg_{base_name}")
                 pdf_page_numbers = st.checkbox("Page numbers", value=defaults.page_numbers,
                                                key=f"_stx_pdf_pn_{base_name}")
-                # Default PDF scale to current Zoom % (if user hasn't set a custom scale)
                 _zoom_pct = st.session_state.get(_ZOOM_KEY, 100)
                 _scale_default = round(_zoom_pct / 100, 1)
                 _scale_default = max(0.5, min(2.0, _scale_default))
                 pdf_scale = st.slider("Scale", min_value=0.5, max_value=2.0,
                                       value=_scale_default, step=0.1,
                                       key=f"_stx_pdf_scale_{base_name}")
-                st.markdown("**Margins**")
-                m_top = st.text_input("Top", value=defaults.margin_top,
-                                      key=f"_stx_pdf_mt_{base_name}")
-                m_bottom = st.text_input("Bottom", value=defaults.margin_bottom,
-                                         key=f"_stx_pdf_mb_{base_name}")
-                m_left = st.text_input("Left", value=defaults.margin_left,
-                                       key=f"_stx_pdf_ml_{base_name}")
-                m_right = st.text_input("Right", value=defaults.margin_right,
-                                        key=f"_stx_pdf_mr_{base_name}")
-            else:
-                st.caption("PDF requires `streamtex[pdf]`")
+                st.markdown("**Margins (mm)**")
+                m_top = st.number_input("Top", min_value=0, value=_margin_mm(defaults.margin_top),
+                                        key=f"_stx_pdf_mt_{base_name}")
+                m_bottom = st.number_input("Bottom", min_value=0, value=_margin_mm(defaults.margin_bottom),
+                                           key=f"_stx_pdf_mb_{base_name}")
+                m_left = st.number_input("Left", min_value=0, value=_margin_mm(defaults.margin_left),
+                                         key=f"_stx_pdf_ml_{base_name}")
+                m_right = st.number_input("Right", min_value=0, value=_margin_mm(defaults.margin_right),
+                                          key=f"_stx_pdf_mr_{base_name}")
 
             submitted = st.form_submit_button("Generate")
 
         if submitted:
             results = {}
+            # Resolve which HTML to use based on scope
+            effective_html = html
+            if paginated and export_scope == "Full document" and full_book_html:
+                effective_html = full_book_html
+
             if want_html:
-                results["html"] = html
+                results["html"] = effective_html
             if want_pdf and pdf_available:
+                _pdf_mode = (PdfMode.PAGINATED if section_breaks == _BREAK_PAGE
+                             else PdfMode.CONTINUOUS)
                 with st.spinner("Generating PDF..."):
-                    cfg = PdfConfig(
-                        mode=PdfMode.PAGINATED if pdf_mode == "Paginated" else PdfMode.CONTINUOUS,
-                        format=pdf_format,
-                        landscape=pdf_landscape,
-                        margin_top=m_top,
-                        margin_bottom=m_bottom,
-                        margin_left=m_left,
-                        margin_right=m_right,
-                        print_background=pdf_background,
-                        scale=pdf_scale,
-                        page_numbers=pdf_page_numbers,
-                        header_template=defaults.header_template,
-                        footer_template=defaults.footer_template,
-                        theme_bg=st.session_state.get(_STX_THEME_BG_KEY, "#fff"),
-                        theme_text=st.session_state.get(_STX_THEME_TEXT_KEY, "#333"),
-                    )
-                    results["pdf"] = export_pdf(html, config=cfg)
+                    try:
+                        cfg = PdfConfig(
+                            mode=_pdf_mode,
+                            format=pdf_format,
+                            landscape=pdf_landscape,
+                            margin_top=f"{m_top}mm",
+                            margin_bottom=f"{m_bottom}mm",
+                            margin_left=f"{m_left}mm",
+                            margin_right=f"{m_right}mm",
+                            print_background=pdf_background,
+                            scale=pdf_scale,
+                            page_numbers=pdf_page_numbers,
+                            header_template=defaults.header_template,
+                            footer_template=defaults.footer_template,
+                            theme_bg=st.session_state.get(_STX_THEME_BG_KEY, "#fff"),
+                            theme_text=st.session_state.get(_STX_THEME_TEXT_KEY, "#333"),
+                        )
+                        results["pdf"] = export_pdf(effective_html, config=cfg)
+                    except Exception as exc:
+                        st.error(f"PDF generation failed: {exc}")
             st.session_state[state_key] = results
 
         # Show download buttons from cached results
@@ -780,12 +845,27 @@ def _isolate_widget_keys():
         ctx.widget_ids_this_run = saved_ids
 
 
+_STX_FULL_EXPORT_HTML_KEY = "_stx_full_export_html"
+
+
 def _build_page_cache(module_list, toc_config, marker_config, separator,
-                      cache_hash, *args, **kwargs):
-    """Execute all blocks inside st.empty() to collect TOC/markers, then cache."""
+                      cache_hash, *args, export_config: ExportConfig | None = None,
+                      **kwargs):
+    """Execute all blocks inside st.empty() to collect TOC/markers, then cache.
+
+    When *export_config* is provided the export buffer is active during the
+    full render so the complete HTML is captured and stored in session_state
+    under ``_STX_FULL_EXPORT_HTML_KEY``.
+    """
     reset_toc_registry(toc_config)
     if marker_config is not None:
         reset_marker_registry(marker_config)
+
+    # Activate export buffer during cache build to capture full-book HTML
+    if export_config is not None:
+        reset_export_buffer(export_config)
+    else:
+        reset_export_buffer(ExportConfig(enabled=False))
 
     use_search = toc_config is not None and toc_config.search
     collector = start_collector() if use_search else None
@@ -823,6 +903,13 @@ def _build_page_cache(module_list, toc_config, marker_config, separator,
                 st_include(separator, *args, **kwargs)
 
     hidden.empty()
+
+    # Store the full-book HTML before resetting the buffer
+    if export_config is not None:
+        full_html = generate_export_html()
+        if full_html:
+            st.session_state[_STX_FULL_EXPORT_HTML_KEY] = full_html
+        reset_export_buffer(ExportConfig(enabled=False))
 
     search_index = stop_collector() if use_search else None
 
@@ -1383,6 +1470,10 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
         with st.sidebar:
             _inspector_placeholder = st.empty()
 
+    # --- Effective layout values (needed by both cache build and current-page export) ---
+    effective_pw = f"{st.session_state.get(_PAGE_WIDTH_KEY, page_width)}%"
+    effective_zoom = st.session_state.get(_ZOOM_KEY, zoom) / 100
+
     # --- Cache management (3-tier: session → file → full rebuild) ---
     cache_hash = _compute_cache_hash(module_list)
     cache_path = _resolve_cache_path(module_list)
@@ -1414,13 +1505,32 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
 
     # Tier 3: full rebuild (slow — renders all blocks in hidden container)
     if not has_valid_cache:
-        reset_export_buffer(ExportConfig(enabled=False))
+        # Pass export_config so the cache build also captures the full-book HTML
+        _cache_export_cfg = None
+        if export:
+            _cache_export_cfg = ExportConfig(
+                enabled=True, page_title=export_title,
+                page_width=effective_pw, zoom=effective_zoom,
+            )
         _build_page_cache(module_list, toc_config, marker_config,
-                          separator, cache_hash, *args, **kwargs)
+                          separator, cache_hash, *args,
+                          export_config=_cache_export_cfg, **kwargs)
         cache = st.session_state[_STX_CACHE_KEY]
         # Persist to disk for future sessions
         if cache_path:
             _save_file_cache(cache_path, cache)
+
+    # When cache was restored from session/disk, full-book HTML may be missing.
+    # Run a dedicated export-only pass to capture it (idempotent — same blocks).
+    if export and _STX_FULL_EXPORT_HTML_KEY not in st.session_state:
+        _export_cfg = ExportConfig(
+            enabled=True, page_title=export_title,
+            page_width=effective_pw, zoom=effective_zoom,
+        )
+        _build_page_cache(module_list, toc_config, marker_config,
+                          separator, cache_hash, *args,
+                          export_config=_export_cfg, **kwargs)
+        cache = st.session_state[_STX_CACHE_KEY]
 
     # --- Current page ---
     if _STX_PAGE_KEY not in st.session_state:
@@ -1436,10 +1546,6 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
     if _refresh_search:
         _refresh_collector = start_collector()
         _refresh_collector.set_block(current_page)
-
-    # --- Prepare registries for current page ---
-    effective_pw = f"{st.session_state.get(_PAGE_WIDTH_KEY, page_width)}%"
-    effective_zoom = st.session_state.get(_ZOOM_KEY, zoom) / 100
     reset_export_buffer(ExportConfig(enabled=export, page_title=export_title,
                                      page_width=effective_pw, zoom=effective_zoom))
     reset_toc_registry(toc_config)
@@ -1601,11 +1707,12 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
 
     # --- Export downloads ---
     if is_export_active():
-        full_html = generate_export_html()
-        if full_html:
+        section_html = generate_export_html()
+        if section_html:
             base_name = export_title.replace(' ', '_').lower()
             with st.sidebar:
-                _offer_export_downloads(full_html, base_name, pdf_config=pdf_config)
+                _offer_export_downloads(section_html, base_name,
+                                        pdf_config=pdf_config, paginated=True)
 
     # --- Inspector panel (opt-in, rendered into reserved sidebar placeholder) ---
     if _inspector_placeholder is not None and st.session_state.get("_stx_inspector_open", False):

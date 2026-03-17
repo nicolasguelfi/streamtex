@@ -433,9 +433,10 @@ claude
 
 | Categorie | Commandes | Description |
 |-----------|-----------|-------------|
-| stx-designer (5) | init, update, audit, fix, tool | Cycle de vie complet du projet |
+| stx-designer (12) | init, update, audit, fix, tool, slide-new, slide-audit, slide-fix, style-audit, style-refactor, block-new, block-preview | Cycle de vie complet du projet |
 | Developer (2) | test-run, lint | Tests et linting |
 | Project (5) | collection-new, course-generate, project-customize, project-init, project-upgrade | Gestion de projets |
+| Migration (5) | conversion-audit, html-convert-batch, html-convert-block, html-export, html-migrate | Migration HTML vers StreamTeX |
 | stx-issue (6) | bug, feature, question, docs, comment, list | Issues GitHub (shared) |
 | Skills (8) | visual-design-rules, slide-design-rules, style-conventions, streamtex-quick-reference, block-blueprints, testing-patterns, stx-migrate, docs-lookup | Regles de conception |
 | Agents (3) | slide-designer, slide-reviewer, project-architect | Agents specialises |

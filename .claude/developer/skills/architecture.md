@@ -32,7 +32,7 @@ __init__.py (public API re-exports)
   +-- marker.py (MarkerConfig, st_marker) -> toc
   +-- book.py (st_book, st_include, st_toc, load_css) -> toc, marker, export, zoom
   +-- zoom.py (add_zoom_options, inject_zoom_logic) -> constants
-  +-- slide.py (SlideBreakMode, SlideBreakConfig, st_slide_break, add_slide_break_options, inject_slide_break_css) -> constants
+  +-- slide.py (SlideBreakMode, SlideBreakConfig, st_slide_break, add_slide_break_options) -> constants
   |
   +-- ai/ (AI image generation)
   |     config.py (AIImageConfig, set/get_ai_image_config — DI singleton)

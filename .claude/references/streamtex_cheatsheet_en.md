@@ -199,11 +199,14 @@ st_ai_image("a minimalist neural network diagram, flat design, dark bg",
 
 # Interactive — widget with prompt input + generate button
 st_ai_image_widget(default_prompt="a serene landscape", key="my_gen",
-                   show_save=True,
-                   api_key=None)  # Per-call API key override (bypasses config/env)
+                   show_save=True, api_key=None,
+                   style=s.ai_image, width="100%", height="auto",
+                   size="1024x1024", quality="standard", model=None,
+                   alt="", light_bg=False, config=None)
 
 # Programmatic — generate without displaying (e.g. Claude workflow)
-path = generate_image("a futuristic city", provider="openai")
+path = generate_image("a futuristic city", provider="openai",
+                      save=True, base_image=None)  # save=True caches to disk; base_image for img2img
 st_image(uri=path, width="100%")
 ```
 
@@ -569,6 +572,7 @@ st_book(
     page_width=90,                  # Page width as % of browser width (default 90)
     zoom=100,                       # Default zoom level as % (default 100)
     pdf_config=None,                # PdfConfig for PDF export defaults
+    exports=None,                   # List[ExportConfig] — auto-export to disk (new)
     chrome_banner=True,             # Show browser recommendation banner (Chrome/Edge)
     banner_color="rgba(211,47,47,0.8)",  # Legacy — use banner=BannerConfig(...) instead
     monties_color=None,             # Legacy — use banner=BannerConfig(...) instead
@@ -856,7 +860,9 @@ class ProjectBlockHelperConfig(BlockHelperConfig):
 set_block_helper_config(ProjectBlockHelperConfig())
 
 # Convenience wrappers
-def show_code(code_string: str, language: str = "python", line_numbers: bool = True, wrap: bool = False):
+def show_code(code_string: str = "", language: str = "python", line_numbers: bool = True,
+              style=None, wrap=None, file=None, encoding="utf-8",
+              line_start=None, start_line=None, end_line=None):
     return _show_code(code_string, language, line_numbers, wrap=wrap)
 
 def show_explanation(text: str):
@@ -874,6 +880,7 @@ from streamtex import show_code, show_explanation, show_details
 show_code("print('hello')")                          # Uses injected config style
 show_code("print('hello')", style=s.custom.style)    # Override with explicit style
 show_code('{"key": "value"}', language="json", wrap=True)  # Wrapping for JSON
+show_code(file="examples/demo.py", start_line=5, end_line=15)  # From file with line range
 
 # show_explanation / show_details render Markdown (bold, italic, lists, links…)
 show_explanation("""\
@@ -1158,6 +1165,7 @@ import streamtex as stx
 stx.add_zoom_options()                                  # Defaults: width=100%, zoom=100%
 stx.add_zoom_options(default_page_width=80)             # Start at 80% width
 stx.add_zoom_options(default_page_width=80, default_zoom=125)  # 80% width, 125% zoom
+stx.add_zoom_options(container=st.sidebar)              # Render controls in specific container
 
 # Low-level injection (rarely needed):
 stx.inject_zoom_logic(100, 100)      # Width 100%, Zoom 100%
@@ -1405,9 +1413,9 @@ Credentials resolution: explicit path > `GSHEET_CREDENTIALS` env > `GOOGLE_APPLI
 ### ExportConfig
 
 ```python
-from streamtex import ExportConfig
+from streamtex import ExportConfig, ExportMode
 
-# ExportConfig — settings for HTML export
+# --- Legacy usage (internal buffer config) ---
 config = ExportConfig(
     enabled=True,                    # Enable export buffer (default False)
     page_title="My StreamTeX Export",  # Title of exported HTML document
@@ -1416,7 +1424,41 @@ config = ExportConfig(
     zoom=0.8,                        # CSS zoom applied to exported page (default 1.0)
 )
 # Passed internally by st_book(export=True); rarely constructed manually
-# Width % and Zoom % from the sidebar are automatically propagated to the export
+
+# --- Auto-export usage (new — via st_book(exports=[...])) ---
+from streamtex import PdfConfig
+
+# HTML auto-export with timestamp
+html_export = ExportConfig(
+    format="html",                   # "html" or "pdf"
+    mode=ExportMode.ALWAYS,          # ALWAYS (auto) | MANUAL (sidebar) | NEVER
+    output_dir="./exports",          # Directory for exported files
+    filename="my-course",            # Base filename (default: book name)
+    timestamp=True,                  # Append -YYMMDD-HHMMSS to filename
+)
+
+# PDF auto-export with custom config
+pdf_export = ExportConfig(
+    format="pdf",
+    mode=ExportMode.ALWAYS,
+    output_dir="./exports",
+    filename="my-slides",
+    timestamp=False,
+    pdf=PdfConfig(format="A4", landscape=True, margin_top="0", margin_bottom="0"),
+)
+
+# Pass list to st_book — each config = one output file
+st_book([...], exports=[html_export, pdf_export])
+```
+
+### ExportMode
+
+```python
+from streamtex import ExportMode
+
+ExportMode.ALWAYS   # Auto-export to disk after every render
+ExportMode.MANUAL   # Show sidebar panel — user clicks Generate (default sidebar)
+ExportMode.NEVER    # Disable export entirely
 ```
 
 ### FileCategoryRegistry
@@ -1778,8 +1820,7 @@ import streamtex as stx
 stx.add_slide_break_options()                           # Defaults: enabled, FULL, 60vh
 stx.add_slide_break_options(default_enabled=True, default_mode=SlideBreakMode.FULL, default_space=60)
 
-# Low-level CSS variable injection (rarely needed):
-stx.inject_slide_break_css(enabled=True, mode=SlideBreakMode.FULL, space_vh=60)
+# CSS variables are injected automatically by add_slide_break_options() and st_slide_break()
 ```
 
 ### Slide Break CSS Variables

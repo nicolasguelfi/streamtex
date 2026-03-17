@@ -22,11 +22,23 @@
 **Think with AI. Present with StreamTeX.**
 
 StreamTeX is the first document library designed for generative AI. It uses
-Python and Markdown — two of the languages best understood by large language
+mainly Python — one of the languages best understood by large language
 models — so an AI assistant can create, modify, and maintain your documents
 as naturally as a human developer. You keep full control at all times: every
 file is readable text, editable by hand or by AI, with no limits imposed by
 the software or provider.
+
+<p align="center">
+  <a href="https://www.youtube.com/watch?v=FTkw_9LGWYA">
+    <img src="https://img.youtube.com/vi/FTkw_9LGWYA/maxresdefault.jpg" alt="StreamTeX Demo" width="600">
+  </a>
+</p>
+
+<p align="center">
+  <a href="https://www.youtube.com/watch?v=FTkw_9LGWYA&list=PLY94DCgRcAmsUBWwl7yYVm6Sd4hyvWoK2&index=1">
+    <img src="https://img.shields.io/badge/%E2%96%B6%EF%B8%8F_Watch_all_tutorials-YouTube_Playlist-red?style=for-the-badge&logo=youtube" alt="YouTube Playlist">
+  </a>
+</p>
 
 ## Why StreamTeX?
 

@@ -19,12 +19,47 @@
 [![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-pink)](https://github.com/sponsors/nicolasguelfi)
 [![Best on Chrome](https://img.shields.io/badge/Best%20on-Chrome-4285F4?logo=googlechrome&logoColor=white)](https://www.google.com/chrome/)
 
-**AI-powered content framework for Streamlit** — create presentations, courses,
-and web-books with Claude or Cursor. No coding required.
+**Think with AI. Present with StreamTeX.**
 
-> StreamTeX combines a modular block architecture with AI-powered workflows.
-> Describe your project in natural language, and let Claude or Cursor build it —
-> or use the Python API for full control.
+StreamTeX is the first document library designed for generative AI. It uses
+Python and Markdown — two of the languages best understood by large language
+models — so an AI assistant can create, modify, and maintain your documents
+as naturally as a human developer. You keep full control at all times: every
+file is readable text, editable by hand or by AI, with no limits imposed by
+the software or provider.
+
+## Why StreamTeX?
+
+### Two paths, one tool
+
+StreamTeX supports two complementary approaches that produce **exactly the same result**:
+
+| | Zero-code path | Code-first path |
+|---|---|---|
+| **You describe** | What you want in natural language | The document in Python |
+| **The AI** | Generates the entire project | Assists, audits, and fixes |
+| **Ideal for** | Teachers, consultants, managers | Developers, researchers, engineers |
+| **Requires** | No programming experience | Basic Python knowledge |
+
+### 10 reasons to choose StreamTeX
+
+1. **Built for generative AI** — The only document library that AI can create, modify, and maintain end-to-end. Describe what you want in plain language; keep full control over the result.
+2. **Zero HTML, zero CSS** — All formatting through composable Style objects in Python. No web knowledge needed.
+3. **Pure Python, nothing else** — One language for content, logic, and style. No proprietary syntax, no opaque binary format. Readable, diffable, reviewable.
+4. **Total composability** — Styles combine with `+`, blocks nest freely, documents are structured like code: functions, modules, reuse.
+5. **Complete independence** — No account, no subscription, no mandatory server. Your files are yours — Git-versioned, readable in any text editor.
+6. **Universal export** — Self-contained HTML (single file), PDF, cloud deployment. Works everywhere, forever.
+7. **Built-in diagrams** — Mermaid, PlantUML, TikZ, and LaTeX — no external tools to install.
+8. **Book navigation** — Table of contents, pagination, markers, keyboard navigation. Documents that read like real books.
+9. **The Streamlit ecosystem** — Access all Streamlit widgets while keeping professional typography and layout.
+10. **One-command deployment** — Pre-configured Docker and Render. Local prototype to online document in minutes.
+
+### Who is StreamTeX for?
+
+- **Teachers & trainers** — Interactive, navigable educational documents with professional layouts — no CSS required.
+- **Professionals & consultants** — Self-contained exportable documents (HTML/PDF), independent of any vendor or subscription.
+- **Developers & engineers** — Native Python, composable, Git-versioned, with syntax highlighting and integrated diagrams.
+- **Researchers & scientists** — LaTeX-quality typesetting + web interactivity + built-in diagrams (Mermaid, PlantUML, TikZ).
 
 ## Getting Started
 

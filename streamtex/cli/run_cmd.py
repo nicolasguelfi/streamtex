@@ -42,6 +42,22 @@ def _get_os_key() -> str:
     return "linux"
 
 
+def _detect_chrome() -> bool:
+    """Return True if Google Chrome is available on this machine."""
+    os_key = _get_os_key()
+    if os_key == "darwin":
+        return os.path.isdir("/Applications/Google Chrome.app")
+    if os_key == "windows":
+        return shutil.which("chrome") is not None or os.path.exists(
+            os.path.join(
+                os.environ.get("PROGRAMFILES", "C:\\Program Files"),
+                "Google", "Chrome", "Application", "chrome.exe",
+            )
+        )
+    # Linux
+    return shutil.which("google-chrome") is not None
+
+
 def _open_browser(browser: str, url: str) -> None:
     """Open a specific browser with the given URL."""
     os_key = _get_os_key()
@@ -154,7 +170,7 @@ def _resolve_port(port_arg: int | None) -> int:
     "-b", "--browser",
     type=click.Choice(["chrome", "firefox", "safari", "edge", "none"]),
     default=None,
-    help="Browser to open (default: system default).",
+    help="Browser to open (default: Chrome if available, else system default).",
 )
 @click.option("--headless", is_flag=True, help="Don't open any browser.")
 @click.option("-f", "--force", is_flag=True, help="Kill any process using the target port before starting.")
@@ -169,6 +185,11 @@ def run(book, port, browser, headless, force, extra_args):
     # Kill existing process on the port if --force
     if force:
         _kill_port(actual_port)
+
+    # Auto-detect Chrome when no --browser is specified
+    # Priority: explicit --browser > auto-detect Chrome > Streamlit default
+    if not headless and browser is None and _detect_chrome():
+        browser = "chrome"
 
     # Build streamlit command — use `uv run` so Streamlit runs inside the
     # project's .venv (not the uv-tool Python that hosts the CLI).

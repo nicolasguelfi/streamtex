@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.21] — 2026-03-17
+
+### Changed
+- **`stx run` auto-detects Chrome**: When no `--browser` option is specified, `stx run` now automatically opens Chrome if available on the machine; falls back to the system default browser otherwise. The `--browser` flag still overrides this behavior.
+- **README redesigned**: New "Why StreamTeX?" section with 10 reasons, user profiles, two-path table (zero-code / code-first), and embedded YouTube demo video. Tagline updated to "Think with AI. Present with StreamTeX."
+
 ## [0.4.20] — 2026-03-17
 
 ### Fixed

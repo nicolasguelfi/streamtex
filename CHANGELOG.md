@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.22] — 2026-03-17
+
+### Added
+- **Browser tests**: New `test_browser.py` with 4 tests covering `st_chrome_banner()` — previously the only module with zero test coverage
+
+### Fixed
+- **Documentation examples**: Fixed incorrect kwargs in developer manual `show_code()` examples — `sidebar_depth` → `sidebar_max_level`, `auto_markers` → `auto_marker_on_toc`, `keyboard_nav` → `next_keys`/`prev_keys` (TOCConfig and MarkerConfig)
+- **Enum reference**: Fixed `NumberingMode.INLINE` → `NumberingMode.BOTH` in advanced manual marker config block
+- **Ghost API reference**: Removed `inject_slide_break_css()` from all documentation — this function never existed in the library; CSS variable injection is handled internally by `add_slide_break_options()` and `st_slide_break()`
+
 ## [0.4.21] — 2026-03-17
 
 ### Added

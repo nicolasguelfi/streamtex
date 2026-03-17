@@ -18,7 +18,14 @@ from .banner import BannerConfig, BannerMode, _render_banner, _render_loop_banne
 from .browser import st_chrome_banner
 from .code import add_wrap_all_option
 from .enums import Tags
-from .export import ExportConfig, generate_export_html, is_export_active, reset_export_buffer
+from .export import (
+    ExportConfig,
+    ExportMode,
+    build_export_filename,
+    generate_export_html,
+    is_export_active,
+    reset_export_buffer,
+)
 from .marker import MarkerConfig, inject_marker_navigation, marker_entries, reset_marker_registry
 from .pdf_export import PdfConfig
 from .presentation import get_presentation_config, st_presentation_footer
@@ -224,6 +231,51 @@ def _offer_export_downloads(html: str, base_name: str,
             )
 
 
+def _run_auto_exports(
+    exports: list[ExportConfig],
+    html: str,
+    base_name: str,
+) -> None:
+    """Execute all ``mode=ALWAYS`` exports — write files to disk.
+
+    Skips configs whose ``mode`` is not ``ALWAYS``.  HTML exports are
+    written directly; PDF exports go through ``export_pdf()``.
+
+    A sidebar notification summarises what was written.
+    """
+    from .pdf_export import export_pdf
+
+    written: list[str] = []
+    for cfg in exports:
+        if cfg.mode != ExportMode.ALWAYS:
+            continue
+        path = build_export_filename(cfg, base_name)
+        try:
+            if cfg.format == "pdf":
+                pdf_cfg = cfg.pdf
+                if pdf_cfg is None:
+                    from .pdf_export import PdfConfig
+                    pdf_cfg = PdfConfig()
+                # Inject theme colours from session state
+                pdf_cfg.theme_bg = st.session_state.get(_STX_THEME_BG_KEY, "#fff")
+                pdf_cfg.theme_text = st.session_state.get(_STX_THEME_TEXT_KEY, "#333")
+                export_pdf(html, output_path=path, config=pdf_cfg)
+            else:
+                from pathlib import Path as _P
+                _P(path).parent.mkdir(parents=True, exist_ok=True)
+                _P(path).write_text(html, encoding="utf-8")
+            written.append(path)
+        except Exception as exc:
+            logger.warning("Auto-export failed for %s: %s", path, exc)
+            with st.sidebar:
+                st.warning(f"Export failed: {path}\n{exc}")
+
+    if written:
+        with st.sidebar:
+            label = ", ".join(f"`{w}`" for w in written)
+            st.caption(f"Auto-exported: {label}")
+
+
 def _resolve_sidebar_max_level(toc_config: TOCConfig, paginated: bool) -> int | None:
     """Return the effective max TOC level for the sidebar.
 
@@ -271,6 +323,7 @@ def _inject_bib_preview_if_enabled():
 def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConfig = None, separator=None,
             export: bool = True, export_title: str = "StreamTeX Export",
             pdf_config: PdfConfig = None,
+            exports: list[ExportConfig] | None = None,
             paginate: bool = False,
             banner_color: str = "rgba(211, 47, 47, 0.8)",
             banner: BannerConfig = None,
@@ -286,6 +339,11 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
     :param export: If True, enables HTML export with a download button in the sidebar.
     :param export_title: Title used for the exported HTML document.
     :param pdf_config: Optional PdfConfig to customise PDF export (format, margins, scale, etc.).
+    :param exports: Optional list of ExportConfig for auto-export to disk.
+        Each config defines one output file (format, mode, output_dir, filename,
+        timestamp, pdf).  Configs with ``mode=ExportMode.ALWAYS`` are written
+        automatically after rendering.  Configs with ``mode=ExportMode.MANUAL``
+        show in the sidebar panel.  Overrides ``export`` when provided.
     :param paginate: If True, renders one block at a time for faster widget interactions.
     :param banner_color: Background color for paginated navigation banners (CSS value).
     :param banner: Optional BannerConfig for full banner customisation (overrides banner_color).
@@ -295,6 +353,15 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
     :param page_width: Page width as % of browser width (default 90).
     :param zoom: Default zoom level as % (default 100).
     """
+    # --- Resolve export flags from exports list ---
+    if exports is not None:
+        has_always = any(c.mode == ExportMode.ALWAYS for c in exports)
+        has_manual = any(c.mode == ExportMode.MANUAL for c in exports)
+        has_never_only = all(c.mode == ExportMode.NEVER for c in exports)
+        # Enable buffer if any config needs HTML generation
+        export = has_always or has_manual
+        if has_never_only:
+            export = False
     # --- Resolve banner configuration (3 levels) ---
     if banner is not None:
         banner_config = banner
@@ -347,7 +414,8 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
     if st.session_state[_STX_VIEW_MODE_KEY] == "Paginated":
         _paginated_book(module_list, toc_config, marker_config, separator,
                         export, export_title, banner_config, *args,
-                        pdf_config=pdf_config, inspector=inspector,
+                        pdf_config=pdf_config, exports=exports,
+                        inspector=inspector,
                         page_width=page_width, zoom=zoom, **kwargs)
         return
 
@@ -471,8 +539,16 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
         full_html = generate_export_html()
         if full_html:
             base_name = export_title.replace(' ', '_').lower()
-            with st.sidebar:
-                _offer_export_downloads(full_html, base_name, pdf_config=pdf_config)
+            # Auto-export (mode=ALWAYS) configs
+            if exports:
+                _run_auto_exports(exports, full_html, base_name)
+            # Sidebar panel for manual configs (or legacy export=True)
+            _show_manual = exports is None or any(
+                c.mode == ExportMode.MANUAL for c in exports
+            )
+            if _show_manual:
+                with st.sidebar:
+                    _offer_export_downloads(full_html, base_name, pdf_config=pdf_config)
 
     # --- Inspector panel (opt-in, rendered into reserved sidebar placeholder) ---
     if _inspector_placeholder is not None and st.session_state.get("_stx_inspector_open", False):
@@ -1446,8 +1522,8 @@ def _inject_paginated_nav_js(current_page, total, marker_config,
 
 def _paginated_book(module_list, toc_config, marker_config, separator,
                     export, export_title, banner_config: BannerConfig, *args,
-                    pdf_config=None, inspector=None, page_width=100, zoom=100,
-                    **kwargs):
+                    pdf_config=None, exports=None, inspector=None,
+                    page_width=100, zoom=100, **kwargs):
     """Paginated rendering — only renders one block per rerun."""
     start_time = time.time()
     logger.debug("Starting st_book (paginated)...")
@@ -1710,9 +1786,17 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
         section_html = generate_export_html()
         if section_html:
             base_name = export_title.replace(' ', '_').lower()
-            with st.sidebar:
-                _offer_export_downloads(section_html, base_name,
-                                        pdf_config=pdf_config, paginated=True)
+            # Auto-export uses full-book HTML when available
+            _full_html = st.session_state.get(_STX_FULL_EXPORT_HTML_KEY) or section_html
+            if exports:
+                _run_auto_exports(exports, _full_html, base_name)
+            _show_manual = exports is None or any(
+                c.mode == ExportMode.MANUAL for c in exports
+            )
+            if _show_manual:
+                with st.sidebar:
+                    _offer_export_downloads(section_html, base_name,
+                                            pdf_config=pdf_config, paginated=True)
 
     # --- Inspector panel (opt-in, rendered into reserved sidebar placeholder) ---
     if _inspector_placeholder is not None and st.session_state.get("_stx_inspector_open", False):

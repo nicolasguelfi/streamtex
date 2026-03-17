@@ -73,7 +73,7 @@ from .enums import Tags
 from .zoom import add_zoom_options, inject_zoom_logic
 
 # Export
-from .export import ExportConfig, st_export, st_html
+from .export import ExportConfig, ExportMode, st_export, st_html
 
 # PDF Export (requires optional 'pdf' extra)
 from .pdf_export import PdfConfig, PdfMode, export_pdf

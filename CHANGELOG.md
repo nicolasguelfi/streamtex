@@ -7,9 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.4.21] — 2026-03-17
 
+### Added
+- **Auto-export to disk** (`exports=[ExportConfig(...)]`): New `exports` parameter on `st_book()` accepts a list of `ExportConfig` objects, each describing one output file (HTML or PDF) with format, filename, output directory, timestamp, and PDF settings. Three modes: `ExportMode.ALWAYS` (auto-export after every render), `ExportMode.MANUAL` (sidebar panel), `ExportMode.NEVER` (disabled). Multiple configs enable simultaneous export of different formats/settings (e.g. A4 portrait for print + landscape for projection + HTML archive).
+- **`ExportMode` enum**: New public enum (`ALWAYS`, `MANUAL`, `NEVER`) controlling when export happens.
+- **`build_export_filename()` helper**: Builds output paths with optional timestamp suffix (`-YYMMDD-HHMMSS`).
+- **Timestamp support**: `ExportConfig(timestamp=True)` appends `-YYMMDD-HHMMSS` to the filename for versioned exports.
+
 ### Changed
 - **`stx run` auto-detects Chrome**: When no `--browser` option is specified, `stx run` now automatically opens Chrome if available on the machine; falls back to the system default browser otherwise. The `--browser` flag still overrides this behavior.
 - **README redesigned**: New "Why StreamTeX?" section with 10 reasons, user profiles, two-path table (zero-code / code-first), and embedded YouTube demo video. Tagline updated to "Think with AI. Present with StreamTeX."
+- **`ExportConfig` extended**: New fields `format`, `mode`, `output_dir`, `filename`, `timestamp`, `pdf` for auto-export configuration. Fully backward-compatible — existing `enabled`/`page_title`/`page_width`/`page_padding`/`zoom` fields unchanged.
 
 ## [0.4.20] — 2026-03-17
 

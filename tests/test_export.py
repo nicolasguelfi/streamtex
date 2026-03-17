@@ -1,12 +1,16 @@
 """Unit tests for streamtex.export — buffer, config, global functions, st_html."""
 
+import os
+import re
 from unittest.mock import patch
 
 import streamtex.export as export_mod
 from streamtex.export import (
     ExportConfig,
+    ExportMode,
     HtmlExportBuffer,
     _render,
+    build_export_filename,
     export_append,
     export_pop_wrapper,
     export_push_wrapper,
@@ -316,3 +320,150 @@ class TestStExport:
         with st_export("<p>fb</p>"):
             executed = True
         assert executed is True
+
+
+# ---------------------------------------------------------------------------
+# ExportMode enum
+# ---------------------------------------------------------------------------
+
+class TestExportMode:
+    def test_always_value(self):
+        assert ExportMode.ALWAYS.value == "always"
+
+    def test_manual_value(self):
+        assert ExportMode.MANUAL.value == "manual"
+
+    def test_never_value(self):
+        assert ExportMode.NEVER.value == "never"
+
+    def test_all_modes(self):
+        modes = [*ExportMode]
+        assert len(modes) == 3
+
+
+# ---------------------------------------------------------------------------
+# ExportConfig — new auto-export fields
+# ---------------------------------------------------------------------------
+
+class TestExportConfigAutoExport:
+    def test_default_auto_export_fields(self):
+        cfg = ExportConfig()
+        assert cfg.format == "html"
+        assert cfg.mode == ExportMode.ALWAYS
+        assert cfg.output_dir == "./exports"
+        assert cfg.filename is None
+        assert cfg.timestamp is False
+        assert cfg.pdf is None
+
+    def test_custom_auto_export_html(self):
+        cfg = ExportConfig(
+            format="html",
+            mode=ExportMode.ALWAYS,
+            output_dir="/tmp/out",
+            filename="my-book",
+            timestamp=True,
+        )
+        assert cfg.format == "html"
+        assert cfg.mode == ExportMode.ALWAYS
+        assert cfg.output_dir == "/tmp/out"
+        assert cfg.filename == "my-book"
+        assert cfg.timestamp is True
+
+    def test_custom_auto_export_pdf(self):
+        from streamtex.pdf_export import PdfConfig
+        pdf = PdfConfig(format="A3", landscape=False)
+        cfg = ExportConfig(
+            format="pdf",
+            mode=ExportMode.ALWAYS,
+            filename="slides",
+            pdf=pdf,
+        )
+        assert cfg.format == "pdf"
+        assert cfg.pdf is not None
+        assert cfg.pdf.format == "A3"
+        assert cfg.pdf.landscape is False
+
+    def test_manual_mode(self):
+        cfg = ExportConfig(mode=ExportMode.MANUAL)
+        assert cfg.mode == ExportMode.MANUAL
+
+    def test_never_mode(self):
+        cfg = ExportConfig(mode=ExportMode.NEVER)
+        assert cfg.mode == ExportMode.NEVER
+
+    def test_backward_compat_enabled_field(self):
+        """Legacy 'enabled' field still works for buffer config."""
+        cfg = ExportConfig(enabled=True, page_title="Test")
+        assert cfg.enabled is True
+        assert cfg.page_title == "Test"
+
+
+# ---------------------------------------------------------------------------
+# build_export_filename
+# ---------------------------------------------------------------------------
+
+class TestBuildExportFilename:
+    def test_html_no_timestamp(self, tmp_path):
+        cfg = ExportConfig(
+            format="html",
+            output_dir=str(tmp_path),
+            filename="my-doc",
+            timestamp=False,
+        )
+        path = build_export_filename(cfg, "fallback")
+        assert path == str(tmp_path / "my-doc.html")
+
+    def test_pdf_no_timestamp(self, tmp_path):
+        cfg = ExportConfig(
+            format="pdf",
+            output_dir=str(tmp_path),
+            filename="slides",
+            timestamp=False,
+        )
+        path = build_export_filename(cfg, "fallback")
+        assert path == str(tmp_path / "slides.pdf")
+
+    def test_uses_base_name_when_filename_none(self, tmp_path):
+        cfg = ExportConfig(
+            format="html",
+            output_dir=str(tmp_path),
+            filename=None,
+            timestamp=False,
+        )
+        path = build_export_filename(cfg, "my_book")
+        assert path == str(tmp_path / "my_book.html")
+
+    def test_timestamp_appended(self, tmp_path):
+        cfg = ExportConfig(
+            format="html",
+            output_dir=str(tmp_path),
+            filename="doc",
+            timestamp=True,
+        )
+        path = build_export_filename(cfg, "fallback")
+        # Pattern: doc-YYMMDD-HHMMSS.html
+        basename = os.path.basename(path)
+        assert re.match(r"doc-\d{6}-\d{6}\.html$", basename), f"Unexpected filename: {basename}"
+
+    def test_creates_output_dir(self, tmp_path):
+        out = tmp_path / "nested" / "dir"
+        assert not out.exists()
+        cfg = ExportConfig(
+            format="html",
+            output_dir=str(out),
+            filename="test",
+            timestamp=False,
+        )
+        build_export_filename(cfg, "fallback")
+        assert out.exists()
+
+    def test_pdf_timestamp(self, tmp_path):
+        cfg = ExportConfig(
+            format="pdf",
+            output_dir=str(tmp_path),
+            filename="report",
+            timestamp=True,
+        )
+        path = build_export_filename(cfg, "fallback")
+        basename = os.path.basename(path)
+        assert re.match(r"report-\d{6}-\d{6}\.pdf$", basename)

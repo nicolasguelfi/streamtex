@@ -10,9 +10,15 @@ import importlib.resources as resources
 import os
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Optional
+from datetime import datetime
+from enum import Enum
+from pathlib import Path
+from typing import TYPE_CHECKING, Optional
 
 import streamlit as st
+
+if TYPE_CHECKING:
+    from .pdf_export import PdfConfig
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -20,14 +26,85 @@ import streamlit as st
 from .constants import PAGE_PADDING, PAGE_WIDTH
 
 
+class ExportMode(Enum):
+    """Controls when automatic file export happens."""
+
+    ALWAYS = "always"
+    """Auto-export to disk after every render."""
+
+    MANUAL = "manual"
+    """Show sidebar panel — user clicks Generate (default behaviour)."""
+
+    NEVER = "never"
+    """Disable export entirely (no buffer, no sidebar panel)."""
+
+
 @dataclass
 class ExportConfig:
-    """Settings for the HTML export feature."""
+    """Settings for the HTML export feature.
+
+    Used in two ways:
+
+    1. **Internal buffer config** (legacy) — passed by ``st_book()`` to
+       ``reset_export_buffer()``.  Only ``enabled``, ``page_title``,
+       ``page_width``, ``page_padding``, and ``zoom`` matter here.
+
+    2. **Auto-export config** (new) — passed via ``st_book(exports=[...])``
+       to describe one output file.  The fields ``format``, ``mode``,
+       ``output_dir``, ``filename``, ``timestamp``, and ``pdf`` are used.
+    """
+
+    # --- Buffer / rendering fields (used internally by the export pipeline) ---
     enabled: bool = False
     page_title: str = "StreamTeX Export"
     page_width: str = PAGE_WIDTH
     page_padding: str = PAGE_PADDING
     zoom: float = 1.0
+
+    # --- Auto-export fields (used by st_book exports=[...]) ---
+    format: str = "html"
+    """Output format: ``"html"`` or ``"pdf"``."""
+
+    mode: ExportMode = ExportMode.ALWAYS
+    """When to export: ``ALWAYS`` (auto), ``MANUAL`` (sidebar), ``NEVER``."""
+
+    output_dir: str = "./exports"
+    """Directory where exported files are written."""
+
+    filename: str | None = None
+    """Base filename (without extension).  Defaults to the book name."""
+
+    timestamp: bool = False
+    """Append ``-YYMMDD-HHMMSS`` to the filename."""
+
+    pdf: "PdfConfig | None" = None
+    """PDF configuration (only used when ``format="pdf"``)."""
+
+
+def build_export_filename(config: "ExportConfig", base_name: str) -> str:
+    """Build the full output path for an export config.
+
+    Parameters
+    ----------
+    config : ExportConfig
+        The export configuration describing format, filename, timestamp, etc.
+    base_name : str
+        Fallback name derived from the book title (used when ``config.filename``
+        is None).
+
+    Returns
+    -------
+    str
+        Absolute path to the output file.
+    """
+    name = config.filename or base_name
+    ext = "pdf" if config.format == "pdf" else "html"
+    if config.timestamp:
+        ts = datetime.now().strftime("%y%m%d-%H%M%S")
+        name = f"{name}-{ts}"
+    out_dir = Path(config.output_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    return str(out_dir / f"{name}.{ext}")
 
 
 # ---------------------------------------------------------------------------

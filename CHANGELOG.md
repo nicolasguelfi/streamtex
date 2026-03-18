@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`AssetCollector` class**: Collects, deduplicates, and packages media assets during export. Supports `rewrite_html()`, `to_zip()`, and `write_to_disk()` methods.
 - **`ExportConfig.asset_mode`**: New field defaulting to `AssetMode.EXTERNAL`. Set to `AssetMode.EMBEDDED` for legacy single-file base64 behavior.
 - **25 new tests** in `test_asset_collector.py` covering asset registration, deduplication, HTML rewriting, ZIP generation, and disk writing.
+- **`PresentationConfig.counter_mode`**: New field (`"bloc"` or `"slide"`) controlling the footer counter display. `"bloc"` (default) shows "Bloc N / M" counting sections. `"slide"` shows "Slide N / M" synced with the floating marker navigation bar via JavaScript.
 
 ### Changed
 - **HTML download button**: When asset mode is `EXTERNAL`, the download button label changes to "Download HTML (ZIP)" and serves a `.zip` file instead of a plain `.html` file.

@@ -353,7 +353,7 @@ class TestFooterRendering:
         mock_get.return_value = PresentationConfig(footer=True)
         st_presentation_footer(current_slide=3, total_slides=10)
         html = mock_render.call_args[0][0]
-        assert "Slide 3 / 10" in html
+        assert "Bloc 3 / 10" in html
 
     @patch("streamtex.presentation._render")
     @patch("streamtex.presentation.get_presentation_config")
@@ -400,7 +400,7 @@ class TestFooterRendering:
         cfg = PresentationConfig(title="Explicit", footer=True)
         st_presentation_footer(current_slide=2, total_slides=8, config=cfg)
         html = mock_render.call_args[0][0]
-        assert "Slide 2 / 8" in html
+        assert "Bloc 2 / 8" in html
         assert "Explicit" in html
 
     @patch("streamtex.presentation._render")
@@ -425,7 +425,23 @@ class TestFooterRendering:
         mock_get.return_value = PresentationConfig(footer=True)
         st_presentation_footer(current_slide=1, total_slides=1)
         html = mock_render.call_args[0][0]
-        assert "Slide 1 / 1" in html
+        assert "Bloc 1 / 1" in html
+
+    @patch("streamtex.presentation._render")
+    def test_counter_mode_slide(self, mock_render):
+        cfg = PresentationConfig(footer=True, counter_mode="slide")
+        st_presentation_footer(current_slide=5, total_slides=20, config=cfg)
+        html = mock_render.call_args[0][0]
+        assert "Slide 5 / 20" in html
+        assert 'data-stx-counter="slide"' in html
+
+    @patch("streamtex.presentation._render")
+    def test_counter_mode_bloc_no_data_attr(self, mock_render):
+        cfg = PresentationConfig(footer=True, counter_mode="bloc")
+        st_presentation_footer(current_slide=2, total_slides=10, config=cfg)
+        html = mock_render.call_args[0][0]
+        assert "Bloc 2 / 10" in html
+        assert "data-stx-counter" not in html
 
 
 # ── add_presentation_options ─────────────────────────────────────────────

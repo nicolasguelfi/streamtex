@@ -483,7 +483,8 @@ def validate_project(project_path: str) -> list[ValidationCheck]:
 
 
 def _copy_rich_template(
-    template_name: str, target: str, project_name: str
+    template_name: str, target: str, project_name: str,
+    extras: list[str] | None = None,
 ) -> list[str]:
     """Copy a rich template from streamtex-docs/templates/ into *target*.
 
@@ -518,7 +519,7 @@ def _copy_rich_template(
     # correct project name and hatchling packages=[] config)
     pyproject_path = os.path.join(target, "pyproject.toml")
     with open(pyproject_path, "w", encoding="utf-8") as f:
-        f.write(generate_pyproject_toml(project_name))
+        f.write(generate_pyproject_toml(project_name, extras=extras))
     if "pyproject.toml" not in copied:
         copied.append("pyproject.toml")
 
@@ -561,12 +562,25 @@ def new(
     target = resolve_project_dir(name)
     os.makedirs(target, exist_ok=True)
 
+    # 1b. Read preset from stx.toml to determine extras (pdf, ai, etc.)
+    from .workspace_cmd import PRESET_EXTRAS, load_stx_toml
+
+    extras: list[str] | None = None
+    ws_root = find_workspace_root()
+    if ws_root is not None:
+        try:
+            config = load_stx_toml(ws_root)
+            preset = config.get("preset", "developer")
+            extras = PRESET_EXTRAS.get(preset, []) or None
+        except Exception:
+            pass
+
     # 2. Scaffold files (rich template or minimal)
     if template:
-        files = _copy_rich_template(template, target, name)
+        files = _copy_rich_template(template, target, name, extras=extras)
         console.print(f"[green]Project created from template '{template}':[/green] {target}")
     else:
-        files = scaffold_project(target, name, collection=is_collection)
+        files = scaffold_project(target, name, collection=is_collection, extras=extras)
         console.print(f"[green]Project scaffolded:[/green] {target}")
     for f in files:
         console.print(f"  {f}")

@@ -50,6 +50,12 @@ class PresentationConfig:
     footer: bool = True
     """Show a fixed slide counter bar at the bottom of the viewport."""
 
+    counter_mode: str = "bloc"
+    """Counter display mode in the footer:
+    - ``"bloc"``: shows "Bloc 3 / 12" (section/module count, default)
+    - ``"slide"``: shows "Slide 37 / 282" (marker-based, synced with floating bar)
+    """
+
     footer_height: str = "48px"
     """CSS height of the footer bar."""
 
@@ -245,11 +251,18 @@ def st_presentation_footer(
         else ""
     )
 
+    if cfg.counter_mode == "slide":
+        prefix = "Slide"
+        attr = ' data-stx-counter="slide"'
+    else:
+        prefix = "Bloc"
+        attr = ""
+
     html = (
         f'<div class="stx-presentation-footer">'
         f"  {title_html}"
-        f'  <span class="stx-pf-counter">'
-        f"    Slide {current_slide} / {total_slides}"
+        f'  <span class="stx-pf-counter"{attr}>'
+        f"    {prefix} {current_slide} / {total_slides}"
         f"  </span>"
         f"</div>"
     )

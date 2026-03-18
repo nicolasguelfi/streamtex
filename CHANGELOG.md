@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.23] — 2026-03-18
+
+### Added
+- **External asset export** (`AssetMode.EXTERNAL`): HTML exports now extract media assets (images, audio, video) from base64 data URIs into a separate `data/` folder with relative paths. Download is a ZIP archive containing `document.html` + `data/{images,audio,video}/`. Deduplication by SHA-256 content hash.
+- **`AssetMode` enum**: New public enum (`EMBEDDED`, `EXTERNAL`) controlling how media assets are stored in HTML exports.
+- **`AssetCollector` class**: Collects, deduplicates, and packages media assets during export. Supports `rewrite_html()`, `to_zip()`, and `write_to_disk()` methods.
+- **`ExportConfig.asset_mode`**: New field defaulting to `AssetMode.EXTERNAL`. Set to `AssetMode.EMBEDDED` for legacy single-file base64 behavior.
+- **25 new tests** in `test_asset_collector.py` covering asset registration, deduplication, HTML rewriting, ZIP generation, and disk writing.
+
+### Changed
+- **HTML download button**: When asset mode is `EXTERNAL`, the download button label changes to "Download HTML (ZIP)" and serves a `.zip` file instead of a plain `.html` file.
+- **Auto-export** (`ExportMode.ALWAYS`): When asset mode is `EXTERNAL`, auto-export writes a folder structure (`name/name.html` + `name/data/...`) instead of a single file.
+
 ## [0.4.22] — 2026-03-17
 
 ### Added

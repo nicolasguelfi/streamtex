@@ -6,8 +6,13 @@ Streamlit (st.html) and an optional export buffer.  Context managers
 HTML reproduces the nesting structure with inline styles.
 """
 
+import base64
+import hashlib
 import importlib.resources as resources
+import io
 import os
+import re
+import zipfile
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime
@@ -37,6 +42,16 @@ class ExportMode(Enum):
 
     NEVER = "never"
     """Disable export entirely (no buffer, no sidebar panel)."""
+
+
+class AssetMode(Enum):
+    """Controls how media assets are stored in HTML exports."""
+
+    EMBEDDED = "embedded"
+    """Base64 data URIs inline in the HTML (legacy, single file)."""
+
+    EXTERNAL = "external"
+    """Assets saved to a ``data/`` folder, HTML uses relative paths (ZIP download)."""
 
 
 @dataclass
@@ -79,6 +94,183 @@ class ExportConfig:
 
     pdf: "PdfConfig | None" = None
     """PDF configuration (only used when ``format="pdf"``)."""
+
+    asset_mode: AssetMode = AssetMode.EXTERNAL
+    """How media assets are stored: ``EMBEDDED`` (base64) or ``EXTERNAL`` (files in data/)."""
+
+
+# ---------------------------------------------------------------------------
+# Asset collector — extracts and deduplicates media from HTML
+# ---------------------------------------------------------------------------
+
+# Regex matching data URIs in src="..." or src='...' attributes
+_DATA_URI_RE = re.compile(
+    r"""(src\s*=\s*["'])"""          # group 1: src=" or src='
+    r"""(data:([^;]+);base64,"""     # group 2: full data URI start, group 3: mime
+    r"""([A-Za-z0-9+/=\s]+))"""      # group 4: base64 payload
+    r"""(["'])""",                    # group 5: closing quote
+    re.DOTALL,
+)
+
+# Map MIME types to asset subdirectories
+_MIME_TO_SUBDIR = {
+    "image": "images",
+    "audio": "audio",
+    "video": "video",
+}
+
+# Map MIME types to file extensions
+_MIME_TO_EXT = {
+    "image/png": ".png",
+    "image/jpeg": ".jpg",
+    "image/gif": ".gif",
+    "image/svg+xml": ".svg",
+    "image/webp": ".webp",
+    "image/bmp": ".bmp",
+    "image/x-icon": ".ico",
+    "audio/mpeg": ".mp3",
+    "audio/wav": ".wav",
+    "audio/ogg": ".ogg",
+    "audio/flac": ".flac",
+    "audio/aac": ".aac",
+    "video/mp4": ".mp4",
+    "video/webm": ".webm",
+    "video/ogg": ".ogv",
+}
+
+
+@dataclass
+class _AssetEntry:
+    """An extracted media asset."""
+    data: bytes
+    mime: str
+    relative_path: str  # e.g. "data/images/a1b2c3d4.png"
+
+
+class AssetCollector:
+    """Collects media assets during export and deduplicates by content hash."""
+
+    def __init__(self) -> None:
+        self._assets: dict[str, _AssetEntry] = {}  # content hash → entry
+        self._data_uri_to_path: dict[str, str] = {}  # full data URI → relative path
+
+    @property
+    def assets(self) -> dict[str, _AssetEntry]:
+        return self._assets
+
+    def register_data_uri(self, data_uri: str) -> str:
+        """Register a ``data:<mime>;base64,...`` URI and return the relative path.
+
+        If the same content was already registered, returns the existing path
+        (deduplication by SHA-256).
+        """
+        if data_uri in self._data_uri_to_path:
+            return self._data_uri_to_path[data_uri]
+
+        # Parse the data URI
+        m = re.match(r"data:([^;]+);base64,(.*)", data_uri, re.DOTALL)
+        if not m:
+            return data_uri  # not a data URI, return unchanged
+        mime = m.group(1)
+        b64_payload = m.group(2).strip()
+
+        try:
+            raw = base64.b64decode(b64_payload)
+        except Exception:
+            return data_uri
+
+        return self._register_bytes(raw, mime, data_uri)
+
+    def register_file(self, file_path: str, mime: str) -> str:
+        """Register a local file and return the relative path."""
+        try:
+            with open(file_path, "rb") as f:
+                raw = f.read()
+        except OSError:
+            return file_path
+        # Use original filename as hint
+        original_name = os.path.basename(file_path)
+        return self._register_bytes(raw, mime, _original_name=original_name)
+
+    def register_bytes(self, raw: bytes, mime: str) -> str:
+        """Register raw bytes and return the relative path."""
+        return self._register_bytes(raw, mime)
+
+    def _register_bytes(self, raw: bytes, mime: str,
+                        data_uri: str | None = None,
+                        _original_name: str = "") -> str:
+        content_hash = hashlib.sha256(raw).hexdigest()[:12]
+
+        if content_hash in self._assets:
+            path = self._assets[content_hash].relative_path
+            if data_uri:
+                self._data_uri_to_path[data_uri] = path
+            return path
+
+        # Determine subdirectory and extension
+        media_type = mime.split("/")[0] if "/" in mime else "image"
+        subdir = _MIME_TO_SUBDIR.get(media_type, "other")
+        ext = _MIME_TO_EXT.get(mime, "")
+        if not ext and _original_name:
+            _, ext = os.path.splitext(_original_name)
+        if not ext:
+            ext = ".bin"
+
+        # Use original name if available, otherwise hash-based name
+        if _original_name:
+            stem = os.path.splitext(_original_name)[0]
+            filename = f"{stem}_{content_hash[:6]}{ext}"
+        else:
+            filename = f"{content_hash}{ext}"
+
+        relative_path = f"data/{subdir}/{filename}"
+
+        entry = _AssetEntry(data=raw, mime=mime, relative_path=relative_path)
+        self._assets[content_hash] = entry
+        if data_uri:
+            self._data_uri_to_path[data_uri] = relative_path
+        return relative_path
+
+    def rewrite_html(self, html: str) -> str:
+        """Replace all base64 data URIs in *html* with relative asset paths."""
+        def _replace(match):
+            prefix = match.group(1)    # src="
+            data_uri = match.group(2)  # data:...;base64,...
+            quote = match.group(5)     # closing quote
+            path = self.register_data_uri(f"{data_uri}")
+            return f"{prefix}{path}{quote}"
+        return _DATA_URI_RE.sub(_replace, html)
+
+    def to_zip(self, html: str, base_name: str) -> bytes:
+        """Create a ZIP containing the HTML file and all assets in data/.
+
+        The HTML has all data URIs replaced with relative paths.
+        """
+        rewritten = self.rewrite_html(html)
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+            zf.writestr(f"{base_name}/{base_name}.html", rewritten)
+            for entry in self._assets.values():
+                zf.writestr(f"{base_name}/{entry.relative_path}", entry.data)
+        buf.seek(0)
+        return buf.getvalue()
+
+    def write_to_disk(self, html: str, output_dir: str, base_name: str) -> str:
+        """Write HTML + assets to disk. Returns the HTML file path."""
+        rewritten = self.rewrite_html(html)
+        out = Path(output_dir) / base_name
+        out.mkdir(parents=True, exist_ok=True)
+        html_path = out / f"{base_name}.html"
+        html_path.write_text(rewritten, encoding="utf-8")
+        for entry in self._assets.values():
+            asset_path = out / entry.relative_path
+            asset_path.parent.mkdir(parents=True, exist_ok=True)
+            asset_path.write_bytes(entry.data)
+        return str(html_path)
+
+    def reset(self) -> None:
+        self._assets.clear()
+        self._data_uri_to_path.clear()
 
 
 def build_export_filename(config: "ExportConfig", base_name: str) -> str:
@@ -216,24 +408,36 @@ def _load_default_css() -> str:
 # ---------------------------------------------------------------------------
 
 _buffer: Optional[HtmlExportBuffer] = None
+_asset_collector: Optional[AssetCollector] = None
 
 
 def reset_export_buffer(config: ExportConfig = None) -> None:
     """Initialise or reset the global export buffer."""
-    global _buffer
+    global _buffer, _asset_collector
     if config is None or not config.enabled:
         _buffer = None
+        _asset_collector = None
         return
     if _buffer is not None:
         _buffer.config = config
         _buffer.reset()
     else:
         _buffer = HtmlExportBuffer(config)
+    # Always reset the asset collector
+    if config.asset_mode == AssetMode.EXTERNAL:
+        _asset_collector = AssetCollector()
+    else:
+        _asset_collector = None
 
 
 def is_export_active() -> bool:
     """Return True when the export buffer is collecting fragments."""
     return _buffer is not None
+
+
+def get_asset_collector() -> Optional[AssetCollector]:
+    """Return the global asset collector, or None when assets are embedded."""
+    return _asset_collector
 
 
 def export_append(html: str) -> None:

@@ -643,6 +643,9 @@ def inject_marker_navigation() -> None:
         counter.textContent = padded + ' / ' + markers.length;
         label.textContent = m ? (m.label || nearestVisibleLabel()) : '';
         if (popupOpen) highlightPopup();
+        /* Sync presentation footer when counter_mode="slide" */
+        var fc = hostDoc.querySelector('.stx-pf-counter[data-stx-counter="slide"]');
+        if (fc) fc.textContent = 'Slide ' + (currentIdx + 1) + ' / ' + markers.length;
     }
 
     /* --- Keyboard handler --- */

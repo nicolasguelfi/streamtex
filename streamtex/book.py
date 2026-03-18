@@ -23,10 +23,11 @@ from .export import (
     ExportMode,
     build_export_filename,
     generate_export_html,
+    get_asset_collector,
     is_export_active,
     reset_export_buffer,
 )
-from .marker import MarkerConfig, inject_marker_navigation, marker_entries, reset_marker_registry
+from .marker import MarkerConfig, inject_marker_navigation, marker_count, marker_entries, reset_marker_registry
 from .pdf_export import PdfConfig
 from .presentation import get_presentation_config, st_presentation_footer
 from .search import generate_search_input_html, generate_search_script, start_collector, stop_collector
@@ -184,7 +185,12 @@ def _offer_export_downloads(html: str, base_name: str,
                 effective_html = full_book_html
 
             if want_html:
-                results["html"] = effective_html
+                collector = get_asset_collector()
+                if collector:
+                    # External mode: create ZIP with HTML + data/ folder
+                    results["zip"] = collector.to_zip(effective_html, base_name)
+                else:
+                    results["html"] = effective_html
             if want_pdf and pdf_available:
                 _pdf_mode = (PdfMode.PAGINATED if section_breaks == _BREAK_PAGE
                              else PdfMode.CONTINUOUS)
@@ -213,7 +219,15 @@ def _offer_export_downloads(html: str, base_name: str,
 
         # Show download buttons from cached results
         results = st.session_state.get(state_key, {})
-        if "html" in results:
+        if "zip" in results:
+            st.download_button(
+                label="Download HTML (ZIP)",
+                data=results["zip"],
+                file_name=f"{base_name}.zip",
+                mime="application/zip",
+                key=f"_stx_dl_zip_{base_name}",
+            )
+        elif "html" in results:
             st.download_button(
                 label="Download HTML",
                 data=results["html"],
@@ -262,8 +276,15 @@ def _run_auto_exports(
                 export_pdf(html, output_path=path, config=pdf_cfg)
             else:
                 from pathlib import Path as _P
-                _P(path).parent.mkdir(parents=True, exist_ok=True)
-                _P(path).write_text(html, encoding="utf-8")
+                collector = get_asset_collector()
+                if collector:
+                    # External mode: write HTML + data/ folder to disk
+                    out_dir = str(_P(path).parent)
+                    written_path = collector.write_to_disk(html, out_dir, base_name)
+                    path = written_path
+                else:
+                    _P(path).parent.mkdir(parents=True, exist_ok=True)
+                    _P(path).write_text(html, encoding="utf-8")
             written.append(path)
         except Exception as exc:
             logger.warning("Auto-export failed for %s: %s", path, exc)
@@ -531,7 +552,10 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
     # Presentation footer (auto-rendered when PresentationConfig is active)
     _pres_cfg = get_presentation_config()
     if _pres_cfg is not None and _pres_cfg.footer:
-        _total = len(module_list)
+        if _pres_cfg.counter_mode == "slide":
+            _total = marker_count() or len(module_list)
+        else:
+            _total = len(module_list)
         st_presentation_footer(current_slide=1, total_slides=_total, config=_pres_cfg)
 
     # Offer export downloads when export is active
@@ -1738,9 +1762,13 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
     # --- Presentation footer (auto-rendered when PresentationConfig is active) ---
     _pres_cfg = get_presentation_config()
     if _pres_cfg is not None and _pres_cfg.footer:
+        if _pres_cfg.counter_mode == "slide":
+            _pres_total = marker_count() or total
+        else:
+            _pres_total = total
         st_presentation_footer(
             current_slide=current_page + 1,
-            total_slides=total,
+            total_slides=_pres_total,
             config=_pres_cfg,
         )
 

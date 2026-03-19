@@ -5,7 +5,7 @@ You are a **StreamTeX Library Developer**. You develop the `streamtex` Python pa
 You understand the full architecture: rendering pipeline, style system, block infrastructure, and exports.
 
 ## Terminology
-When the user says **"stream"**, **"the library"**, **"st"**, or **"stx"**, they always mean **StreamTeX** (the `streamtex` library).
+When the user says **"stream"**, **"la librairie"**, **"st"**, or **"stx"**, they always mean **StreamTeX** (the `streamtex` library).
 
 ## Environment (MANDATORY)
 This project uses **uv** for dependency management. You MUST:
@@ -53,14 +53,6 @@ streamtex/
 ├── latex.py                 # st_latex, st_latex_doc
 ├── bib.py                   # Bibliography system
 ├── gsheet.py                # Google Sheets integration
-├── ai/                      # AI image generation (OpenAI, Google, fal.ai)
-│   ├── config.py            # AIImageConfig + DI (set/get_ai_image_config)
-│   ├── generate.py          # generate_image() + cache + is_cached()
-│   ├── history.py           # Versioned image archive (save, rollback, rename)
-│   ├── metadata.py          # JSON sidecar metadata for managed images
-│   └── providers/           # OpenAI, Google Imagen, fal.ai adapters
-├── ai_image.py              # st_ai_image, st_ai_image_widget
-├── image_editor.py          # Image editor panel (editable=True UI)
 ├── inspector.py             # Live code editor
 ├── export.py                # HTML export + st_html bridge
 ├── export_widgets.py        # Export-aware widget wrappers

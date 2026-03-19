@@ -10,11 +10,11 @@ from streamtex.zoom import (
 )
 
 # ---------------------------------------------------------------------------
-# inject_zoom_logic — CSS output
+# inject_zoom_logic — CSS output (fixed zoom)
 # ---------------------------------------------------------------------------
 
 class TestInjectZoomLogicCSS:
-    """Verify the CSS output of inject_zoom_logic."""
+    """Verify the CSS output of inject_zoom_logic with fixed zoom values."""
 
     @patch("streamtex.zoom.st")
     def test_defaults_100_100(self, mock_st):
@@ -53,33 +53,74 @@ class TestInjectZoomLogicCSS:
 
     @patch("streamtex.zoom.st")
     def test_single_st_html_call(self, mock_st):
-        """Only one st.html() call (compatible with export guard)."""
+        """Fixed zoom: only one st.html() call (compatible with export guard)."""
         inject_zoom_logic(100, 100)
         assert mock_st.html.call_count == 1
 
-
-# ---------------------------------------------------------------------------
-# inject_zoom_logic — No JS
-# ---------------------------------------------------------------------------
-
-class TestInjectZoomLogicNoJS:
-    """Verify no JavaScript or components usage."""
-
-    def test_no_components_import(self):
-        """zoom.py should not import streamlit.components."""
-        import inspect
-
-        import streamtex.zoom as zoom_mod
-        source = inspect.getsource(zoom_mod)
-        assert "components" not in source
-
     @patch("streamtex.zoom.st")
-    def test_no_script_tag(self, mock_st):
-        """Injected CSS should not contain <script> tags."""
+    def test_no_script_tag_fixed_zoom(self, mock_st):
+        """Fixed zoom CSS should not contain <script> tags."""
         inject_zoom_logic(100, 100)
         css_call = mock_st.html.call_args[0][0]
         assert "<script>" not in css_call
-        assert "<script " not in css_call
+
+
+# ---------------------------------------------------------------------------
+# inject_zoom_logic — zoom="fit"
+# ---------------------------------------------------------------------------
+
+class TestInjectZoomFit:
+    """Verify JS output for zoom='fit'."""
+
+    @patch("streamtex.zoom.components")
+    @patch("streamtex.zoom.st")
+    def test_fit_uses_components_html(self, mock_st, mock_components):
+        """zoom='fit' uses components.html() (for <script> support)."""
+        inject_zoom_logic(100, "fit")
+        # Should NOT use st.html (no CSS-only call)
+        assert mock_st.html.call_count == 0
+        # Should use components.html (for JS execution)
+        assert mock_components.html.call_count == 1
+
+    @patch("streamtex.zoom.components")
+    @patch("streamtex.zoom.st")
+    def test_fit_contains_script(self, mock_st, mock_components):
+        """zoom='fit' output contains <script> for auto-fit calculation."""
+        inject_zoom_logic(100, "fit")
+        js_call = mock_components.html.call_args[0][0]
+        assert "<script>" in js_call
+
+    @patch("streamtex.zoom.components")
+    @patch("streamtex.zoom.st")
+    def test_fit_contains_width_css(self, mock_st, mock_components):
+        """zoom='fit' still includes width CSS."""
+        inject_zoom_logic(80, "fit")
+        js_call = mock_components.html.call_args[0][0]
+        assert "width: 80%" in js_call
+
+    @patch("streamtex.zoom.components")
+    @patch("streamtex.zoom.st")
+    def test_fit_contains_resize_observer(self, mock_st, mock_components):
+        """zoom='fit' uses resize handler for re-fit on viewport change."""
+        inject_zoom_logic(100, "fit")
+        js_call = mock_components.html.call_args[0][0]
+        assert "resize" in js_call
+
+    @patch("streamtex.zoom.components")
+    @patch("streamtex.zoom.st")
+    def test_fit_contains_cleanup(self, mock_st, mock_components):
+        """zoom='fit' registers cleanup for next injection."""
+        inject_zoom_logic(100, "fit")
+        js_call = mock_components.html.call_args[0][0]
+        assert "_stxZoomFitCleanup" in js_call
+
+    @patch("streamtex.zoom.components")
+    @patch("streamtex.zoom.st")
+    def test_fit_contains_scroll_height(self, mock_st, mock_components):
+        """zoom='fit' measures scrollHeight to determine content height."""
+        inject_zoom_logic(100, "fit")
+        js_call = mock_components.html.call_args[0][0]
+        assert "scrollHeight" in js_call
 
 
 # ---------------------------------------------------------------------------
@@ -92,7 +133,7 @@ class TestAddZoomOptions:
     @patch("streamtex.zoom.inject_zoom_logic")
     @patch("streamtex.zoom.st")
     def test_creates_two_number_inputs(self, mock_st, mock_inject):
-        """Should create exactly 2 number_input widgets."""
+        """Should create exactly 2 number_input widgets for fixed zoom."""
         mock_st.session_state = {}
         ctx = MagicMock()
         add_zoom_options(container=ctx)
@@ -123,3 +164,24 @@ class TestAddZoomOptions:
         mock_st.session_state = {_PAGE_WIDTH_KEY: 75, _ZOOM_KEY: 125}
         add_zoom_options(container=MagicMock())
         mock_inject.assert_called_once_with(75, 125)
+
+    @patch("streamtex.zoom.inject_zoom_logic")
+    @patch("streamtex.zoom.st")
+    def test_fit_zoom_disables_number_input(self, mock_st, mock_inject):
+        """When zoom='fit', Zoom% number_input is disabled (greyed out)."""
+        mock_st.session_state = {_ZOOM_KEY: "fit"}
+        ctx = MagicMock()
+        add_zoom_options(container=ctx)
+        # 2 number_inputs: Width% (active) + Zoom% (disabled)
+        assert ctx.number_input.call_count == 2
+        # The second call (Zoom%) should be disabled
+        zoom_call = ctx.number_input.call_args_list[1]
+        assert zoom_call.kwargs.get("disabled") is True
+
+    @patch("streamtex.zoom.inject_zoom_logic")
+    @patch("streamtex.zoom.st")
+    def test_fit_zoom_calls_inject_with_fit(self, mock_st, mock_inject):
+        """inject_zoom_logic receives 'fit' when zoom='fit'."""
+        mock_st.session_state = {_PAGE_WIDTH_KEY: 100, _ZOOM_KEY: "fit"}
+        add_zoom_options(container=MagicMock())
+        mock_inject.assert_called_once_with(100, "fit")

@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.24] — 2026-03-19
+
+### Added
+- **Presentation profiles** (`PresentationProfile`): named display configurations switchable at runtime via sidebar or floating navigation bar. Each profile bundles mode, layout (width/zoom), wrap, and slide break settings.
+- **`PageLayout`**: dataclass for page dimensions (width %, zoom %). No range limits — accepts any numeric value. Supports `zoom="fit"` for auto-fit to viewport height.
+- **`ViewMode`** enum: `PAGINATED` / `CONTINUOUS` — document view mode.
+- **`SlideBreakDisplayConfig`**: dataclass for slide break settings (enabled, mode, space) within a profile.
+- **`ProfileConfig`**: JSON-serializable wrapper for a named list of profiles. Supports `to_json()`, `from_json()`, `save()`, `load()` for configuration export/import.
+- **Factory presets**: `PresentationProfile.responsive_preset()` (Desktop/Tablet/Mobile), `.presentation_preset()` (Presenter/Audience/Handout), `.desktop_mobile_preset()` (Desktop/Mobile pair).
+- **Sidebar profile selector**: phone icon (`📱`) + selectbox with `*` indicator for modified profiles + `↻` reset button.
+- **Floating bar profile menu**: phone icon SVG button (left side of navigation bar) opens a popup with all profiles. Active profile highlighted, modified profiles show `*`.
+- **Save configuration UI**: "Save configuration" expander in sidebar with download button for JSON export (appears when multiple profiles are defined).
+- **`presentation_profiles` parameter** on `st_book()`: accepts a list of `PresentationProfile` instances.
+- **Zoom "fit"**: `PageLayout(zoom="fit")` auto-calculates zoom factor so content fits within the viewport height. Uses JS-based measurement with ResizeObserver for re-fit on window resize. No zoom minimum — user is sovereign.
+- **50+ tests** in `test_presentation_profile.py` and `test_zoom.py` covering data classes, factory presets, apply/modified detection, JSON round-trip serialization, and zoom fit.
+
+### Changed
+- **Factory presets default to `PAGINATED`**: All profiles in `responsive_preset()`, `desktop_mobile_preset()`, and `presentation_preset()` now default to paginated mode. The `PresentationProfile` default mode changed from `CONTINUOUS` to `PAGINATED`.
+- **All 6 manuals** now include `presentation_profiles=PresentationProfile.desktop_mobile_preset()` for Desktop + Mobile display switching.
+- **Templates** (project, presentation) now include display profiles by default.
+
 ## [0.4.23] — 2026-03-18
 
 ### Added

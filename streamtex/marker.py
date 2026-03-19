@@ -458,25 +458,18 @@ def inject_marker_navigation(
             item.onclick = function() {
                 profilePopup.style.display = 'none';
                 profilePopupOpen = false;
-                /* Open the sidebar profile selectbox and click the matching option. */
-                var sboxes = hostDoc.querySelectorAll('[data-testid="stSelectbox"]');
-                for (var si = 0; si < sboxes.length; si++) {
-                    var lbl = sboxes[si].querySelector('label');
-                    if (!lbl || lbl.textContent.indexOf('Profile') === -1) continue;
-                    var trigger = sboxes[si].querySelector('[data-baseweb="select"] > div');
-                    if (!trigger) continue;
-                    trigger.click();
-                    setTimeout(function() {
-                        var opts = hostDoc.querySelectorAll('[role="option"]');
-                        for (var oi = 0; oi < opts.length; oi++) {
-                            var optText = (opts[oi].textContent || '').trim();
-                            if (optText === pName || optText === pName + ' *') {
-                                opts[oi].click();
-                                return;
-                            }
-                        }
-                    }, 100);
-                    return;
+                /* Find and click the hidden stx_prof_ button in sidebar.
+                   The button's on_click sets _stx_profile_pending, triggering
+                   a Streamlit-native rerun. */
+                var allBtns = hostDoc.querySelectorAll(
+                    '[data-testid="stBaseButton-secondary"]'
+                );
+                for (var bi = 0; bi < allBtns.length; bi++) {
+                    var txt = (allBtns[bi].textContent || '').trim();
+                    if (txt === 'stx_prof_' + pName) {
+                        allBtns[bi].click();
+                        return;
+                    }
                 }
             };
         })(name);

@@ -517,6 +517,34 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
             _stx_settings.divider()
             add_slide_break_options(container=_stx_settings)
 
+        # Hidden profile buttons for JS→Streamlit switching (floating bar).
+        # CSS hides them immediately; components.html adds the hide class.
+        # Buttons remain clickable (position:absolute, not display:none).
+        st.html(
+            '<style>.stx-hidden-btns { position:absolute !important;'
+            " left:-9999px !important; height:0 !important;"
+            " overflow:hidden !important; pointer-events:auto !important; }</style>"
+        )
+        _prof_ctr = st.container()
+        with _prof_ctr:
+            for _p in all_profiles:
+                def _switch_profile(_name=_p.name):
+                    st.session_state["_stx_profile_pending"] = _name
+                st.button(f"stx_prof_{_p.name}", key=f"_stx_pbtn_{_p.name}",
+                          on_click=_switch_profile)
+        components.html("""<script>
+        (function(){
+            var btns = parent.document.querySelectorAll('[data-testid="stBaseButton-secondary"]');
+            for (var i = 0; i < btns.length; i++) {
+                var txt = (btns[i].textContent || '').trim();
+                if (txt.indexOf('stx_prof_') === 0) {
+                    var w = btns[i].closest('[data-testid="stButton"]');
+                    if (w) w.classList.add('stx-hidden-btns');
+                }
+            }
+        })();
+        </script>""", height=0)
+
     if st.session_state[_STX_VIEW_MODE_KEY] == "Paginated":
         _paginated_book(module_list, toc_config, marker_config, separator,
                         export, export_title, banner_config, *args,

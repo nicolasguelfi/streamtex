@@ -68,7 +68,7 @@ class SlideBreakDisplayConfig:
     mode: SlideBreakMode = SlideBreakMode.FULL
     """Display mode: FULL, RULE_ONLY, SPACER_ONLY, MARKER_ONLY, HIDDEN."""
 
-    space: int = 60
+    space: int = 5
     """Vertical spacing in vh units.  No min/max."""
 
 
@@ -123,7 +123,7 @@ class PresentationProfile:
                 layout=PageLayout(width=100, zoom=100),
                 breaks=SlideBreakDisplayConfig(
                     mode=SlideBreakMode.FULL,
-                    space=100,
+                    space=5,
                 ),
             ),
             cls(
@@ -309,7 +309,7 @@ class ProfileConfig:
                     breaks_data.get("mode", "Full"),
                     SlideBreakMode.FULL,
                 ),
-                space=breaks_data.get("space", 60),
+                space=breaks_data.get("space", 5),
             )
             profiles.append(
                 PresentationProfile(

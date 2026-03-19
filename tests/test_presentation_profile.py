@@ -68,7 +68,7 @@ class TestSlideBreakDisplayConfig:
         config = SlideBreakDisplayConfig()
         assert config.enabled is True
         assert config.mode == SlideBreakMode.FULL
-        assert config.space == 60
+        assert config.space == 5
 
     def test_no_range_limit_on_space(self):
         config = SlideBreakDisplayConfig(space=200)
@@ -98,7 +98,7 @@ class TestPresentationProfile:
         assert p.wrap is True
         assert p.breaks.enabled is True
         assert p.breaks.mode == SlideBreakMode.FULL
-        assert p.breaks.space == 60
+        assert p.breaks.space == 5
 
     def test_flat_construction(self):
         p = PresentationProfile(
@@ -129,7 +129,7 @@ class TestPresentationProfile:
         assert p.mode == ViewMode.PAGINATED  # default
         assert p.wrap is True
         assert p.breaks.enabled is False
-        assert p.breaks.space == 60
+        assert p.breaks.space == 5
 
 
 # ── build_default_profile ────────────────────────────────────────────────
@@ -296,7 +296,7 @@ class TestFactoryPresets:
         presenter = profiles[0]
         assert presenter.mode == ViewMode.PAGINATED
         assert presenter.layout.width == 100
-        assert presenter.breaks.space == 100
+        assert presenter.breaks.space == 5
         handout = profiles[2]
         assert handout.breaks.enabled is False
 
@@ -440,7 +440,7 @@ class TestProfileConfig:
         assert p["wrap"] is True
         assert p["breaks"]["enabled"] is True
         assert p["breaks"]["mode"] == "Full"
-        assert p["breaks"]["space"] == 60
+        assert p["breaks"]["space"] == 5
 
     def test_from_dict_defaults(self):
         """Missing fields in JSON should use sensible defaults."""

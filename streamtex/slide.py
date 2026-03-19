@@ -210,7 +210,7 @@ def _effective_config(
     # Override mode and space from sidebar
     mode_label = st.session_state.get(_BREAK_MODE_KEY, "Full")
     sidebar_mode = _MODE_LABELS.get(mode_label, cfg.mode)
-    space_vh = st.session_state.get(_BREAK_SPACE_KEY, 60)
+    space_vh = st.session_state.get(_BREAK_SPACE_KEY, 5)
 
     return SlideBreakConfig(
         mode=sidebar_mode,

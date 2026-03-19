@@ -30,6 +30,14 @@ from .export import (
 from .marker import MarkerConfig, inject_marker_navigation, marker_count, marker_entries, reset_marker_registry
 from .pdf_export import PdfConfig
 from .presentation import get_presentation_config, st_presentation_footer
+from .presentation_profile import (
+    _ACTIVE_PROFILE_KEY,
+    PresentationProfile,
+    ProfileConfig,
+    apply_profile,
+    build_default_profile,
+    is_profile_modified,
+)
 from .search import generate_search_input_html, generate_search_script, start_collector, stop_collector
 from .slide import add_slide_break_options
 from .space import st_br, st_space
@@ -362,6 +370,7 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
             chrome_banner: bool = True,
             page_width: int = 90,
             zoom: int = 100,
+            presentation_profiles: list[PresentationProfile] | None = None,
             *args, monties_color: str = None, **kwargs):
     """Generates a web page e-book from a list of block modules.
 
@@ -422,13 +431,80 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
         st.session_state[_STX_THEME_TEXT_KEY] = st.get_option("theme.textColor") or "#333"
     # --- Bibliography setup ---
     _setup_bibliography(bib_sources, bib_config)
+    # --- Presentation profiles ---
+    default_profile = build_default_profile(page_width, zoom, paginate)
+    user_profiles = presentation_profiles or []
+    if any(p.name == "Default" for p in user_profiles):
+        all_profiles = list(user_profiles)
+    else:
+        all_profiles = [default_profile] + list(user_profiles)
+    _pnames = [p.name for p in all_profiles]
+    if len(set(_pnames)) != len(_pnames):
+        _dupes = {n for n in _pnames if _pnames.count(n) > 1}
+        raise ValueError(f"Duplicate profile names: {_dupes}.")
+    profile_names = [p.name for p in all_profiles]
+    profile_by_name = {p.name: p for p in all_profiles}
+    if _ACTIVE_PROFILE_KEY not in st.session_state:
+        st.session_state[_ACTIVE_PROFILE_KEY] = profile_names[0]
+    active_name = st.session_state.get(_ACTIVE_PROFILE_KEY, profile_names[0])
+    if active_name not in profile_by_name:
+        active_name = profile_names[0]
+        st.session_state[_ACTIVE_PROFILE_KEY] = active_name
+    active_profile = profile_by_name[active_name]
+    _profile_modified = is_profile_modified(active_profile)
+
+    # --- Profile switch detection (BEFORE any widget) ---
+    _pending_switch = st.session_state.pop("_stx_profile_pending", None)
+    if _pending_switch and _pending_switch in profile_by_name:
+        apply_profile(profile_by_name[_pending_switch])
+        st.session_state["_stx_profile_select"] = _pending_switch
+        st.rerun()
+
     # --- Settings expander (sidebar) ---
     if _STX_VIEW_MODE_KEY not in st.session_state:
         st.session_state[_STX_VIEW_MODE_KEY] = "Paginated" if paginate else "Continuous"
 
+    def _on_profile_change():
+        st.session_state["_stx_profile_pending"] = st.session_state["_stx_profile_select"]
+
     with st.sidebar:
         _stx_settings = st.expander("Settings")
         with _stx_settings:
+            # ── Profile selector + reset button ──
+            _col_select, _col_reset = _stx_settings.columns([5, 1])
+            with _col_select:
+                def _format_profile(name):
+                    if name == active_name and _profile_modified:
+                        return f"{name} *"
+                    return name
+                _stx_settings.selectbox(
+                    "\U0001F4F1 Profile",
+                    options=profile_names,
+                    format_func=_format_profile,
+                    key="_stx_profile_select",
+                    on_change=_on_profile_change,
+                )
+            with _col_reset:
+                _stx_settings.write("")
+                if _profile_modified:
+                    if _stx_settings.button("\u21BB", key="_stx_profile_reset",
+                                            help="Reset to profile values"):
+                        st.session_state["_stx_profile_pending"] = active_name
+                        st.rerun()
+
+            # ── Save configuration ──
+            if presentation_profiles:
+                with _stx_settings.expander("\U0001F4BE Save configuration"):
+                    _cfg_name = st.text_input("Configuration name", value="my_config",
+                                              key="_stx_config_name")
+                    _current_config = ProfileConfig(name=_cfg_name, profiles=all_profiles)
+                    st.download_button("\U0001F4E5 Download JSON",
+                                      data=_current_config.to_json(),
+                                      file_name=f"{_cfg_name}.json",
+                                      mime="application/json",
+                                      key="_stx_config_download")
+
+            # ── Existing controls ──
             _stx_settings.radio(
                 "**View**",
                 options=["Paginated", "Continuous"],
@@ -446,7 +522,11 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
                         export, export_title, banner_config, *args,
                         pdf_config=pdf_config, exports=exports,
                         inspector=inspector,
-                        page_width=page_width, zoom=zoom, **kwargs)
+                        page_width=page_width, zoom=zoom,
+                        profile_names=profile_names,
+                        active_profile=active_name,
+                        profile_modified=_profile_modified,
+                        all_profiles=all_profiles, **kwargs)
         return
 
     start_time = time.time()
@@ -556,7 +636,11 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
 
     # Inject marker navigation JS (only if markers were registered)
     if marker_config is not None:
-        inject_marker_navigation()
+        inject_marker_navigation(
+            profile_names=profile_names,
+            active_profile=active_name,
+            profile_modified=_profile_modified,
+        )
 
     # Presentation footer (auto-rendered when PresentationConfig is active)
     _pres_cfg = get_presentation_config()
@@ -1556,7 +1640,10 @@ def _inject_paginated_nav_js(current_page, total, marker_config,
 def _paginated_book(module_list, toc_config, marker_config, separator,
                     export, export_title, banner_config: BannerConfig, *args,
                     pdf_config=None, exports=None, inspector=None,
-                    page_width=100, zoom=100, **kwargs):
+                    page_width=100, zoom=100,
+                    profile_names=None, active_profile=None,
+                    profile_modified=False, all_profiles=None,
+                    **kwargs):
     """Paginated rendering — only renders one block per rerun."""
     start_time = time.time()
     logger.debug("Starting st_book (paginated)...")
@@ -1814,7 +1901,11 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
         e.get("page_idx", 0) == current_page for e in cache.get("markers", [])
     )
     if marker_config is not None and _page_has_markers:
-        inject_marker_navigation()
+        inject_marker_navigation(
+            profile_names=profile_names,
+            active_profile=active_profile,
+            profile_modified=profile_modified,
+        )
 
     # --- Hidden navigation buttons (one per page, clickable by JS) ---
     for i in range(total):

@@ -180,12 +180,21 @@ def st_marker(label: str = "", visible: bool = False, hidden: bool = False) -> N
 # JS / CSS injection — called once after all blocks are rendered
 # ---------------------------------------------------------------------------
 
-def inject_marker_navigation() -> None:
+def inject_marker_navigation(
+    *,
+    profile_names: list[str] | None = None,
+    active_profile: str | None = None,
+    profile_modified: bool = False,
+) -> None:
     """Inject the floating nav widget and keyboard/scroll JS.
 
     Uses components.html() to create a real iframe where scripts execute
     (st.html() strips <script> tags in Streamlit 1.54+).
     From the iframe we access parent.document (same pattern as zoom.py).
+
+    :param profile_names: List of profile names for the profile popup.
+    :param active_profile: Currently active profile name.
+    :param profile_modified: Whether the active profile has been modified.
     """
     entries = marker_entries()
     if not entries:
@@ -408,6 +417,87 @@ def inject_marker_navigation() -> None:
     label.className = 'stx-marker-label';
     label.style.cssText = 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;opacity:.8;' +
         (labelChars > 0 ? 'width:' + labelChars + 'ch;display:inline-block;' : 'display:none;');
+
+    /* --- Profile data + phone icon popup --- */
+    var profileNames = __PROFILE_NAMES__;
+    var activeProfileName = __ACTIVE_PROFILE__;
+    var profileModified = __PROFILE_MODIFIED__;
+
+    var profileBtn = hostDoc.createElement('button');
+    profileBtn.className = 'stx-nav-btn stx-profile-menu-btn';
+    profileBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" ' +
+        'fill="none" stroke="currentColor" stroke-width="2" ' +
+        'stroke-linecap="round" stroke-linejoin="round">' +
+        '<rect x="5" y="2" width="14" height="20" rx="2" ry="2"/>' +
+        '<line x1="12" y1="18" x2="12.01" y2="18"/></svg>';
+    profileBtn.title = 'Display profiles';
+    profileBtn.style.cssText = btnStyle + 'display:flex;align-items:center;font-size:14px;';
+    profileBtn.onmouseenter = function() { this.style.background = btnHover; };
+    profileBtn.onmouseleave = function() { this.style.background = 'none'; };
+
+    var profilePopup = hostDoc.createElement('div');
+    profilePopup.className = 'stx-profile-popup';
+    profilePopup.style.cssText = 'display:none;position:absolute;bottom:calc(100% + 8px);left:0;background:rgba(30,30,30,.95);backdrop-filter:blur(6px);border-radius:8px;padding:6px 0;min-width:150px;box-shadow:0 4px 20px rgba(0,0,0,.4);z-index:999999;';
+
+    profileNames.forEach(function(name) {
+        var isActive = (name === activeProfileName);
+        var dispLabel = (isActive && profileModified) ? name + ' *' : name;
+        var item = hostDoc.createElement('div');
+        item.textContent = dispLabel;
+        item.style.cssText = 'padding:7px 16px;cursor:pointer;font-size:13px;color:#e0e0e0;transition:background .15s;white-space:nowrap;' +
+            (isActive
+                ? 'border-left:3px solid #4fc3f7;background:rgba(79,195,247,.15);font-weight:600;'
+                : 'border-left:3px solid transparent;');
+        item.onmouseenter = function() {
+            if (!isActive) this.style.background = 'rgba(255,255,255,.08)';
+        };
+        item.onmouseleave = function() {
+            this.style.background = isActive ? 'rgba(79,195,247,.15)' : 'transparent';
+        };
+        (function(pName) {
+            item.onclick = function() {
+                profilePopup.style.display = 'none';
+                profilePopupOpen = false;
+                /* Open the sidebar profile selectbox and click the matching option. */
+                var sboxes = hostDoc.querySelectorAll('[data-testid="stSelectbox"]');
+                for (var si = 0; si < sboxes.length; si++) {
+                    var lbl = sboxes[si].querySelector('label');
+                    if (!lbl || lbl.textContent.indexOf('Profile') === -1) continue;
+                    var trigger = sboxes[si].querySelector('[data-baseweb="select"] > div');
+                    if (!trigger) continue;
+                    trigger.click();
+                    setTimeout(function() {
+                        var opts = hostDoc.querySelectorAll('[role="option"]');
+                        for (var oi = 0; oi < opts.length; oi++) {
+                            var optText = (opts[oi].textContent || '').trim();
+                            if (optText === pName || optText === pName + ' *') {
+                                opts[oi].click();
+                                return;
+                            }
+                        }
+                    }, 100);
+                    return;
+                }
+            };
+        })(name);
+        profilePopup.appendChild(item);
+    });
+
+    var profilePopupOpen = false;
+    profileBtn.onclick = function(e) {
+        e.stopPropagation();
+        profilePopupOpen = !profilePopupOpen;
+        profilePopup.style.display = profilePopupOpen ? 'block' : 'none';
+    };
+    hostDoc.addEventListener('click', function(e) {
+        if (profilePopupOpen && !profileBtn.contains(e.target) && !profilePopup.contains(e.target)) {
+            profilePopupOpen = false;
+            profilePopup.style.display = 'none';
+        }
+    });
+
+    bar.appendChild(profileBtn);
+    nav.appendChild(profilePopup);
 
     bar.appendChild(btnPrev);
     bar.appendChild(counter);
@@ -761,7 +851,10 @@ def inject_marker_navigation() -> None:
         .replace('__HOME_URL__', STX_HOME_URL)
         .replace('__STX_CORAL__', STX_CORAL)
         .replace('__DRAGGABLE__', 'true' if config.draggable else 'false')
-        .replace('__COLLAPSIBLE__', 'true' if config.collapsible else 'false'))
+        .replace('__COLLAPSIBLE__', 'true' if config.collapsible else 'false')
+        .replace('__PROFILE_NAMES__', json.dumps(profile_names or ["Default"]))
+        .replace('__ACTIVE_PROFILE__', json.dumps(active_profile or "Default"))
+        .replace('__PROFILE_MODIFIED__', 'true' if profile_modified else 'false'))
 
     # components.html() creates a real iframe where scripts execute
     # (st.html() strips <script> tags in Streamlit 1.54+)

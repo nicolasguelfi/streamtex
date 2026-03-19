@@ -49,14 +49,13 @@ class PageLayout:
     - ``zoom < 100``: content shrinks (ideal for mobile simulation)
     - ``zoom > 100``: content grows, user scrolls
     - Negative values: CSS treats them as-is (overlap effects)
-    - ``zoom = "fit"``: auto-fit content to viewport height (JS-based)
     """
 
     width: int = 90
     """Page width as % of browser viewport.  No min/max."""
 
-    zoom: int | str = 100
-    """CSS zoom level as %, or ``"fit"`` for auto-fit to viewport.  No min/max."""
+    zoom: int = 100
+    """CSS zoom level as %.  No min/max."""
 
 
 @dataclass
@@ -199,9 +198,6 @@ def apply_profile(profile: PresentationProfile) -> None:
     for key, extractor in _get_field_mapping():
         st.session_state[key] = extractor(profile)
     st.session_state[_ACTIVE_PROFILE_KEY] = profile.name
-    # Sync the "Fit to page" toggle with the zoom value
-    from .zoom import _ZOOM_FIT_KEY
-    st.session_state[_ZOOM_FIT_KEY] = profile.layout.zoom == "fit"
 
 
 def is_profile_modified(profile: PresentationProfile) -> bool:

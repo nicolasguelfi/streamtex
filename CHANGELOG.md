@@ -9,20 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **Presentation profiles** (`PresentationProfile`): named display configurations switchable at runtime via sidebar or floating navigation bar. Each profile bundles mode, layout (width/zoom), wrap, and slide break settings.
-- **`PageLayout`**: dataclass for page dimensions (width %, zoom %). No range limits — accepts any numeric value. Supports `zoom="fit"` for auto-fit to viewport height.
+- **`PageLayout`**: dataclass for page dimensions (width %, zoom %). No range limits — accepts any numeric value.
 - **`ViewMode`** enum: `PAGINATED` / `CONTINUOUS` — document view mode.
 - **`SlideBreakDisplayConfig`**: dataclass for slide break settings (enabled, mode, space) within a profile.
 - **`ProfileConfig`**: JSON-serializable wrapper for a named list of profiles. Supports `to_json()`, `from_json()`, `save()`, `load()` for configuration export/import.
-- **Factory presets**: `PresentationProfile.responsive_preset()` (Desktop/Tablet/Mobile), `.presentation_preset()` (Presenter/Audience/Handout), `.desktop_mobile_preset()` (Desktop/Mobile pair).
+- **Factory presets**: `PresentationProfile.responsive_preset()` (Desktop/Tablet/Mobile), `.presentation_preset()` (Presenter/Audience/Handout), `.desktop_mobile_preset()` (Desktop/Mobile pair). All default to `PAGINATED` mode.
 - **Sidebar profile selector**: phone icon (`📱`) + selectbox with `*` indicator for modified profiles + `↻` reset button.
 - **Floating bar profile menu**: phone icon SVG button (left side of navigation bar) opens a popup with all profiles. Active profile highlighted, modified profiles show `*`.
-- **Save configuration UI**: "Save configuration" expander in sidebar with download button for JSON export (appears when multiple profiles are defined).
+- **Save configuration UI**: "Save configuration" expander in sidebar with download button for JSON export (appears when user-defined profiles are provided).
 - **`presentation_profiles` parameter** on `st_book()`: accepts a list of `PresentationProfile` instances.
-- **Zoom "fit"**: `PageLayout(zoom="fit")` auto-calculates zoom factor so content fits within the viewport height. Uses JS-based measurement with ResizeObserver for re-fit on window resize. No zoom minimum — user is sovereign.
-- **50+ tests** in `test_presentation_profile.py` and `test_zoom.py` covering data classes, factory presets, apply/modified detection, JSON round-trip serialization, and zoom fit.
+- **40+ tests** in `test_presentation_profile.py` covering data classes, factory presets, apply/modified detection, JSON round-trip serialization.
+
+### Fixed
+- **Paginated export panel kills marker navigation bar** — the export "Download as..." panel was rendered in the sidebar AFTER the marker iframe injection, causing Streamlit to rebuild the sidebar DOM and destroy the marker `components.html` iframe. Fixed by moving the export panel BEFORE `inject_marker_navigation()`.
+- **On-demand full-book HTML rebuild** — replaced the synchronous `_build_page_cache()` rebuild (which created temporary iframes that interfered with navigation) with an on-demand callback triggered when the user clicks "Generate" in the export panel.
 
 ### Changed
-- **Factory presets default to `PAGINATED`**: All profiles in `responsive_preset()`, `desktop_mobile_preset()`, and `presentation_preset()` now default to paginated mode. The `PresentationProfile` default mode changed from `CONTINUOUS` to `PAGINATED`.
 - **All 6 manuals** now include `presentation_profiles=PresentationProfile.desktop_mobile_preset()` for Desktop + Mobile display switching.
 - **Templates** (project, presentation) now include display profiles by default.
 

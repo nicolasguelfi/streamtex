@@ -168,8 +168,8 @@ class TestApplyProfile:
         )
         apply_profile(p)
         assert session_state[_ACTIVE_PROFILE_KEY] == "Test"
-        # 7 field keys + 1 active profile key + 1 zoom fit toggle = 9
-        assert len(session_state) == 9
+        # 7 field keys + 1 active profile key = 8
+        assert len(session_state) == 8
 
     def test_extreme_values_applied(self, session_state):
         p = PresentationProfile(
@@ -456,82 +456,3 @@ class TestProfileConfig:
         assert p.mode == ViewMode.PAGINATED
         assert p.wrap is True
         assert p.breaks.enabled is True
-
-
-# ── Zoom "fit" ────────────────────────────────────────────────────────────
-
-
-class TestZoomFit:
-    def test_page_layout_accepts_fit(self):
-        layout = PageLayout(width=100, zoom="fit")
-        assert layout.zoom == "fit"
-        assert layout.width == 100
-
-    def test_page_layout_default_is_int(self):
-        layout = PageLayout()
-        assert layout.zoom == 100
-        assert isinstance(layout.zoom, int)
-
-    def test_profile_with_fit_zoom(self):
-        p = PresentationProfile(
-            name="Fit",
-            layout=PageLayout(width=100, zoom="fit"),
-        )
-        assert p.layout.zoom == "fit"
-        assert p.layout.width == 100
-
-    def test_fit_zoom_json_round_trip(self):
-        """zoom='fit' survives JSON serialization."""
-        config = ProfileConfig(
-            name="fit_test",
-            profiles=[
-                PresentationProfile(
-                    "FitProfile",
-                    layout=PageLayout(width=100, zoom="fit"),
-                ),
-            ],
-        )
-        restored = ProfileConfig.from_json(config.to_json())
-        assert restored.profiles[0].layout.zoom == "fit"
-        assert restored.profiles[0].layout.width == 100
-
-    def test_fit_zoom_to_dict(self):
-        config = ProfileConfig(
-            name="fit",
-            profiles=[
-                PresentationProfile("A", layout=PageLayout(zoom="fit")),
-            ],
-        )
-        d = config.to_dict()
-        assert d["profiles"][0]["layout"]["zoom"] == "fit"
-
-    def test_fit_zoom_apply_profile(self, session_state):
-        """apply_profile stores 'fit' in session_state."""
-        p = PresentationProfile(
-            "Fit", layout=PageLayout(width=100, zoom="fit"),
-        )
-        apply_profile(p)
-        from streamtex.zoom import _ZOOM_KEY
-        assert session_state[_ZOOM_KEY] == "fit"
-
-    def test_fit_zoom_is_profile_modified(self, session_state):
-        """is_profile_modified works with zoom='fit'."""
-        p = PresentationProfile(
-            "Fit", layout=PageLayout(width=100, zoom="fit"),
-        )
-        apply_profile(p)
-        assert not is_profile_modified(p)
-        from streamtex.zoom import _ZOOM_KEY
-        session_state[_ZOOM_KEY] = 100
-        assert is_profile_modified(p)
-
-    def test_mixed_fit_and_int_profiles(self):
-        """Profiles can mix fit and int zoom values."""
-        profiles = [
-            PresentationProfile("Desktop", layout=PageLayout(zoom=100)),
-            PresentationProfile("Fit", layout=PageLayout(zoom="fit")),
-        ]
-        config = ProfileConfig(name="mixed", profiles=profiles)
-        restored = ProfileConfig.from_json(config.to_json())
-        assert restored.profiles[0].layout.zoom == 100
-        assert restored.profiles[1].layout.zoom == "fit"

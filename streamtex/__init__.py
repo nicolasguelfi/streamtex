@@ -24,7 +24,7 @@ import io as _io
 _real_stderr = _sys.stderr
 _sys.stderr = _io.StringIO()
 
-__version__ = "0.4.24"
+__version__ = "0.4.23"
 
 # Core style system
 from .styles import Style, ListStyle, StyleGrid, StxStyles, StreamTeX_Styles, theme
@@ -57,15 +57,6 @@ from .slide import (
     st_slide_break, SlideBreakConfig, SlideBreakMode,
     set_slide_break_config, get_slide_break_config,
     add_slide_break_options,
-)
-
-# Presentation profiles (display configurations)
-from .presentation_profile import (
-    PresentationProfile,
-    PageLayout,
-    ViewMode,
-    SlideBreakDisplayConfig,
-    ProfileConfig,
 )
 
 # Presentation mode (fullscreen 16/9)

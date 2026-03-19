@@ -744,3 +744,38 @@ Explicit values always override auto defaults.
 - `banner.py` — BannerMode enum, BannerConfig dataclass, _render_banner()
 - `book.py` — Resolves banner config (banner > monties_color > banner_color),
   passes BannerConfig to _paginated_book(), calls _render_banner() for top/bottom banners.
+
+## 18. Presentation Profiles
+
+### Overview
+
+Presentation profiles let users switch between named display configurations
+(Desktop, Mobile, Presenter, etc.) at runtime via the sidebar or the floating
+navigation bar. Each profile bundles mode, layout, wrap, and slide break settings.
+
+### Recommended setup
+
+```python
+from streamtex import PresentationProfile, st_book
+
+st_book([...], presentation_profiles=PresentationProfile.desktop_mobile_preset())
+```
+
+### Factory presets
+
+```python
+PresentationProfile.desktop_mobile_preset()  # Desktop (90%, 100%) + Mobile (100%, 60%)
+PresentationProfile.responsive_preset()      # Desktop + Tablet + Mobile
+PresentationProfile.presentation_preset()    # Presenter + Audience + Handout
+```
+
+All presets default to `PAGINATED` mode. The `PresentationProfile` dataclass
+follows the same pattern as `BannerConfig` and `SlideBreakConfig`.
+
+### Architecture
+
+- `presentation_profile.py` — PresentationProfile, PageLayout, ViewMode,
+  SlideBreakDisplayConfig, ProfileConfig, apply_profile(), is_profile_modified()
+- `book.py` — Profile selectbox in sidebar Settings, profile switch detection,
+  hidden stx_prof_ buttons for floating bar JS interaction
+- `marker.py` — Phone icon popup in floating bar, profile_names/active_profile params

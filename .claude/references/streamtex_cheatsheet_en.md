@@ -573,10 +573,73 @@ st_book(
     zoom=100,                       # Default zoom level as % (default 100)
     pdf_config=None,                # PdfConfig for PDF export defaults
     exports=None,                   # List[ExportConfig] — auto-export to disk (new)
+    presentation_profiles=None,     # List[PresentationProfile] — display profiles
     chrome_banner=True,             # Show browser recommendation banner (Chrome/Edge)
     banner_color="rgba(211,47,47,0.8)",  # Legacy — use banner=BannerConfig(...) instead
     monties_color=None,             # Legacy — use banner=BannerConfig(...) instead
 )
+```
+
+### Presentation Profiles — Display Configurations
+
+Named display configurations switchable at runtime via the sidebar or the floating navigation bar.
+
+```python
+from streamtex import (
+    PresentationProfile, PageLayout, ViewMode,
+    SlideBreakDisplayConfig, ProfileConfig,
+)
+
+# Define custom profiles
+profiles = [
+    PresentationProfile(
+        name="Desktop",
+        layout=PageLayout(width=90, zoom=100),
+    ),
+    PresentationProfile(
+        name="Mobile",
+        layout=PageLayout(width=100, zoom=60),
+        breaks=SlideBreakDisplayConfig(enabled=False),
+    ),
+]
+
+st_book([...], presentation_profiles=profiles)
+```
+
+**Factory presets** (all default to `PAGINATED` mode):
+
+```python
+# Desktop + Mobile pair
+st_book([...], presentation_profiles=PresentationProfile.desktop_mobile_preset())
+
+# Desktop + Tablet + Mobile
+st_book([...], presentation_profiles=PresentationProfile.responsive_preset())
+
+# Presenter + Audience + Handout (for slide decks)
+st_book([...], presentation_profiles=PresentationProfile.presentation_preset())
+```
+
+**Data types**:
+
+| Type | Fields | Description |
+|------|--------|-------------|
+| `PresentationProfile` | name, mode, layout, wrap, breaks | Top-level profile |
+| `PageLayout` | width, zoom | Page dimensions (no range limits) |
+| `ViewMode` | PAGINATED, CONTINUOUS | View mode enum |
+| `SlideBreakDisplayConfig` | enabled, mode, space | Slide break settings |
+
+**JSON save/load** (`ProfileConfig`):
+
+```python
+from streamtex import ProfileConfig
+
+# Save
+config = ProfileConfig(name="my_config", profiles=profiles)
+config.save("config.json")
+
+# Load
+config = ProfileConfig.load("config.json")
+st_book([...], presentation_profiles=config.profiles)
 ```
 
 ### st_chrome_banner — Browser Recommendation

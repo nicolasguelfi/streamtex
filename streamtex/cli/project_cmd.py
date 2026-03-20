@@ -596,7 +596,7 @@ def new(
         else:
             console.print(f"[yellow]git init:[/yellow] {result.stderr.strip()}")
 
-    # 4. Claude profile
+    # 4. Claude profile (install_profile also creates .claude/custom/)
     if not no_claude:
         try:
             from .claude_cmd import install_profile

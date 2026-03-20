@@ -82,6 +82,14 @@ uv run ruff check streamtex/ --fix  # Auto-fix lint issues
 2. **Linting** -> `uv run ruff check streamtex/` (`/stx-developer:lint`)
 3. **Deploy** -> Publish to PyPI (`/stx-developer:deploy`)
 
+## Customization
+- `.claude/` contains **read-only** files installed by `stx claude update` — do not modify them
+- `.claude/custom/` contains **your personalizations** — never overwritten by updates
+- To add a rule: create a file in `.claude/custom/references/`
+- To add a skill: create a file in `.claude/custom/skills/`
+- To add a slash command: create `.claude/commands/my-cmd/run.md` (commands go in `commands/`, not `custom/commands/`)
+- See `.claude/custom/README.md` for full details
+
 ## CHANGELOG (MANDATORY)
 **ALWAYS update `CHANGELOG.md`** when making changes to the library:
 - **Before any version bump**, add an entry under the new version heading

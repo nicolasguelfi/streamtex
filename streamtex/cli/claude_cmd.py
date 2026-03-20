@@ -10,6 +10,35 @@ import click
 from .console import get_console
 from .workspace_cmd import find_workspace_root, load_stx_toml
 
+_CUSTOM_README = """\
+# .claude/custom/ — User Customizations
+
+This directory is for **your** personalized extensions. Files here are:
+- **Never overwritten** by `stx claude update`
+- **Preserved** across preset upgrades (`stx install --preset`)
+- **Loaded by Claude Code** as part of the `.claude/` context
+
+## How to use
+
+| What | Where | Example |
+|------|-------|---------|
+| Extra coding rules | `custom/references/` | `project_conventions.md` |
+| Custom skills | `custom/skills/` | `my_domain_knowledge.md` |
+| Custom templates | `custom/templates/` | `my_template.md` |
+
+## Custom slash commands
+
+Custom commands go directly in `.claude/commands/` (not in `custom/commands/`),
+because Claude Code only scans `.claude/commands/` for slash commands.
+Files you add there are safe — `stx claude update` only overwrites files
+declared in the profile manifest.
+
+## Official vs. custom files
+
+- `.claude/references/`, `.claude/developer/`, `.claude/designer/` → **read-only** (managed by StreamTeX)
+- `.claude/custom/` → **yours** (never touched by StreamTeX)
+"""
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -148,7 +177,16 @@ def install_profile(claude_repo: str, profile: str, target: str) -> list[str]:
                     if rel not in installed:
                         installed.append(rel)
 
-    # 3. Write .claude/.stx-profile marker
+    # 3. Create .claude/custom/ directory with README if it doesn't exist
+    custom_dir = os.path.join(claude_dir, "custom")
+    if not os.path.isdir(custom_dir):
+        os.makedirs(custom_dir, exist_ok=True)
+        readme_path = os.path.join(custom_dir, "README.md")
+        with open(readme_path, "w", encoding="utf-8") as f:
+            f.write(_CUSTOM_README)
+        installed.append(os.path.relpath(readme_path, target))
+
+    # 4. Write .claude/.stx-profile marker
     marker_path = os.path.join(claude_dir, ".stx-profile")
     with open(marker_path, "w", encoding="utf-8") as f:
         f.write(profile + "\n")
@@ -285,10 +323,15 @@ def compare_profile(
         else:
             diffs.append(FileDiff(path=rel_path, status="modified"))
 
-    # Check for extra files in .claude/ not in source (excluding .stx-profile)
+    # Check for extra files in .claude/ not in source (excluding .stx-profile and custom/)
     claude_dir = os.path.join(target, ".claude")
+    custom_prefix = os.path.join(".claude", "custom")
     if os.path.isdir(claude_dir):
         for root, _dirs, filenames in os.walk(claude_dir):
+            rel_root = os.path.relpath(root, target)
+            # Skip custom/ directory entirely — user-owned
+            if rel_root == custom_prefix or rel_root.startswith(custom_prefix + os.sep):
+                continue
             for fname in filenames:
                 abs_path = os.path.join(root, fname)
                 rel = os.path.relpath(abs_path, target)
@@ -473,6 +516,14 @@ def _update_single_target(
     """
     diffs = compare_profile(claude_repo, profile, target)
     source_files = collect_source_files(claude_repo, profile)
+
+    # Ensure .claude/custom/ exists (for projects created before this feature)
+    custom_dir = os.path.join(target, ".claude", "custom")
+    if not os.path.isdir(custom_dir):
+        os.makedirs(custom_dir, exist_ok=True)
+        readme_path = os.path.join(custom_dir, "README.md")
+        with open(readme_path, "w", encoding="utf-8") as f:
+            f.write(_CUSTOM_README)
 
     updated: list[str] = []
     skipped: list[str] = []

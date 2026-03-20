@@ -1,6 +1,6 @@
 # Coherence Check Rules
 
-Reference file for `/stx-coherence:audit`. Defines 21 check categories.
+Reference file for `/stx-coherence:audit`. Defines 22 check categories.
 
 ---
 
@@ -95,14 +95,20 @@ Reference file for `/stx-coherence:audit`. Defines 21 check categories.
 
 ---
 
-## Check 5: Version Alignment (scope: all)
+## Check 5: Version Alignment (scope: library, all)
 
-**Goal**: Library version satisfies all dependency constraints.
+**Goal**: Library version is consistent across all locations and satisfies all dependency constraints.
 
-**Source**: `streamtex/pyproject.toml` → `[project] version`
+**Source files**:
+- `streamtex/pyproject.toml` → `[project] version`
+- `streamtex/streamtex/__init__.py` → `__version__`
+- `streamtex/CHANGELOG.md` → latest `## [X.Y.Z]` entry
+
 **Targets**: All `pyproject.toml` files in `streamtex-docs/`, `projects/*/`
 
 **Rules**:
+- ERROR if `pyproject.toml` version differs from `__init__.py` `__version__`
+- ERROR if CHANGELOG.md latest entry version differs from `pyproject.toml` version
 - WARNING if library version doesn't satisfy a `streamtex>=X.Y.Z` constraint
 - INFO: report current library version and all constraints found
 
@@ -680,3 +686,74 @@ for cls in [PdfConfig, ExportConfig, BannerConfig]:
 - ERROR if any file contains a bare namespace slash command reference (e.g. `/developer:test-run` instead of `/stx-developer:test-run`)
 - WARNING if any file contains a bare namespace path reference (e.g. `commands/project/` instead of `commands/stx-project/`)
 - INFO: report all namespace directories found and their prefix status
+
+---
+
+## Check 22: Release & Deploy Pipeline Coherence (scope: library, all)
+
+**Goal**: The release pipeline (git tag → PyPI → lock file → Render deploy → GitHub Release) is fully consistent. Every step must be completed and synchronized.
+
+**Why this check is critical**: Missing any step in the release pipeline causes silent failures: Render installs the wrong version from PyPI, GitHub shows an outdated "Latest" badge, lock files reference non-existent versions, or users install an old version. This check was added after a session where multiple pipeline steps were skipped, causing hours of debugging.
+
+**Source files**:
+- `streamtex/pyproject.toml` → `[project] version`
+- `streamtex/streamtex/__init__.py` → `__version__`
+- `streamtex/CHANGELOG.md` → latest `## [X.Y.Z]` entry
+- Git tags: `git tag --sort=-creatordate | head -1`
+- PyPI: `curl -s https://pypi.org/pypi/streamtex/json | python3 -c "import sys,json; print(json.load(sys.stdin)['info']['version'])"`
+- `streamtex-docs/uv.lock` → `name = "streamtex"` version
+- GitHub Releases: `gh release list -R nicolasguelfi/streamtex --limit 1`
+- Render deploy: `gh run list -R nicolasguelfi/streamtex-docs --workflow=render-deploy.yml --limit=1 --json conclusion`
+
+**Method**:
+1. Read the library version from `pyproject.toml` and `__init__.py` — they MUST match
+2. Read the latest CHANGELOG entry version — MUST match library version
+3. Read the latest git tag — MUST match library version (format: `vX.Y.Z`)
+4. Query PyPI for the latest published version — MUST match library version
+5. Read `streamtex-docs/uv.lock` streamtex version — MUST match PyPI version
+6. Query GitHub Releases for the latest release — MUST match library version
+7. Query the last Render deploy workflow run — MUST be `success`
+
+**Rules**:
+- ERROR if `pyproject.toml` version ≠ `__init__.py` `__version__`
+- ERROR if CHANGELOG latest entry ≠ library version
+- ERROR if latest git tag ≠ `v{library_version}`
+- ERROR if PyPI latest version ≠ library version (library not published)
+- ERROR if `streamtex-docs/uv.lock` streamtex version ≠ PyPI latest (lock file stale)
+- ERROR if no GitHub Release exists for the library version
+- WARNING if the latest Render deploy workflow run is `failure`
+- WARNING if the GitHub Release for the library version is not marked as "Latest"
+- INFO: report the complete pipeline state (version, tag, PyPI, lock, release, deploy)
+
+**How to check** (automated):
+```bash
+# Library version
+LIB_VER=$(grep 'version =' streamtex/pyproject.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
+INIT_VER=$(grep '__version__' streamtex/streamtex/__init__.py | sed 's/.*"\(.*\)".*/\1/')
+CHANGELOG_VER=$(grep '^## \[' streamtex/CHANGELOG.md | head -1 | sed 's/.*\[\(.*\)\].*/\1/')
+GIT_TAG=$(cd streamtex && git tag --sort=-creatordate | head -1)
+PYPI_VER=$(curl -s https://pypi.org/pypi/streamtex/json | python3 -c "import sys,json; print(json.load(sys.stdin)['info']['version'])")
+LOCK_VER=$(grep -A1 'name = "streamtex"' streamtex-docs/uv.lock | grep version | head -1 | sed 's/.*"\(.*\)".*/\1/')
+GH_RELEASE=$(gh release list -R nicolasguelfi/streamtex --limit 1 --json tagName,isLatest -q '.[0].tagName')
+RENDER_STATUS=$(gh run list -R nicolasguelfi/streamtex-docs --workflow=render-deploy.yml --limit=1 --json conclusion -q '.[0].conclusion')
+
+echo "pyproject.toml: $LIB_VER"
+echo "__init__.py:    $INIT_VER"
+echo "CHANGELOG:      $CHANGELOG_VER"
+echo "Git tag:        $GIT_TAG"
+echo "PyPI:           $PYPI_VER"
+echo "Lock file:      $LOCK_VER"
+echo "GitHub Release: $GH_RELEASE"
+echo "Render deploy:  $RENDER_STATUS"
+```
+
+**Release pipeline checklist** (correct order):
+1. Bump version in `pyproject.toml` + `__init__.py` + `CHANGELOG.md`
+2. Commit + push to GitHub
+3. `uv build && uv publish --token $PYPI_TOKEN`
+4. `git tag vX.Y.Z && git push origin vX.Y.Z`
+5. `gh release create vX.Y.Z --title "..." --notes "..." --latest`
+6. Update `streamtex-docs/uv.lock`: `uv lock --upgrade-package streamtex`
+7. Commit + push streamtex-docs
+8. `gh workflow run render-deploy.yml -R nicolasguelfi/streamtex-docs`
+9. Verify deploy success

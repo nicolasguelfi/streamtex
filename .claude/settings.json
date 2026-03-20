@@ -4,8 +4,6 @@
       "Bash(uv run *)",
       "Bash(uv sync*)",
       "Bash(uv add *)",
-      "Bash(docker build *)",
-      "Bash(docker run *)",
       "Bash(git status*)",
       "Bash(git diff*)",
       "Bash(git log*)",

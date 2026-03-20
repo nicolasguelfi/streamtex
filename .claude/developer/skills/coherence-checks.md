@@ -92,6 +92,9 @@ Reference file for `/stx-coherence:audit`. Defines 22 check categories.
 - ERROR if file content differs between source and copy
 - WARNING if a source file exists but has no copy in an expected location
 - INFO: report total files checked and sync status
+- INFO: report any files found in `.claude/custom/` (user customizations detected)
+- WARNING if a file in `.claude/custom/references/` has the same name as a file in `.claude/references/` (potential shadow/conflict)
+- WARNING if a file in `.claude/custom/skills/` has the same name as a file in `.claude/developer/skills/` or `.claude/designer/skills/` (potential shadow/conflict)
 
 ---
 

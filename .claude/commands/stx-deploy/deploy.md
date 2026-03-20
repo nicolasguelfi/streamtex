@@ -228,7 +228,17 @@ Add the project to `.stx-deploy.json`:
 }
 ```
 
-### Step 12: Display result
+### Step 12: Check CDN status
+
+Read `.stx-deploy.json` and check if `cdn.enabled` is true.
+
+If CDN is NOT configured, append a reminder:
+```
+Tip: Your server has no CDN or bot protection yet.
+     Run /stx-deploy:configure-domain to set up Cloudflare (free).
+```
+
+### Step 13: Display result
 
 ```
 Project deployed successfully!
@@ -236,6 +246,7 @@ Project deployed successfully!
   Status:  running (health check OK)
   Memory:  1g
   Auto-deploy: enabled
+  CDN:     $CDN_STATUS
 
 Deploy another: /stx-deploy:deploy [path]
 Deploy batch:   /stx-deploy:deploy-batch [folder]

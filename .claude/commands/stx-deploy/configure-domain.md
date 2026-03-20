@@ -142,13 +142,78 @@ Update `.stx-deploy.json`:
 - Update `coolify_url` to `https://coolify.$DOMAIN`
 - Add `"configure-domain"` to `phases_completed`
 
-### Step 12: Display next step
+### Step 12: Propose Cloudflare CDN & DDoS Protection
+
+**ALWAYS propose this step** after domain configuration:
+
+```
+Your domain is configured and working. Would you like to add
+Cloudflare CDN & DDoS protection? (recommended)
+
+Benefits:
+  - Free CDN (faster page loads worldwide)
+  - DDoS protection (layer 3/4/7)
+  - Rate limiting (block abusive traffic)
+  - Bot & AI crawler detection/blocking
+  - Web Application Firewall (WAF)
+  - SSL termination at edge
+  - Analytics & threat dashboard
+
+Setup takes ~10 minutes, no downtime.
+```
+
+If the user accepts:
+
+1. **Create Cloudflare account** (free plan) at https://dash.cloudflare.com
+2. **Add the domain** in Cloudflare dashboard
+3. **Change nameservers** at the registrar (OVH, Gandi, etc.) to Cloudflare's assigned nameservers
+4. **Wait for activation** (can take up to 24h, usually minutes)
+5. **Configure DNS records** in Cloudflare:
+   - A `@` → `<server-IP>`, Proxy ON (orange cloud)
+   - A `*` → `<server-IP>`, Proxy ON (orange cloud)
+   - A `coolify` → `<server-IP>`, Proxy OFF (grey cloud — WebSocket admin panel)
+6. **SSL/TLS settings** in Cloudflare:
+   - SSL mode: **Full (strict)** (server already has Let's Encrypt)
+   - Always Use HTTPS: ON
+   - Minimum TLS Version: 1.2
+7. **Security settings**:
+   - Security Level: Medium
+   - Bot Fight Mode: ON
+   - Under Attack Mode: OFF (enable manually during attacks)
+   - Challenge Passage: 30 minutes
+8. **Bot & AI crawler protection** (Security → Bots):
+   - Bot Fight Mode: ON (blocks known bad bots)
+   - AI Scrapers and Crawlers: Block (prevents AI training crawlers)
+   - Configure custom WAF rules if needed:
+     - Block requests with no User-Agent
+     - Rate limit: max 100 requests/10s per IP
+     - Challenge suspicious traffic patterns
+9. **Update `.stx-deploy.json`**:
+   - Set `cdn.provider: "cloudflare"`
+   - Set `cdn.enabled: true`
+   - Set `cdn.bot_protection: true`
+
+If the user declines:
+```
+OK, skipping Cloudflare. You can set it up later anytime —
+your domain and SSL work fine without it.
+
+Note: Without Cloudflare, your server has only basic protection:
+  - Hetzner network-level DDoS (layer 3/4 only)
+  - UFW firewall
+  - fail2ban (SSH only)
+  - No bot/crawler protection
+  - No rate limiting on HTTP traffic
+```
+
+### Step 13: Display next step
 
 ```
 Domain configured successfully!
   Domain:    $DOMAIN
   Wildcard:  *.$DOMAIN → <IP>
   SSL:       active (Let's Encrypt)
+  CDN:       $CDN_STATUS
   Dashboard: https://coolify.$DOMAIN
 
 Next step: /stx-deploy:deploy [project-path]

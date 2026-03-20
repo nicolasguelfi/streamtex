@@ -45,7 +45,20 @@ Display the scaling decision table:
 | LB connections > 80% capacity   | Upgrade load balancer           |
 | 60+ projects on one server      | Add a server                    |
 
-### Step 3: Analyze (--analyze or default)
+### Step 3: Check CDN status first
+
+Read `.stx-deploy.json` and check `cdn.enabled`. If CDN is NOT configured:
+```
+Before scaling, consider adding Cloudflare CDN (free):
+  - CDN caching reduces server load significantly
+  - Bot/crawler blocking prevents wasted resources
+  - Rate limiting stops abusive traffic
+  - This may resolve your performance issue without scaling
+
+Set up CDN: /stx-deploy:configure-domain $DOMAIN
+```
+
+### Step 4: Analyze (--analyze or default)
 
 Collect metrics via SSH:
 ```bash
@@ -82,7 +95,7 @@ Recommendation: RAM is approaching 80%. Consider:
 Vertical is simpler. Horizontal provides redundancy.
 ```
 
-### Step 4: Vertical scaling (--vertical)
+### Step 5: Vertical scaling (--vertical)
 
 **IMPORTANT**: Vertical scaling requires a brief server shutdown (2-5 minutes of downtime).
 
@@ -123,7 +136,7 @@ ssh $USER@$IP "sudo docker ps --format 'table {{.Names}}\t{{.Status}}'"
 
 6. Update `.stx-deploy.json` with new server type.
 
-### Step 5: Horizontal scaling (--horizontal)
+### Step 6: Horizontal scaling (--horizontal)
 
 1. Provision and secure a new worker (reuse provision + secure logic)
 2. If no load balancer exists, create one (reuse setup-loadbalancer logic)
@@ -140,6 +153,6 @@ To move projects to the new worker:
   In Coolify → Application → Settings → Server → select streamtex-worker-1
 ```
 
-### Step 6: Update state and display result
+### Step 7: Update state and display result
 
 Update `.stx-deploy.json` with all changes and display final status.

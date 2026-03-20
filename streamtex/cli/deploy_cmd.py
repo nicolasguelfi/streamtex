@@ -517,7 +517,7 @@ def render_service_url(name: str) -> str:
         subdomain = "docs-" + name[len("streamtex-"):]
     else:
         subdomain = name
-    return f"https://{subdomain}.streamtex.ros.lu"
+    return f"https://{subdomain}.streamtex.org"
 
 
 def parse_render_yaml_services(project_path: str) -> list[str]:

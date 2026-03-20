@@ -91,12 +91,23 @@ If a deployment fails:
 - Ask the user: continue with remaining projects or stop?
 - Record the failure in the plan
 
-### Step 7: Display summary
+### Step 7: Check CDN status
+
+Read `.stx-deploy.json` and check if `cdn.enabled` is true.
+
+If CDN is NOT configured, append a reminder:
+```
+Tip: Your server has no CDN or bot protection yet.
+     Run /stx-deploy:configure-domain to set up Cloudflare (free).
+```
+
+### Step 8: Display summary
 
 ```
 Batch Deployment Complete:
   Deployed: 3/3
   Failed: 0
+  CDN:     $CDN_STATUS
 
   #  Project          URL                              Status
   1  cours-python     https://cours-python.mondomaine.com   running

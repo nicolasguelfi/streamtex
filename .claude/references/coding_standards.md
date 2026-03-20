@@ -27,7 +27,25 @@ project_name/
     themes.py              # Theme overrides (dict)
   static/images/           # Image assets
   .streamlit/config.toml   # MUST have enableStaticServing = true
+  .claude/                 # Claude Code configuration
+    references/            # Read-only — coding standards, cheatsheet
+    commands/              # Read-only — slash commands (+ user custom commands)
+    developer/             # Read-only — skills, agents
+    designer/              # Read-only — skills, agents, templates, tools
+    custom/                # User personalizations (never overwritten)
+      references/          # Extra rules loaded after official ones
+      skills/              # Additional skills
+      templates/           # Custom project templates
+      README.md            # Usage instructions
 ```
+
+### `.claude/custom/` — User Customizations
+Files in `.claude/` (except `custom/`) are **read-only** — installed and updated by `stx claude update`.
+The `.claude/custom/` directory is for user-specific extensions that are **never overwritten** by updates.
+- Add rules in `custom/references/` (loaded by Claude alongside official references)
+- Add skills in `custom/skills/`
+- Add templates in `custom/templates/`
+- Custom slash commands go in `.claude/commands/` directly (Claude Code only scans that path)
 
 ## 4. Mandatory Imports
 

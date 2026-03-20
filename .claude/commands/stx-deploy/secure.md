@@ -166,5 +166,9 @@ Server secured successfully!
   fail2ban: active (3 attempts → 1h ban)
   Updates: automatic
 
+Note: This secures the server at OS level. For application-level
+protection (DDoS, bot blocking, rate limiting, WAF), Cloudflare CDN
+will be proposed during /stx-deploy:configure-domain.
+
 Next step: /stx-deploy:install-coolify
 ```

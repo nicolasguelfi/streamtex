@@ -322,12 +322,12 @@ stx claude install project ./my-project
 
 ### Online manuals (read & explore)
 
-- [All manuals (hub)](https://docs.streamtex.ros.lu)
-- [Introduction](https://docs-intro.streamtex.ros.lu)
-- [Advanced](https://docs-advanced.streamtex.ros.lu)
-- [AI & Claude](https://docs-ai.streamtex.ros.lu)
-- [Deployment Guide](https://docs-deploy.streamtex.ros.lu)
-- [Developer Guide](https://docs-developer.streamtex.ros.lu)
+- [All manuals (hub)](https://docs.streamtex.org)
+- [Introduction](https://docs-intro.streamtex.org)
+- [Advanced](https://docs-advanced.streamtex.org)
+- [AI & Claude](https://docs-ai.streamtex.org)
+- [Deployment Guide](https://docs-deploy.streamtex.org)
+- [Developer Guide](https://docs-developer.streamtex.org)
 
 ### Examples (source code)
 

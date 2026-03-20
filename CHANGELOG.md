@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.1] — 2026-03-20
+
+### Fixed
+- **Slide break space default**: Changed from 60vh to 5vh everywhere — `SlideBreakDisplayConfig.space`, `presentation_preset()` Presenter profile, `_effective_config()` fallback, and `_from_dict()` deserialization default.
+
 ## [0.5.0] — 2026-03-19
 
 ### Added

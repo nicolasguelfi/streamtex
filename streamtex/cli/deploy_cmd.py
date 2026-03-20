@@ -510,8 +510,14 @@ def setup_hf_remote(project_path: str, space_url: str) -> None:
 
 
 def render_service_url(name: str) -> str:
-    """Derive the public URL for a Render service."""
-    return f"https://{name}.onrender.com"
+    """Derive the public URL for a deployed service on Hetzner/Coolify."""
+    if name == "streamtex":
+        subdomain = "docs"
+    elif name.startswith("streamtex-"):
+        subdomain = "docs-" + name[len("streamtex-"):]
+    else:
+        subdomain = name
+    return f"https://{subdomain}.streamtex.ros.lu"
 
 
 def parse_render_yaml_services(project_path: str) -> list[str]:

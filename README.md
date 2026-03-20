@@ -322,12 +322,12 @@ stx claude install project ./my-project
 
 ### Online manuals (read & explore)
 
-- [All manuals (hub)](https://streamtex.onrender.com)
-- [Introduction](https://streamtex-intro.onrender.com)
-- [Advanced](https://streamtex-advanced.onrender.com)
-- [AI & Claude](https://streamtex-ai.onrender.com)
-- [Deployment Guide](https://streamtex-deploy.onrender.com)
-- [Developer Guide](https://streamtex-developer.onrender.com)
+- [All manuals (hub)](https://docs.streamtex.ros.lu)
+- [Introduction](https://docs-intro.streamtex.ros.lu)
+- [Advanced](https://docs-advanced.streamtex.ros.lu)
+- [AI & Claude](https://docs-ai.streamtex.ros.lu)
+- [Deployment Guide](https://docs-deploy.streamtex.ros.lu)
+- [Developer Guide](https://docs-developer.streamtex.ros.lu)
 
 ### Examples (source code)
 

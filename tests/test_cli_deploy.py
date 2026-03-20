@@ -1161,11 +1161,11 @@ def test_huggingface_command_custom_title_emoji(tmp_path):
 
 
 def test_render_service_url():
-    assert render_service_url("my-app") == "https://my-app.onrender.com"
+    assert render_service_url("my-app") == "https://my-app.streamtex.ros.lu"
 
 
 def test_render_service_url_with_dash():
-    assert render_service_url("streamtex-intro") == "https://streamtex-intro.onrender.com"
+    assert render_service_url("streamtex-intro") == "https://docs-intro.streamtex.ros.lu"
 
 
 # ---------------------------------------------------------------------------
@@ -1211,7 +1211,7 @@ def test_http_probe_live():
     mock_resp.__exit__ = MagicMock(return_value=False)
 
     with patch("streamtex.cli.deploy_cmd.urllib.request.urlopen", return_value=mock_resp):
-        status, msg = http_probe("https://example.onrender.com")
+        status, msg = http_probe("https://example.streamtex.ros.lu")
     assert status == "live"
     assert "200" in msg
 
@@ -1291,7 +1291,7 @@ def test_check_render_status_single_name():
     assert len(results) == 1
     assert results[0].name == "my-app"
     assert results[0].status == "live"
-    assert "onrender.com" in results[0].url
+    assert "streamtex.ros.lu" in results[0].url
 
 
 def test_check_render_status_from_render_yaml(tmp_path):
@@ -1365,7 +1365,7 @@ def test_status_command_render():
     with patch(
         "streamtex.cli.deploy_cmd.check_render_status",
         return_value=[
-            DeployStatus(name="my-app", status="live", url="https://my-app.onrender.com", message="HTTP 200"),
+            DeployStatus(name="my-app", status="live", url="https://my-app.streamtex.ros.lu", message="HTTP 200"),
         ],
     ):
         result = runner.invoke(cli, ["deploy", "status", "render", "my-app"])

@@ -371,6 +371,7 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
             page_width: int = 90,
             zoom: int = 100,
             presentation_profiles: list[PresentationProfile] | None = None,
+            doc_version: str | None = None,
             *args, monties_color: str = None, **kwargs):
     """Generates a web page e-book from a list of block modules.
 
@@ -468,6 +469,18 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
         st.session_state["_stx_profile_pending"] = st.session_state["_stx_profile_select"]
 
     with st.sidebar:
+        if doc_version:
+            from . import __version__ as _lib_version
+            _ver = f"docs {doc_version} \u00b7 lib {_lib_version}"
+            _is_pag = st.session_state.get(_STX_VIEW_MODE_KEY,
+                "Paginated" if paginate else "Continuous") == "Paginated"
+            _ver_href = f"#stx-goto-{len(module_list) - 1}" if _is_pag else "#changelog"
+            st.markdown(
+                f'<a href="{_ver_href}" style="display:block;text-align:center;'
+                f'font-size:0.8em;opacity:0.55;text-decoration:none;color:inherit;"'
+                f'>{_ver}</a>',
+                unsafe_allow_html=True,
+            )
         _stx_settings = st.expander("Settings")
         with _stx_settings:
             # ── Profile selector + reset button ──

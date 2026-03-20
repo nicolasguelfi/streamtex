@@ -15,6 +15,11 @@ This project uses **uv** for dependency management. You MUST:
 - Use `uv add <package>` to add dependencies, `uv add --group dev <package>` for dev deps
 - Run `uv sync` if `uv.lock` or `pyproject.toml` changed
 
+## Source of Truth for .claude/ files (CRITICAL)
+The `.claude/` directory contains **READ-ONLY copies** installed by `stx claude update`.
+**NEVER modify files in `.claude/` directly** — always edit the source in `streamtex-claude/`
+and run `stx claude update --all` to propagate changes.
+
 ## Context Loading (MANDATORY before any code change)
 Before modifying library code, you MUST read:
 1. `.claude/references/coding_standards.md` — full coding standards (single source of truth)

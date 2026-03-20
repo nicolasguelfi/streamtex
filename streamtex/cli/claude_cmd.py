@@ -498,9 +498,8 @@ def _update_single_target(
         if os.path.isfile(dst_path):
             os.chmod(dst_path, 0o644)
         shutil.copy2(src_path, dst_path)
-        # Re-protect shared references and commands
-        if d.path.startswith(os.path.join(".claude", "references")) or \
-           d.path.startswith(os.path.join(".claude", "commands")):
+        # Re-protect all .claude/ files (read-only copies of streamtex-claude sources)
+        if d.path.startswith(".claude"):
             os.chmod(dst_path, 0o444)
         updated.append(d.path)
 

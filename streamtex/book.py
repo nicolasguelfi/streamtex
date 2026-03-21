@@ -519,13 +519,8 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
             add_slide_break_options(container=_stx_settings)
 
         # Hidden profile buttons for JS→Streamlit switching (floating bar).
-        # CSS hides them immediately; components.html adds the hide class.
+        # MutationObserver hides them via inline style whenever React renders them.
         # Buttons remain clickable (position:absolute, not display:none).
-        st.html(
-            '<style>.stx-hidden-btns { position:absolute !important;'
-            " left:-9999px !important; height:0 !important;"
-            " overflow:hidden !important; pointer-events:auto !important; }</style>"
-        )
         _prof_ctr = st.container()
         with _prof_ctr:
             for _p in all_profiles:
@@ -535,13 +530,24 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
                           on_click=_switch_profile)
         components.html("""<script>
         (function(){
-            var btns = parent.document.querySelectorAll('[data-testid="stBaseButton-secondary"]');
-            for (var i = 0; i < btns.length; i++) {
-                var txt = (btns[i].textContent || '').trim();
-                if (txt.indexOf('stx_prof_') === 0) {
-                    var w = btns[i].closest('[data-testid="stButton"]');
-                    if (w) w.classList.add('stx-hidden-btns');
+            var HIDE = 'position:absolute;left:-9999px;height:0;overflow:hidden;pointer-events:auto;';
+            function hideProfileButtons() {
+                var btns = parent.document.querySelectorAll('[data-testid="stBaseButton-secondary"]');
+                for (var i = 0; i < btns.length; i++) {
+                    var txt = (btns[i].textContent || '').trim();
+                    if (txt.indexOf('stx_prof_') === 0) {
+                        var w = btns[i].closest('[data-testid="stButton"]');
+                        if (w && w.style.cssText.indexOf('-9999px') < 0) {
+                            w.style.cssText = HIDE;
+                        }
+                    }
                 }
+            }
+            hideProfileButtons();
+            var sidebar = parent.document.querySelector('[data-testid="stSidebar"]');
+            if (sidebar) {
+                var obs = new MutationObserver(hideProfileButtons);
+                obs.observe(sidebar, { childList: true, subtree: true });
             }
         })();
         </script>""", height=0)

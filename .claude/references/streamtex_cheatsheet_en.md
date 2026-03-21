@@ -575,6 +575,7 @@ st_book(
     exports=None,                   # List[ExportConfig] — auto-export to disk (new)
     presentation_profiles=None,     # List[PresentationProfile] — display profiles
     chrome_banner=True,             # Show browser recommendation banner (Chrome/Edge)
+    doc_version=None,               # str | None — version string shown in sidebar
     banner_color="rgba(211,47,47,0.8)",  # Legacy — use banner=BannerConfig(...) instead
     monties_color=None,             # Legacy — use banner=BannerConfig(...) instead
 )
@@ -1947,6 +1948,29 @@ set_presentation_config(PresentationConfig(
     hide_streamlit_header=True,
 ))
 ```
+
+**PresentationConfig fields:**
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `title` | `str` | `""` | Title displayed in the presentation footer |
+| `subtitle` | `str` | `""` | Optional subtitle (not currently rendered in footer) |
+| `aspect_ratio` | `str` | `"16/9"` | CSS aspect-ratio value ("16/9", "4/3", "16/10") |
+| `enforce_ratio` | `bool` | `True` | Apply aspect-ratio + overflow:hidden to slide container |
+| `footer` | `bool` | `True` | Show fixed slide counter bar at viewport bottom |
+| `counter_mode` | `str` | `"bloc"` | Counter display: `"bloc"` (section count) or `"slide"` (marker-based) |
+| `footer_height` | `str` | `"48px"` | CSS height of the footer bar |
+| `footer_bg` | `str \| None` | `None` | Footer background colour (None = inherit from theme) |
+| `footer_text_color` | `str \| None` | `None` | Footer text colour (None = inherit from theme) |
+| `footer_font_size` | `str` | `"18px"` | Font size for footer text |
+| `center_content` | `bool` | `True` | Vertically centre slide content within viewport |
+| `content_padding` | `str` | `"48px 64px"` | CSS padding inside each slide container |
+| `hide_streamlit_header` | `bool` | `True` | Hide the Streamlit header bar |
+| `hide_streamlit_footer` | `bool` | `True` | Hide the "Made with Streamlit" footer |
+| `hide_deploy_button` | `bool` | `True` | Hide the Streamlit deploy button |
+| `sidebar_default` | `str` | `"collapsed"` | Initial sidebar state ("collapsed" or "expanded") |
+| `slide_transition` | `str` | `"none"` | Transition effect ("none", "fade", "slide") |
+| `transition_duration` | `str` | `"0.3s"` | CSS transition duration |
 
 ### get_presentation_config()
 

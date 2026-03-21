@@ -128,7 +128,7 @@ streamtex-dev/                  # Workspace root
     shared-blocks/
   streamtex-claude/             # Profils Claude
     profiles/
-      developer/
+      library/
       documentation/
       presentation/
       project/
@@ -436,7 +436,8 @@ claude
 | stx-designer (12) | init, update, audit, fix, tool, slide-new, slide-audit, slide-fix, style-audit, style-refactor, block-new, block-preview | Cycle de vie complet du projet |
 | Developer (2) | test-run, lint | Tests et linting |
 | Project (5) | collection-new, course-generate, project-customize, project-init, project-upgrade | Gestion de projets |
-| Migration (5) | conversion-audit, html-convert-batch, html-convert-block, html-export, html-migrate | Migration HTML vers StreamTeX |
+| Import (6) | marp-analyze, marp, html, html-block, html-batch, html-audit | Import Marp/HTML vers StreamTeX |
+| Export (1) | html | Export StreamTeX vers HTML |
 | stx-issue (6) | bug, feature, question, docs, comment, list | Issues GitHub (shared) |
 | Skills (8) | visual-design-rules, slide-design-rules, style-conventions, streamtex-quick-reference, block-blueprints, testing-patterns, stx-migrate, docs-lookup | Regles de conception |
 | Agents (3) | slide-designer, slide-reviewer, project-architect | Agents specialises |
@@ -1252,6 +1253,105 @@ Ces templates sont utilises aussi depuis l'interface web GitHub.
 
 ---
 
+## Section 4f — Import et Export (topic: `import`, `export`)
+
+Le namespace `/stx-import` regroupe 6 commandes pour importer du contenu externe
+(Marp, HTML) vers StreamTeX. Le namespace `/stx-export` contient 1 commande
+pour exporter un projet StreamTeX vers HTML.
+
+### Import Marp
+
+```bash
+# Analyser un projet Marp avant import (inventaire, audit, rapport de migration)
+> /stx-import:marp-analyze chemin/vers/projet-marp
+
+# Importer un projet Marp complet dans le projet StreamTeX courant
+> /stx-import:marp chemin/vers/projet-marp
+```
+
+### Import HTML
+
+```bash
+# Importer du contenu HTML (ex: export Google Docs) dans un bloc StreamTeX
+> /stx-import:html chemin/vers/fichier.html
+
+# Convertir un seul fichier HTML en bloc StreamTeX
+> /stx-import:html-block chemin/vers/export.html
+
+# Conversion batch de plusieurs fichiers HTML
+> /stx-import:html-batch
+
+# Auditer la qualite d'une conversion HTML vers StreamTeX
+> /stx-import:html-audit
+```
+
+### Export HTML
+
+```bash
+# Exporter un projet StreamTeX en fichier HTML autonome
+> /stx-export:html
+```
+
+---
+
+## Section 4g — Deploiement Hetzner/Coolify (topic: `deploy-hetzner`)
+
+Le namespace `/stx-deploy` regroupe 11 commandes pour le deploiement sur
+infrastructure Hetzner avec Coolify. Ces commandes couvrent le cycle complet :
+provisionnement du serveur, installation de Coolify, deploiement des projets,
+configuration DNS/SSL, securisation et mise a l'echelle.
+
+### Provisionnement et installation
+
+```bash
+# Provisionner un serveur Hetzner (creation, cle SSH, firewall)
+> /stx-deploy:provision
+
+# Installer Coolify v4 sur le serveur
+> /stx-deploy:install-coolify
+```
+
+### Deploiement
+
+```bash
+# Verifier les prerequis avant deploiement
+> /stx-deploy:preflight
+
+# Deployer un projet StreamTeX sur Hetzner
+> /stx-deploy:deploy
+
+# Deployer plusieurs projets en batch
+> /stx-deploy:deploy-batch
+```
+
+### Configuration
+
+```bash
+# Configurer le DNS et le SSL pour un domaine
+> /stx-deploy:configure-domain
+
+# Configurer un load balancer multi-serveur
+> /stx-deploy:setup-loadbalancer
+```
+
+### Maintenance
+
+```bash
+# Voir le statut de l'infrastructure et des projets deployes
+> /stx-deploy:status
+
+# Mettre a jour les projets deployes
+> /stx-deploy:update
+
+# Securiser le serveur Hetzner (firewall, SSH hardening, fail2ban)
+> /stx-deploy:secure
+
+# Mettre a l'echelle l'infrastructure (scale up ou scale out)
+> /stx-deploy:scale
+```
+
+---
+
 ## Section 5 — Gotchas connus
 
 ### 1. `from streamtex import *` masque `list()`
@@ -1380,15 +1480,38 @@ Ces templates sont utilises aussi depuis l'interface web GitHub.
 | Creer une collection | `/stx-project:collection-new <description>` |
 | Generer un cours | `/stx-project:course-generate` |
 
-### Commandes Claude (migration)
+### Commandes Claude (import — 6)
 
 | Tache | Commande |
 |-------|----------|
-| Migrer du HTML vers StreamTeX | `/stx-migration:html-migrate <description>` |
-| Convertir un bloc HTML | `/stx-migration:html-convert-block <description>` |
-| Conversion batch HTML | `/stx-migration:html-convert-batch` |
-| Exporter en HTML | `/stx-migration:html-export` |
-| Auditer une conversion | `/stx-migration:conversion-audit` |
+| Analyser un projet Marp | `/stx-import:marp-analyze <description>` |
+| Importer un projet Marp | `/stx-import:marp <description>` |
+| Importer du HTML | `/stx-import:html <description>` |
+| Convertir un bloc HTML | `/stx-import:html-block <description>` |
+| Conversion batch HTML | `/stx-import:html-batch` |
+| Auditer une conversion HTML | `/stx-import:html-audit` |
+
+### Commandes Claude (export — 1)
+
+| Tache | Commande |
+|-------|----------|
+| Exporter en HTML | `/stx-export:html` |
+
+### Commandes Claude (deploy Hetzner — 11)
+
+| Tache | Commande |
+|-------|----------|
+| Provisionner un serveur | `/stx-deploy:provision` |
+| Installer Coolify | `/stx-deploy:install-coolify` |
+| Verifier les prerequis | `/stx-deploy:preflight` |
+| Deployer un projet | `/stx-deploy:deploy` |
+| Deployer en batch | `/stx-deploy:deploy-batch` |
+| Configurer DNS/SSL | `/stx-deploy:configure-domain` |
+| Configurer load balancer | `/stx-deploy:setup-loadbalancer` |
+| Statut infrastructure | `/stx-deploy:status` |
+| Mettre a jour les deploiements | `/stx-deploy:update` |
+| Securiser le serveur | `/stx-deploy:secure` |
+| Mise a l'echelle | `/stx-deploy:scale` |
 
 ### Commandes Claude (presentation)
 

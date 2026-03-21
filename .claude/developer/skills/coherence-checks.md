@@ -21,6 +21,7 @@ Reference file for `/stx-coherence:audit`. Defines 22 check categories.
 **Known exceptions** (not expected in blocks):
 - Low-level exports: `export_append`, `export_push_wrapper`, `export_pop_wrapper`, `generate_export_html`, `reset_export_buffer`, `is_export_active`
 - Config internals: `get_block_helper_config`, `get_bib_config`, `get_gsheet_config`, `get_link_config`, `get_bib_registry`, `reset_bib_registry`, `get_ai_image_config`, `get_slide_break_config`, `get_presentation_config`
+- Display/layout internals: `PageLayout`, `ViewMode`, `SlideBreakDisplayConfig`, `ProfileConfig`, `AssetMode`
 - Parser internals: `parse_bibtex_string`, `parse_ris_string`, `register_bib_parser`
 - Utility re-exports: `generate_bib_stubs`, `export_bibtex`, `load_css`, `exec_static`, `resolve_content`, `inject_link_preview_scaffold`, `add_wrap_all_option`, `add_slide_break_options`
 - Error/result types: `AIImageError`, `AIImageResult`, `BibParseError`, `GSheetError`
@@ -215,6 +216,7 @@ Reference file for `/stx-coherence:audit`. Defines 22 check categories.
 
 **Explicit exceptions** (allowed in French or other languages):
 - `streamtex-claude/shared/commands/stx-guide.md` — French by design (user-facing guide)
+- `streamtex-claude/cursor/*.md` — Internal planning documents (not user-facing)
 - Manual content that demonstrates multilingual features (e.g., i18n examples)
 - Inline code identifiers (variable/function names are language-neutral)
 
@@ -319,6 +321,8 @@ Then for each code block, parse function calls and verify parameter names and en
 
 **Known exceptions** (modules not expected to have dedicated test files):
 - `__init__.py`, `constants.py`, `enums.py`, `utils.py` (tested indirectly)
+- `block_helpers.py` — covered indirectly by `test_export_guard.py`
+- `search.py` — covered indirectly by `test_book_search_markers.py`
 - Modules with only re-exports or trivial wrappers
 
 ### Sub-check 12b: Signature drift
@@ -479,7 +483,6 @@ Then for each `show_code()` string, parse function calls and verify keyword argu
 |--------|----------|---------------------------------------------|
 | `from streamtex.enums import ListTypes` | `lt` | `unordered`, `ordered`, `custom`, ... |
 | `from streamtex.enums import Tags` | `t` | `div`, `span`, `p`, `h1`-`h6`, ... |
-| `from streamtex.enums import SpaceDir` | — | `horizontal`, `vertical` |
 | `from streamtex import PdfMode` | — | `CONTINUOUS`, `PAGINATED` |
 | `from streamtex import PdfConfig` | — | `mode`, `format`, `landscape`, `scale`, `margins`, ... |
 | `from streamtex import ExportConfig` | — | Constructor parameters |
@@ -499,10 +502,10 @@ Then for each `show_code()` string, parse function calls and verify keyword argu
 **How to check** (automated introspection):
 ```bash
 uv run python -c "
-from streamtex.enums import ListTypes, Tags, SpaceDir
+from streamtex.enums import ListTypes, Tags
 from streamtex import PdfMode, PdfConfig, ExportConfig, BannerConfig
 import inspect
-for cls in [ListTypes, Tags, SpaceDir, PdfMode]:
+for cls in [ListTypes, Tags, PdfMode]:
     members = [x for x in dir(cls) if not x.startswith('_')]
     print(f'{cls.__name__}: {members}')
 for cls in [PdfConfig, ExportConfig, BannerConfig]:

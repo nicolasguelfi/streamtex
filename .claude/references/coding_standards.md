@@ -605,8 +605,8 @@ st_book([...], toc_config=toc, marker_config=marker_config)
 | `popup_open` | `bool` | `False` | Initial state of the marker popup list |
 | `next_keys` | `list[str]` | `["PageDown"]` | Keys to navigate forward (supports modifier syntax) |
 | `prev_keys` | `list[str]` | `["PageUp"]` | Keys to navigate backward |
-| `draggable` | `bool` | `False` | Allow dragging the widget anywhere (position in localStorage) |
-| `collapsible` | `bool` | `False` | Show ⋮ button to collapse/expand (state in localStorage) |
+| `draggable` | `bool` | `True` | Allow dragging the widget anywhere (position in localStorage) |
+| `collapsible` | `bool` | `True` | Show ⋮ button to collapse/expand (state in localStorage) |
 
 ### Per-heading overrides
 

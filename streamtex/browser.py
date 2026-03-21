@@ -10,9 +10,15 @@ _CHROME_BANNER_JS = """\
   var doc = win.document;
   if (doc.getElementById('stx-chrome-banner')) return;
 
-  var isChrome = /Chrome\\//.test(navigator.userAgent)
-                 && !/Edg\\//.test(navigator.userAgent)
-                 && !/OPR\\//.test(navigator.userAgent);
+  var ua = navigator.userAgent;
+  // All iOS browsers use WebKit — no Chrome advantage, skip banner entirely
+  var isIOS = /iPad|iPhone|iPod/.test(ua)
+              || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  if (isIOS) return;
+
+  var isChrome = (/Chrome\\//.test(ua) || /CriOS\\//.test(ua))
+                 && !/Edg\\//.test(ua)
+                 && !/OPR\\//.test(ua);
   if (isChrome) return;
 
   var banner = doc.createElement('div');

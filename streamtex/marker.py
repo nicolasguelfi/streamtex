@@ -573,11 +573,18 @@ def inject_marker_navigation(
         nav.style.cursor = 'grab';
         nav.style.touchAction = 'none';  /* prevent browser scroll/zoom during drag */
         var _dragStartX, _dragStartY, _dragNavX, _dragNavY, _dragging = false;
+        var _stxPopup = null;  /* set later when popup is created */
 
-        /* Filter: only drag from non-interactive elements */
+        /* Filter: only drag from non-interactive elements, never from popup */
         function isDragTarget(el) {
             var tag = el.tagName;
-            return tag !== 'BUTTON' && tag !== 'A' && tag !== 'INPUT' && tag !== 'IMG';
+            if (tag === 'BUTTON' || tag === 'A' || tag === 'INPUT' || tag === 'IMG') return false;
+            var node = el;
+            while (node && node !== nav) {
+                if (node === _stxPopup) return false;
+                node = node.parentNode;
+            }
+            return true;
         }
 
         /* Clamp nav position to visible viewport */
@@ -726,7 +733,8 @@ def inject_marker_navigation(
 
     /* --- Popup marker list --- */
     var popup = hostDoc.createElement('div');
-    popup.style.cssText = 'display:none;position:absolute;bottom:calc(100% + 8px);right:0;background:rgba(30,30,30,.95);color:#eee;border-radius:12px;padding:6px 0;min-width:240px;max-width:350px;max-height:400px;overflow-y:auto;box-shadow:0 4px 20px rgba(0,0,0,.5);backdrop-filter:blur(8px);font-size:12px;';
+    popup.style.cssText = 'display:none;position:absolute;bottom:calc(100% + 8px);right:0;background:rgba(30,30,30,.95);color:#eee;border-radius:12px;padding:6px 0;min-width:240px;max-width:350px;max-height:400px;overflow-y:auto;box-shadow:0 4px 20px rgba(0,0,0,.5);backdrop-filter:blur(8px);font-size:12px;touch-action:auto;-webkit-overflow-scrolling:touch;';
+    if (typeof _stxPopup !== 'undefined') _stxPopup = popup;  /* link to drag filter */
 
     for (var vi = 0; vi < visibleMarkers.length; vi++) {
         var globalIdx = visibleMarkers[vi].index;
@@ -751,6 +759,8 @@ def inject_marker_navigation(
     function togglePopup(show) {
         popupOpen = typeof show === 'boolean' ? show : !popupOpen;
         popup.style.display = popupOpen ? 'block' : 'none';
+        /* Allow native touch scroll inside popup; restore drag lock when closed */
+        if (draggable) nav.style.touchAction = popupOpen ? 'auto' : 'none';
         hostWin._stxMarkerPopupState = popupOpen;
         if (popupOpen) highlightPopup();
     }

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.5.4] — 2026-03-21
 
+### Fixed
+- **Chrome banner shown on iOS Chrome**: banner incorrectly appeared because iOS Chrome uses `CriOS` (not `Chrome`) in its user-agent string. Now detects `CriOS` and skips the banner entirely on iOS since all iOS browsers use WebKit (no Chrome advantage).
+- **Marker popup list not scrollable on touch devices**: touching inside the popup block list started a drag instead of scrolling. Fixed by excluding the popup from drag targets (`isDragTarget`) and toggling `touch-action` on the nav element when the popup opens/closes.
+
 ### Added
 - **`view_modes` parameter on `st_book()`**: restrict available view modes in the sidebar. Pass `view_modes=[ViewMode.PAGINATED]` to lock paginated-only (hides the View radio), or `[ViewMode.PAGINATED, ViewMode.CONTINUOUS]` to allow both (default). Useful for deployed documents where continuous mode should be disabled.
 - **Safety protections for `stx update` and `stx claude update`**:

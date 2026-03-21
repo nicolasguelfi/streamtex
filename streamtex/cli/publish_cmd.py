@@ -227,6 +227,59 @@ def run_publish_checks(
 # ---------------------------------------------------------------------------
 
 
+def _update_downstream_version(
+    library_path: str,
+    version: str,
+    console,
+) -> None:
+    """Update .stx-version and uv.lock in sibling repos after a PyPI publish.
+
+    Looks for repos containing a `.stx-version` file in the parent directory
+    of the library (the workspace root).  For each match, writes the new
+    version and runs ``uv lock`` to refresh the lock file so that Docker
+    cache is invalidated on the next deploy.
+    """
+    from pathlib import Path
+
+    workspace = Path(library_path).resolve().parent
+    updated: list[str] = []
+
+    for child in sorted(workspace.iterdir()):
+        stx_ver = child / ".stx-version"
+        if not stx_ver.is_file():
+            continue
+
+        current = stx_ver.read_text().strip()
+        if current == version:
+            console.print(f"[dim]{child.name}/.stx-version already {version}[/dim]")
+            continue
+
+        # Write new version
+        stx_ver.write_text(f"{version}\n")
+        console.print(f"[green]{child.name}/.stx-version[/green] {current} → {version}")
+
+        # Refresh uv.lock so Docker COPY layer is invalidated
+        uv = _find_uv()
+        if uv and (child / "uv.lock").is_file():
+            result = subprocess.run(
+                [uv, "lock"],
+                cwd=str(child),
+                capture_output=True, text=True, timeout=60,
+            )
+            if result.returncode == 0:
+                console.print("[dim]  uv.lock updated[/dim]")
+            else:
+                console.print(f"[yellow]  uv lock failed: {result.stderr.strip()}[/yellow]")
+
+        updated.append(child.name)
+
+    if updated:
+        console.print(
+            f"\n[cyan]Downstream repos updated:[/cyan] {', '.join(updated)}\n"
+            f"[dim]Remember to commit and push these repos before deploying.[/dim]"
+        )
+
+
 @click.command("check")
 @click.argument("path", default=".")
 @click.option("--skip-tests", is_flag=True, help="Skip running tests.")
@@ -340,10 +393,15 @@ def pypi_cmd(path: str, use_test_pypi: bool, skip_tests: bool, skip_lint: bool) 
     if result.returncode != 0:
         raise click.ClickException("Publish failed.")
 
-    # 5. Success message
+    # 7. Success message
     if use_test_pypi:
         url = f"https://test.pypi.org/project/streamtex/{version}/"
     else:
         url = f"https://pypi.org/project/streamtex/{version}/"
 
     console.print(f"\n[bold green]Published![/bold green] → {url}")
+
+    # 8. Update .stx-version in downstream repos (streamtex-docs, projects)
+    #    This ensures Docker cache invalidation on the next deploy.
+    if not use_test_pypi:
+        _update_downstream_version(p, version, console)

@@ -5,11 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.5.4] — 2026-03-22
+## [0.5.5] — 2026-03-22
 
 ### Fixed
-- **`stx claude update` does not re-render CLAUDE.md from template**: `CLAUDE.md.j2` was copied as-is but never rendered to `CLAUDE.md`. Now both `stx claude install` and `stx claude update` render the template with `{{ project_name }}`, `{{ profile }}`, and `{% if %}` conditionals. Added 4 tests.
+- **`stx claude update` does not re-render CLAUDE.md from template**: `CLAUDE.md.j2` was copied as-is but never rendered to `CLAUDE.md`. Now both `stx claude install` and `stx claude update` render the template with `{{ project_name }}`, `{{ profile }}`, and `{% if %}` conditionals.
 - **`stx claude update` skip message unclear**: improved the message when locally modified files are skipped, with explicit instructions to use `--force` and note about automatic backup.
+- **`.claude/` files lose read-only protection after git operations**: git resets chmod 444 to 644 on checkout/pull. `.claude/` managed files are now excluded from git tracking via `.gitignore`. Migration is automatic: `stx update` adds the gitignore rules, untracks files, and auto-commits when safe.
+
+### Changed
+- **`generate_gitignore()`** now includes `.claude/*` exclusion rules (with `!.claude/custom/` and `!.claude/.stx-profile` exceptions) for new projects.
+
+## [0.5.4] — 2026-03-21
 
 - **Chrome banner shown on iOS Chrome**: banner incorrectly appeared because iOS Chrome uses `CriOS` (not `Chrome`) in its user-agent string. Now detects `CriOS` and skips the banner entirely on iOS since all iOS browsers use WebKit (no Chrome advantage).
 - **Marker popup list not scrollable on touch devices**: touching inside the popup block list started a drag instead of scrolling. Fixed by excluding the popup from drag targets (`isDragTarget`) and toggling `touch-action` on the nav element when the popup opens/closes.

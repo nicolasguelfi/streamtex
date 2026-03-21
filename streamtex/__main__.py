@@ -27,7 +27,9 @@ def main():
         prog="streamtex",
         description=(
             "StreamTeX command-line utilities.\n\n"
-            "For the full CLI, install optional deps: uv add \"streamtex[cli]\""
+            "For the full CLI, install optional deps:\n"
+            "  uv add \"streamtex[cli]\"      # if using uv\n"
+            "  pip install \"streamtex[cli]\"  # if using pip"
         ),
     )
     sub = parser.add_subparsers(dest="command")

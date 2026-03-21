@@ -75,6 +75,30 @@ StreamTeX supports two complementary approaches that produce **exactly the same 
 
 ## Getting Started
 
+### Prerequisites
+
+- **Python 3.11+** — check with `python3 --version`
+- **git** — check with `git --version`
+- **[uv](https://docs.astral.sh/uv/)** (recommended) — fast Python package manager
+
+**Install uv** (if not already installed):
+
+```bash
+# macOS / Linux
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# macOS with Homebrew
+brew install uv
+
+# Windows
+powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
+
+# Or with pip (any platform)
+pip install uv
+```
+
+> **Without uv?** StreamTeX can also be installed with pip alone — see [Manual Installation](#manual-installation-without-stx-cli) below.
+
 StreamTeX supports 4 installation levels. Pick the one that fits your needs.
 
 ### Quick Start (minimal, no workspace)
@@ -134,8 +158,6 @@ uv add "streamtex[ai-fal]"       # fal.ai only
 > **AI image generation** requires API keys in your `.env` file:
 > `STX_OPENAI_API_KEY`, `STX_GOOGLE_AI_KEY`, `STX_FAL_KEY` (only the providers you use).
 > See the [AI Guide](https://github.com/nicolasguelfi/streamtex/blob/main/AI_GUIDE.md#ai-image-generation) for configuration details.
-
-**Prerequisites**: Python 3.11+, git, [uv](https://docs.astral.sh/uv/).
 
 ### Zero-Code with Claude or Cursor
 
@@ -372,11 +394,15 @@ my-project/
 ## Installation
 
 ```bash
-# Install or upgrade the CLI as a global tool
+# With uv (recommended) — install or upgrade the CLI as a global tool
 uv tool install "streamtex[cli]" -U
 
+# With pip (alternative — no uv required)
+pip install "streamtex[cli]"
+
 # Or as a project dependency
-uv add streamtex
+uv add streamtex          # uv
+pip install streamtex     # pip
 ```
 
 Optional extras:
@@ -391,11 +417,7 @@ uv add "streamtex[ai-fal]"       # AI images — fal.ai only
 uv add "streamtex[pdf]"          # PDF export via Playwright
 ```
 
-### Prerequisites
-
-- Python >= 3.11
-- [uv](https://docs.astral.sh/uv/) (recommended package manager)
-- git
+> Replace `uv add` with `pip install` if you don't use uv.
 
 ### Project Configuration
 

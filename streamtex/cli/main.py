@@ -17,6 +17,12 @@ def _check_uv_version() -> None:
 
     uv = shutil.which("uv")
     if not uv:
+        print(
+            "Note: uv is not installed. Some stx commands (install, update, publish) require it.\n"
+            "Install uv:  curl -LsSf https://astral.sh/uv/install.sh | sh\n"
+            "More info:   https://docs.astral.sh/uv/getting-started/installation/\n",
+            file=sys.stderr,
+        )
         return
     try:
         result = subprocess.run(
@@ -47,9 +53,11 @@ def app() -> None:
         print(
             "Error: the stx CLI requires optional dependencies.\n"
             "Install them with:\n\n"
-            "    uv add \"streamtex[cli]\"\n\n"
+            "    uv add \"streamtex[cli]\"          # if using uv\n"
+            "    pip install \"streamtex[cli]\"      # if using pip\n\n"
             "Or install click and rich directly:\n\n"
-            "    uv add click rich jinja2",
+            "    uv add click rich jinja2           # if using uv\n"
+            "    pip install click rich jinja2       # if using pip",
             file=sys.stderr,
         )
         sys.exit(1)

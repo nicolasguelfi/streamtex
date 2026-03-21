@@ -308,7 +308,15 @@ def _find_uv() -> str:
     """Locate the uv binary."""
     uv = shutil.which("uv")
     if uv is None:
-        raise click.ClickException("uv not found in PATH. Install it: https://docs.astral.sh/uv/")
+        raise click.ClickException(
+            "uv not found in PATH.\n\n"
+            "Install uv with one of these commands:\n\n"
+            "  curl -LsSf https://astral.sh/uv/install.sh | sh   # macOS / Linux\n"
+            "  brew install uv                                     # Homebrew\n"
+            "  pip install uv                                      # pip\n"
+            "  powershell -c \"irm https://astral.sh/uv/install.ps1 | iex\"  # Windows\n\n"
+            "More info: https://docs.astral.sh/uv/getting-started/installation/"
+        )
     return uv
 
 

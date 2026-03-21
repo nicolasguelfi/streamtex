@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.3] — 2026-03-20
+
+### Added
+- **Mobile-friendly floating bar**: `max-width` constraint + `flex-wrap` for 2-line layout on mobile (<600px). Line 1: controls (profile, nav, list). Line 2: label, collapse, brand, grip.
+- **Touch drag support**: `touchstart`/`touchmove`/`touchend` handlers alongside mouse handlers for mobile/tablet drag. Shared `startDrag()`/`moveDrag()`/`endDrag()` functions.
+- **Drag grip handle**: braille dots (`⠿`) visible only in collapsed state, positioned at end of bar for touch-friendly repositioning.
+- **`draggable` and `collapsible` default to `True`** in `MarkerConfig` — all users get drag and collapse without explicit config.
+
+### Fixed
+- **Hidden profile buttons visible in sidebar**: replaced one-shot hiding script with `MutationObserver` on sidebar. Buttons now hidden via inline `style.cssText` (no CSS class dependency). Eliminates race condition where `components.html` script ran before React rendered buttons.
+- **Profile asterisk on first load**: `is_profile_modified()` now ignores missing `session_state` keys (returns `False` instead of `True` when widgets haven't rendered yet).
+- **Profile reset button layout**: moved `↻` button inline with selectbox using `vertical_alignment="bottom"`, full-width selectbox with `label_visibility="collapsed"`.
+
+### Changed
+- **Floating bar drag refactored**: extracted `isDragTarget()`, `startDrag()`, `moveDrag()`, `endDrag()` shared between mouse and touch handlers.
+
+### Removed
+- **"Save configuration" expander** from sidebar (ProfileConfig remains in library API).
+- **CSS class `.stx-hidden-btns`** — replaced by inline styles via MutationObserver (more reliable).
+
+## [0.5.2] — 2026-03-20
+
+### Added
+- **README**: prerequisites section, pip alternative install instructions, uv install guidance.
+- **CLI**: improved error messages when uv is not installed (shows install commands for all platforms).
+
 ## [0.5.1] — 2026-03-20
 
 ### Fixed

@@ -206,7 +206,7 @@ def is_profile_modified(profile: PresentationProfile) -> bool:
     Uses :func:`_get_field_mapping` as single source of truth.
     """
     return any(
-        st.session_state.get(key) != extractor(profile)
+        key in st.session_state and st.session_state[key] != extractor(profile)
         for key, extractor in _get_field_mapping()
     )
 

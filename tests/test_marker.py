@@ -244,13 +244,13 @@ class TestMarkerDraggableCollapsible:
 
     # --- MarkerConfig defaults ---
 
-    def test_draggable_default_false(self):
+    def test_draggable_default_true(self):
         cfg = MarkerConfig()
-        assert cfg.draggable is False
+        assert cfg.draggable is True
 
-    def test_collapsible_default_false(self):
+    def test_collapsible_default_true(self):
         cfg = MarkerConfig()
-        assert cfg.collapsible is False
+        assert cfg.collapsible is True
 
     # --- MarkerConfig accepts True ---
 

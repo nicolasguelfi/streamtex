@@ -33,7 +33,6 @@ from .presentation import get_presentation_config, st_presentation_footer
 from .presentation_profile import (
     _ACTIVE_PROFILE_KEY,
     PresentationProfile,
-    ProfileConfig,
     apply_profile,
     build_default_profile,
     is_profile_modified,
@@ -483,14 +482,16 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
             )
         _stx_settings = st.expander("Settings")
         with _stx_settings:
-            # ── Profile selector + reset button ──
-            _col_select, _col_reset = _stx_settings.columns([5, 1])
+            # ── Profile selector with inline reset ──
+            def _format_profile(name):
+                if name == active_name and _profile_modified:
+                    return f"{name} *"
+                return name
+
+            _col_select, _col_reset = _stx_settings.columns([6, 1],
+                                                              vertical_alignment="bottom")
             with _col_select:
-                def _format_profile(name):
-                    if name == active_name and _profile_modified:
-                        return f"{name} *"
-                    return name
-                _stx_settings.selectbox(
+                st.selectbox(
                     "\U0001F4F1 Profile",
                     options=profile_names,
                     format_func=_format_profile,
@@ -498,24 +499,11 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
                     on_change=_on_profile_change,
                 )
             with _col_reset:
-                _stx_settings.write("")
-                if _profile_modified:
-                    if _stx_settings.button("\u21BB", key="_stx_profile_reset",
-                                            help="Reset to profile values"):
-                        st.session_state["_stx_profile_pending"] = active_name
-                        st.rerun()
-
-            # ── Save configuration ──
-            if presentation_profiles:
-                with _stx_settings.expander("\U0001F4BE Save configuration"):
-                    _cfg_name = st.text_input("Configuration name", value="my_config",
-                                              key="_stx_config_name")
-                    _current_config = ProfileConfig(name=_cfg_name, profiles=all_profiles)
-                    st.download_button("\U0001F4E5 Download JSON",
-                                      data=_current_config.to_json(),
-                                      file_name=f"{_cfg_name}.json",
-                                      mime="application/json",
-                                      key="_stx_config_download")
+                if st.button("\u21BB", key="_stx_profile_reset",
+                             help="Reset to profile values",
+                             use_container_width=True):
+                    st.session_state["_stx_profile_pending"] = active_name
+                    st.rerun()
 
             # ── Existing controls ──
             _stx_settings.radio(

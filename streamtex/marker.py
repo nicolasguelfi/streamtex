@@ -53,11 +53,12 @@ class MarkerConfig:
     """Keys to navigate to the previous marker.
     Supports modifier syntax: ``"Ctrl+ArrowLeft"``."""
 
-    draggable: bool = False
-    """Allow the floating nav widget to be dragged anywhere on screen."""
+    draggable: bool = True
+    """Allow the floating nav widget to be dragged anywhere on screen (mouse + touch)."""
 
-    collapsible: bool = False
-    """Show a ⋮ button to collapse/expand the nav widget."""
+    collapsible: bool = True
+    """Show a ⋮ button to collapse/expand the nav widget.
+    When collapsed, a drag grip handle replaces the hidden elements."""
 
 
 class MarkerRegistry:
@@ -323,7 +324,7 @@ def inject_marker_navigation(
 
     nav = hostDoc.createElement('div');
     nav.id = 'streamtex-marker-nav';
-    nav.style.cssText = 'position:fixed;__POS_CSS__display:__SHOW_UI__;z-index:999998;font-family:sans-serif;user-select:none;';
+    nav.style.cssText = 'position:fixed;__POS_CSS__display:__SHOW_UI__;z-index:999998;font-family:sans-serif;user-select:none;max-width:calc(100vw - 16px);';
     hostDoc.body.appendChild(nav);
 
     /* --- Responsive style for narrow viewports --- */
@@ -331,9 +332,17 @@ def inject_marker_navigation(
     if (mobileStyle) mobileStyle.remove();
     mobileStyle = hostDoc.createElement('style');
     mobileStyle.id = 'stx-marker-responsive';
-    mobileStyle.textContent = '@media (max-width: 800px) { ' +
+    mobileStyle.textContent =
+    /* Tablet breakpoint */
+    '@media (max-width: 800px) { ' +
         '#streamtex-marker-nav .stx-marker-bar { border-radius: 16px; } ' +
         '#streamtex-marker-nav .stx-marker-label { max-width: 20ch !important; flex-shrink: 1; } ' +
+    '} ' +
+    /* Mobile breakpoint — force 2-line layout */
+    '@media (max-width: 600px) { ' +
+        '#streamtex-marker-nav .stx-marker-break { display:block !important; width:100% !important; height:0 !important; } ' +
+        '#streamtex-marker-nav .stx-marker-bar { gap: 4px; padding: 6px 10px; justify-content: center; } ' +
+        '#streamtex-marker-nav .stx-marker-label { max-width: 14ch !important; flex-shrink: 1; } ' +
     '} ' +
     /* Hide number input spinners */
     '#streamtex-marker-nav input[type=number]::-webkit-outer-spin-button, ' +
@@ -343,7 +352,7 @@ def inject_marker_navigation(
     /* --- Controls bar --- */
     var bar = hostDoc.createElement('div');
     bar.className = 'stx-marker-bar';
-    bar.style.cssText = 'display:flex;align-items:center;gap:8px;background:rgba(40,40,40,.85);color:#eee;border-radius:24px;padding:6px 14px;font-size:13px;backdrop-filter:blur(6px);box-shadow:0 2px 10px rgba(0,0,0,.3);';
+    bar.style.cssText = 'display:flex;align-items:center;gap:8px;background:rgba(40,40,40,.85);color:#eee;border-radius:24px;padding:6px 14px;font-size:13px;backdrop-filter:blur(6px);box-shadow:0 2px 10px rgba(0,0,0,.3);flex-wrap:wrap;max-width:100%;box-sizing:border-box;';
     nav.appendChild(bar);
 
     var btnStyle = 'background:none;border:none;color:inherit;font-size:16px;cursor:pointer;padding:2px 6px;border-radius:4px;line-height:1;';
@@ -497,6 +506,13 @@ def inject_marker_navigation(
     bar.appendChild(counterInput);
     bar.appendChild(btnNext);
     bar.appendChild(btnList);
+
+    /* Flex line-break element — hidden on desktop, forces 2nd row on mobile */
+    var flexBreak = hostDoc.createElement('span');
+    flexBreak.className = 'stx-marker-break';
+    flexBreak.style.cssText = 'display:none;width:0;height:0;';
+    bar.appendChild(flexBreak);
+
     bar.appendChild(label);
 
     /* --- Collapsible ⋮ button --- */
@@ -504,6 +520,7 @@ def inject_marker_navigation(
     var collapsed = false;
     var btnCollapse = null;
     var barChildren = [];  /* elements to hide/show on collapse */
+    var gripHandle = null;
 
     if (collapsible) {
         /* Restore collapsed state from localStorage */
@@ -531,8 +548,10 @@ def inject_marker_navigation(
                 if (!collapsed && barChildren[ci] === counter) barChildren[ci].style.display = 'inline-block';
                 if (!collapsed && barChildren[ci] === counterInput) barChildren[ci].style.display = 'none';
             }
+            /* Grip handle: visible only when collapsed */
+            if (gripHandle) gripHandle.style.display = collapsed ? 'inline-block' : 'none';
             bar.style.padding = collapsed ? '6px 8px' : '6px 14px';
-            bar.style.borderRadius = collapsed ? '8px' : '24px';
+            bar.style.borderRadius = collapsed ? '12px' : '24px';
             if (collapsed && popupOpen) togglePopup(false);
             try { localStorage.setItem('stx-marker-collapsed', collapsed ? '1' : '0'); } catch(e) {}
         }
@@ -548,11 +567,18 @@ def inject_marker_navigation(
         applyCollapsed();
     }
 
-    /* --- Draggable --- */
+    /* --- Draggable (mouse + touch) --- */
     var draggable = __DRAGGABLE__;
     if (draggable) {
         nav.style.cursor = 'grab';
+        nav.style.touchAction = 'none';  /* prevent browser scroll/zoom during drag */
         var _dragStartX, _dragStartY, _dragNavX, _dragNavY, _dragging = false;
+
+        /* Filter: only drag from non-interactive elements */
+        function isDragTarget(el) {
+            var tag = el.tagName;
+            return tag !== 'BUTTON' && tag !== 'A' && tag !== 'INPUT' && tag !== 'IMG';
+        }
 
         /* Clamp nav position to visible viewport */
         function clampNav() {
@@ -569,6 +595,36 @@ def inject_marker_navigation(
                 nav.style.transform = 'none';
             }
             return {x: cx, y: cy};
+        }
+
+        function startDrag(x, y) {
+            _dragging = true;
+            _dragStartX = x;
+            _dragStartY = y;
+            var rect = nav.getBoundingClientRect();
+            _dragNavX = rect.left;
+            _dragNavY = rect.top;
+            nav.style.cursor = 'grabbing';
+        }
+
+        function moveDrag(x, y) {
+            if (!_dragging) return;
+            nav.style.left = (_dragNavX + x - _dragStartX) + 'px';
+            nav.style.top = (_dragNavY + y - _dragStartY) + 'px';
+            nav.style.right = 'auto';
+            nav.style.bottom = 'auto';
+            nav.style.transform = 'none';
+            clampNav();
+        }
+
+        function endDrag() {
+            if (!_dragging) return;
+            _dragging = false;
+            nav.style.cursor = 'grab';
+            try {
+                var pos = clampNav();
+                localStorage.setItem('stx-marker-pos', JSON.stringify(pos));
+            } catch(e) {}
         }
 
         /* Restore saved position, then clamp to current viewport */
@@ -588,38 +644,28 @@ def inject_marker_navigation(
             }
         } catch(e) {}
 
+        /* Mouse drag handlers */
         nav.addEventListener('mousedown', function(e) {
-            if (e.target.tagName === 'BUTTON' || e.target.tagName === 'A' ||
-                e.target.tagName === 'INPUT' || e.target.tagName === 'IMG') return;
-            _dragging = true;
-            _dragStartX = e.clientX;
-            _dragStartY = e.clientY;
-            var rect = nav.getBoundingClientRect();
-            _dragNavX = rect.left;
-            _dragNavY = rect.top;
-            nav.style.cursor = 'grabbing';
+            if (!isDragTarget(e.target)) return;
+            startDrag(e.clientX, e.clientY);
             e.preventDefault();
         });
-        hostDoc.addEventListener('mousemove', function(e) {
+        hostDoc.addEventListener('mousemove', function(e) { moveDrag(e.clientX, e.clientY); });
+        hostDoc.addEventListener('mouseup', endDrag);
+
+        /* Touch drag handlers (mobile/tablet) */
+        nav.addEventListener('touchstart', function(e) {
+            if (!isDragTarget(e.target)) return;
+            var t = e.touches[0];
+            startDrag(t.clientX, t.clientY);
+        }, {passive: true});
+        hostDoc.addEventListener('touchmove', function(e) {
             if (!_dragging) return;
-            var dx = e.clientX - _dragStartX;
-            var dy = e.clientY - _dragStartY;
-            nav.style.left = (_dragNavX + dx) + 'px';
-            nav.style.top = (_dragNavY + dy) + 'px';
-            nav.style.right = 'auto';
-            nav.style.bottom = 'auto';
-            nav.style.transform = 'none';
-            clampNav();
-        });
-        hostDoc.addEventListener('mouseup', function() {
-            if (!_dragging) return;
-            _dragging = false;
-            nav.style.cursor = 'grab';
-            try {
-                var pos = clampNav();
-                localStorage.setItem('stx-marker-pos', JSON.stringify(pos));
-            } catch(e) {}
-        });
+            e.preventDefault();  /* prevent page scroll during drag */
+            var t = e.touches[0];
+            moveDrag(t.clientX, t.clientY);
+        }, {passive: false});
+        hostDoc.addEventListener('touchend', endDrag);
 
         /* Re-clamp on viewport resize (window resize, sidebar toggle, etc.) */
         hostWin.addEventListener('resize', function() {
@@ -659,6 +705,23 @@ def inject_marker_navigation(
         brand.appendChild(heart);
 
         bar.appendChild(brand);
+    }
+
+    /* --- Drag grip handle (visible only when collapsed) --- */
+    if (collapsible) {
+        /* Include brand elements in collapsible group so they hide when collapsed */
+        if (typeof sep !== 'undefined' && sep) barChildren.push(sep);
+        if (typeof brand !== 'undefined' && brand) barChildren.push(brand);
+
+        gripHandle = hostDoc.createElement('span');
+        gripHandle.className = 'stx-drag-grip';
+        gripHandle.textContent = '\\u2847\\u2847\\u2847';  /* ⡇⡇⡇ braille grip dots */
+        gripHandle.title = 'Drag to move';
+        gripHandle.style.cssText = 'display:none;cursor:grab;padding:2px 6px;font-size:14px;letter-spacing:2px;color:rgba(255,255,255,.5);touch-action:none;user-select:none;';
+        bar.appendChild(gripHandle);
+
+        /* Re-apply collapsed state now that all elements (brand, grip) exist */
+        applyCollapsed();
     }
 
     /* --- Popup marker list --- */

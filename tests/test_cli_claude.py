@@ -5,6 +5,7 @@ import os
 from click.testing import CliRunner
 
 from streamtex.cli.claude_cmd import (
+    _ensure_claude_gitignore,
     _render_claude_md,
     collect_source_files,
     compare_profile,
@@ -867,3 +868,90 @@ def test_update_rerenders_claude_md(tmp_path):
     # CLAUDE.md should be re-rendered with new content
     content = (target / "CLAUDE.md").read_text()
     assert "# my-app v2" in content
+
+
+# ---------------------------------------------------------------------------
+# .gitignore migration
+# ---------------------------------------------------------------------------
+
+def test_ensure_claude_gitignore_adds_rules(tmp_path):
+    """_ensure_claude_gitignore adds .claude/ rules to .gitignore."""
+    import subprocess
+
+    from rich.console import Console
+
+    console = Console(quiet=True)
+
+    proj = tmp_path / "proj"
+    proj.mkdir()
+    subprocess.run(["git", "init", str(proj)], capture_output=True, timeout=10)
+    (proj / ".claude").mkdir()
+    (proj / ".claude" / "foo.md").write_text("x")
+
+    _ensure_claude_gitignore(str(proj), console)
+
+    content = (proj / ".gitignore").read_text()
+    assert ".claude/*" in content
+    assert "!.claude/custom/" in content
+    assert "!.claude/.stx-profile" in content
+
+
+def test_ensure_claude_gitignore_untracks_files(tmp_path):
+    """_ensure_claude_gitignore removes tracked .claude/ files from git index."""
+    import subprocess
+
+    from rich.console import Console
+
+    console = Console(quiet=True)
+
+    proj = tmp_path / "proj"
+    proj.mkdir()
+    subprocess.run(["git", "init", str(proj)], capture_output=True, timeout=10)
+    subprocess.run(
+        ["git", "config", "user.email", "test@test.com"],
+        cwd=str(proj), capture_output=True, timeout=10,
+    )
+    subprocess.run(
+        ["git", "config", "user.name", "Test"],
+        cwd=str(proj), capture_output=True, timeout=10,
+    )
+
+    # Create and commit .claude/ files
+    (proj / ".claude").mkdir()
+    (proj / ".claude" / "CLAUDE.md.j2").write_text("template")
+    (proj / ".claude" / "custom").mkdir()
+    (proj / ".claude" / "custom" / "rules.md").write_text("custom rule")
+    (proj / ".claude" / ".stx-profile").write_text("project\n")
+    subprocess.run(
+        ["git", "add", "-A"],
+        cwd=str(proj), capture_output=True, timeout=10,
+    )
+    subprocess.run(
+        ["git", "commit", "-m", "init"],
+        cwd=str(proj), capture_output=True, timeout=10,
+    )
+
+    _ensure_claude_gitignore(str(proj), console)
+
+    # .claude/CLAUDE.md.j2 should be untracked
+    result = subprocess.run(
+        ["git", "ls-files", ".claude/CLAUDE.md.j2"],
+        cwd=str(proj), capture_output=True, text=True, timeout=10,
+    )
+    assert result.stdout.strip() == ""
+
+    # .claude/custom/ and .stx-profile should still be tracked
+    result = subprocess.run(
+        ["git", "ls-files", ".claude/custom/rules.md"],
+        cwd=str(proj), capture_output=True, text=True, timeout=10,
+    )
+    assert "rules.md" in result.stdout
+
+    result = subprocess.run(
+        ["git", "ls-files", ".claude/.stx-profile"],
+        cwd=str(proj), capture_output=True, text=True, timeout=10,
+    )
+    assert ".stx-profile" in result.stdout
+
+    # Local file should still exist
+    assert (proj / ".claude" / "CLAUDE.md.j2").exists()

@@ -217,6 +217,11 @@ __pycache__/
 dist/
 build/
 .ruff_cache/
+
+# Claude profile — managed by stx claude install/update, not git
+.claude/*
+!.claude/custom/
+!.claude/.stx-profile
 """
 
 

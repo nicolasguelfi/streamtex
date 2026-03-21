@@ -614,6 +614,90 @@ def _backup_modified_files(
     return backup_dir
 
 
+_CLAUDE_GITIGNORE_BLOCK = """\
+
+# Claude profile — managed by stx claude install/update, not git
+.claude/*
+!.claude/custom/
+!.claude/.stx-profile
+"""
+
+
+def _ensure_claude_gitignore(target: str, console) -> None:
+    """Ensure .claude/ is in .gitignore and untracked from git.
+
+    This migrates existing repos where .claude/ was previously tracked.
+    """
+    import subprocess
+
+    git_dir = os.path.join(target, ".git")
+    if not os.path.isdir(git_dir):
+        return  # Not a git repo — nothing to do
+
+    # 1. Ensure .gitignore has the .claude/ block
+    gitignore_path = os.path.join(target, ".gitignore")
+    gitignore_content = ""
+    if os.path.isfile(gitignore_path):
+        with open(gitignore_path, encoding="utf-8") as f:
+            gitignore_content = f.read()
+
+    if ".claude/*" not in gitignore_content:
+        with open(gitignore_path, "a", encoding="utf-8") as f:
+            f.write(_CLAUDE_GITIGNORE_BLOCK)
+        console.print("  [green]\u2713[/green] .gitignore: added .claude/ exclusion rules")
+
+    # 2. Check if .claude/ files are tracked by git (excluding custom/ and .stx-profile)
+    try:
+        result = subprocess.run(
+            ["git", "ls-files", ".claude/"],
+            cwd=target,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return
+
+    if result.returncode != 0 or not result.stdout.strip():
+        return  # Nothing tracked
+
+    tracked = [
+        f for f in result.stdout.strip().splitlines()
+        if not f.startswith(".claude/custom/") and f != ".claude/.stx-profile"
+    ]
+
+    if not tracked:
+        return
+
+    # 3. Untrack .claude/ files (keeps local copies, removes from git index)
+    console.print(
+        f"  [yellow]Migrating:[/yellow] removing {len(tracked)} "
+        ".claude/ file(s) from git tracking (local copies preserved)"
+    )
+    subprocess.run(
+        ["git", "rm", "-r", "--cached", "--quiet", ".claude/"],
+        cwd=target,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    # Re-add the exceptions that should stay tracked
+    for exception in [".claude/custom/", ".claude/.stx-profile"]:
+        exc_path = os.path.join(target, exception)
+        if os.path.exists(exc_path):
+            subprocess.run(
+                ["git", "add", exception],
+                cwd=target,
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+    console.print(
+        "  [green]\u2713[/green] .claude/ untracked from git "
+        "(run [bold]git commit[/bold] to finalize migration)"
+    )
+
+
 def _update_single_target(
     claude_repo: str,
     profile: str,
@@ -635,6 +719,9 @@ def _update_single_target(
         readme_path = os.path.join(custom_dir, "README.md")
         with open(readme_path, "w", encoding="utf-8") as f:
             f.write(_CUSTOM_README)
+
+    # Migrate: ensure .claude/ is gitignored and untracked
+    _ensure_claude_gitignore(target, console)
 
     # Back up modified files before overwriting
     backup_dir = _backup_modified_files(target, diffs, source_files)

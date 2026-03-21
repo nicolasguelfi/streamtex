@@ -48,7 +48,7 @@ _OVERLAY_CSS = """\
 }
 #stx-loading-bar-fill {
   height: 100%; border-radius: 2px; background: white;
-  width: 0%; transition: width 1.5s ease;
+  width: 0%; transition: width 0.3s ease;
 }
 #stx-loading-counter {
   font-size: 0.85rem; opacity: 0.6; display: none;

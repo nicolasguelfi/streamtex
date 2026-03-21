@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.4] — 2026-03-21
+
+### Added
+- **`view_modes` parameter on `st_book()`**: restrict available view modes in the sidebar. Pass `view_modes=[ViewMode.PAGINATED]` to lock paginated-only (hides the View radio), or `[ViewMode.PAGINATED, ViewMode.CONTINUOUS]` to allow both (default). Useful for deployed documents where continuous mode should be disabled.
+- **Safety protections for `stx update` and `stx claude update`**:
+  - `stx update`: skips `git pull` on repos with uncommitted changes (warns with file list). Now also detects staged changes.
+  - `stx claude update`: skips all locally modified `.claude/` files (not just `CLAUDE.md`) unless `--force` is used.
+  - `stx claude update --force`: creates a timestamped backup in `.claude/.backup/<timestamp>/` before overwriting modified files.
+- **Loading overlay**: full-screen semi-transparent mauve overlay with progress percentage during app loading. Shows "Initializing…" with pulse animation during setup, then real-time `module X / Y` progress during block rendering. Works in both continuous and paginated modes (during cache build). New `loading` parameter on `st_book()` (default `True`). Automatically disabled in warmup mode.
+- **Loading overlay UX improvements**: smoother progress bar (1.5s CSS transition), current module name displayed below counter (e.g. `bck_intro`), bouncing-dots heartbeat animation to show activity even when a heavy module stalls the progress bar.
+
 ## [0.5.3] — 2026-03-20
 
 ### Added

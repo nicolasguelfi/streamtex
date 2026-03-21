@@ -436,7 +436,7 @@ def test_update_command_already_up_to_date(tmp_path):
     assert "up to date" in result.output
 
 
-def test_update_command_updates_modified(tmp_path):
+def test_update_command_skips_modified_without_force(tmp_path):
     ws = _make_workspace(tmp_path)
     target = tmp_path / "my-project"
     target.mkdir()
@@ -451,12 +451,62 @@ def test_update_command_updates_modified(tmp_path):
     os.chdir(ws)
     result = runner.invoke(cli, ["claude", "update", str(target)])
     assert result.exit_code == 0, result.output
+    # Modified files are skipped without --force
+    assert "Skipped" in result.output
+    assert "test-run.md" in result.output
+
+    # Verify the file was NOT updated (old content preserved)
+    content = (target / ".claude" / "commands" / "developer" / "test-run.md").read_text()
+    assert "v2" not in content
+
+
+def test_update_command_updates_modified_with_force(tmp_path):
+    ws = _make_workspace(tmp_path)
+    target = tmp_path / "my-project"
+    target.mkdir()
+
+    install_profile(str(ws / "streamtex-claude"), "project", str(target))
+
+    # Modify source file in claude repo
+    src = ws / "streamtex-claude" / "profiles" / "project" / "commands" / "developer" / "test-run.md"
+    src.write_text("Run tests v2\n")
+
+    runner = CliRunner()
+    os.chdir(ws)
+    result = runner.invoke(cli, ["claude", "update", "--force", str(target)])
+    assert result.exit_code == 0, result.output
     assert "Updated" in result.output
     assert "test-run.md" in result.output
 
     # Verify the file was updated
     updated = (target / ".claude" / "commands" / "developer" / "test-run.md").read_text()
     assert "v2" in updated
+
+
+def test_update_command_creates_backup_on_force(tmp_path):
+    ws = _make_workspace(tmp_path)
+    target = tmp_path / "my-project"
+    target.mkdir()
+
+    install_profile(str(ws / "streamtex-claude"), "project", str(target))
+
+    # Modify source file in claude repo
+    src = ws / "streamtex-claude" / "profiles" / "project" / "commands" / "developer" / "test-run.md"
+    src.write_text("Run tests v2\n")
+
+    runner = CliRunner()
+    os.chdir(ws)
+    result = runner.invoke(cli, ["claude", "update", "--force", str(target)])
+    assert result.exit_code == 0, result.output
+    assert "Backup saved to" in result.output
+
+    # Verify backup directory was created
+    backup_root = target / ".claude" / ".backup"
+    assert backup_root.is_dir()
+    # Should contain a timestamped subdirectory
+    backups = [*backup_root.iterdir()]
+    assert len(backups) == 1
+    assert backups[0].is_dir()
 
 
 def test_update_command_preserves_claude_md(tmp_path):
@@ -671,7 +721,8 @@ def test_update_all_flag(tmp_path):
 
     runner = CliRunner()
     os.chdir(ws)
-    result = runner.invoke(cli, ["claude", "update", "--all"])
+    # --force required to overwrite modified files
+    result = runner.invoke(cli, ["claude", "update", "--all", "--force"])
     assert result.exit_code == 0, result.output
     assert "Updated" in result.output
 

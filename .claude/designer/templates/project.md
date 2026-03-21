@@ -39,7 +39,7 @@ Standard StreamTeX project for screen viewing.
 # book.py configuration
 from streamtex import (
     st_book, TOCConfig, NumberingMode, MarkerConfig, BannerConfig,
-    PdfConfig, ExportConfig, ExportMode, PresentationProfile,
+    PdfConfig, ExportConfig, ExportMode, PresentationProfile, ViewMode,
 )
 
 toc = TOCConfig(
@@ -55,6 +55,7 @@ st_book(
     marker_config=marker,
     paginate=True,
     banner=BannerConfig.full(),
+    view_modes=[ViewMode.PAGINATED, ViewMode.CONTINUOUS],
     # Auto-export to disk (disabled by default — change NEVER to ALWAYS to enable)
     exports=[
         ExportConfig(

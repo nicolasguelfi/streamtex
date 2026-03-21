@@ -323,6 +323,7 @@ Then for each code block, parse function calls and verify parameter names and en
 - `__init__.py`, `constants.py`, `enums.py`, `utils.py` (tested indirectly)
 - `block_helpers.py` — covered indirectly by `test_export_guard.py`
 - `search.py` — covered indirectly by `test_book_search_markers.py`
+- `loading.py` — JS overlay injection, requires live Streamlit runtime (tested indirectly via `test_book_integration.py`)
 - Modules with only re-exports or trivial wrappers
 
 ### Sub-check 12b: Signature drift

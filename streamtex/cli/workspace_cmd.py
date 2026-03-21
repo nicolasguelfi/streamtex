@@ -293,13 +293,19 @@ def _get_dirty_files(repo_path: str) -> list[str]:
             capture_output=True, text=True, timeout=5,
         )
         tracked = [f for f in result.stdout.strip().splitlines() if f]
+        # Also check staged changes
+        result_staged = subprocess.run(
+            ["git", "-C", repo_path, "diff", "--cached", "--name-only"],
+            capture_output=True, text=True, timeout=5,
+        )
+        staged = [f for f in result_staged.stdout.strip().splitlines() if f]
         # Also check untracked files
         result2 = subprocess.run(
             ["git", "-C", repo_path, "ls-files", "--others", "--exclude-standard"],
             capture_output=True, text=True, timeout=5,
         )
         untracked = [f for f in result2.stdout.strip().splitlines() if f]
-        return tracked + untracked
+        return list(dict.fromkeys(tracked + staged + untracked))
     except (subprocess.TimeoutExpired, OSError):
         return ["(unknown)"]
 
@@ -849,6 +855,21 @@ def update(skip_sync, skip_profiles, dry_run, repair):
         if dry_run:
             console.print(f"  [cyan]{repo_name}[/cyan]: would git pull")
             pulled += 1
+            continue
+
+        # Safety: skip repos with uncommitted changes (except uv.lock-only)
+        dirty = _get_dirty_files(repo_path)
+        if dirty and dirty != ["uv.lock"]:
+            file_list = ", ".join(dirty[:5])
+            if len(dirty) > 5:
+                file_list += f" (+{len(dirty) - 5} more)"
+            console.print(
+                f"  [yellow]{repo_name}[/yellow]: skipped pull"
+                f" — uncommitted changes: {file_list}"
+            )
+            console.print(
+                "    [dim]Commit or stash changes, then re-run stx update.[/dim]"
+            )
             continue
 
         console.print(f"  [cyan]{repo_name}[/cyan]: git pull …")

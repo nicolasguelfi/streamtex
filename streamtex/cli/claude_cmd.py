@@ -4,6 +4,7 @@ import filecmp
 import os
 import shutil
 from dataclasses import dataclass
+from datetime import datetime
 
 import click
 
@@ -503,6 +504,47 @@ def find_profile_targets(ws_root: str) -> list[tuple[str, str]]:
     return results
 
 
+def _backup_modified_files(
+    target: str,
+    diffs: list,
+    source_files: dict[str, str],
+) -> str | None:
+    """Back up locally modified files before overwriting.
+
+    Creates a timestamped backup directory under ``.claude/.backup/``.
+    Only backs up files that exist locally and differ from the source.
+
+    Returns the backup directory path, or ``None`` if no files were backed up.
+    """
+    to_backup: list[str] = []
+    for d in diffs:
+        if d.status != "modified":
+            continue
+        dst_path = os.path.join(target, d.path)
+        if not os.path.isfile(dst_path):
+            continue
+        src_path = source_files.get(d.path)
+        if src_path and not filecmp.cmp(src_path, dst_path, shallow=False):
+            to_backup.append(d.path)
+
+    if not to_backup:
+        return None
+
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    backup_dir = os.path.join(target, ".claude", ".backup", timestamp)
+    os.makedirs(backup_dir, exist_ok=True)
+
+    for rel_path in to_backup:
+        src = os.path.join(target, rel_path)
+        dst = os.path.join(backup_dir, rel_path)
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
+        # Make readable even if source is read-only
+        if os.path.isfile(src):
+            shutil.copy2(src, dst)
+
+    return backup_dir
+
+
 def _update_single_target(
     claude_repo: str,
     profile: str,
@@ -525,6 +567,12 @@ def _update_single_target(
         with open(readme_path, "w", encoding="utf-8") as f:
             f.write(_CUSTOM_README)
 
+    # Back up modified files before overwriting
+    backup_dir = _backup_modified_files(target, diffs, source_files)
+    if backup_dir:
+        rel_backup = os.path.relpath(backup_dir, target)
+        console.print(f"  [dim]Backup saved to {rel_backup}/[/dim]")
+
     updated: list[str] = []
     skipped: list[str] = []
 
@@ -534,8 +582,9 @@ def _update_single_target(
         if d.status == "extra":
             continue
 
-        # Preserve CLAUDE.md unless --force
-        if d.path == "CLAUDE.md" and d.status == "modified" and not force:
+        # Preserve locally modified files unless --force
+        # (custom/ files never appear in source_files, so they are inherently safe)
+        if d.status == "modified" and not force:
             skipped.append(d.path)
             continue
 

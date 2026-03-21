@@ -439,8 +439,8 @@ claude
 | Import (6) | marp-analyze, marp, html, html-block, html-batch, html-audit | Import Marp/HTML vers StreamTeX |
 | Export (1) | html | Export StreamTeX vers HTML |
 | stx-issue (6) | bug, feature, question, docs, comment, list | Issues GitHub (shared) |
-| Skills (8) | visual-design-rules, slide-design-rules, style-conventions, streamtex-quick-reference, block-blueprints, testing-patterns, stx-migrate, docs-lookup | Regles de conception |
-| Agents (3) | slide-designer, slide-reviewer, project-architect | Agents specialises |
+| Skills (8, profil project) | visual-design-rules, slide-design-rules, style-conventions, streamtex-quick-reference, block-blueprints, testing-patterns, stx-migrate, docs-lookup | Regles de conception |
+| Agents (3, profil project) | slide-designer, slide-reviewer, project-architect | Agents specialises |
 | Templates (4) | project, presentation, collection, course | Templates pour init |
 | Tools (1) | survey-convert | Outils specialises |
 
@@ -1121,11 +1121,11 @@ from streamtex.styles.core import ListStyle
 
 # Symboles custom qui cyclent selon le niveau d'imbrication
 arrows = ListStyle(symbols=["→", "◦", "■"])
-with st_list(list_style=arrows) as l:
+with st_list(l_style=arrows) as l:
     with l.item(): st_write("Niveau 1 → ")
     with l.item():
         st_write("Niveau 1 → ")
-        with st_list(list_style=arrows) as l2:
+        with st_list(l_style=arrows) as l2:
             with l2.item(): st_write("Niveau 2 ◦ ")
 ```
 
@@ -1461,6 +1461,9 @@ configuration DNS/SSL, securisation et mise a l'echelle.
 | Audit sync profils + stx-guide | `/stx-coherence:audit profiles` |
 | Audit blocs + structure + templates | `/stx-coherence:audit blocks` |
 | Audit langue anglaise | `/stx-coherence:audit language` |
+| Corriger pas a pas | `/stx-coherence:fix` (audit implicite → plan → fix 1 par 1 avec confirmation) |
+| Corriger erreurs seules | `/stx-coherence:fix --errors-only` |
+| Voir le plan sans executer | `/stx-coherence:fix --dry-run` |
 
 ### Commandes Claude (developer)
 

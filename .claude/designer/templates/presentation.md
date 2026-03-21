@@ -65,7 +65,7 @@ class BlockStyles:
 
 ```python
 from streamtex import (
-    st_book, TOCConfig, MarkerConfig,
+    st_book, TOCConfig, MarkerConfig, ViewMode,
     set_presentation_config, PresentationConfig,
     set_slide_break_config, SlideBreakConfig, SlideBreakMode,
     PdfConfig, ExportConfig, ExportMode, PresentationProfile,
@@ -92,6 +92,7 @@ st_book(
     marker_config=marker,
     paginate=True,
     banner=BannerConfig.full(),
+    view_modes=[ViewMode.PAGINATED, ViewMode.CONTINUOUS],
     # Auto-export to disk (disabled by default — change NEVER to ALWAYS to enable)
     exports=[
         ExportConfig(

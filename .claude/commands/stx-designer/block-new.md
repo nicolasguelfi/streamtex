@@ -7,11 +7,11 @@ Arguments: $ARGUMENTS (block name and optional description, e.g. "bck_intro_welc
 1. **Load context**: Read `documentation/streamtex_cheatsheet_en.md` for syntax reference.
 2. **Read architecture**: Read the target project's `book.py` to understand how blocks are wired. For reference, see `documentation/template_project/book.py` or `documentation/manuals/stx_manual_intro/book.py`.
 3. **Check blueprints**: Read `.claude/designer/skills/block-blueprints.md` and check if a blueprint matches the requested block type. If a match is found, use it as the structural base and adapt it to the user's specific context (subject, palette, audience). Common matches:
-   - "slide de titre" → Blueprint 1 (bck_title)
-   - "comparaison X vs Y" → Blueprint 4 (bck_comparison)
-   - "demo de code" → Blueprint 6 (bck_code_demo)
-   - "etapes / processus" → Blueprint 7 (bck_timeline)
-   - "resume / conclusion" → Blueprint 10 (bck_conclusion)
+   - "title slide" → Blueprint 1 (bck_title)
+   - "comparison X vs Y" → Blueprint 4 (bck_comparison)
+   - "code demo" → Blueprint 6 (bck_code_demo)
+   - "steps / process" → Blueprint 7 (bck_timeline)
+   - "summary / conclusion" → Blueprint 10 (bck_conclusion)
 4. **Parse arguments**: Extract the block name (must follow `bck_[description]_[suffix]` format). If only a description is given, generate an appropriate name.
 5. **Determine target project**: Look at the current working directory or ask the user which project to use.
 6. **Create the block file** in `[project]/blocks/` with:

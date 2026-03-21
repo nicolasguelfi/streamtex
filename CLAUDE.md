@@ -43,6 +43,7 @@ streamtex/
 ├── list.py                  # st_list — ul/ol/custom lists
 ├── markdown.py              # st_markdown — file= support
 ├── book.py                  # st_book — paginated/continuous modes
+├── loading.py               # Loading overlay with progress percentage
 ├── banner.py                # BannerMode, BannerConfig
 ├── toc.py                   # Table of Contents
 ├── marker.py                # Navigation markers

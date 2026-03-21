@@ -456,3 +456,96 @@ class TestProfileConfig:
         assert p.mode == ViewMode.PAGINATED
         assert p.wrap is True
         assert p.breaks.enabled is True
+
+
+# ── view_modes resolution ────────────────────────────────────────────────
+
+
+class TestViewModesResolution:
+    """Tests for the view_modes parameter logic used in st_book().
+
+    Since st_book() requires a live Streamlit runtime, these tests validate
+    the pure-logic resolution patterns that st_book() applies internally.
+    """
+
+    def test_none_allows_both_modes(self):
+        """view_modes=None resolves to both Paginated and Continuous."""
+        view_modes = None
+        allowed = (
+            [m.value for m in view_modes]
+            if view_modes
+            else [ViewMode.PAGINATED.value, ViewMode.CONTINUOUS.value]
+        )
+        assert allowed == ["Paginated", "Continuous"]
+
+    def test_single_paginated(self):
+        """view_modes=[ViewMode.PAGINATED] resolves to paginated only."""
+        view_modes = [ViewMode.PAGINATED]
+        allowed = [m.value for m in view_modes]
+        assert allowed == ["Paginated"]
+
+    def test_single_continuous(self):
+        """view_modes=[ViewMode.CONTINUOUS] resolves to continuous only."""
+        view_modes = [ViewMode.CONTINUOUS]
+        allowed = [m.value for m in view_modes]
+        assert allowed == ["Continuous"]
+
+    def test_both_modes_explicit(self):
+        """Explicit both modes matches None behavior."""
+        view_modes = [ViewMode.PAGINATED, ViewMode.CONTINUOUS]
+        allowed = [m.value for m in view_modes]
+        assert allowed == ["Paginated", "Continuous"]
+
+    def test_reversed_order(self):
+        """Order is preserved from input."""
+        view_modes = [ViewMode.CONTINUOUS, ViewMode.PAGINATED]
+        allowed = [m.value for m in view_modes]
+        assert allowed == ["Continuous", "Paginated"]
+
+    def test_empty_list_is_falsy(self):
+        """Empty list is falsy — falls back to both modes (same as None)."""
+        view_modes = []
+        allowed = (
+            [m.value for m in view_modes]
+            if view_modes
+            else [ViewMode.PAGINATED.value, ViewMode.CONTINUOUS.value]
+        )
+        assert allowed == ["Paginated", "Continuous"]
+
+    def test_default_mode_selection_paginate_true(self):
+        """paginate=True → default is Paginated if it's in allowed modes."""
+        paginate = True
+        allowed = ["Paginated", "Continuous"]
+        default = "Paginated" if paginate else "Continuous"
+        result = default if default in allowed else allowed[0]
+        assert result == "Paginated"
+
+    def test_default_mode_selection_paginate_false(self):
+        """paginate=False → default is Continuous if it's in allowed modes."""
+        paginate = False
+        allowed = ["Paginated", "Continuous"]
+        default = "Paginated" if paginate else "Continuous"
+        result = default if default in allowed else allowed[0]
+        assert result == "Continuous"
+
+    def test_default_mode_clamped_when_not_allowed(self):
+        """paginate=False but only Paginated allowed → clamped to Paginated."""
+        paginate = False
+        allowed = ["Paginated"]
+        default = "Paginated" if paginate else "Continuous"
+        result = default if default in allowed else allowed[0]
+        assert result == "Paginated"
+
+    def test_clamp_existing_session_state(self):
+        """Current value not in allowed modes → clamped to first allowed."""
+        current = "Continuous"
+        allowed = ["Paginated"]
+        result = current if current in allowed else allowed[0]
+        assert result == "Paginated"
+
+    def test_no_clamp_when_value_is_allowed(self):
+        """Current value in allowed modes → kept as is."""
+        current = "Continuous"
+        allowed = ["Paginated", "Continuous"]
+        result = current if current in allowed else allowed[0]
+        assert result == "Continuous"

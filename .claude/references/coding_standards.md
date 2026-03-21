@@ -186,8 +186,8 @@ gap_style = Style("gap:24px;", "grid_gap")
 with st_grid(cols=2, grid_style=gap_style):
     # 2-column layout with 24px gap (using grid_style)
 
-# Common column patterns:
-st_grid(cols=2)                                    # 2 equal columns
+# Common column patterns (fixed — use responsive variant for narrow screens):
+st_grid(cols=2)                                    # 2 equal columns (fixed)
 st_grid(cols="1fr 1fr 1fr")                       # 3 equal columns (CSS syntax)
 st_grid(cols="auto 1fr")                          # First col: fit content, second: rest
 st_grid(cols="repeat(auto-fill, minmax(200px, 1fr))")  # Responsive cards
@@ -778,6 +778,22 @@ from streamtex import PresentationProfile, st_book
 
 st_book([...], presentation_profiles=PresentationProfile.desktop_mobile_preset())
 ```
+
+### View Mode Restriction
+
+Restrict which view modes (Paginated / Continuous) are available in the sidebar:
+
+```python
+from streamtex import st_book, ViewMode
+
+# Allow both modes (default)
+st_book([...], view_modes=[ViewMode.PAGINATED, ViewMode.CONTINUOUS])
+
+# Lock to paginated only (hides the View radio in sidebar)
+st_book([...], paginate=True, view_modes=[ViewMode.PAGINATED])
+```
+
+When `view_modes` contains a single mode, the View radio is hidden. When `None` (default), both modes are available. Profile switches that target a restricted mode are automatically clamped to the first allowed mode.
 
 ### Factory presets
 

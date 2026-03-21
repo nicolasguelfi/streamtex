@@ -24,7 +24,10 @@ import streamlit as st
 from importlib.resources import files as pkg_files
 
 import streamtex as stx
-from streamtex import st_book, TOCConfig, NumberingMode, MarkerConfig, BannerConfig, PdfConfig, ExportConfig, ExportMode
+from streamtex import (
+    st_book, TOCConfig, NumberingMode, MarkerConfig, BannerConfig,
+    PdfConfig, ExportConfig, ExportMode, ViewMode,
+)
 
 from blocks import registry
 
@@ -53,6 +56,7 @@ st_book(
     marker_config=marker_config,
     paginate=True,
     banner=BannerConfig.full(),
+    view_modes=[ViewMode.PAGINATED, ViewMode.CONTINUOUS],
     # pdf_config=PdfConfig(format="A4", landscape=True, page_numbers=True),
     # Auto-export to disk (disabled by default — change NEVER to ALWAYS to enable)
     exports=[

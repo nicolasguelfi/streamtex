@@ -27,12 +27,14 @@ from .export import (
     is_export_active,
     reset_export_buffer,
 )
+from .loading import inject_loading_overlay, remove_loading_overlay, update_loading_progress
 from .marker import MarkerConfig, inject_marker_navigation, marker_count, marker_entries, reset_marker_registry
 from .pdf_export import PdfConfig
 from .presentation import get_presentation_config, st_presentation_footer
 from .presentation_profile import (
     _ACTIVE_PROFILE_KEY,
     PresentationProfile,
+    ViewMode,
     apply_profile,
     build_default_profile,
     is_profile_modified,
@@ -362,6 +364,7 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
             pdf_config: PdfConfig = None,
             exports: list[ExportConfig] | None = None,
             paginate: bool = False,
+            view_modes: list[ViewMode] | None = None,
             banner_color: str = "rgba(211, 47, 47, 0.8)",
             banner: BannerConfig = None,
             bib_sources=None, bib_config=None,
@@ -371,6 +374,7 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
             zoom: int = 100,
             presentation_profiles: list[PresentationProfile] | None = None,
             doc_version: str | None = None,
+            loading: bool = True,
             *args, monties_color: str = None, **kwargs):
     """Generates a web page e-book from a list of block modules.
 
@@ -384,6 +388,9 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
         automatically after rendering.  Configs with ``mode=ExportMode.MANUAL``
         show in the sidebar panel.  Overrides ``export`` when provided.
     :param paginate: If True, renders one block at a time for faster widget interactions.
+    :param view_modes: Optional list of allowed ViewMode values.
+        When a single mode is given, the View radio is hidden and
+        the document is locked to that mode.  Defaults to both modes.
     :param banner_color: Background color for paginated navigation banners (CSS value).
     :param banner: Optional BannerConfig for full banner customisation (overrides banner_color).
     :param bib_sources: Optional list of paths to .bib, .json, .ris, or .csl-json files.
@@ -391,6 +398,7 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
     :param inspector: Optional InspectorConfig to enable the block inspector panel.
     :param page_width: Page width as % of browser width (default 90).
     :param zoom: Default zoom level as % (default 100).
+    :param loading: If True (default), show a full-screen overlay with progress during loading.
     """
     # --- Resolve export flags from exports list ---
     if exports is not None:
@@ -401,6 +409,14 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
         export = has_always or has_manual
         if has_never_only:
             export = False
+    # --- Resolve allowed view modes ---
+    _allowed_modes: list[str] = (
+        [m.value for m in view_modes]
+        if view_modes
+        else [ViewMode.PAGINATED.value, ViewMode.CONTINUOUS.value]
+    )
+    if not _allowed_modes:
+        raise ValueError("view_modes must contain at least one ViewMode.")
     # --- Resolve banner configuration (3 levels) ---
     if banner is not None:
         banner_config = banner
@@ -419,6 +435,11 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
         _warmup_build_cache(module_list, toc_config, marker_config,
                             separator, *args, **kwargs)
         return
+
+    # --- Loading overlay (before any slow work) ---
+    _show_loading = loading and not _warmup_mode
+    if _show_loading:
+        inject_loading_overlay()
 
     # --- Password gate (env-driven, no-op locally) ---
     _password_gate()
@@ -462,7 +483,13 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
 
     # --- Settings expander (sidebar) ---
     if _STX_VIEW_MODE_KEY not in st.session_state:
-        st.session_state[_STX_VIEW_MODE_KEY] = "Paginated" if paginate else "Continuous"
+        _default = "Paginated" if paginate else "Continuous"
+        st.session_state[_STX_VIEW_MODE_KEY] = (
+            _default if _default in _allowed_modes else _allowed_modes[0]
+        )
+    # Force-clamp if the current value is no longer allowed (profile switch, etc.)
+    if st.session_state.get(_STX_VIEW_MODE_KEY) not in _allowed_modes:
+        st.session_state[_STX_VIEW_MODE_KEY] = _allowed_modes[0]
 
     def _on_profile_change():
         st.session_state["_stx_profile_pending"] = st.session_state["_stx_profile_select"]
@@ -506,12 +533,13 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
                     st.rerun()
 
             # ── Existing controls ──
-            _stx_settings.radio(
-                "**View**",
-                options=["Paginated", "Continuous"],
-                horizontal=True,
-                key=_STX_VIEW_MODE_KEY,
-            )
+            if len(_allowed_modes) > 1:
+                _stx_settings.radio(
+                    "**View**",
+                    options=_allowed_modes,
+                    horizontal=True,
+                    key=_STX_VIEW_MODE_KEY,
+                )
             add_zoom_options(default_page_width=page_width, default_zoom=zoom,
                              container=_stx_settings)
             add_wrap_all_option(container=_stx_settings)
@@ -561,7 +589,8 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
                         profile_names=profile_names,
                         active_profile=active_name,
                         profile_modified=_profile_modified,
-                        all_profiles=all_profiles, **kwargs)
+                        all_profiles=all_profiles,
+                        loading=_show_loading, **kwargs)
         return
 
     start_time = time.time()
@@ -620,6 +649,11 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
     use_search = use_toc_sidebar and toc_config.search
     collector = start_collector() if use_search else None
 
+    # Switch overlay from "Initializing…" to progress mode
+    _total_modules = len(module_list)
+    if _show_loading:
+        update_loading_progress(0, _total_modules)
+
     # Run the blocks (potentially populating the ToC registry)
     for i, module in enumerate(module_list):
 
@@ -634,6 +668,11 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
         markers_before = len(marker_entries()) if marker_config is not None else 0
 
         st_include(module, *args, _inspector_config=inspector, **kwargs)
+
+        # Update loading overlay progress
+        if _show_loading:
+            _mod_name = getattr(module, '__name__', '').rsplit('.', 1)[-1]
+            update_loading_progress(i + 1, _total_modules, _mod_name)
 
         # Tag new TOC entries with their block index
         if use_toc_sidebar:
@@ -652,6 +691,10 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
             st_include(separator, *args, **kwargs)
 
         st_space("v", "70px")
+
+    # Remove loading overlay after all modules are rendered
+    if _show_loading:
+        remove_loading_overlay()
 
     # Stop collector and get search index
     block_index = stop_collector() if use_search else None
@@ -1078,6 +1121,7 @@ _STX_FULL_EXPORT_HTML_KEY = "_stx_full_export_html"
 
 def _build_page_cache(module_list, toc_config, marker_config, separator,
                       cache_hash, *args, export_config: ExportConfig | None = None,
+                      progress_callback=None,
                       **kwargs):
     """Execute all blocks inside st.empty() to collect TOC/markers, then cache.
 
@@ -1126,6 +1170,10 @@ def _build_page_cache(module_list, toc_config, marker_config, separator,
                 for entry in marker_entries()[markers_before:]:
                     if "page_idx" not in entry:
                         entry["page_idx"] = i
+
+            if progress_callback is not None:
+                _mod_name = getattr(module, '__name__', '').rsplit('.', 1)[-1]
+                progress_callback(i + 1, len(module_list), _mod_name)
 
             if separator and i < len(module_list) - 1:
                 st_include(separator, *args, **kwargs)
@@ -1678,6 +1726,7 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
                     page_width=100, zoom=100,
                     profile_names=None, active_profile=None,
                     profile_modified=False, all_profiles=None,
+                    loading=False,
                     **kwargs):
     """Paginated rendering — only renders one block per rerun."""
     start_time = time.time()
@@ -1743,9 +1792,12 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
                 enabled=True, page_title=export_title,
                 page_width=effective_pw, zoom=effective_zoom,
             )
+        # Progress callback for loading overlay
+        _progress_cb = update_loading_progress if loading else None
         _build_page_cache(module_list, toc_config, marker_config,
                           separator, cache_hash, *args,
-                          export_config=_cache_export_cfg, **kwargs)
+                          export_config=_cache_export_cfg,
+                          progress_callback=_progress_cb, **kwargs)
         cache = st.session_state[_STX_CACHE_KEY]
         # Persist to disk for future sessions
         if cache_path:
@@ -1767,6 +1819,10 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
                               separator, cache_hash, *args,
                               export_config=_ecfg, **kwargs)
         st.session_state["_stx_export_rebuild_fn"] = _rebuild_full_export
+
+    # Remove loading overlay (after cache is ready, before page render)
+    if loading:
+        remove_loading_overlay()
 
     # --- Current page ---
     if _STX_PAGE_KEY not in st.session_state:

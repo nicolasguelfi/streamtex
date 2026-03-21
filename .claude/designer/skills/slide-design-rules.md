@@ -84,9 +84,9 @@ def build():
                     l_style=bs.body, li_style=bs.body,
                     list_type=lt.unordered,
                 ) as l:
-                    with l.item(): st_write(bs.body, "Point clef 1")
-                    with l.item(): st_write(bs.body, "Point clef 2")
-                    with l.item(): st_write(bs.body, "Point clef 3")
+                    with l.item(): st_write(bs.body, "Key point 1")
+                    with l.item(): st_write(bs.body, "Key point 2")
+                    with l.item(): st_write(bs.body, "Key point 3")
         st_space(size=2)
 
         # === L3 — Question / transition ===

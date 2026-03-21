@@ -30,7 +30,8 @@ __init__.py (public API re-exports)
   |
   +-- toc.py (TOCConfig, reset_toc_registry, toc_entries) -> independent singleton
   +-- marker.py (MarkerConfig, st_marker) -> toc
-  +-- book.py (st_book, st_include, st_toc, load_css) -> toc, marker, export, zoom
+  +-- loading.py (inject_loading_overlay, update_loading_progress, remove_loading_overlay) -> independent (JS overlay)
+  +-- book.py (st_book, st_include, st_toc, load_css) -> toc, marker, export, zoom, loading
   +-- zoom.py (add_zoom_options, inject_zoom_logic) -> constants
   +-- slide.py (SlideBreakMode, SlideBreakConfig, st_slide_break, add_slide_break_options) -> constants
   |
@@ -95,7 +96,7 @@ Both `toc.py` and `marker.py` use module-level singleton registries:
 | **Styles** | `styles/` | CSS generation, composition, theming |
 | **Rendering** | `write`, `container`, `grid`, `list`, `image`, `code`, `space`, `overlay` | Content → HTML |
 | **Navigation** | `toc`, `marker`, `zoom` | TOC, keyboard nav, zoom |
-| **Orchestration** | `book`, `collection` | Page flow, multi-project |
+| **Orchestration** | `book`, `collection`, `loading` | Page flow, multi-project, loading overlay |
 | **Export** | `export`, `export_widgets` | HTML export pipeline |
 | **AI** | `ai/`, `ai_image` | AI image generation (OpenAI, Google, fal.ai) |
 | **Infrastructure** | `blocks`, `block_helpers`, `utils`, `constants`, `enums` | DI, registries, enums |

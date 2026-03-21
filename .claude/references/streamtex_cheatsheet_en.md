@@ -565,6 +565,7 @@ st_book(
     export=True,                    # Enable HTML export
     export_title="StreamTeX Export",
     paginate=False,                 # One block per page
+    view_modes=None,                # List[ViewMode] — restrict allowed view modes (None=both)
     banner=None,                    # BannerConfig for paginated navigation banners
     bib_sources=None,               # List of .bib/.json/.ris paths
     bib_config=None,                # BibConfig for bibliography
@@ -576,6 +577,7 @@ st_book(
     presentation_profiles=None,     # List[PresentationProfile] — display profiles
     chrome_banner=True,             # Show browser recommendation banner (Chrome/Edge)
     doc_version=None,               # str | None — version string shown in sidebar
+    loading=True,                   # Show loading overlay with progress (default True)
     banner_color="rgba(211,47,47,0.8)",  # Legacy — use banner=BannerConfig(...) instead
     monties_color=None,             # Legacy — use banner=BannerConfig(...) instead
 )
@@ -584,6 +586,26 @@ st_book(
 ### Presentation Profiles — Display Configurations
 
 Named display configurations switchable at runtime via the sidebar or the floating navigation bar.
+
+#### View Mode Restriction (`view_modes`)
+
+Control which view modes are available in the sidebar Settings radio:
+
+```python
+from streamtex import st_book, ViewMode
+
+# Both modes available (default — same as view_modes=None)
+st_book(blocks, view_modes=[ViewMode.PAGINATED, ViewMode.CONTINUOUS])
+
+# Lock to paginated only (hides the View radio)
+st_book(blocks, paginate=True, view_modes=[ViewMode.PAGINATED])
+
+# Lock to continuous only
+st_book(blocks, view_modes=[ViewMode.CONTINUOUS])
+```
+
+When a single mode is given, the View radio is hidden and the document is locked to that mode.
+Useful for deployed documents where switching modes should be disabled.
 
 ```python
 from streamtex import (

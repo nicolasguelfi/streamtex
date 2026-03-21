@@ -955,3 +955,101 @@ def test_ensure_claude_gitignore_untracks_files(tmp_path):
 
     # Local file should still exist
     assert (proj / ".claude" / "CLAUDE.md.j2").exists()
+
+
+def test_ensure_claude_gitignore_auto_commits(tmp_path):
+    """Migration auto-commits when no pre-existing staged changes."""
+    import subprocess
+
+    from rich.console import Console
+
+    console = Console(quiet=True)
+
+    proj = tmp_path / "proj"
+    proj.mkdir()
+    subprocess.run(["git", "init", str(proj)], capture_output=True, timeout=10)
+    subprocess.run(
+        ["git", "config", "user.email", "test@test.com"],
+        cwd=str(proj), capture_output=True, timeout=10,
+    )
+    subprocess.run(
+        ["git", "config", "user.name", "Test"],
+        cwd=str(proj), capture_output=True, timeout=10,
+    )
+
+    # Create and commit .claude/ files
+    (proj / ".claude").mkdir()
+    (proj / ".claude" / "refs.md").write_text("ref")
+    subprocess.run(["git", "add", "-A"], cwd=str(proj), capture_output=True, timeout=10)
+    subprocess.run(
+        ["git", "commit", "-m", "init"],
+        cwd=str(proj), capture_output=True, timeout=10,
+    )
+
+    _ensure_claude_gitignore(str(proj), console)
+
+    # Should have auto-committed — no staged changes left
+    result = subprocess.run(
+        ["git", "diff", "--cached", "--name-only"],
+        cwd=str(proj), capture_output=True, text=True, timeout=10,
+    )
+    assert result.stdout.strip() == ""
+
+    # Verify commit message
+    result = subprocess.run(
+        ["git", "log", "-1", "--format=%s"],
+        cwd=str(proj), capture_output=True, text=True, timeout=10,
+    )
+    assert "stop tracking .claude/" in result.stdout
+
+
+def test_ensure_claude_gitignore_skips_commit_if_staged(tmp_path):
+    """Migration does NOT auto-commit when user has staged changes."""
+    import subprocess
+
+    from rich.console import Console
+
+    console = Console(quiet=True)
+
+    proj = tmp_path / "proj"
+    proj.mkdir()
+    subprocess.run(["git", "init", str(proj)], capture_output=True, timeout=10)
+    subprocess.run(
+        ["git", "config", "user.email", "test@test.com"],
+        cwd=str(proj), capture_output=True, timeout=10,
+    )
+    subprocess.run(
+        ["git", "config", "user.name", "Test"],
+        cwd=str(proj), capture_output=True, timeout=10,
+    )
+
+    # Create and commit .claude/ + another file
+    (proj / ".claude").mkdir()
+    (proj / ".claude" / "refs.md").write_text("ref")
+    (proj / "book.py").write_text("# book")
+    subprocess.run(["git", "add", "-A"], cwd=str(proj), capture_output=True, timeout=10)
+    subprocess.run(
+        ["git", "commit", "-m", "init"],
+        cwd=str(proj), capture_output=True, timeout=10,
+    )
+
+    # Stage an unrelated change BEFORE migration
+    (proj / "book.py").write_text("# book v2")
+    subprocess.run(["git", "add", "book.py"], cwd=str(proj), capture_output=True, timeout=10)
+
+    _ensure_claude_gitignore(str(proj), console)
+
+    # Should NOT have auto-committed — staged changes still present
+    result = subprocess.run(
+        ["git", "diff", "--cached", "--name-only"],
+        cwd=str(proj), capture_output=True, text=True, timeout=10,
+    )
+    staged = result.stdout.strip().splitlines()
+    assert "book.py" in staged  # user's staged change preserved
+
+    # Last commit should still be "init", not the migration
+    result = subprocess.run(
+        ["git", "log", "-1", "--format=%s"],
+        cwd=str(proj), capture_output=True, text=True, timeout=10,
+    )
+    assert result.stdout.strip() == "init"

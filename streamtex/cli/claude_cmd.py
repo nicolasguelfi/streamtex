@@ -627,12 +627,25 @@ def _ensure_claude_gitignore(target: str, console) -> None:
     """Ensure .claude/ is in .gitignore and untracked from git.
 
     This migrates existing repos where .claude/ was previously tracked.
+    If the migration changes the git index and there are no pre-existing
+    staged changes, the migration is auto-committed.  Otherwise the user
+    is told to commit manually (to avoid mixing migration with unrelated
+    staged work).
     """
     import subprocess
 
     git_dir = os.path.join(target, ".git")
     if not os.path.isdir(git_dir):
         return  # Not a git repo — nothing to do
+
+    def _git(*args: str) -> subprocess.CompletedProcess:
+        return subprocess.run(
+            ["git", *args],
+            cwd=target,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
 
     # 1. Ensure .gitignore has the .claude/ block
     gitignore_path = os.path.join(target, ".gitignore")
@@ -641,20 +654,16 @@ def _ensure_claude_gitignore(target: str, console) -> None:
         with open(gitignore_path, encoding="utf-8") as f:
             gitignore_content = f.read()
 
+    gitignore_changed = False
     if ".claude/*" not in gitignore_content:
         with open(gitignore_path, "a", encoding="utf-8") as f:
             f.write(_CLAUDE_GITIGNORE_BLOCK)
+        gitignore_changed = True
         console.print("  [green]\u2713[/green] .gitignore: added .claude/ exclusion rules")
 
     # 2. Check if .claude/ files are tracked by git (excluding custom/ and .stx-profile)
     try:
-        result = subprocess.run(
-            ["git", "ls-files", ".claude/"],
-            cwd=target,
-            capture_output=True,
-            text=True,
-            timeout=10,
-        )
+        result = _git("ls-files", ".claude/")
     except (FileNotFoundError, subprocess.TimeoutExpired):
         return
 
@@ -669,33 +678,53 @@ def _ensure_claude_gitignore(target: str, console) -> None:
     if not tracked:
         return
 
-    # 3. Untrack .claude/ files (keeps local copies, removes from git index)
+    # 3. Check for pre-existing staged changes (to avoid mixing with migration)
+    staged_before = _git("diff", "--cached", "--name-only")
+    has_staged = bool(staged_before.stdout.strip())
+
+    # 4. Untrack .claude/ files (keeps local copies, removes from git index)
     console.print(
         f"  [yellow]Migrating:[/yellow] removing {len(tracked)} "
         ".claude/ file(s) from git tracking (local copies preserved)"
     )
-    subprocess.run(
-        ["git", "rm", "-r", "--cached", "--quiet", ".claude/"],
-        cwd=target,
-        capture_output=True,
-        text=True,
-        timeout=30,
-    )
+    _git("rm", "-r", "--cached", "--quiet", ".claude/")
+
     # Re-add the exceptions that should stay tracked
     for exception in [".claude/custom/", ".claude/.stx-profile"]:
         exc_path = os.path.join(target, exception)
         if os.path.exists(exc_path):
-            subprocess.run(
-                ["git", "add", exception],
-                cwd=target,
-                capture_output=True,
-                text=True,
-                timeout=10,
+            _git("add", exception)
+
+    # Stage .gitignore if we modified it
+    if gitignore_changed:
+        _git("add", ".gitignore")
+
+    # 5. Auto-commit if no pre-existing staged changes
+    if has_staged:
+        console.print(
+            "  [green]\u2713[/green] .claude/ untracked from git "
+            "(run [bold]git commit[/bold] to finalize — "
+            "skipped auto-commit because you have other staged changes)"
+        )
+    else:
+        result = _git(
+            "commit", "-m",
+            "chore: stop tracking .claude/ managed files\n\n"
+            "Files in .claude/ (except custom/ and .stx-profile) are now\n"
+            "managed by `stx claude install/update`, not git.\n"
+            "Local copies are preserved. This migration was performed\n"
+            "automatically by `stx update`.",
+        )
+        if result.returncode == 0:
+            console.print(
+                "  [green]\u2713[/green] .claude/ untracked from git "
+                "[dim](auto-committed)[/dim]"
             )
-    console.print(
-        "  [green]\u2713[/green] .claude/ untracked from git "
-        "(run [bold]git commit[/bold] to finalize migration)"
-    )
+        else:
+            console.print(
+                "  [green]\u2713[/green] .claude/ untracked from git "
+                "(run [bold]git commit[/bold] to finalize)"
+            )
 
 
 def _update_single_target(

@@ -44,6 +44,68 @@ declared in the profile manifest.
 # Helpers
 # ---------------------------------------------------------------------------
 
+def _render_claude_md(template_path: str, project_name: str, profile: str) -> str:
+    """Render a CLAUDE.md.j2 template into final CLAUDE.md content.
+
+    Handles ``{{ project_name }}``, ``{{ profile }}``, and simple
+    ``{% if profile == "..." %}...{% endif %}`` conditionals without
+    requiring Jinja2.
+    """
+    import re
+
+    with open(template_path, encoding="utf-8") as f:
+        content = f.read()
+
+    content = content.replace("{{ project_name }}", project_name)
+    content = content.replace("{{ profile }}", profile)
+
+    # Process {% if profile == "xxx" %}...{% endif %} blocks
+    def _eval_conditional(match: re.Match) -> str:
+        cond_profile = match.group(1)
+        block = match.group(2)
+        return block if cond_profile == profile else ""
+
+    content = re.sub(
+        r'\{%\s*if\s+profile\s*==\s*"(\w+)"\s*%\}(.*?)\{%\s*endif\s*%\}',
+        _eval_conditional,
+        content,
+        flags=re.DOTALL,
+    )
+
+    # Clean up triple+ blank lines left by removed blocks
+    content = re.sub(r"\n{3,}", "\n\n", content)
+
+    return content
+
+
+def _render_claude_md_for_target(
+    target: str, profile: str,
+) -> str | None:
+    """Render CLAUDE.md from .claude/CLAUDE.md.j2 if the template exists.
+
+    Writes the rendered content to ``CLAUDE.md`` at the project root.
+    Returns the rendered path, or ``None`` if no template was found.
+    """
+    template_path = os.path.join(target, ".claude", "CLAUDE.md.j2")
+    if not os.path.isfile(template_path):
+        return None
+
+    project_name = os.path.basename(os.path.abspath(target))
+    rendered = _render_claude_md(template_path, project_name, profile)
+
+    dst = os.path.join(target, "CLAUDE.md")
+    # Make writable if read-only
+    if os.path.isfile(dst):
+        st = os.stat(dst)
+        if not st.st_mode & 0o200:
+            os.chmod(dst, st.st_mode | 0o200)
+
+    with open(dst, "w", encoding="utf-8") as f:
+        f.write(rendered)
+
+    return dst
+
+
 def find_claude_repo(ws_root: str, config: dict) -> str:
     """Locate the streamtex-claude repo in the workspace.
 
@@ -192,6 +254,13 @@ def install_profile(claude_repo: str, profile: str, target: str) -> list[str]:
     with open(marker_path, "w", encoding="utf-8") as f:
         f.write(profile + "\n")
     installed.append(os.path.relpath(marker_path, target))
+
+    # 5. Render CLAUDE.md from .claude/CLAUDE.md.j2 template (if present)
+    rendered = _render_claude_md_for_target(target, profile)
+    if rendered:
+        rel = os.path.relpath(rendered, target)
+        if rel not in installed:
+            installed.append(rel)
 
     return sorted(installed)
 
@@ -603,15 +672,41 @@ def _update_single_target(
             os.chmod(dst_path, 0o444)
         updated.append(d.path)
 
+    # Re-render CLAUDE.md from .j2 template after any file update
+    # (also renders if CLAUDE.md is missing or .j2 was updated)
+    j2_path = os.path.join(target, ".claude", "CLAUDE.md.j2")
+    claude_md_path = os.path.join(target, "CLAUDE.md")
+    if os.path.isfile(j2_path):
+        project_name = os.path.basename(os.path.abspath(target))
+        rendered = _render_claude_md(j2_path, project_name, profile)
+        needs_render = not os.path.isfile(claude_md_path)
+        if not needs_render:
+            with open(claude_md_path, encoding="utf-8") as f:
+                needs_render = f.read() != rendered
+        if needs_render:
+            if os.path.isfile(claude_md_path):
+                st = os.stat(claude_md_path)
+                if not st.st_mode & 0o200:
+                    os.chmod(claude_md_path, st.st_mode | 0o200)
+            with open(claude_md_path, "w", encoding="utf-8") as f:
+                f.write(rendered)
+            updated.append("CLAUDE.md")
+            console.print("  [green]\u2713[/green] CLAUDE.md [dim](rendered from .claude/CLAUDE.md.j2)[/dim]")
+
     if updated:
-        console.print(f"\n[green]Updated {len(updated)} file(s):[/green]")
+        console.print(f"\n[green]Updated {len(updated)} file(s).[/green]")
         for f in updated:
-            console.print(f"  [green]\u2713[/green] {f}")
+            if f != "CLAUDE.md":  # already printed above with render note
+                console.print(f"  [green]\u2713[/green] {f}")
     else:
         console.print("\n[bold green]Profile is already up to date.[/bold green]")
 
     if skipped:
-        console.print(f"\n[yellow]Skipped {len(skipped)} file(s) (use --force to overwrite):[/yellow]")
+        console.print(
+            f"\n[yellow]Skipped {len(skipped)} locally modified file(s).[/yellow]\n"
+            "  These files differ from the source — local changes would be lost.\n"
+            "  Use [bold]--force[/bold] to overwrite (a backup is saved to .claude/.backup/)."
+        )
         for f in skipped:
             console.print(f"  [yellow]\u25cb[/yellow] {f}")
 

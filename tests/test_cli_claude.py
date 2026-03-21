@@ -5,6 +5,7 @@ import os
 from click.testing import CliRunner
 
 from streamtex.cli.claude_cmd import (
+    _render_claude_md,
     collect_source_files,
     compare_profile,
     find_claude_repo,
@@ -759,3 +760,110 @@ def test_check_command(tmp_path):
     result = runner.invoke(cli, ["claude", "check"])
     assert result.exit_code == 1
     assert "out of sync" in result.output
+
+
+# ---------------------------------------------------------------------------
+# CLAUDE.md.j2 template rendering
+# ---------------------------------------------------------------------------
+
+def test_render_claude_md_substitutes_variables():
+    """{{ project_name }} and {{ profile }} are replaced."""
+    import tempfile
+
+    template = "# {{ project_name }} Rules\nProfile: {{ profile }}\n"
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".j2", delete=False) as f:
+        f.write(template)
+        f.flush()
+        result = _render_claude_md(f.name, "my-project", "documentation")
+    os.unlink(f.name)
+
+    assert "# my-project Rules" in result
+    assert "Profile: documentation" in result
+    assert "{{" not in result
+
+
+def test_render_claude_md_conditional_blocks():
+    """{% if profile == 'X' %} blocks are included/excluded correctly."""
+    import tempfile
+
+    template = (
+        "Before\n"
+        '{% if profile == "presentation" %}\n'
+        "Presentation content\n"
+        "{% endif %}\n"
+        "After\n"
+    )
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".j2", delete=False) as f:
+        f.write(template)
+        path = f.name
+
+    # Profile matches — block included
+    result = _render_claude_md(path, "proj", "presentation")
+    assert "Presentation content" in result
+
+    # Profile doesn't match — block excluded
+    result = _render_claude_md(path, "proj", "documentation")
+    assert "Presentation content" not in result
+    assert "Before" in result
+    assert "After" in result
+
+    os.unlink(path)
+
+
+def test_install_renders_claude_md_from_j2(tmp_path):
+    """install_profile renders CLAUDE.md from .j2 template."""
+    ws = _make_workspace(tmp_path)
+    claude_repo = str(ws / "streamtex-claude")
+
+    # Replace project profile's CLAUDE.md with a .j2 template
+    profile_dir = ws / "streamtex-claude" / "profiles" / "project"
+    (profile_dir / "CLAUDE.md").unlink()
+    (profile_dir / "CLAUDE.md.j2").write_text(
+        "# {{ project_name }} — Rules\nProfile: {{ profile }}\n"
+    )
+
+    target = ws / "my-app"
+    target.mkdir()
+    installed = install_profile(claude_repo, "project", str(target))
+
+    # Template should be copied to .claude/
+    assert (target / ".claude" / "CLAUDE.md.j2").exists()
+
+    # Rendered CLAUDE.md should exist at project root
+    assert (target / "CLAUDE.md").exists()
+    content = (target / "CLAUDE.md").read_text()
+    assert "# my-app — Rules" in content
+    assert "Profile: project" in content
+    assert "CLAUDE.md" in installed
+
+
+def test_update_rerenders_claude_md(tmp_path):
+    """update re-renders CLAUDE.md when the .j2 template changes."""
+    ws = _make_workspace(tmp_path)
+    claude_repo = str(ws / "streamtex-claude")
+
+    # Use .j2 template
+    profile_dir = ws / "streamtex-claude" / "profiles" / "project"
+    (profile_dir / "CLAUDE.md").unlink()
+    (profile_dir / "CLAUDE.md.j2").write_text(
+        "# {{ project_name }} v1\n"
+    )
+
+    target = ws / "my-app"
+    target.mkdir()
+    install_profile(claude_repo, "project", str(target))
+    assert "v1" in (target / "CLAUDE.md").read_text()
+
+    # Update template source
+    (profile_dir / "CLAUDE.md.j2").write_text(
+        "# {{ project_name }} v2\n"
+    )
+
+    runner = CliRunner()
+    os.chdir(ws)
+    result = runner.invoke(cli, ["claude", "update", "--force", str(target)])
+    assert result.exit_code == 0, result.output
+
+    # CLAUDE.md should be re-rendered with new content
+    content = (target / "CLAUDE.md").read_text()
+    assert "# my-app v2" in content

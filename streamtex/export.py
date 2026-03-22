@@ -378,11 +378,27 @@ class HtmlExportBuffer:
 # ---------------------------------------------------------------------------
 
 def _get_theme_color(option: str, fallback: str) -> str:
-    """Read a Streamlit theme color from config, with fallback."""
+    """Read a Streamlit theme color from config, with fallback.
+
+    When ``theme.base`` is ``"dark"`` but individual colors are not set,
+    use Streamlit's dark-mode defaults instead of light-mode fallbacks.
+    """
     try:
         val = st.get_option(option)
         if val:
             return val
+    except Exception:
+        pass
+    # Detect dark theme base and provide matching defaults
+    try:
+        base = st.get_option("theme.base")
+        if base == "dark":
+            _dark_defaults = {
+                "theme.backgroundColor": "#0e1117",
+                "theme.textColor": "#fafafa",
+                "theme.primaryColor": "#ff4b4b",
+            }
+            return _dark_defaults.get(option, fallback)
     except Exception:
         pass
     return fallback

@@ -90,6 +90,15 @@ def _offer_export_downloads(html: str, base_name: str,
     state_key = f"_stx_export_{base_name}"
     defaults = pdf_config or PdfConfig()
 
+    # Deterministic config fingerprint: when PdfConfig changes in book.py,
+    # widget keys change, forcing Streamlit to create fresh widgets with
+    # the new default values.  Old orphaned keys are harmless.
+    _cfg_str = (f"{defaults.format}|{defaults.landscape}|{defaults.print_background}|"
+                f"{defaults.page_numbers}|{defaults.scale}|{defaults.margin_top}|"
+                f"{defaults.margin_bottom}|{defaults.margin_left}|{defaults.margin_right}")
+    _cfg_fp = hashlib.md5(_cfg_str.encode()).hexdigest()[:6]
+    _pk = f"{base_name}_{_cfg_fp}"  # PDF widget key suffix
+
     # Full-book HTML available from paginated cache build
     full_book_html = st.session_state.get(_STX_FULL_EXPORT_HTML_KEY) if paginated else None
 
@@ -109,7 +118,7 @@ def _offer_export_downloads(html: str, base_name: str,
             st.caption("PDF requires `streamtex[pdf]`")
 
         # ── Form — configuration + Generate ──────────────────────
-        with st.form(key=f"_stx_export_form_{base_name}"):
+        with st.form(key=f"_stx_export_form_{_pk}"):
 
             # ── Content (applies to both formats) ────────────────
             st.markdown("**Content**")
@@ -117,15 +126,13 @@ def _offer_export_downloads(html: str, base_name: str,
             # Scope (paginated view only)
             export_scope = "Full document"
             if paginated:
-                if full_book_html:
-                    export_scope = st.radio(
-                        "Scope",
-                        options=["Full document", "Current section"],
-                        index=0,
-                        key=f"_stx_export_scope_{base_name}",
-                    )
-                else:
-                    export_scope = "Current section"
+                export_scope = st.radio(
+                    "Scope",
+                    options=["Full document", "Current section"],
+                    index=0,
+                    key=f"_stx_export_scope_{_pk}",
+                )
+                if not full_book_html and export_scope == "Current section":
                     st.caption("Exporting current section")
 
             # Section breaks
@@ -135,7 +142,7 @@ def _offer_export_downloads(html: str, base_name: str,
                 "Section breaks",
                 options=[_BREAK_PAGE, _BREAK_CONTINUOUS],
                 index=_break_default,
-                key=f"_stx_export_breaks_{base_name}",
+                key=f"_stx_export_breaks_{_pk}",
             )
 
             # ── PDF layout (only when PDF is checked) ────────────
@@ -160,29 +167,27 @@ def _offer_export_downloads(html: str, base_name: str,
                     options=["A4", "A3", "Letter", "Legal", "Tabloid"],
                     index=["A4", "A3", "Letter", "Legal", "Tabloid"].index(defaults.format)
                     if defaults.format in ["A4", "A3", "Letter", "Legal", "Tabloid"] else 0,
-                    key=f"_stx_pdf_format_{base_name}",
+                    key=f"_stx_pdf_format_{_pk}",
                 )
                 pdf_landscape = st.checkbox("Landscape", value=defaults.landscape,
-                                            key=f"_stx_pdf_land_{base_name}")
+                                            key=f"_stx_pdf_land_{_pk}")
                 pdf_background = st.checkbox("Backgrounds", value=defaults.print_background,
-                                             key=f"_stx_pdf_bg_{base_name}")
+                                             key=f"_stx_pdf_bg_{_pk}")
                 pdf_page_numbers = st.checkbox("Page numbers", value=defaults.page_numbers,
-                                               key=f"_stx_pdf_pn_{base_name}")
-                _zoom_pct = st.session_state.get(_ZOOM_KEY, 100)
-                _scale_default = round(_zoom_pct / 100, 1)
-                _scale_default = max(0.5, min(2.0, _scale_default))
-                pdf_scale = st.slider("Scale", min_value=0.5, max_value=2.0,
+                                               key=f"_stx_pdf_pn_{_pk}")
+                _scale_default = round(max(0.1, defaults.scale), 1)
+                pdf_scale = st.slider("Scale", min_value=0.1, max_value=5.0,
                                       value=_scale_default, step=0.1,
-                                      key=f"_stx_pdf_scale_{base_name}")
+                                      key=f"_stx_pdf_scale_{_pk}")
                 st.markdown("**Margins (mm)**")
                 m_top = st.number_input("Top", min_value=0, value=_margin_mm(defaults.margin_top),
-                                        key=f"_stx_pdf_mt_{base_name}")
+                                        key=f"_stx_pdf_mt_{_pk}")
                 m_bottom = st.number_input("Bottom", min_value=0, value=_margin_mm(defaults.margin_bottom),
-                                           key=f"_stx_pdf_mb_{base_name}")
+                                           key=f"_stx_pdf_mb_{_pk}")
                 m_left = st.number_input("Left", min_value=0, value=_margin_mm(defaults.margin_left),
-                                         key=f"_stx_pdf_ml_{base_name}")
+                                         key=f"_stx_pdf_ml_{_pk}")
                 m_right = st.number_input("Right", min_value=0, value=_margin_mm(defaults.margin_right),
-                                          key=f"_stx_pdf_mr_{base_name}")
+                                          key=f"_stx_pdf_mr_{_pk}")
 
             submitted = st.form_submit_button("Generate")
 
@@ -400,6 +405,13 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
     :param zoom: Default zoom level as % (default 100).
     :param loading: If True (default), show a full-screen overlay with progress during loading.
     """
+    # --- Resolve PdfConfig from exports list if not provided directly ---
+    if pdf_config is None and exports:
+        for _ecfg in exports:
+            if _ecfg.format == "pdf" and _ecfg.pdf is not None:
+                pdf_config = _ecfg.pdf
+                break
+
     # --- Resolve export flags from exports list ---
     if exports is not None:
         has_always = any(c.mode == ExportMode.ALWAYS for c in exports)
@@ -448,8 +460,18 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
         st_chrome_banner()
     # --- Cache theme colors (once, early, in guaranteed Streamlit context) ---
     if _STX_THEME_BG_KEY not in st.session_state:
-        st.session_state[_STX_THEME_BG_KEY] = st.get_option("theme.backgroundColor") or "#fff"
-        st.session_state[_STX_THEME_TEXT_KEY] = st.get_option("theme.textColor") or "#333"
+        _bg = st.get_option("theme.backgroundColor")
+        _txt = st.get_option("theme.textColor")
+        if not _bg or not _txt:
+            _base = st.get_option("theme.base")
+            if _base == "dark":
+                _bg = _bg or "#0e1117"
+                _txt = _txt or "#fafafa"
+            else:
+                _bg = _bg or "#fff"
+                _txt = _txt or "#333"
+        st.session_state[_STX_THEME_BG_KEY] = _bg
+        st.session_state[_STX_THEME_TEXT_KEY] = _txt
     # --- Bibliography setup ---
     _setup_bibliography(bib_sources, bib_config)
     # --- Presentation profiles ---
@@ -467,6 +489,15 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
     profile_by_name = {p.name: p for p in all_profiles}
     if _ACTIVE_PROFILE_KEY not in st.session_state:
         st.session_state[_ACTIVE_PROFILE_KEY] = profile_names[0]
+        # Apply first profile's layout as initial values so zoom/width
+        # match the profile without requiring an explicit click.
+        _initial = all_profiles[0]
+        if _PAGE_WIDTH_KEY not in st.session_state:
+            page_width = _initial.layout.width
+            st.session_state[_PAGE_WIDTH_KEY] = page_width
+        if _ZOOM_KEY not in st.session_state:
+            zoom = _initial.layout.zoom
+            st.session_state[_ZOOM_KEY] = zoom
     active_name = st.session_state.get(_ACTIVE_PROFILE_KEY, profile_names[0])
     if active_name not in profile_by_name:
         active_name = profile_names[0]
@@ -1178,6 +1209,13 @@ def _build_page_cache(module_list, toc_config, marker_config, separator,
             if separator and i < len(module_list) - 1:
                 st_include(separator, *args, **kwargs)
 
+            # Insert slide break between blocks for PDF page-break support.
+            # Without this, the exported HTML has no .stx-slide-break-spacer
+            # elements, so @media print page-break rules have nothing to target.
+            if export_config is not None and i < len(module_list) - 1:
+                from .slide import st_slide_break
+                st_slide_break()
+
     hidden.empty()
 
     # Store the full-book HTML before resetting the buffer
@@ -1189,12 +1227,18 @@ def _build_page_cache(module_list, toc_config, marker_config, separator,
 
     search_index = stop_collector() if use_search else None
 
+    # Persist cited bibliography keys so st_bibliography(only_cited=True) works
+    # in paginated mode (cite() calls only run during cache build, not per-page).
+    from .bib import get_bib_registry as _get_bib_registry
+    _bib_cited = list(_get_bib_registry()._cited)
+
     st.session_state[_STX_CACHE_KEY] = {
         "hash": cache_hash,
         "toc": copy.deepcopy(toc_entries()) if toc_config else [],
         "markers": copy.deepcopy(marker_entries()) if marker_config else [],
         "total": len(module_list),
         "search_index": search_index,
+        "cited_keys": _bib_cited,
     }
 
 
@@ -1654,8 +1698,13 @@ def _inject_paginated_nav_js(current_page, total, marker_config,
             hostWin._stxMarkerStartIdx =
                 pageFirstMarker[np] !== undefined ? pageFirstMarker[np] : 0;
             navigateToPage(np);
-        } else if (direction === 'prev' && currentPage > 0) {
-            var pp = currentPage - 1;
+        } else if (direction === 'prev') {
+            var pp;
+            if (currentPage > 0) {
+                pp = currentPage - 1;
+            } else {
+                pp = lastNamedPage;  /* Loop back to last page */
+            }
             hostWin._stxMarkerStartIdx =
                 pageLastMarker[pp] !== undefined ? pageLastMarker[pp] : -1;
             navigateToPage(pp);
@@ -1863,6 +1912,14 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
                     "hidden": entry.get("hidden", False),
                     "page": entry.get("page_idx", 0),
                 })
+
+    # Pre-seed bibliography cited keys from cache so only_cited=True works
+    if cache.get("cited_keys"):
+        from .bib import get_bib_registry as _get_bib_reg
+        _bib_reg = _get_bib_reg()
+        for _key in cache["cited_keys"]:
+            if _key not in _bib_reg._cited:
+                _bib_reg._cited.append(_key)
 
     # --- Banner — page titles for navigation labels ---
     page_titles = _get_page_titles(cache, total)

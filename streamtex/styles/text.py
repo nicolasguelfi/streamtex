@@ -236,6 +236,40 @@ class Sizes:
     small_size      = Style("font-size: var(--stx-small-size, 6pt);",   "small_size")
     tiny_size       = Style("font-size: var(--stx-tiny-size, 4pt);",    "tiny_size")
 
+    # --- Numeric pt scale (granular, gap-filling) ---
+    # Complements the semantic names above. Use when you need an exact
+    # size that falls between two named sizes (e.g. 40pt between Large/large).
+    # Convention: pt<N> where N is the point size.
+    pt4   = Style("font-size: 4pt;",   "pt4")
+    pt6   = Style("font-size: 6pt;",   "pt6")
+    pt8   = Style("font-size: 8pt;",   "pt8")
+    pt10  = Style("font-size: 10pt;",  "pt10")
+    pt12  = Style("font-size: 12pt;",  "pt12")
+    pt14  = Style("font-size: 14pt;",  "pt14")
+    pt16  = Style("font-size: 16pt;",  "pt16")
+    pt18  = Style("font-size: 18pt;",  "pt18")
+    pt20  = Style("font-size: 20pt;",  "pt20")
+    pt22  = Style("font-size: 22pt;",  "pt22")
+    pt24  = Style("font-size: 24pt;",  "pt24")
+    pt28  = Style("font-size: 28pt;",  "pt28")
+    pt32  = Style("font-size: 32pt;",  "pt32")
+    pt36  = Style("font-size: 36pt;",  "pt36")
+    pt40  = Style("font-size: 40pt;",  "pt40")
+    pt44  = Style("font-size: 44pt;",  "pt44")
+    pt48  = Style("font-size: 48pt;",  "pt48")
+    pt52  = Style("font-size: 52pt;",  "pt52")
+    pt56  = Style("font-size: 56pt;",  "pt56")
+    pt60  = Style("font-size: 60pt;",  "pt60")
+    pt64  = Style("font-size: 64pt;",  "pt64")
+    pt72  = Style("font-size: 72pt;",  "pt72")
+    pt80  = Style("font-size: 80pt;",  "pt80")
+    pt88  = Style("font-size: 88pt;",  "pt88")
+    pt96  = Style("font-size: 96pt;",  "pt96")
+    pt112 = Style("font-size: 112pt;", "pt112")
+    pt128 = Style("font-size: 128pt;", "pt128")
+    pt160 = Style("font-size: 160pt;", "pt160")
+    pt196 = Style("font-size: 196pt;", "pt196")
+
 
 class Fonts:
     font_arial         = Style("font-family: Arial; font-style: normal;",         "font_arial")
@@ -270,6 +304,8 @@ class Fonts:
 class Wrap:
     wrap = Style("text-wrap: wrap;", "wrap")
     nowrap = Style("text-wrap: nowrap;", "nowrap")
+    preline = Style("white-space: pre-line;", "preline")
+    """Preserves newlines in source text (\\n → line break), collapses other whitespace."""
 
 
 class Titles:

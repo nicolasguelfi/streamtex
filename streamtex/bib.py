@@ -435,6 +435,9 @@ def _parse_bibtex_fields(fields_str: str) -> Dict[str, str]:
         name = match.group(1).lower()
         value = match.group(2) or match.group(3) or match.group(4) or ""
         value = re.sub(r'\s+', ' ', value.replace("\n", " ")).strip()
+        # Strip outer braces from values like {{UNESCO}} → UNESCO
+        while value.startswith("{") and value.endswith("}"):
+            value = value[1:-1]
         fields[name] = value
     return fields
 
@@ -828,7 +831,8 @@ def _escape_attr(text: str) -> str:
 # ===================================================================
 
 def st_bibliography(*, style=None, title: str = "References",
-                    title_style=None, toc_lvl: Optional[str] = None,
+                    title_style=None, entry_style=None, number_style=None,
+                    toc_lvl: Optional[str] = None,
                     only_cited: bool = True,
                     format: Optional[BibFormat] = None) -> None:
     """Render the full bibliography list.
@@ -837,6 +841,8 @@ def st_bibliography(*, style=None, title: str = "References",
         style: Style for the bibliography container
         title: Section title
         title_style: Style for the title
+        entry_style: Style for each bibliography entry text (controls font size, color, etc.)
+        number_style: Style for the citation number [N] (controls color, weight)
         toc_lvl: Register title in TOC at this level
         only_cited: Only show cited entries (vs all registered)
         format: Override BibConfig format
@@ -863,14 +869,20 @@ def st_bibliography(*, style=None, title: str = "References",
         st_write(ts, title, toc_lvl=toc_lvl)
         st_space("v", 2)
 
+    # Build inline CSS from Style objects
+    entry_css = entry_style.css if entry_style else ""
+    number_css = number_style.css if number_style else "font-weight:bold;"
+
     # Entries
     with st_block(style):
         for i, entry in enumerate(entries):
-            formatted = format_entry(entry, fmt, i + 1)
+            formatted = format_entry(entry, fmt, number=0)
+            num_html = f'<span style="{number_css}">[{i + 1}]</span> '
             anchor_id = f"bib-{entry.key}"
             _render(
-                f'<p id="{anchor_id}" style="margin-bottom:10px;text-indent:-2em;'
-                f'padding-left:2em;line-height:1.6;">{formatted}</p>'
+                f'<p id="{anchor_id}" style="margin-bottom:10px;text-indent:-2.5em;'
+                f'padding-left:2.5em;line-height:1.6;{entry_css}">'
+                f'{num_html}{formatted}</p>'
             )
 
 
@@ -1019,6 +1031,15 @@ def _format_ieee(entry: BibEntry, number: int = 0) -> str:
 
     if entry.year:
         parts.append(f"{entry.year}.")
+
+    if entry.doi or entry.url:
+        from .link_config import get_link_config
+        _t = get_link_config().external_target
+        _ta = f' target="{_t}"' if _t and _t != "_self" else ""
+        if entry.doi:
+            parts.append(f'<a href="https://doi.org/{entry.doi}"{_ta} style="color:#6090d0;">doi:{entry.doi}</a>')
+        else:
+            parts.append(f'<a href="{entry.url}"{_ta} style="color:#6090d0;">{entry.url}</a>')
 
     return " ".join(parts)
 

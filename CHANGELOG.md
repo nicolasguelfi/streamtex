@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.10] — 2026-03-23
+
+### Added
+- **PDF presentation formats**: 16:9, 16:10, 4:3 and custom free-form ratios (e.g. "21:9", "2.35:1") in the PDF export page size selector.
+- **`content_width` parameter on `PdfConfig`**: controls content width as a percentage (10-100%) of the PDF page, same logic as `PageLayout(width=...)` for on-screen display. Background fills full page, content is centered.
+- **Auto-viewport in PDF export**: viewport width is automatically computed from page format, margins, and scale so content fills the PDF page width exactly. No more narrow content on landscape pages.
+- **Page format dimension lookup**: `_page_dimensions_mm()` supports all standard paper formats and arbitrary W:H ratios.
+- **22 new tests**: page dimensions, viewport calculation, content width CSS injection, format ratios.
+
+### Changed
+- **PDF Scale and Content width inputs**: replaced slider with `st.number_input` — integer percentage, +/- buttons step by 10, free keyboard entry for precise values.
+- **PDF sidebar**: "Custom ratio" option with always-visible text input field (disabled when a preset format is selected).
+
+### Fixed
+- **Export slide breaks created phantom markers**: `st_slide_break()` called between blocks during export cache build now uses `marker=False`, preventing hidden markers from polluting the navigation registry.
+- **Stale cache after library upgrade**: version was already in the cache hash but the v0.5.9 cache persisted because version wasn't bumped with the fix. Cache is now properly invalidated.
+- **Content width CSS targeted wrong classes**: exported HTML uses `.streamtex-page`, not Streamlit's `.stMain` classes. CSS injection now targets the correct class.
+
+## [0.5.9] — 2026-03-23
+
+### Fixed
+- **Marker counter desynchronized in paginated mode**: slide break markers inserted during export cache build were missing `page_idx` tags, causing pre-seed/post-seed to lose them. This desynchronized the floating bar counter and popup navigation.
+
 ## [0.5.8] — 2026-03-23
 
 ### Added

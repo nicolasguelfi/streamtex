@@ -34,6 +34,7 @@ class PdfConfig:
             mode=PdfMode.PAGINATED,
             format="A4",
             landscape=True,
+            content_width=80,
         )
     """
 
@@ -63,6 +64,12 @@ class PdfConfig:
 
     scale: float = 1.0
     """Scale factor (0.1–2.0). 1.0 = 100%."""
+
+    content_width: int = 100
+    """Content width as percentage of the page (10–100).
+    Similar to PageLayout(width=...) for on-screen display.
+    80 means the content fills 80% of the page, centered with 10% padding each side.
+    Background fills the full page regardless of this setting."""
 
     header_template: str = ""
     """HTML template for page header (Chromium print header format)."""
@@ -124,6 +131,31 @@ def inject_print_css(html: str, mode: PdfMode) -> str:
 # Conversion factors to millimetres
 _UNIT_TO_MM = {"mm": 1.0, "cm": 10.0, "in": 25.4, "px": 0.264583, "pt": 0.352778}
 
+# Standard page formats — (width_mm, height_mm) in portrait orientation.
+# Formats marked (*) are presentation ratios stored in landscape directly;
+# _page_dimensions_mm() handles the landscape flag for all entries.
+_PAGE_FORMATS_MM: dict[str, tuple[float, float]] = {
+    # Paper formats (portrait)
+    "A0": (841, 1189),
+    "A1": (594, 841),
+    "A2": (420, 594),
+    "A3": (297, 420),
+    "A4": (210, 297),
+    "A5": (148, 210),
+    "A6": (105, 148),
+    "Letter": (215.9, 279.4),
+    "Legal": (215.9, 355.6),
+    "Tabloid": (279.4, 431.8),
+    "Ledger": (431.8, 279.4),
+    # Presentation formats (landscape, 254mm = 10in reference height)
+    "16:9": (338.7, 190.5),
+    "16:10": (323.8, 202.4),
+    "4:3": (270.9, 203.2),
+}
+
+# Screen DPI used by Chromium for CSS pixel conversion
+_SCREEN_DPI = 96
+
 
 def _parse_margin(value: str) -> float:
     """Parse a CSS margin string (e.g. '10mm', '0', '1in') to millimetres."""
@@ -136,6 +168,126 @@ def _parse_margin(value: str) -> float:
     num = float(m.group(1))
     unit = m.group(2) or "mm"
     return num * _UNIT_TO_MM.get(unit, 1.0)
+
+
+# Formats natively supported by Playwright's `format` parameter.
+_PLAYWRIGHT_NATIVE_FORMATS = {
+    "a0", "a1", "a2", "a3", "a4", "a5", "a6",
+    "letter", "legal", "tabloid", "ledger",
+}
+
+# Reference height for ratio-based formats (190.5mm ≈ 7.5in)
+_RATIO_REF_HEIGHT_MM = 190.5
+
+
+def _page_dimensions_mm(fmt: str, landscape: bool) -> tuple[float, float]:
+    """Return (width_mm, height_mm) for a page format and orientation.
+
+    Supports named formats (A4, Letter, 16:9, ...) and free-form ratios
+    like ``"21:9"`` or ``"2.35:1"``.
+
+    Args:
+        fmt: Page format name or ratio (case-insensitive).
+        landscape: If True, swap width and height for paper formats.
+            Ratio-based formats (containing ``:``) are always landscape
+            and ignore this flag.
+
+    Returns:
+        (width_mm, height_mm) tuple.
+
+    Raises:
+        ValueError: If the format is not recognized or the ratio is invalid.
+    """
+    # Case-insensitive lookup in known formats
+    key = next((k for k in _PAGE_FORMATS_MM if k.lower() == fmt.lower()), None)
+    if key is not None:
+        w, h = _PAGE_FORMATS_MM[key]
+        if landscape and ":" not in key:
+            w, h = h, w
+        return w, h
+
+    # Free-form ratio: "W:H" (e.g. "21:9", "2.35:1")
+    m = re.match(r"^\s*([0-9]*\.?[0-9]+)\s*:\s*([0-9]*\.?[0-9]+)\s*$", fmt)
+    if m:
+        rw, rh = float(m.group(1)), float(m.group(2))
+        if rw <= 0 or rh <= 0:
+            raise ValueError(f"Invalid ratio {fmt!r}: both values must be positive.")
+        h = _RATIO_REF_HEIGHT_MM
+        w = h * rw / rh
+        return w, h
+
+    raise ValueError(
+        f"Unknown page format {fmt!r}. "
+        f"Supported: {', '.join(_PAGE_FORMATS_MM.keys())} or a ratio like '16:9'."
+    )
+
+
+def _is_native_playwright_format(fmt: str) -> bool:
+    """Return True if Playwright supports this format name directly."""
+    return fmt.lower() in _PLAYWRIGHT_NATIVE_FORMATS
+
+
+def _compute_viewport_width(
+    fmt: str,
+    landscape: bool,
+    margin_left: str,
+    margin_right: str,
+    scale: float,
+) -> int:
+    """Compute the optimal viewport width in CSS pixels for PDF export.
+
+    The viewport is sized so that the HTML content, once rendered at this
+    width and scaled by ``scale``, fills the available page width exactly.
+
+    Args:
+        fmt: Page format (e.g. "A4").
+        landscape: Landscape orientation.
+        margin_left: Left margin (CSS value).
+        margin_right: Right margin (CSS value).
+        scale: Chromium print scale factor.
+
+    Returns:
+        Viewport width in pixels (integer, minimum 800).
+    """
+    page_w, _ = _page_dimensions_mm(fmt, landscape)
+    available_mm = page_w - _parse_margin(margin_left) - _parse_margin(margin_right)
+    available_px = available_mm / 25.4 * _SCREEN_DPI
+    viewport_px = available_px / max(scale, 0.1)
+    return max(int(round(viewport_px)), 800)
+
+
+def _inject_content_width_css(html: str, content_width: int) -> str:
+    """Inject CSS to control content width in the exported HTML for PDF.
+
+    The exported HTML (from ``generate_full_html()``) wraps content in
+    ``<div class="streamtex-page">`` — NOT Streamlit's ``.stMain`` classes.
+    This function targets that actual class to ensure content fills the
+    viewport (which is sized to match the PDF page).
+
+    When content_width < 100, symmetric padding narrows the content while
+    the body background remains full-bleed — same logic as
+    ``PageLayout(width=...)`` for on-screen display.
+
+    Args:
+        html: Complete HTML document string.
+        content_width: Percentage (10–100).
+
+    Returns:
+        HTML with layout CSS injected before ``</head>``.
+    """
+    cw = max(10, min(100, content_width))
+    padding_pct = (100 - cw) / 2
+
+    css = (
+        f".streamtex-page {{"
+        f" max-width: 100% !important;"
+        f" width: 100% !important;"
+        f" margin: 0 !important;"
+        f" padding: {padding_pct:.1f}% !important;"
+        f" box-sizing: border-box !important;"
+        f"}}"
+    )
+    return html.replace("</head>", f"<style>{css}</style>\n</head>")
 
 
 # ---------------------------------------------------------------------------
@@ -151,6 +303,11 @@ def export_pdf(
 
     Requires ``playwright`` to be installed (``uv add "streamtex[pdf]"``).
     On first use, run ``playwright install chromium`` to download the browser.
+
+    The viewport width is automatically computed from the page format, margins,
+    and scale so that the content fills the PDF page width exactly.  Use
+    ``content_width`` (10–100%) to narrow the content area while keeping the
+    background full-bleed (same logic as ``PageLayout(width=...)``).
 
     Args:
         html: Complete HTML document (e.g. from ``generate_export_html()``).
@@ -179,6 +336,9 @@ def export_pdf(
     cfg = config or PdfConfig()
     html = inject_print_css(html, cfg.mode)
 
+    # Inject content-width CSS if narrower than 100%
+    html = _inject_content_width_css(html, cfg.content_width)
+
     text = cfg.theme_text
 
     # Page numbers footer (inline styles only — Chromium template parser is restrictive)
@@ -202,14 +362,26 @@ def export_pdf(
 
     display_header_footer = bool(cfg.header_template or footer or cfg.page_numbers)
 
+    # Compute viewport to match the PDF page width
+    viewport_w = _compute_viewport_width(
+        cfg.format, cfg.landscape, cfg.margin_left, cfg.margin_right, cfg.scale,
+    )
+
+    # Resolve page size: native Playwright format or explicit width/height
+    if _is_native_playwright_format(cfg.format):
+        page_size_kwargs = {"format": cfg.format, "landscape": cfg.landscape}
+    else:
+        # Custom format (16:9, 16:10, 4:3, or free-form ratio) → explicit mm
+        w_mm, h_mm = _page_dimensions_mm(cfg.format, cfg.landscape)
+        page_size_kwargs = {"width": f"{w_mm}mm", "height": f"{h_mm}mm"}
+
     with sync_playwright() as p:
         browser = p.chromium.launch()
-        page = browser.new_page()
+        page = browser.new_page(viewport={"width": viewport_w, "height": 900})
         page.set_content(html, wait_until="networkidle")
 
         pdf_bytes = page.pdf(
-            format=cfg.format,
-            landscape=cfg.landscape,
+            **page_size_kwargs,
             print_background=cfg.print_background,
             scale=cfg.scale,
             margin={

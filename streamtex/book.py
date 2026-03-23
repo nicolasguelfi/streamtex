@@ -94,8 +94,9 @@ def _offer_export_downloads(html: str, base_name: str,
     # widget keys change, forcing Streamlit to create fresh widgets with
     # the new default values.  Old orphaned keys are harmless.
     _cfg_str = (f"{defaults.format}|{defaults.landscape}|{defaults.print_background}|"
-                f"{defaults.page_numbers}|{defaults.scale}|{defaults.margin_top}|"
-                f"{defaults.margin_bottom}|{defaults.margin_left}|{defaults.margin_right}")
+                f"{defaults.page_numbers}|{defaults.scale}|{defaults.content_width}|"
+                f"{defaults.margin_top}|{defaults.margin_bottom}|"
+                f"{defaults.margin_left}|{defaults.margin_right}")
     _cfg_fp = hashlib.md5(_cfg_str.encode()).hexdigest()[:6]
     _pk = f"{base_name}_{_cfg_fp}"  # PDF widget key suffix
 
@@ -152,6 +153,7 @@ def _offer_export_downloads(html: str, base_name: str,
             pdf_background = defaults.print_background
             pdf_page_numbers = defaults.page_numbers
             pdf_scale = defaults.scale
+            pdf_content_width = defaults.content_width
             m_top = _margin_mm(defaults.margin_top)
             m_bottom = _margin_mm(defaults.margin_bottom)
             m_left = _margin_mm(defaults.margin_left)
@@ -162,23 +164,57 @@ def _offer_export_downloads(html: str, base_name: str,
                 _cur_z = st.session_state.get(_ZOOM_KEY, 100)
                 st.markdown("**PDF layout**")
                 st.caption(f"Current view: Width {_cur_w}% · Zoom {_cur_z}%")
-                pdf_format = st.selectbox(
+                _FORMAT_OPTIONS = [
+                    "16:9", "16:10", "4:3",
+                    "A4", "A3", "Letter", "Legal", "Tabloid",
+                    "Custom ratio",
+                ]
+                _fmt_default = defaults.format
+                _fmt_idx = next(
+                    (i for i, f in enumerate(_FORMAT_OPTIONS) if f.lower() == _fmt_default.lower()),
+                    0,
+                )
+                # If defaults.format is a custom ratio not in the list, select "Custom ratio"
+                if _fmt_idx == 0 and _fmt_default.lower() not in [f.lower() for f in _FORMAT_OPTIONS]:
+                    _fmt_idx = len(_FORMAT_OPTIONS) - 1
+                _pdf_format_choice = st.selectbox(
                     "Page size",
-                    options=["A4", "A3", "Letter", "Legal", "Tabloid"],
-                    index=["A4", "A3", "Letter", "Legal", "Tabloid"].index(defaults.format)
-                    if defaults.format in ["A4", "A3", "Letter", "Legal", "Tabloid"] else 0,
+                    options=_FORMAT_OPTIONS,
+                    index=_fmt_idx,
                     key=f"_stx_pdf_format_{_pk}",
                 )
-                pdf_landscape = st.checkbox("Landscape", value=defaults.landscape,
-                                            key=f"_stx_pdf_land_{_pk}")
+                _is_custom = _pdf_format_choice == "Custom ratio"
+                _has_custom_ratio = ":" in defaults.format and defaults.format not in _FORMAT_OPTIONS
+                _custom_default = defaults.format if _has_custom_ratio else "21:9"
+                _custom_ratio = st.text_input(
+                    "Ratio (W:H)", value=_custom_default,
+                    disabled=not _is_custom,
+                    key=f"_stx_pdf_custom_ratio_{_pk}",
+                )
+                pdf_format = _custom_ratio if _is_custom else _pdf_format_choice
+                # Hide landscape checkbox for ratio-based formats (always landscape)
+                if ":" in pdf_format and pdf_format != "Custom ratio":
+                    pdf_landscape = True
+                else:
+                    pdf_landscape = st.checkbox("Landscape", value=defaults.landscape,
+                                                key=f"_stx_pdf_land_{_pk}")
                 pdf_background = st.checkbox("Backgrounds", value=defaults.print_background,
                                              key=f"_stx_pdf_bg_{_pk}")
                 pdf_page_numbers = st.checkbox("Page numbers", value=defaults.page_numbers,
                                                key=f"_stx_pdf_pn_{_pk}")
-                _scale_default = round(max(0.1, defaults.scale), 1)
-                pdf_scale = st.slider("Scale", min_value=0.1, max_value=5.0,
-                                      value=_scale_default, step=0.1,
-                                      key=f"_stx_pdf_scale_{_pk}")
+                _scale_default = max(10, min(500, round(defaults.scale * 100)))
+                _pdf_scale_pct = st.number_input(
+                    "Scale (%)", min_value=10, max_value=500,
+                    value=_scale_default, step=10,
+                    key=f"_stx_pdf_scale_{_pk}",
+                )
+                pdf_scale = _pdf_scale_pct / 100.0
+                _cw_default = max(10, min(100, defaults.content_width))
+                pdf_content_width = st.number_input(
+                    "Content width (%)", min_value=10, max_value=100,
+                    value=_cw_default, step=10,
+                    key=f"_stx_pdf_cw_{_pk}",
+                )
                 st.markdown("**Margins (mm)**")
                 m_top = st.number_input("Top", min_value=0, value=_margin_mm(defaults.margin_top),
                                         key=f"_stx_pdf_mt_{_pk}")
@@ -229,6 +265,7 @@ def _offer_export_downloads(html: str, base_name: str,
                             margin_right=f"{m_right}mm",
                             print_background=pdf_background,
                             scale=pdf_scale,
+                            content_width=pdf_content_width,
                             page_numbers=pdf_page_numbers,
                             header_template=defaults.header_template,
                             footer_template=defaults.footer_template,

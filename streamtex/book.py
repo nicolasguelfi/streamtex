@@ -1214,7 +1214,13 @@ def _build_page_cache(module_list, toc_config, marker_config, separator,
             # elements, so @media print page-break rules have nothing to target.
             if export_config is not None and i < len(module_list) - 1:
                 from .slide import st_slide_break
+                sb_before = len(marker_entries()) if marker_config else 0
                 st_slide_break()
+                # Tag slide-break markers so pre/post-seed can filter by page
+                if marker_config:
+                    for entry in marker_entries()[sb_before:]:
+                        if "page_idx" not in entry:
+                            entry["page_idx"] = i
 
     hidden.empty()
 
@@ -1991,6 +1997,21 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
             '<div id="stx-banner-sentinel" style="height:1px;"></div>',
             unsafe_allow_html=True,
         )
+
+    # Seed hidden markers for current page (slide breaks not rendered in paginated mode)
+    if marker_config and cache.get("markers"):
+        from . import marker as _marker_mod
+        registry = _marker_mod._registry
+        if registry is not None:
+            for entry in cache["markers"]:
+                if entry.get("page_idx", 0) == current_page and entry.get("hidden", False):
+                    registry._entries.append({
+                        "index": entry["index"],
+                        "label": entry["label"],
+                        "anchor": entry["anchor"],
+                        "hidden": True,
+                        "page": current_page,
+                    })
 
     # Post-seed markers for pages AFTER current (for global navigation)
     if marker_config and cache.get("markers"):

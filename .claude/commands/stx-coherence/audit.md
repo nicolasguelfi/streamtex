@@ -10,7 +10,7 @@ Arguments: $ARGUMENTS (optional scope: all | library | docs | profiles | blocks 
 2. **Load rules**: Read `.claude/developer/skills/coherence-checks.md`.
 
 3. **Determine scope** from arguments:
-   - `all` (default) — Run all 22 check categories
+   - `all` (default) — Run all 28 check categories
    - `library` — Checks 1 + 2 + 5 + 9 + 10 + 12 + 17 + 22 (API coverage, cheatsheet sync, version alignment, README links, language, test coverage sync, CHANGELOG freshness, release pipeline)
    - `docs` — Checks 3 + 6 + 7 + 10 + 13 + 14 + 15 + 16 (cross-manual consistency, block structure, template freshness, language, blocks→library API, example signatures, enum coherence, static files)
    - `profiles` — Checks 4 + 8 + 10 + 11 + 18 + 19 + 20 + 21 (profile file sync, stx-guide sync, language, artifact API validation, manifest file existence, CLI template registry sync, issue template sync, command namespace prefix)
@@ -18,6 +18,7 @@ Arguments: $ARGUMENTS (optional scope: all | library | docs | profiles | blocks 
    - `artifacts` — Check 11 only (Claude artifact API validation)
    - `tests` — Check 12 only (test coverage sync)
    - `language` — Check 10 only (language consistency)
+   - `ce` — Checks 23 + 24 + 25 + 26 + 27 + 28 (CE agent sync, CE template sync, CE docs structure, CE cheatsheet sync, CE command registration, CE plan-solution coherence)
 
 4. **Execute checks** for the selected scope. For each check:
    - Read the specified source files

@@ -136,3 +136,24 @@ The `stx-designer` commands cover the full project lifecycle:
 8. **Help** -> `/stx-designer:init --help` (cheatsheet for all commands)
 9. **Testing** -> `uv run pytest tests/ -v` (`/stx-developer:test-run`)
 10. **Linting** -> `uv run ruff check` (`/stx-developer:lint`)
+
+## Workflows — stx-ce Compound Document Engineering
+
+The `stx-ce` commands provide a structured methodology for document production:
+
+```
+COLLECT -> ASSESS -> PLAN -> PRODUCE -> REVIEW -> COMPOUND
+```
+
+1. **Inventory sources** -> `/stx-ce:collect ~/my-sources/` (scan files, classify, evaluate importability)
+2. **Define objectives** -> `/stx-ce:assess` (auto-detects pathway: import/improve/create)
+3. **Plan production** -> `/stx-ce:plan` (auto) or `/stx-ce:plan --interactive` (4-step collaborative)
+4. **Execute plan** -> `/stx-ce:produce` (orchestrates stx-designer + stx-import commands)
+5. **Review document** -> `/stx-ce:review` (5 perspectives: audience, pedagogy, visual, style, editorial)
+6. **Capitalize** -> `/stx-ce:compound` (document learnings in docs/solutions/)
+7. **Full cycle** -> `/stx-ce:go "description"` (autonomous with validation gates)
+8. **Quick start** -> `/stx-ce:go --quick "description"` (skip collect/assess)
+9. **Help** -> `/stx-ce:collect --help` (CE cheatsheet)
+
+CE artifacts are stored in `docs/` (collect/, assess/, plans/, reviews/, solutions/).
+See `.claude/references/ce_cheatsheet_en.md` for the full reference.

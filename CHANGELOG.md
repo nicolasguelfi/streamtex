@@ -13,6 +13,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **Version alignment**: `__init__.py` version now matches `pyproject.toml`.
 
+## [0.5.7] — 2026-03-22
+
+### Changed
+- **CLAUDE.md updated**: Enhanced with stx-ce Compound Document Engineering workflow section (8 commands, 7-phase cycle).
+
+## [0.5.6] — 2026-03-22
+
+### Added
+- **Bibliography entry styles**: `BibStyle.entry_style` and `BibStyle.number_style` for fine-grained control over bibliography rendering (font size, color, spacing).
+- **PDF export dark theme support**: `PdfConfig` now detects `theme.base = "dark"` and adjusts export backgrounds. Fallback to `get_option("theme.base")` when config.toml detection fails.
+- **pt scale system**: `PdfConfig.pt_scale` parameter for consistent font scaling in PDF output (default 1.0).
+
+### Fixed
+- **Bibliography `only_cited=True` empty in paginated mode**: cited keys were not collected across pages because each page had its own render context. Fix: cache cited keys in `st.session_state` across page renders.
+- **Dark theme PDF export**: `theme.base = "dark"` was not detected by `get_option()` in some Streamlit versions. Added fallback to parse `.streamlit/config.toml` directly.
+- **PDF widget persistence**: `PdfConfig` was disconnected from the export panel widgets. Widget key fingerprinting now ensures config stays in sync.
+
 ## [0.5.5] — 2026-03-22
 
 ### Fixed

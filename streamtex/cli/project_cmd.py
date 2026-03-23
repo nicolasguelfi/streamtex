@@ -306,6 +306,30 @@ def scaffold_project(
     images_dir = os.path.join(target_dir, "static", "images")
     os.makedirs(images_dir, exist_ok=True)
 
+    # docs/ — CE (Compound Engineering) artifact directories
+    ce_dirs = [
+        "docs/collect",
+        "docs/assess",
+        "docs/plans",
+        "docs/reviews",
+        "docs/solutions/structure",
+        "docs/solutions/style",
+        "docs/solutions/content",
+        "docs/solutions/process",
+        "docs/solutions/pedagogy",
+        "docs/solutions/assets",
+        "docs/solutions/deployment",
+        "docs/solutions/import",
+        "docs/solutions/governance",
+    ]
+    for d in ce_dirs:
+        dir_path = os.path.join(target_dir, d)
+        os.makedirs(dir_path, exist_ok=True)
+        gitkeep = os.path.join(dir_path, ".gitkeep")
+        if not os.path.exists(gitkeep):
+            with open(gitkeep, "w") as f:
+                f.write("")
+
     # collection.toml (only in collection mode)
     if collection:
         _write("collection.toml", generate_collection_toml(name))

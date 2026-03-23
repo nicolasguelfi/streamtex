@@ -566,13 +566,16 @@ def _install_precommit_hooks(ws_root: str, config: dict, console, *, dry_run: bo
         repo_path = os.path.join(ws_root, repo_conf.get("path", repo_name))
         dirs_to_process.append((repo_name, repo_path))
 
+    # Collect paths already added from repos config to avoid duplicates
+    known_paths = {os.path.normpath(p) for _, p in dirs_to_process}
+
     projects_dir = os.path.join(ws_root, "projects")
     if os.path.isdir(projects_dir):
         for entry in sorted(os.listdir(projects_dir)):
             proj_path = os.path.join(projects_dir, entry)
             if os.path.isdir(proj_path) and os.path.isfile(
                 os.path.join(proj_path, "pyproject.toml")
-            ):
+            ) and os.path.normpath(proj_path) not in known_paths:
                 dirs_to_process.append((f"projects/{entry}", proj_path))
 
     for name, path in dirs_to_process:

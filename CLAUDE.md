@@ -1,11 +1,11 @@
-# StreamTeX Library — Claude Code Rules
+# streamtex — Claude Code Rules
 
 ## Identity
-You are a **StreamTeX Library Developer**. You develop the `streamtex` Python package.
-You understand the full architecture: rendering pipeline, style system, block infrastructure, and exports.
+You are a **StreamTeX Expert**. You NEVER write standard Streamlit code for content rendering.
+You ALWAYS use the `streamtex` library (`stx.*` functions) instead of raw `st.*` calls.
 
 ## Terminology
-When the user says **"stream"**, **"la librairie"**, **"st"**, or **"stx"**, they always mean **StreamTeX** (the `streamtex` library).
+When the user says **"stream"**, **"la librairie"**, **"st"**, or **"stx"**, they always mean **StreamTeX**.
 
 ## Environment (MANDATORY)
 This project uses **uv** for dependency management. You MUST:
@@ -15,73 +15,96 @@ This project uses **uv** for dependency management. You MUST:
 - Use `uv add <package>` to add dependencies, `uv add --group dev <package>` for dev deps
 - Run `uv sync` if `uv.lock` or `pyproject.toml` changed
 
-## Source of Truth for .claude/ files (CRITICAL)
-The `.claude/` directory contains **READ-ONLY copies** installed by `stx claude update`.
-**NEVER modify files in `.claude/` directly** — always edit the source in `streamtex-claude/`
-and run `stx claude update --all` to propagate changes.
-
-## Context Loading (MANDATORY before any code change)
-Before modifying library code, you MUST read:
+## Context Loading (MANDATORY before any code generation)
+Before writing any block code, you MUST read:
 1. `.claude/references/coding_standards.md` — full coding standards (single source of truth)
 2. `.claude/references/streamtex_cheatsheet_en.md` — syntax reference
-3. `.claude/developer/skills/architecture.md` — library architecture overview
+3. `book.py` — to understand how blocks are wired
 
-## Key Rules
-- **After every code change**, run `uv run ruff check streamtex/` — ruff enforces isort (I001) import ordering
-- **Run tests** after any library change: `uv run pytest tests/ -v`
-- **No breaking changes** without explicit approval
-- **Update `__init__.py`** when adding new public API functions
-- **Type hints** on all public functions
+## Coding Standards
+See `.claude/references/coding_standards.md` for the full reference. Key rules:
 
-## Library Architecture
+- **stx for content, st for interactivity only**
+- **One `st_write()` with tuples for inline mixed-style text** (multiple calls stack vertically)
+- **No raw HTML/CSS** — use Style composition (Style() constructor for CSS, Style.create() for copying)
+- **No hardcoded black/white** — let Streamlit handle themes
+- **Block files** need `BlockStyles` class + `build()` function
+- **Style reuse** — one generic style, reused everywhere
+- **After every code change**, run `uv run ruff check` before committing
+
+## Key Components
+
+### Core Rendering
+- `st_write(style, text|tuple)` — Text rendering with inline mixed-style support
+- `st_grid(cols, grid_style, cell_styles)` — CSS Grid layout with responsive columns
+- `st_block(style)`, `st_span(style)` — Container context managers
+- `st_list(list_type)` — List rendering with ul/ol/custom support
+- `st_markdown(style, file=)` — Markdown rendering (Streamlit native engine)
+
+### Organization & Navigation
+- `st_book(blocks, paginate=True|False, view_modes=[ViewMode.PAGINATED, ViewMode.CONTINUOUS])` — Book orchestration with paginated/continuous modes; `view_modes` restricts which modes are available (single-mode hides the radio button)
+- `st_collection(config)` — Multi-project collection system
+
+### Styling
+- `Style(css_string, style_id)` — Create style from CSS
+- `Style.create(existing, new_id)` — Copy an existing style
+- Style composition: `Style + Style`, `Style + string`, `Style - string`
+
+### Media & Visual
+- `st_image(style, src)` — Image handling with base64 encoding
+- `st_code(style, code=, language=)` — Code blocks with Pygments
+- `st_space(dir, amount)`, `st_br()` — Spacing
+- `st_mermaid(style, code)` — Mermaid diagrams
+- `st_plantuml(style, code)` — PlantUML diagrams
+- `st_tikz(style, code)` — TikZ diagrams via LaTeX pipeline
+- `st_latex(style, code)` — LaTeX math rendering
+
+### Block Infrastructure
+- `ProjectBlockRegistry` — Lazy-loading block registry
+- `BlockHelper`, `show_code`, `show_explanation`, `show_details` — Block helpers with DI
+
+## Running the App
+```bash
+stx run
+```
+
+## Project Structure
 ```
 streamtex/
-├── __init__.py              # Public API re-exports
-├── write.py                 # st_write — text rendering with tuple support
-├── grid.py                  # st_grid — CSS Grid layout
-├── container.py             # st_block, st_span — context managers
-├── list.py                  # st_list — ul/ol/custom lists
-├── markdown.py              # st_markdown — file= support
-├── book.py                  # st_book — paginated/continuous modes
-├── loading.py               # Loading overlay with progress percentage
-├── banner.py                # BannerMode, BannerConfig
-├── toc.py                   # Table of Contents
-├── marker.py                # Navigation markers
-├── collection.py            # st_collection — multi-project
-├── image.py                 # st_image — base64 encoding
-├── code.py                  # st_code — Pygments
-├── space.py                 # st_space, st_br
-├── overlay.py               # st_overlay — absolute positioning
-├── zoom.py                  # CSS zoom control
-├── mermaid.py               # st_mermaid — pan/zoom diagrams
-├── plantuml.py              # st_plantuml — HTTP server
-├── tikz.py                  # st_tikz — LaTeX pipeline
-├── latex.py                 # st_latex, st_latex_doc
-├── bib.py                   # Bibliography system
-├── gsheet.py                # Google Sheets integration
-├── inspector.py             # Live code editor
-├── export.py                # HTML export + st_html bridge
-├── export_widgets.py        # Export-aware widget wrappers
-├── blocks.py                # ProjectBlockRegistry, LazyBlockRegistry
-├── block_helpers.py         # BlockHelper, show_code, DI pattern
-├── styles/                  # Style system (core.py, grid.py, list.py)
-├── constants.py             # PAGE_WIDTH, PAGE_PADDING
-├── enums.py                 # Tags, ListTypes
-└── utils.py                 # generate_key, contain_link
+├── book.py                 # Entry point
+├── blocks/                 # Block files (bck_*.py)
+│   ├── __init__.py         # ProjectBlockRegistry
+│   └── helpers.py          # Block helper config
+├── custom/
+│   ├── styles.py           # Project styles
+│   └── themes.py           # Theme overrides
+├── static/images/          # Static assets
+└── .streamlit/config.toml  # Streamlit config
 ```
 
-## Testing
-```bash
-uv run pytest tests/ -v          # Run all tests
-uv run pytest tests/test_write.py -v  # Run specific test file
-uv run ruff check streamtex/    # Lint check
-uv run ruff check streamtex/ --fix  # Auto-fix lint issues
-```
+## Documentation Lookup (when answering user questions)
 
-## Workflows
-1. **Testing** -> `uv run pytest tests/ -v` (`/stx-developer:test-run`)
-2. **Linting** -> `uv run ruff check streamtex/` (`/stx-developer:lint`)
-3. **Deploy** -> Publish to PyPI (`/stx-developer:deploy`)
+When the user asks a question about StreamTeX usage, patterns, or features:
+
+1. **Check if manuals exist**: look for `../../streamtex-docs/manuals/` (relative to this project).
+   Also try `../streamtex-docs/manuals/` (if project is directly in the workspace root).
+2. **If found** — search the relevant manual blocks for examples and patterns:
+   - `stx_manual_intro/blocks/` — fundamentals (text, grids, lists, images, containers, styles)
+   - `stx_manual_advanced/blocks/` — advanced features (export, PDF, bibliography, diagrams, overlays, banners)
+   - `stx_manual_ai/blocks/` — AI image generation, Claude profiles, prompt patterns
+   - `stx_manual_deploy/blocks/` — deployment (Docker, Render, CI/CD)
+   - `stx_manual_developer/blocks/` — library internals (architecture, testing, block system, CLI)
+   - Block files are `bck_*.py` — the `def build()` function contains live examples with `show_code()`, `show_explanation()`, and `show_details()`.
+3. **If NOT found** — the user's workspace doesn't include the documentation repo. Tell them:
+   > The StreamTeX documentation manuals are not available in your workspace.
+   > To access them (rich examples, tutorials, and patterns), upgrade your workspace:
+   > ```
+   > stx install --preset standard
+   > stx update
+   > ```
+   > This will clone the `streamtex-docs` repo with 6 manuals and 114+ example blocks.
+
+Always prefer showing real examples from manual blocks over generating code from scratch.
 
 ## Customization
 - `.claude/` contains **read-only** files installed by `stx claude update` — do not modify them
@@ -91,10 +114,37 @@ uv run ruff check streamtex/ --fix  # Auto-fix lint issues
 - To add a slash command: create `.claude/commands/my-cmd/run.md` (commands go in `commands/`, not `custom/commands/`)
 - See `.claude/custom/README.md` for full details
 
-## CHANGELOG (MANDATORY)
-**ALWAYS update `CHANGELOG.md`** when making changes to the library:
-- **Before any version bump**, add an entry under the new version heading
-- Use [Keep a Changelog](https://keepachangelog.com/) format: `Added`, `Changed`, `Fixed`, `Removed`
-- Group related changes under clear subsections
-- Include CLI command changes, new exports, bug fixes, documentation updates
-- The CHANGELOG is the user-facing record of what changed — if it's worth committing, it's worth documenting
+## Workflows — stx-designer Commands
+
+The `stx-designer` commands cover the full project lifecycle:
+
+1. **Create project** -> `/stx-designer:init <description>` (templates: project, presentation, collection, course)
+2. **Add content** -> `/stx-designer:update add a new block about X` or `/stx-designer:update add 3 slides on Y`
+3. **Customize** -> `/stx-designer:update change palette to blue/violet` or `/stx-designer:update switch to auditorium mode`
+4. **Migrate HTML** -> `/stx-designer:update --migrate convert intro.html`
+5. **Audit quality** -> `/stx-designer:audit --all` or `/stx-designer:audit --target bck_intro`
+6. **Fix issues** -> `/stx-designer:fix --all` or `/stx-designer:fix --target bck_intro`
+7. **Specialized tools** -> `/stx-designer:tool survey-convert`
+8. **Help** -> `/stx-designer:init --help` (cheatsheet for all commands)
+9. **Testing** -> `uv run pytest tests/ -v` (`/stx-developer:test-run`)
+10. **Linting** -> `uv run ruff check` (`/stx-developer:lint`)
+
+## Workflows — stx-ce Compound Document Engineering
+
+The `stx-ce` commands provide a structured methodology for document production:
+
+```
+COLLECT -> ASSESS -> PLAN -> PRODUCE -> REVIEW -> FIX -> COMPOUND
+```
+
+1. **Inventory sources** -> `/stx-ce:collect ~/my-sources/` (scan files, classify, evaluate importability)
+2. **Define objectives** -> `/stx-ce:assess` (auto-detects pathway: import/improve/create)
+3. **Plan production** -> `/stx-ce:plan` (auto) or `/stx-ce:plan --interactive` (4-step collaborative)
+4. **Execute plan** -> `/stx-ce:produce` (orchestrates stx-designer + stx-import commands)
+5. **Review document** -> `/stx-ce:review` (5 perspectives: audience, pedagogy, visual, style, editorial)
+6. **Fix findings** -> `/stx-ce:fix` (correct automatable issues, verify, trace — iterable with review)
+7. **Capitalize** -> `/stx-ce:compound` (3 axes: production learnings, ecosystem feedback, dev governance)
+8. **Full cycle** -> `/stx-ce:go "description"` (autonomous with 3 validation gates)
+
+CE artifacts are stored in `docs/` (collect/, assess/, plans/, reviews/, solutions/).
+See `.claude/references/ce_cheatsheet_en.md` for the full reference.

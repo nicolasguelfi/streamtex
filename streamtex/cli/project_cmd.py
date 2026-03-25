@@ -27,6 +27,7 @@ import streamtex as stx
 from streamtex import (
     st_book, TOCConfig, NumberingMode, MarkerConfig, BannerConfig,
     PdfConfig, ExportConfig, ExportMode, ViewMode,
+    Spacing, SpacingConfig, set_spacing,
 )
 
 from blocks import registry
@@ -48,6 +49,12 @@ marker_config = MarkerConfig(
     next_keys=["PageDown"],
     prev_keys=["PageUp"],
 )
+
+# Section spacing — configurable margins around blocks and sections
+# set_spacing(SpacingConfig(
+#     block=Spacing(top=2),          # vertical space before each block
+#     section=Spacing(top=2),        # vertical space between slide_break sections
+# ))
 
 st_book(
     registry,

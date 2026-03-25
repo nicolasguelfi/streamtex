@@ -8,6 +8,7 @@ import streamlit as st
 
 from .export import _render
 from .marker import st_marker
+from .spacing import Spacing, consume_block_top_injected, resolve_section_spacing, set_section_horizontal
 
 
 class SlideBreakMode(Enum):
@@ -75,6 +76,10 @@ class SlideBreakConfig:
 
     fullscreen: bool = False
     """When True, force space='100vh' so each slide fills the viewport."""
+
+    spacing: Spacing | None = None
+    """Section spacing override for this specific slide break.
+    When None, inherits from block-level or global section spacing."""
 
 
 # ---------------------------------------------------------------------------
@@ -222,12 +227,14 @@ def _effective_config(
         opacity=cfg.opacity,
         marker=cfg.marker,
         fullscreen=cfg.fullscreen,
+        spacing=cfg.spacing,
     ), True
 
 
 def st_slide_break(
     marker_label: str = "",
     config: Optional[SlideBreakConfig] = None,
+    spacing: Optional[Spacing] = None,
 ) -> None:
     """Presentation section break: styled rule + viewport spacer + hidden marker.
 
@@ -244,13 +251,33 @@ def st_slide_break(
         marker_label: Label for the hidden marker. Auto-generated if empty.
         config: Per-call config override. Falls back to the global config
                 set by set_slide_break_config().
+        spacing: Per-call section spacing override.  Takes precedence over
+                 ``config.spacing`` and all other levels.
     """
+    from .space import st_space
+
     cfg, enabled = _effective_config(config)
+
+    # Deactivate horizontal spacing from the previous section
+    set_section_horizontal(None)
+
+    # Resolve section spacing: direct param > config.spacing > block > profile > global
+    effective_spacing = resolve_section_spacing(
+        call_site=spacing or cfg.spacing,
+    )
+
+    # Inject section.bottom before the break visual (space after previous section)
+    if effective_spacing.bottom is not None:
+        st_space("v", effective_spacing.bottom)
 
     if not enabled or cfg.mode == SlideBreakMode.HIDDEN:
         # Even when hidden, fullscreen marker is still needed for navigation
         if cfg.fullscreen and cfg.marker:
             st_marker(marker_label, hidden=True)
+        # Still inject section.top after the break (even if visual is hidden)
+        if not consume_block_top_injected() and effective_spacing.top is not None:
+            st_space("v", effective_spacing.top)
+        _activate_section_horizontal(effective_spacing)
         return
 
     # Fullscreen mode forces 100vh spacing
@@ -273,3 +300,40 @@ def st_slide_break(
         _render(f'<div class="stx-slide-break-spacer" style="{spacer_css}"></div>')
     if cfg.marker and cfg.mode != SlideBreakMode.HIDDEN:
         st_marker(marker_label, hidden=True)
+
+    # Inject section.top after the break visual (space before next section)
+    # Skip if block.top was already injected for this block (first break)
+    if not consume_block_top_injected() and effective_spacing.top is not None:
+        st_space("v", effective_spacing.top)
+
+    # Activate section-level horizontal spacing for subsequent _render() calls
+    _activate_section_horizontal(effective_spacing)
+
+
+# ---------------------------------------------------------------------------
+# Section-level horizontal spacing (Phase 3)
+# ---------------------------------------------------------------------------
+
+def _close_section_wrapper_if_open() -> None:
+    """Deactivate section-level horizontal spacing.
+
+    Called by ``st_book`` after each ``build()`` to ensure cleanup.
+    """
+    set_section_horizontal(None)
+
+
+def _activate_section_horizontal(spacing: Spacing) -> None:
+    """Activate horizontal padding on all subsequent ``_render()`` calls.
+
+    When ``left`` or ``right`` is set, ``st_html()`` in ``export.py``
+    wraps each HTML fragment with a ``<div>`` that applies the padding.
+    The state is cleared at the next ``st_slide_break`` or block end.
+    """
+    has_horizontal = (
+        spacing.left is not None
+        or spacing.right is not None
+    )
+    if has_horizontal:
+        set_section_horizontal(spacing)
+    else:
+        set_section_horizontal(None)

@@ -42,6 +42,12 @@ from .presentation_profile import (
 from .search import generate_search_input_html, generate_search_script, start_collector, stop_collector
 from .slide import add_slide_break_options
 from .space import st_br, st_space
+from .spacing import (
+    mark_block_top_injected,
+    reset_block_spacing,
+    resolve_block_spacing,
+    set_active_profile,
+)
 from .styles import Style
 from .toc import NumberingMode, TOCConfig, reset_toc_registry, toc_entries
 from .utils import inject_link_preview_scaffold
@@ -52,6 +58,43 @@ logger = logging.getLogger(__name__)
 
 # Warmup mode flag — set by CLI ``stx cache warmup`` for headless cache build.
 _warmup_mode = False
+
+# Counter for unique section CSS class names (Phase 2/3)
+_block_css_counter = 0
+
+
+def _inject_block_horizontal_css(block_spacing) -> None:
+    """Inject a scoped CSS override for block-level horizontal spacing.
+
+    Uses a unique class counter to ensure CSS specificity over the global
+    ``zoom.py`` width injection.  The CSS is injected via ``st.html()``
+    which Streamlit extracts to the page ``<head>``.
+    """
+    global _block_css_counter
+
+    has_horizontal = (
+        block_spacing.left is not None
+        or block_spacing.right is not None
+        or block_spacing.width is not None
+    )
+    if not has_horizontal:
+        return
+
+    _block_css_counter += 1
+    rules = []
+    if block_spacing.width is not None:
+        rules.append(f"width: {block_spacing.width}% !important;")
+        rules.append(f"max-width: {block_spacing.width}% !important;")
+    if block_spacing.left is not None:
+        rules.append(f"padding-left: {block_spacing.left} !important;")
+    if block_spacing.right is not None:
+        rules.append(f"padding-right: {block_spacing.right} !important;")
+
+    css = (
+        f'<style>.stx-block-spacing-{_block_css_counter} '
+        f'.block-container {{ {" ".join(rules)} }}</style>'
+    )
+    st.html(css)
 
 
 def _is_pdf_available() -> bool:
@@ -722,6 +765,12 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
     if _show_loading:
         update_loading_progress(0, _total_modules)
 
+    # Store active profile for section spacing resolution in st_slide_break/st_write
+    set_active_profile(active_profile)
+
+    # Resolve block spacing (profile-aware)
+    _block_sp = resolve_block_spacing(profile=active_profile)
+
     # Run the blocks (potentially populating the ToC registry)
     for i, module in enumerate(module_list):
 
@@ -735,7 +784,22 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
         toc_before = len(toc_entries()) if use_toc_sidebar else 0
         markers_before = len(marker_entries()) if marker_config is not None else 0
 
-        st_include(module, *args, _inspector_config=inspector, **kwargs)
+        # Block spacing: inject block.top before build()
+        if _block_sp.top is not None:
+            st_space("v", _block_sp.top)
+        mark_block_top_injected()
+
+        # Block-level horizontal CSS override (Phase 2)
+        _inject_block_horizontal_css(_block_sp)
+
+        try:
+            st_include(module, *args, _inspector_config=inspector, **kwargs)
+        finally:
+            # Close any open section wrapper from Phase 3
+            from .slide import _close_section_wrapper_if_open
+            _close_section_wrapper_if_open()
+            # Reset per-block spacing override
+            reset_block_spacing()
 
         # Update loading overlay progress
         if _show_loading:
@@ -758,7 +822,9 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
         if separator and i < len(module_list) - 1:
             st_include(separator, *args, **kwargs)
 
-        st_space("v", "70px")
+        # Block spacing: inject block.bottom after build()
+        if _block_sp.bottom is not None:
+            st_space("v", _block_sp.bottom)
 
     # Remove loading overlay after all modules are rendered
     if _show_loading:
@@ -1210,6 +1276,9 @@ def _build_page_cache(module_list, toc_config, marker_config, separator,
     use_search = toc_config is not None and toc_config.search
     collector = start_collector() if use_search else None
 
+    # Resolve block spacing for cache build (no profile in cache build)
+    _block_sp = resolve_block_spacing()
+
     hidden = st.empty()
     with hidden.container(), _isolate_widget_keys():
         for i, module in enumerate(module_list):
@@ -1219,6 +1288,11 @@ def _build_page_cache(module_list, toc_config, marker_config, separator,
             if collector is not None:
                 collector.set_block(i)
 
+            # Block spacing: inject block.top + set flag
+            if _block_sp.top is not None:
+                st_space("v", _block_sp.top)
+            mark_block_top_injected()
+
             if _warmup_mode:
                 try:
                     st_include(module, *args, **kwargs)
@@ -1227,6 +1301,11 @@ def _build_page_cache(module_list, toc_config, marker_config, separator,
                     logger.warning("Warmup: block %s raised — skipping.", name)
             else:
                 st_include(module, *args, **kwargs)
+
+            # Close any open section wrapper + reset per-block override
+            from .slide import _close_section_wrapper_if_open
+            _close_section_wrapper_if_open()
+            reset_block_spacing()
 
             # Tag new TOC entries with their page index
             if toc_config:
@@ -1245,6 +1324,10 @@ def _build_page_cache(module_list, toc_config, marker_config, separator,
 
             if separator and i < len(module_list) - 1:
                 st_include(separator, *args, **kwargs)
+
+            # Block spacing: inject block.bottom after build()
+            if _block_sp.bottom is not None:
+                st_space("v", _block_sp.bottom)
 
             # Insert slide break between blocks for PDF page-break support.
             # Without this, the exported HTML has no .stx-slide-break-spacer
@@ -1974,8 +2057,23 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
             if css and css["show_dividers"]:
                 st.divider()
 
-    # --- Render current block ---
-    st_include(module_list[current_page], *args, _inspector_config=inspector, **kwargs)
+    # --- Render current block (with block spacing) ---
+    _pg_active_prof = None
+    if all_profiles and active_profile:
+        _pg_active_prof = next((p for p in all_profiles if p.name == active_profile), None)
+    set_active_profile(_pg_active_prof)
+    _pg_block_sp = resolve_block_spacing(profile=_pg_active_prof)
+    if _pg_block_sp.top is not None:
+        st_space("v", _pg_block_sp.top)
+    mark_block_top_injected()
+    _inject_block_horizontal_css(_pg_block_sp)
+
+    try:
+        st_include(module_list[current_page], *args, _inspector_config=inspector, **kwargs)
+    finally:
+        from .slide import _close_section_wrapper_if_open
+        _close_section_wrapper_if_open()
+        reset_block_spacing()
 
     # --- Finalize search index refresh ---
     if _refresh_search:

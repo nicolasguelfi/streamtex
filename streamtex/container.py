@@ -14,20 +14,31 @@ def st_block(style: Style = StxStyles.none, _export_wrapper: bool = True):
     # 1. Generate a unique ID to scope the CSS to this specific block
     block_id = generate_key("block")
 
-    # 2. Build CSS + marker span (fused into a single st.html call)
+    # 2. Section-level horizontal spacing (adds padding to this container)
+    from .spacing import get_section_horizontal
+    _sh = get_section_horizontal()
+    _section_css = ""
+    if _sh is not None:
+        if _sh.left:
+            _section_css += f" margin-left: {_sh.left};"
+        if _sh.right:
+            _section_css += f" margin-right: {_sh.right};"
+
+    # 3. Build CSS + marker span (fused into a single st.html call)
     css_and_marker = (
         f'<style>'
         f'div:has(> .element-container > .stHtml > span.{block_id})'
-        f'{{ {str(style)} }}'
+        f'{{ {str(style)}{_section_css} }}'
         f' .element-container:has(.stHtml > span.{block_id})'
         f'{{ width: auto; }}'
         f'</style>'
         f'<span class="{block_id}" style="display:none;"></span>'
     )
 
-    # 3. Export wrapper (no-op when export is inactive)
+    # 4. Export wrapper (no-op when export is inactive)
+    _export_style = f'{style}{_section_css}' if _section_css else str(style)
     if is_export_active() and _export_wrapper:
-        export_push_wrapper(f'<div style="{style}">')
+        export_push_wrapper(f'<div style="{_export_style}">')
 
     # 4. Create a native Streamlit container
     with st.container():
@@ -49,22 +60,33 @@ def st_span(style: Style = StxStyles.none):
     # 1. Generate a unique ID to scope the CSS to this specific block
     block_id = generate_key("span")
 
-    # 2. Build CSS + marker span (fused into a single st.html call)
+    # 2. Section-level horizontal spacing
+    from .spacing import get_section_horizontal
+    _sh = get_section_horizontal()
+    _section_css = ""
+    if _sh is not None:
+        if _sh.left:
+            _section_css += f" margin-left: {_sh.left};"
+        if _sh.right:
+            _section_css += f" margin-right: {_sh.right};"
+
+    # 3. Build CSS + marker span (fused into a single st.html call)
     css_and_marker = (
         f'<style>'
         f'div:has(> .element-container > .stHtml > span.{block_id}) > *'
         f'{{ width: auto; }}'
         f' div:has(> .element-container > .stHtml > span.{block_id})'
-        f'{{ display: flex; flex-direction: row; white-space: pre; {str(style)} }}'
+        f'{{ display: flex; flex-direction: row; white-space: pre; {str(style)}{_section_css} }}'
         f' .element-container:has(.stHtml > span.{block_id})'
         f'{{ width: auto; }}'
         f'</style>'
         f'<span class="{block_id}" style="display:none;"></span>'
     )
 
-    # 3. Export wrapper (no-op when export is inactive)
+    # 4. Export wrapper (no-op when export is inactive)
+    _export_style = f'display:flex;flex-direction:row;white-space:pre;{style}{_section_css}'
     if is_export_active():
-        export_push_wrapper(f'<div style="display:flex;flex-direction:row;white-space:pre;{style}">')
+        export_push_wrapper(f'<div style="{_export_style}">')
 
     # 4. Create a native Streamlit container
     with st.container():

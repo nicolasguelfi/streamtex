@@ -52,6 +52,13 @@ from .toc import reset_toc_registry, toc_entries, TOCConfig, NumberingMode
 # Marker Navigation
 from .marker import st_marker, MarkerConfig
 
+# Section spacing
+from .spacing import (
+    Spacing, SpacingConfig,
+    set_spacing, get_spacing,
+    set_block_spacing, get_block_spacing,
+)
+
 # Slide break (presentation mode)
 from .slide import (
     st_slide_break, SlideBreakConfig, SlideBreakMode,

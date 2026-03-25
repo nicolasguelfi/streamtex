@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING
 import streamlit as st
 
 from .slide import SlideBreakMode
+from .spacing import SpacingConfig
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -97,6 +98,12 @@ class PresentationProfile:
         default_factory=SlideBreakDisplayConfig,
     )
     """Slide break appearance and spacing."""
+
+    spacing: SpacingConfig | None = None
+    """Section spacing override for this profile.
+    When ``None``, inherits from global :func:`set_spacing`.
+    Each profile can define its own block/section spacing,
+    which is the natural way to handle mode-specific differences."""
 
     # ── Factory presets (Phase 2) ─────────────────────────────────────
 

@@ -1,9 +1,11 @@
 import textwrap
+import warnings
 from typing import Optional
 
 from .enums import Tag, Tags
 from .export import _render
 from .marker import get_marker_config, register_marker
+from .spacing import Spacing, consume_block_top_injected, resolve_section_spacing
 from .styles import StxStyles, Style
 from .toc import register_toc_entry
 from .utils import contain_link, strip_html
@@ -13,7 +15,8 @@ def st_write(
     *args, style: Style = StxStyles.none, tag: Tag = Tags.span,
     link:str="", no_link_decor:bool=False, hover:bool=True,
     toc_lvl: Optional[str] = None, label: str = "",
-    marker: Optional[bool] = None ):
+    marker: Optional[bool] = None,
+    spacing: Optional[Spacing] = None ):
     """
     Function to write a styled string with optional link reference and table of content entry.
 
@@ -26,6 +29,9 @@ def st_write(
     :param toc_lvl: A numeric string that may start with '+' or '-' (e.g. '1', '-1' or '+1')
         denoting the toc level of this content. This allows the text to be part of a hierarchical TOC.
     :param label: An optional label to use for the TOC entry. If not provided, a truncated version of `txt` is used.
+    :param spacing: Optional section spacing override for this title.
+        Only effective when ``toc_lvl`` is set and ``auto_marker_on_toc`` is active.
+        Injects ``spacing.top`` before the title when it creates a marker.
 
     Notes:
     - If `toc_lvl` is provided, the function wraps the content in tags to associate it with the specified TOC level.
@@ -38,12 +44,20 @@ def st_write(
     - st_write("click this ", (s.blue, "link", "https://google.com"))
     """
 
+    # Warn if spacing is passed without toc_lvl (no-op)
+    if spacing is not None and toc_lvl is None:
+        warnings.warn(
+            "st_write(spacing=...) has no effect without toc_lvl. "
+            "Spacing is only injected when a title creates a marker via auto_marker_on_toc.",
+            stacklevel=2,
+        )
+
     # Parse style and txt arguments
     container_style, final_txt = _parse_args(*args, style=style, no_link_decor=no_link_decor, hover=hover)
     final_txt = textwrap.dedent(final_txt)
 
     # Handle ToC registration and element id
-    final_txt, key_anchor = _handle_toc(final_txt, toc_lvl, label, marker)
+    final_txt, key_anchor = _handle_toc(final_txt, toc_lvl, label, marker, spacing=spacing)
     elementId = f" id='{key_anchor}'" if key_anchor else ""
 
     # Wrap the text in the specified tag with the given style. This ensures consistent styling.
@@ -102,7 +116,8 @@ def _parse_args(*args, style: Style = StxStyles.none, no_link_decor:bool=False, 
 
     return container_style, final_txt
 
-def _handle_toc(final_txt: str, toc_lvl: Optional[str] = None, label: str = "", marker: Optional[bool] = None):
+def _handle_toc(final_txt: str, toc_lvl: Optional[str] = None, label: str = "",
+                marker: Optional[bool] = None, spacing: Optional[Spacing] = None):
         # --- 3. Handle ToC Registration ---
     key_anchor = ""
     if toc_lvl:
@@ -128,5 +143,13 @@ def _handle_toc(final_txt: str, toc_lvl: Optional[str] = None, label: str = "", 
             )
             if should_mark:
                 register_marker(label, key_anchor)
+
+                # Inject section.top before the title (Phase 1b)
+                # Skip if block.top was already injected (first break in block)
+                if not consume_block_top_injected():
+                    from .space import st_space
+                    effective = resolve_section_spacing(call_site=spacing)
+                    if effective.top is not None:
+                        st_space("v", effective.top)
 
     return final_txt, key_anchor

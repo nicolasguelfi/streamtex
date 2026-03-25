@@ -527,6 +527,18 @@ def st_html(html: str, *, height: int = 0, light_bg: bool = False,
     scrolling : bool
         When True and *height* > 0, enable scrolling inside the iframe.
     """
+    # Section-level horizontal spacing: wrap each fragment with padding
+    from .spacing import get_section_horizontal
+    _sh = get_section_horizontal()
+    if _sh is not None:
+        _parts = []
+        if _sh.left:
+            _parts.append(f"margin-left: {_sh.left};")
+        if _sh.right:
+            _parts.append(f"margin-right: {_sh.right};")
+        if _parts:
+            html = f'<div style="{" ".join(_parts)}">{html}</div>'
+
     live = f"{_LIGHT_SCHEME}{html}" if light_bg else html
     if height > 0:
         import streamlit.components.v1 as components

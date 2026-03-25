@@ -539,3 +539,203 @@ class TestRegressionDefaults:
         assert result.left is None
         assert result.right is None
         assert result.width is None
+
+
+# ── st_block / st_span container integration ──────────────────────────────
+
+class TestContainerSectionHorizontal:
+    """Tests that st_block and st_span propagate section horizontal spacing."""
+
+    def test_st_block_without_section_spacing(self):
+        """st_block CSS has no margin when section horizontal is inactive."""
+        from streamtex.container import st_block
+        from streamtex.styles import StxStyles
+
+        with patch("streamtex.container.st.container") as mock_ct, \
+             patch("streamtex.container.st.html") as mock_html:
+            mock_ct.return_value.__enter__ = lambda s: None
+            mock_ct.return_value.__exit__ = lambda s, *a: False
+            with st_block(StxStyles.none):
+                pass
+            css_call = mock_html.call_args[0][0]
+            assert "margin-left" not in css_call
+            assert "margin-right" not in css_call
+
+    def test_st_block_with_section_spacing(self):
+        """st_block CSS includes margin-left/right when section horizontal is active."""
+        from streamtex.container import st_block
+        from streamtex.styles import StxStyles
+
+        set_section_horizontal(Spacing(left="10%", right="15%"))
+        with patch("streamtex.container.st.container") as mock_ct, \
+             patch("streamtex.container.st.html") as mock_html:
+            mock_ct.return_value.__enter__ = lambda s: None
+            mock_ct.return_value.__exit__ = lambda s, *a: False
+            with st_block(StxStyles.none):
+                pass
+            css_call = mock_html.call_args[0][0]
+            assert "margin-left: 10%" in css_call
+            assert "margin-right: 15%" in css_call
+
+    def test_st_block_left_only(self):
+        """st_block CSS includes only margin-left when right is None."""
+        from streamtex.container import st_block
+        from streamtex.styles import StxStyles
+
+        set_section_horizontal(Spacing(left="20%"))
+        with patch("streamtex.container.st.container") as mock_ct, \
+             patch("streamtex.container.st.html") as mock_html:
+            mock_ct.return_value.__enter__ = lambda s: None
+            mock_ct.return_value.__exit__ = lambda s, *a: False
+            with st_block(StxStyles.none):
+                pass
+            css_call = mock_html.call_args[0][0]
+            assert "margin-left: 20%" in css_call
+            assert "margin-right" not in css_call
+
+    def test_st_span_with_section_spacing(self):
+        """st_span CSS includes margin-left/right when section horizontal is active."""
+        from streamtex.container import st_span
+        from streamtex.styles import StxStyles
+
+        set_section_horizontal(Spacing(left="5%", right="5%"))
+        with patch("streamtex.container.st.container") as mock_ct, \
+             patch("streamtex.container.st.html") as mock_html:
+            mock_ct.return_value.__enter__ = lambda s: None
+            mock_ct.return_value.__exit__ = lambda s, *a: False
+            with st_span(StxStyles.none):
+                pass
+            css_call = mock_html.call_args[0][0]
+            assert "margin-left: 5%" in css_call
+            assert "margin-right: 5%" in css_call
+
+
+# ── _render() wrapping integration ────────────────────────────────────────
+
+class TestRenderWrapping:
+    """Tests that st_html/_render wraps fragments with section horizontal margins."""
+
+    def test_render_without_section_spacing(self):
+        """_render does not wrap when section horizontal is inactive."""
+        from streamtex.export import st_html
+
+        with patch("streamtex.export.st.html") as mock_st_html:
+            st_html('<p>test</p>')
+            html = mock_st_html.call_args[0][0]
+            assert html == '<p>test</p>'
+
+    def test_render_with_section_spacing(self):
+        """_render wraps with margin-left/right div when section horizontal is active."""
+        from streamtex.export import st_html
+
+        set_section_horizontal(Spacing(left="10%", right="10%"))
+        with patch("streamtex.export.st.html") as mock_st_html:
+            st_html('<p>test</p>')
+            html = mock_st_html.call_args[0][0]
+            assert 'margin-left: 10%' in html
+            assert 'margin-right: 10%' in html
+            assert '<p>test</p>' in html
+
+    def test_render_wrapping_left_only(self):
+        """_render wraps with margin-left only when right is None."""
+        from streamtex.export import st_html
+
+        set_section_horizontal(Spacing(left="20%"))
+        with patch("streamtex.export.st.html") as mock_st_html:
+            st_html('<p>test</p>')
+            html = mock_st_html.call_args[0][0]
+            assert 'margin-left: 20%' in html
+            assert 'margin-right' not in html
+
+
+# ── Double-spacing prevention integration ─────────────────────────────────
+
+class TestDoubleSpacingPrevention:
+    """Tests that block.top and section.top don't stack."""
+
+    def test_first_slide_break_skips_section_top(self):
+        """First st_slide_break after block.top should skip section.top."""
+        from streamtex.slide import SlideBreakConfig, SlideBreakMode, st_slide_break
+
+        set_spacing(SpacingConfig(section=Spacing(top=5)))
+        mark_block_top_injected()
+
+        with patch("streamtex.slide._render"), \
+             patch("streamtex.slide.st_marker"), \
+             patch("streamtex.space.st_space") as mock_space:
+            st_slide_break(config=SlideBreakConfig(mode=SlideBreakMode.FULL))
+            # section.top=5 should NOT be injected (block.top already done)
+            top_calls = [c for c in mock_space.call_args_list if c[0] == ("v", 5)]
+            assert len(top_calls) == 0
+
+    def test_second_slide_break_injects_section_top(self):
+        """Second st_slide_break should inject section.top normally."""
+        from streamtex.slide import SlideBreakConfig, SlideBreakMode, st_slide_break
+
+        set_spacing(SpacingConfig(section=Spacing(top=5)))
+        mark_block_top_injected()
+
+        with patch("streamtex.slide._render"), \
+             patch("streamtex.slide.st_marker"), \
+             patch("streamtex.space.st_space") as mock_space:
+            # First break — consumes the flag
+            st_slide_break(config=SlideBreakConfig(mode=SlideBreakMode.FULL))
+            mock_space.reset_mock()
+
+            # Second break — should inject section.top=5
+            st_slide_break(config=SlideBreakConfig(mode=SlideBreakMode.FULL))
+            top_calls = [c for c in mock_space.call_args_list if c[0] == ("v", 5)]
+            assert len(top_calls) >= 1
+
+    def test_flag_not_consumed_without_mark(self):
+        """Without mark_block_top_injected, all breaks inject section.top."""
+        from streamtex.slide import SlideBreakConfig, SlideBreakMode, st_slide_break
+
+        set_spacing(SpacingConfig(section=Spacing(top=3)))
+
+        with patch("streamtex.slide._render"), \
+             patch("streamtex.slide.st_marker"), \
+             patch("streamtex.space.st_space") as mock_space:
+            st_slide_break(config=SlideBreakConfig(mode=SlideBreakMode.FULL))
+            top_calls = [c for c in mock_space.call_args_list if c[0] == ("v", 3)]
+            assert len(top_calls) >= 1
+
+
+# ── Slide break close_section_wrapper cleanup ─────────────────────────────
+
+class TestSlideBreakCleanup:
+    """Tests that st_slide_break deactivates previous section horizontal."""
+
+    def test_slide_break_clears_previous_horizontal(self):
+        """st_slide_break deactivates horizontal from previous section."""
+        from streamtex.slide import SlideBreakConfig, SlideBreakMode, st_slide_break
+
+        set_section_horizontal(Spacing(left="10%"))
+        assert get_section_horizontal() is not None
+
+        with patch("streamtex.slide._render"), \
+             patch("streamtex.slide.st_marker"), \
+             patch("streamtex.space.st_space"):
+            st_slide_break(config=SlideBreakConfig(mode=SlideBreakMode.FULL))
+
+        # After break with no horizontal spacing, state should be cleared
+        assert get_section_horizontal() is None
+
+    def test_slide_break_activates_new_horizontal(self):
+        """st_slide_break with left/right activates section horizontal."""
+        from streamtex.slide import SlideBreakConfig, SlideBreakMode, st_slide_break
+
+        assert get_section_horizontal() is None
+
+        with patch("streamtex.slide._render"), \
+             patch("streamtex.slide.st_marker"), \
+             patch("streamtex.space.st_space"):
+            st_slide_break(
+                config=SlideBreakConfig(mode=SlideBreakMode.FULL),
+                spacing=Spacing(left="15%", right="15%"),
+            )
+
+        sh = get_section_horizontal()
+        assert sh is not None
+        assert sh.left == "15%"
+        assert sh.right == "15%"

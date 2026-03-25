@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.11] — 2026-03-25
+
+### Added
+- **Section Spacing system**: new `Spacing` and `SpacingConfig` dataclasses for configurable margins around blocks and sections.
+- **5-level override hierarchy**: Built-in → Book (`set_spacing`) → Profile (`PresentationProfile.spacing`) → Block (`set_block_spacing`) → Call-site (`st_slide_break(spacing=)`).
+- **Vertical spacing**: `block.top/bottom` replaces the hardcoded 70px inter-block gap. `section.top/bottom` controls gaps between `st_slide_break` sections.
+- **Horizontal spacing**: `left/right` margins on sections affect both StreamTeX content (`_render()` wrapping) and Streamlit containers (`st_block`/`st_span` CSS `:has()` injection).
+- **Double-spacing prevention**: `block.top` and `section.top` never stack at the start of a block.
+- **`spacing` parameter on `st_write()`**: per-title spacing override when `auto_marker_on_toc` is active.
+- **Block-level horizontal CSS injection**: `_inject_block_horizontal_css()` for `width`/`left`/`right` at block level.
+- **74 new tests** in `test_spacing.py`: dataclasses, DI, resolution, double-spacing, container integration, render wrapping.
+- **Manual blocks**: `bck_spacing` (intro) and `bck_spacing_profiles` (advanced).
+- **Updated cheatsheet** with Section Spacing reference.
+- **Updated project template** (`stx project new`) with `set_spacing()` example.
+
+### Changed
+- **`st_slide_break()` signature**: new `spacing: Spacing | None` parameter.
+- **`st_book()` block loop**: injects `block.top`/`block.bottom` from resolved `SpacingConfig` instead of hardcoded `st_space("v", "70px")`.
+
 ## [0.5.10] — 2026-03-23
 
 ### Added

@@ -4,6 +4,7 @@ import os
 import platform
 import shutil
 import signal
+import socket
 import subprocess
 import sys
 import time
@@ -153,14 +154,33 @@ def _kill_port(port: int) -> bool:
         return False
 
 
+def _is_port_free(port: int) -> bool:
+    """Return True if the given port is available for binding."""
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.bind(("127.0.0.1", port))
+            return True
+    except OSError:
+        return False
+
+
+def _find_free_port(start: int = _DEFAULT_PORT, max_tries: int = 50) -> int:
+    """Find the first free port starting from *start*."""
+    for offset in range(max_tries):
+        candidate = start + offset
+        if _is_port_free(candidate):
+            return candidate
+    return start
+
+
 def _resolve_port(port_arg: int | None) -> int:
-    """Resolve the effective port: CLI arg > config file > default."""
+    """Resolve the effective port: CLI arg > config file > first free port."""
     if port_arg:
         return port_arg
     config_port = _read_port_from_config()
     if config_port:
         return config_port
-    return _DEFAULT_PORT
+    return _find_free_port()
 
 
 @click.command(name="run")
@@ -199,8 +219,7 @@ def run(book, port, browser, headless, force, extra_args):
     else:
         cmd = [sys.executable, "-m", "streamlit", "run", entry]
 
-    if port or _read_port_from_config():
-        cmd.extend(["--server.port", str(actual_port)])
+    cmd.extend(["--server.port", str(actual_port)])
 
     # If a specific browser is requested or headless, run in headless mode
     # and open the browser manually

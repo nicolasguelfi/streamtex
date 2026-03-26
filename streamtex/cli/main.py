@@ -4,6 +4,7 @@ This module is referenced by pyproject.toml [project.scripts]:
     stx = "streamtex.cli.main:app"
 """
 
+import os
 import sys
 
 # Minimum uv version required for Python 3.13 managed installs.
@@ -42,6 +43,35 @@ def _check_uv_version() -> None:
         pass  # best-effort check, never block the CLI
 
 
+def _find_global_stx() -> str | None:
+    """Find the global ``stx`` executable outside the current virtualenv.
+
+    When streamtex is installed as a project dependency (without the ``[cli]``
+    extra), a ``.venv/bin/stx`` shim is created that lacks click/rich.  This
+    function locates the *real* ``stx`` — typically the one installed via
+    ``uv tool install streamtex[cli]`` in ``~/.local/bin`` — so that the shim
+    can transparently delegate to it.
+    """
+    venv = os.environ.get("VIRTUAL_ENV", "")
+    if not venv:
+        return None  # not in a venv — nothing to delegate to
+
+    # Walk PATH, skipping entries inside the active venv
+    for directory in os.environ.get("PATH", "").split(os.pathsep):
+        if directory.startswith(venv):
+            continue
+        candidate = os.path.join(directory, "stx")
+        if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+            return candidate
+
+    # Fallback: standard uv tool location
+    candidate = os.path.join(os.path.expanduser("~"), ".local", "bin", "stx")
+    if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+        return candidate
+
+    return None
+
+
 def app() -> None:
     """Launch the StreamTeX CLI."""
     _check_uv_version()
@@ -50,6 +80,15 @@ def app() -> None:
         import click  # noqa: F401
         import rich  # noqa: F401
     except ImportError:
+        # CLI deps not installed — try to delegate to the global stx tool
+        global_stx = _find_global_stx()
+        if global_stx:
+            import subprocess
+
+            raise SystemExit(
+                subprocess.run([global_stx, *sys.argv[1:]]).returncode
+            )
+        # No global stx found — show install instructions
         print(
             "Error: the stx CLI requires optional dependencies.\n"
             "Install them with:\n\n"

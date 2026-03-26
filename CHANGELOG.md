@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.13] — 2026-03-26
+
+### Fixed
+- **`stx` CLI shadowed in project venvs**: when streamtex is installed as a project dependency without `[cli]` extras, `.venv/bin/stx` now transparently delegates to the global `stx` tool install (`~/.local/bin/stx`) instead of showing a misleading "missing dependencies" error. Users can now run `stx status`, `stx run`, etc. with their project venv activated.
+
+### Added
+- **Auto-port resolution in `stx run`**: when no port is specified and no config exists, `stx run` now finds the first available port starting from 8501 instead of always using 8501. Prevents "port already in use" errors when running multiple projects.
+- **`_find_global_stx()` helper**: locates the global stx executable by walking PATH (skipping venv entries) with fallback to `~/.local/bin/stx`.
+- **`_is_port_free()` / `_find_free_port()` helpers**: socket-based port availability check for `stx run`.
+
 ## [0.5.12] — 2026-03-26
 
 ### Added

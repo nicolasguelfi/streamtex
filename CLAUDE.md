@@ -92,7 +92,7 @@ When the user asks a question about StreamTeX usage, patterns, or features:
    - `stx_manual_intro/blocks/` — fundamentals (text, grids, lists, images, containers, styles)
    - `stx_manual_advanced/blocks/` — advanced features (export, PDF, bibliography, diagrams, overlays, banners)
    - `stx_manual_ai/blocks/` — AI image generation, Claude profiles, prompt patterns
-   - `stx_manual_deploy/blocks/` — deployment (Docker, Hetzner/Coolify, CI/CD)
+   - `stx_manual_deploy/blocks/` — deployment (Docker, Render, CI/CD)
    - `stx_manual_developer/blocks/` — library internals (architecture, testing, block system, CLI)
    - Block files are `bck_*.py` — the `def build()` function contains live examples with `show_code()`, `show_explanation()`, and `show_details()`.
 3. **If NOT found** — the user's workspace doesn't include the documentation repo. Tell them:

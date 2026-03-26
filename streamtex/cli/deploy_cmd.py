@@ -1336,3 +1336,896 @@ def env_sync_cmd(path: str, dry_run: bool, service: str | None) -> None:
                     _render_api_post(f"services/{svc_id}/deploys", api_key)
                     console.print(f"  [cyan]↻ {svc_name}[/cyan]: deploy triggered")
             console.print("[bold green]Redeploy triggered![/bold green]")
+
+
+# ---------------------------------------------------------------------------
+# Hetzner / Coolify helpers
+# ---------------------------------------------------------------------------
+
+
+def _read_deploy_env(project_path: str = ".") -> dict[str, str]:
+    """Read ``.stx-deploy.env`` from the project or parent directory.
+
+    Returns a dict of KEY=VALUE pairs.  Raises :class:`click.ClickException`
+    if the file cannot be found.
+    """
+    from pathlib import Path
+
+    from .coolify import _parse_env_file
+
+    candidates = [
+        Path(project_path).resolve() / ".stx-deploy.env",
+        Path(project_path).resolve().parent / ".stx-deploy.env",
+        Path.cwd() / ".stx-deploy.env",
+        Path.cwd().parent / ".stx-deploy.env",
+    ]
+    for p in candidates:
+        if p.is_file():
+            return _parse_env_file(p)
+
+    raise click.ClickException(
+        ".stx-deploy.env not found. Run 'stx deploy setup' first."
+    )
+
+
+def _ssh_run(
+    ip: str,
+    command: str,
+    key_path: str = "~/.ssh/hetzner_streamtex",
+    user: str = "root",
+    timeout: int = 120,
+) -> subprocess.CompletedProcess:
+    """Run a command on a remote server via SSH."""
+    key = os.path.expanduser(key_path)
+    return subprocess.run(
+        [
+            "ssh", "-i", key,
+            "-o", "StrictHostKeyChecking=accept-new",
+            f"{user}@{ip}",
+            command,
+        ],
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+    )
+
+
+# ---------------------------------------------------------------------------
+# stx deploy setup — interactive local setup
+# ---------------------------------------------------------------------------
+
+
+@click.command("setup")
+def setup_cmd() -> None:
+    """Interactive setup for Hetzner/Coolify deployment."""
+    console = get_console()
+    env_vars: dict[str, str] = {}
+
+    console.print("[bold cyan]StreamTeX Deploy Setup[/bold cyan]")
+    console.print("This will configure your local environment for Hetzner deployment.\n")
+
+    # 1. Check hcloud CLI
+    hcloud = shutil.which("hcloud")
+    if hcloud:
+        console.print("[green]\u2713 hcloud CLI found[/green]")
+    else:
+        console.print("[yellow]\u26a0 hcloud CLI not found[/yellow]")
+        if click.confirm("Install hcloud CLI now?", default=True):
+            import platform as _platform
+
+            if _platform.system() == "Darwin":
+                subprocess.run(["brew", "install", "hcloud"], timeout=120)
+            else:
+                subprocess.run(
+                    ["sh", "-c", "apt-get update && apt-get install -y hcloud-cli"],
+                    timeout=120,
+                )
+            hcloud = shutil.which("hcloud")
+            if hcloud:
+                console.print("[green]\u2713 hcloud CLI installed[/green]")
+            else:
+                console.print("[red]\u2717 hcloud CLI installation failed[/red]")
+
+    # 2. Check SSH key
+    ssh_key_path = os.path.expanduser("~/.ssh/hetzner_streamtex")
+    if os.path.isfile(ssh_key_path):
+        console.print(f"[green]\u2713 SSH key found:[/green] {ssh_key_path}")
+    else:
+        console.print(f"[yellow]\u26a0 SSH key not found:[/yellow] {ssh_key_path}")
+        if click.confirm("Generate SSH key now?", default=True):
+            os.makedirs(os.path.dirname(ssh_key_path), exist_ok=True)
+            subprocess.run(
+                [
+                    "ssh-keygen", "-t", "ed25519",
+                    "-f", ssh_key_path,
+                    "-N", "",
+                    "-C", "streamtex-deploy",
+                ],
+                timeout=30,
+            )
+            if os.path.isfile(ssh_key_path):
+                console.print("[green]\u2713 SSH key generated[/green]")
+            else:
+                console.print("[red]\u2717 SSH key generation failed[/red]")
+
+    # 3. Hetzner API token
+    console.print(
+        "\n[cyan]Hetzner API token[/cyan] — "
+        "create one at https://console.hetzner.cloud → Security → API Tokens"
+    )
+    hetzner_token = click.prompt("Hetzner API token", hide_input=True)
+    env_vars["HETZNER_API_TOKEN"] = hetzner_token
+
+    # 4. Register SSH key in Hetzner
+    if hcloud and os.path.isfile(f"{ssh_key_path}.pub"):
+        console.print("[cyan]Registering SSH key in Hetzner…[/cyan]")
+        result = subprocess.run(
+            [
+                "hcloud", "ssh-key", "create",
+                "--name", "streamtex-deploy",
+                "--public-key-from-file", f"{ssh_key_path}.pub",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            env={**os.environ, "HCLOUD_TOKEN": hetzner_token},
+        )
+        if result.returncode == 0:
+            console.print("[green]\u2713 SSH key registered in Hetzner[/green]")
+        else:
+            console.print(
+                f"[yellow]\u26a0 SSH key registration: {result.stderr.strip()}[/yellow]"
+            )
+
+    # 5. Domain name
+    domain = click.prompt("Domain name (e.g. streamtex.org)")
+    env_vars["DEPLOY_DOMAIN"] = domain
+
+    # 6. Cloudflare API token (optional)
+    if click.confirm("Configure Cloudflare DNS integration?", default=False):
+        cf_token = click.prompt("Cloudflare API token", hide_input=True)
+        env_vars["CLOUDFLARE_API_TOKEN"] = cf_token
+
+    # 7. Save .stx-deploy.env
+    env_path = os.path.join(".", ".stx-deploy.env")
+    with open(env_path, "w", encoding="utf-8") as f:
+        f.write("# StreamTeX Deploy Configuration\n")
+        f.write("# Generated by: stx deploy setup\n\n")
+        for key, value in env_vars.items():
+            f.write(f"{key}={value}\n")
+    console.print(f"\n[bold green]\u2713 Configuration saved to {env_path}[/bold green]")
+
+    # Remind about .gitignore
+    console.print(
+        "\n[yellow]Important:[/yellow] Ensure .stx-deploy.env is in your .gitignore!"
+    )
+
+
+# ---------------------------------------------------------------------------
+# stx deploy hetzner — deploy project to Hetzner/Coolify
+# ---------------------------------------------------------------------------
+
+
+@click.command("hetzner")
+@click.argument("path", default=".")
+@click.option("--subdomain", default=None, help="Subdomain for the service.")
+@click.option("--uuid", default=None, help="Coolify application UUID (skip creation).")
+@click.option("--yes", is_flag=True, help="Skip confirmation prompts.")
+def hetzner_cmd(path: str, subdomain: str | None, uuid: str | None, yes: bool) -> None:
+    """Deploy a StreamTeX project to Hetzner via Coolify."""
+    from .coolify import CoolifyClient, CoolifyError, load_deploy_state, save_deploy_state
+
+    console = get_console()
+    p = os.path.abspath(path)
+
+    # 1. Read .stx-deploy.env
+    try:
+        env = _read_deploy_env(p)
+    except click.ClickException:
+        console.print(
+            "[red]No .stx-deploy.env found.[/red]\n"
+            "Run [cyan]stx deploy setup[/cyan] first."
+        )
+        raise
+
+    # 2. Run preflight checks
+    console.print("[cyan]Running preflight checks…[/cyan]")
+    checks = run_preflight(p, skip_tests=True, skip_lint=True)
+    fails = [c for c in checks if c.status == "fail"]
+    if fails:
+        for c in fails:
+            console.print(f"  [red]\u2717 {c.name}[/red]: {c.message}")
+        raise click.ClickException(
+            "Preflight failed. Run 'stx deploy preflight' for details."
+        )
+    console.print("[green]\u2713 Preflight passed[/green]")
+
+    # 3. Detect git remote
+    repo = detect_git_remote(p)
+    if repo is None:
+        raise click.ClickException(
+            "No git remote 'origin' found. Add one with: git remote add origin <url>"
+        )
+    console.print(f"[green]\u2713 Git remote:[/green] {repo}")
+
+    # 4. Prompt for subdomain
+    if not subdomain:
+        domain = env.get("DEPLOY_DOMAIN", "streamtex.org")
+        default_sub = os.path.basename(p).lower().replace("_", "-").replace(" ", "-")
+        subdomain = click.prompt(
+            f"Subdomain (*.{domain})", default=default_sub
+        )
+
+    domain = env.get("DEPLOY_DOMAIN", "streamtex.org")
+    fqdn = f"https://{subdomain}.{domain}"
+    console.print(f"[cyan]Target URL:[/cyan] {fqdn}")
+
+    if not yes and not click.confirm("Proceed with deployment?", default=True):
+        console.print("[yellow]Aborted.[/yellow]")
+        return
+
+    # 5. Connect to Coolify
+    try:
+        client = CoolifyClient.from_env()
+    except CoolifyError as e:
+        raise click.ClickException(str(e)) from e
+
+    # 6. Resolve or guide application creation
+    app_uuid = uuid
+    if not app_uuid:
+        # Check deploy state for existing UUID
+        state = load_deploy_state()
+        services = state.get("services", {})
+        for _name, svc_info in services.items():
+            if isinstance(svc_info, dict) and svc_info.get("subdomain") == subdomain:
+                app_uuid = svc_info.get("uuid")
+                console.print(f"[green]\u2713 Found existing app:[/green] {app_uuid}")
+                break
+
+    if not app_uuid:
+        console.print(
+            "\n[yellow]Coolify application not found.[/yellow]\n"
+            "Please create the application in the Coolify UI:\n"
+            f"  1. Go to your Coolify dashboard\n"
+            f"  2. Create a new application from GitHub repo: {repo}\n"
+            f"  3. Set the domain to: {fqdn}\n"
+            "  4. Copy the application UUID from the URL\n"
+        )
+        app_uuid = click.prompt("Coolify application UUID")
+
+    # 7. Set FOLDER env var if in manuals/ subdirectory
+    rel_path = os.path.basename(p)
+    parent = os.path.basename(os.path.dirname(p))
+    if parent == "manuals" or rel_path.startswith("stx_manual"):
+        folder = f"manuals/{rel_path}"
+        console.print(f"[cyan]Setting FOLDER={folder}[/cyan]")
+        try:
+            client.set_env_var(app_uuid, "FOLDER", folder)
+        except CoolifyError as e:
+            console.print(f"[yellow]\u26a0 Could not set FOLDER: {e}[/yellow]")
+
+    # 8. Set FQDN
+    try:
+        client.set_fqdn(app_uuid, fqdn)
+        console.print(f"[green]\u2713 Domain set:[/green] {fqdn}")
+    except CoolifyError as e:
+        console.print(f"[yellow]\u26a0 Could not set domain: {e}[/yellow]")
+
+    # 9. Trigger rebuild
+    console.print("[cyan]Triggering rebuild…[/cyan]")
+    result = client.rebuild(app_uuid)
+    if not result.success:
+        raise click.ClickException(f"Rebuild failed: {result.message}")
+    console.print(f"[green]\u2713 Rebuild triggered:[/green] {result.message}")
+
+    # 10. Wait for healthy
+    console.print("[cyan]Waiting for service to become healthy…[/cyan]")
+    healthy = client.wait_healthy(app_uuid, timeout=300)
+    if healthy:
+        console.print("[bold green]\u2713 Service is healthy![/bold green]")
+    else:
+        console.print(
+            "[yellow]\u26a0 Service did not reach healthy state within timeout.[/yellow]\n"
+            "Check the Coolify dashboard for deployment logs."
+        )
+
+    # 11. Update .stx-deploy.json
+    state = load_deploy_state()
+    if "services" not in state:
+        state["services"] = {}
+    state["services"][subdomain] = {
+        "uuid": app_uuid,
+        "subdomain": subdomain,
+        "fqdn": fqdn,
+        "repo": repo,
+    }
+    save_deploy_state(state)
+    console.print("[green]\u2713 State saved to .stx-deploy.json[/green]")
+    console.print(f"\n[bold cyan]Deployed:[/bold cyan] {fqdn}")
+
+
+# ---------------------------------------------------------------------------
+# stx deploy update — rebuild/restart services
+# ---------------------------------------------------------------------------
+
+
+@click.command("update")
+@click.argument("target", required=False, default=None)
+@click.option("--quick", is_flag=True, help="Quick restart (no rebuild).")
+@click.option("--yes", is_flag=True, help="Skip confirmation prompts.")
+def update_cmd(target: str | None, quick: bool, yes: bool) -> None:
+    """Rebuild or restart a Coolify service.
+
+    TARGET can be a service name, subdomain, or Coolify UUID.
+    If omitted, lists all services and prompts for selection.
+    """
+    from .coolify import CoolifyClient, CoolifyError, load_deploy_state
+
+    console = get_console()
+
+    try:
+        client = CoolifyClient.from_env()
+    except CoolifyError as e:
+        raise click.ClickException(str(e)) from e
+
+    # Resolve target UUID
+    app_uuid = target
+    app_name = target or "(unknown)"
+
+    if target and not _looks_like_uuid(target):
+        # Try to find UUID from deploy state
+        state = load_deploy_state()
+        services = state.get("services", {})
+        for name, svc_info in services.items():
+            if isinstance(svc_info, dict) and (
+                name == target
+                or svc_info.get("subdomain") == target
+                or svc_info.get("uuid") == target
+            ):
+                app_uuid = svc_info.get("uuid")
+                app_name = name
+                break
+
+    if not target:
+        # List all services and prompt
+        try:
+            apps = client.list_apps()
+        except CoolifyError as e:
+            raise click.ClickException(str(e)) from e
+
+        if not apps:
+            raise click.ClickException("No applications found in Coolify.")
+
+        from rich.table import Table
+
+        table = Table(title="Coolify Applications")
+        table.add_column("#", style="dim")
+        table.add_column("Name", style="cyan")
+        table.add_column("Status")
+        table.add_column("UUID", style="dim")
+
+        for i, app in enumerate(apps, 1):
+            table.add_row(str(i), app.name, app.status, app.uuid)
+
+        console.print(table)
+        choice = click.prompt("Select application number", type=int)
+        if choice < 1 or choice > len(apps):
+            raise click.ClickException(f"Invalid selection: {choice}")
+        selected = apps[choice - 1]
+        app_uuid = selected.uuid
+        app_name = selected.name
+
+    if not app_uuid:
+        raise click.ClickException(
+            f"Could not resolve target '{target}'. "
+            "Provide a valid UUID, service name, or subdomain."
+        )
+
+    action = "restart" if quick else "rebuild"
+    if not yes:
+        if not click.confirm(f"{action.capitalize()} {app_name} ({app_uuid})?", default=True):
+            console.print("[yellow]Aborted.[/yellow]")
+            return
+
+    console.print(f"[cyan]Triggering {action}…[/cyan]")
+    if quick:
+        result = client.restart(app_uuid)
+    else:
+        result = client.rebuild(app_uuid)
+
+    if not result.success:
+        raise click.ClickException(f"{action.capitalize()} failed: {result.message}")
+
+    console.print(f"[bold green]\u2713 {action.capitalize()} triggered:[/bold green] {result.message}")
+
+    if not quick:
+        console.print("[cyan]Waiting for service to become healthy…[/cyan]")
+        healthy = client.wait_healthy(app_uuid, timeout=300)
+        if healthy:
+            console.print("[bold green]\u2713 Service is healthy![/bold green]")
+        else:
+            console.print(
+                "[yellow]\u26a0 Service did not reach healthy state within timeout.[/yellow]"
+            )
+
+
+def _looks_like_uuid(value: str) -> bool:
+    """Check if a string looks like a Coolify UUID (contains hyphens and alphanums)."""
+    return len(value) > 8 and "-" in value and all(
+        c.isalnum() or c == "-" for c in value
+    )
+
+
+# ---------------------------------------------------------------------------
+# stx deploy provision — create Hetzner server
+# ---------------------------------------------------------------------------
+
+
+@click.command("provision")
+@click.option("--name", default="streamtex-prod", help="Server name.")
+@click.option("--type", "server_type", default="cax21", help="Server type (e.g. cax21).")
+@click.option("--image", default="ubuntu-24.04", help="OS image.")
+@click.option("--location", default="fsn1", help="Datacenter location.")
+@click.option("--ssh-key-name", default="streamtex-deploy", help="SSH key name in Hetzner.")
+@click.option("--yes", is_flag=True, help="Skip confirmation prompts.")
+def provision_cmd(
+    name: str,
+    server_type: str,
+    image: str,
+    location: str,
+    ssh_key_name: str,
+    yes: bool,
+) -> None:
+    """Create a Hetzner server for StreamTeX deployment."""
+    from .coolify import load_deploy_state, save_deploy_state
+
+    console = get_console()
+
+    # Check hcloud CLI
+    hcloud = shutil.which("hcloud")
+    if not hcloud:
+        raise click.ClickException(
+            "hcloud CLI not found. Install it: brew install hcloud (macOS) "
+            "or apt install hcloud-cli (Linux)."
+        )
+
+    # Read Hetzner token
+    env = _read_deploy_env()
+    hetzner_token = env.get("HETZNER_API_TOKEN")
+    if not hetzner_token:
+        raise click.ClickException(
+            "HETZNER_API_TOKEN not found in .stx-deploy.env. Run 'stx deploy setup' first."
+        )
+
+    console.print("[cyan]Server configuration:[/cyan]")
+    console.print(f"  Name:     {name}")
+    console.print(f"  Type:     {server_type}")
+    console.print(f"  Image:    {image}")
+    console.print(f"  Location: {location}")
+    console.print(f"  SSH key:  {ssh_key_name}")
+
+    if not yes and not click.confirm("\nCreate this server?", default=True):
+        console.print("[yellow]Aborted.[/yellow]")
+        return
+
+    console.print("[cyan]Creating server…[/cyan]")
+    result = subprocess.run(
+        [
+            hcloud, "server", "create",
+            "--name", name,
+            "--type", server_type,
+            "--image", image,
+            "--location", location,
+            "--ssh-key", ssh_key_name,
+        ],
+        capture_output=True,
+        text=True,
+        timeout=120,
+        env={**os.environ, "HCLOUD_TOKEN": hetzner_token},
+    )
+
+    if result.returncode != 0:
+        raise click.ClickException(f"Server creation failed:\n{result.stderr.strip()}")
+
+    console.print("[green]\u2713 Server created[/green]")
+    console.print(result.stdout.strip())
+
+    # Extract IP address from hcloud output
+    ip_result = subprocess.run(
+        [hcloud, "server", "ip", name],
+        capture_output=True,
+        text=True,
+        timeout=30,
+        env={**os.environ, "HCLOUD_TOKEN": hetzner_token},
+    )
+    server_ip = ip_result.stdout.strip() if ip_result.returncode == 0 else ""
+
+    if server_ip:
+        console.print(f"[bold green]Server IP:[/bold green] {server_ip}")
+
+    # Save to .stx-deploy.json
+    state = load_deploy_state()
+    if "infrastructure" not in state:
+        state["infrastructure"] = {}
+    state["infrastructure"]["server"] = {
+        "name": name,
+        "type": server_type,
+        "image": image,
+        "location": location,
+        "ip": server_ip,
+    }
+    save_deploy_state(state)
+    console.print("[green]\u2713 Server info saved to .stx-deploy.json[/green]")
+
+    console.print(
+        "\n[cyan]Next steps:[/cyan]\n"
+        "  1. stx deploy secure     — harden the server\n"
+        "  2. stx deploy install-coolify — install Coolify\n"
+        "  3. stx deploy configure-domain — setup DNS"
+    )
+
+
+# ---------------------------------------------------------------------------
+# stx deploy secure — harden server via SSH
+# ---------------------------------------------------------------------------
+
+
+@click.command("secure")
+@click.option("--ip", default=None, help="Server IP address.")
+@click.option("--yes", is_flag=True, help="Skip confirmation prompts.")
+def secure_cmd(ip: str | None, yes: bool) -> None:
+    """Harden a Hetzner server (firewall, fail2ban, SSH hardening)."""
+    from .coolify import load_deploy_state
+
+    console = get_console()
+
+    # Resolve IP
+    if not ip:
+        state = load_deploy_state()
+        ip = state.get("infrastructure", {}).get("server", {}).get("ip")
+    if not ip:
+        ip = click.prompt("Server IP address")
+
+    console.print(f"[cyan]Target server:[/cyan] {ip}")
+    console.print(
+        "\nThis will:\n"
+        "  1. Create a deploy user with sudo access\n"
+        "  2. Harden sshd_config (disable password auth, root login)\n"
+        "  3. Setup UFW firewall (allow 22, 80, 443, 8000)\n"
+        "  4. Install fail2ban\n"
+        "  5. Enable unattended-upgrades\n"
+    )
+
+    if not yes and not click.confirm("Proceed with server hardening?", default=True):
+        console.print("[yellow]Aborted.[/yellow]")
+        return
+
+    key_path = os.path.expanduser("~/.ssh/hetzner_streamtex")
+
+    # Step 1: Create deploy user
+    console.print("[cyan]Creating deploy user…[/cyan]")
+    commands_to_run = [
+        # Create user and copy SSH key
+        (
+            "useradd -m -s /bin/bash -G sudo deploy 2>/dev/null || true && "
+            "mkdir -p /home/deploy/.ssh && "
+            "cp /root/.ssh/authorized_keys /home/deploy/.ssh/ && "
+            "chown -R deploy:deploy /home/deploy/.ssh && "
+            "echo 'deploy ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/deploy"
+        ),
+        # Step 2: Harden sshd_config
+        (
+            "sed -i 's/^#\\?PermitRootLogin.*/PermitRootLogin prohibit-password/' /etc/ssh/sshd_config && "
+            "sed -i 's/^#\\?PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config && "
+            "sed -i 's/^#\\?ChallengeResponseAuthentication.*/"
+            "ChallengeResponseAuthentication no/' /etc/ssh/sshd_config && "
+            "systemctl restart sshd"
+        ),
+        # Step 3: Setup UFW
+        (
+            "apt-get update -qq && apt-get install -y -qq ufw > /dev/null && "
+            "ufw default deny incoming && "
+            "ufw default allow outgoing && "
+            "ufw allow 22/tcp && "
+            "ufw allow 80/tcp && "
+            "ufw allow 443/tcp && "
+            "ufw allow 8000/tcp && "
+            "echo 'y' | ufw enable"
+        ),
+        # Step 4: Install fail2ban
+        (
+            "apt-get install -y -qq fail2ban > /dev/null && "
+            "systemctl enable fail2ban && "
+            "systemctl start fail2ban"
+        ),
+        # Step 5: Enable unattended-upgrades
+        (
+            "apt-get install -y -qq unattended-upgrades > /dev/null && "
+            "dpkg-reconfigure -plow unattended-upgrades 2>/dev/null || "
+            "echo 'Unattended-Upgrade::Automatic-Reboot \"false\";' > "
+            "/etc/apt/apt.conf.d/50unattended-upgrades-local"
+        ),
+    ]
+
+    step_names = [
+        "Deploy user",
+        "SSH hardening",
+        "UFW firewall",
+        "fail2ban",
+        "Unattended upgrades",
+    ]
+
+    for step_name, cmd in zip(step_names, commands_to_run):
+        console.print(f"  [cyan]{step_name}…[/cyan]")
+        result = _ssh_run(ip, cmd, key_path, timeout=120)
+        if result.returncode == 0:
+            console.print(f"  [green]\u2713 {step_name}[/green]")
+        else:
+            console.print(
+                f"  [yellow]\u26a0 {step_name}: {result.stderr.strip()[:200]}[/yellow]"
+            )
+
+    console.print("\n[bold green]\u2713 Server hardening complete![/bold green]")
+
+
+# ---------------------------------------------------------------------------
+# stx deploy install-coolify — install Coolify on server
+# ---------------------------------------------------------------------------
+
+
+@click.command("install-coolify")
+@click.option("--ip", default=None, help="Server IP address.")
+@click.option("--yes", is_flag=True, help="Skip confirmation prompts.")
+def install_coolify_cmd(ip: str | None, yes: bool) -> None:
+    """Install Coolify on a Hetzner server."""
+    import time
+
+    from .coolify import load_deploy_state, save_deploy_state
+
+    console = get_console()
+
+    # Resolve IP
+    if not ip:
+        state = load_deploy_state()
+        ip = state.get("infrastructure", {}).get("server", {}).get("ip")
+    if not ip:
+        ip = click.prompt("Server IP address")
+
+    console.print(f"[cyan]Target server:[/cyan] {ip}")
+
+    if not yes and not click.confirm("Install Coolify on this server?", default=True):
+        console.print("[yellow]Aborted.[/yellow]")
+        return
+
+    key_path = os.path.expanduser("~/.ssh/hetzner_streamtex")
+
+    # Run the Coolify installer
+    console.print("[cyan]Installing Coolify (this may take a few minutes)…[/cyan]")
+    result = _ssh_run(
+        ip,
+        "curl -fsSL https://cdn.coollabs.io/coolify/install.sh | bash",
+        key_path,
+        timeout=600,
+    )
+
+    if result.returncode != 0:
+        console.print(f"[red]Installation output:[/red]\n{result.stderr.strip()[:500]}")
+        raise click.ClickException("Coolify installation failed.")
+
+    console.print("[green]\u2713 Coolify installer completed[/green]")
+
+    # Poll until port 8000 responds
+    console.print("[cyan]Waiting for Coolify to start (port 8000)…[/cyan]")
+    coolify_url = f"http://{ip}:8000"
+    for attempt in range(30):
+        try:
+            req = urllib.request.Request(coolify_url, method="HEAD")
+            with urllib.request.urlopen(req, timeout=5):  # noqa: S310
+                console.print("[green]\u2713 Coolify is responding![/green]")
+                break
+        except (urllib.error.URLError, OSError):
+            time.sleep(10)
+    else:
+        console.print(
+            "[yellow]\u26a0 Coolify did not respond within timeout.[/yellow]\n"
+            f"Try accessing manually: {coolify_url}"
+        )
+
+    # Guide browser onboarding
+    console.print(
+        f"\n[bold cyan]Complete setup in your browser:[/bold cyan]\n"
+        f"  1. Open {coolify_url}\n"
+        "  2. Create your admin account\n"
+        "  3. Go to Settings → API → Generate a new token\n"
+        "  4. Copy the API token\n"
+    )
+
+    coolify_token = click.prompt("Coolify API token", hide_input=True)
+
+    # Save to .stx-deploy.env
+    env_path = None
+    from pathlib import Path
+
+    for candidate in [Path.cwd() / ".stx-deploy.env", Path.cwd().parent / ".stx-deploy.env"]:
+        if candidate.is_file():
+            env_path = candidate
+            break
+
+    if env_path is None:
+        env_path = Path.cwd() / ".stx-deploy.env"
+
+    with open(env_path, "a", encoding="utf-8") as f:
+        f.write(f"\n# Coolify\nCOOLIFY_URL=https://coolify.{_read_deploy_env().get('DEPLOY_DOMAIN', ip)}\n")
+        f.write(f"COOLIFY_API_TOKEN={coolify_token}\n")
+
+    console.print(f"[green]\u2713 Coolify credentials saved to {env_path}[/green]")
+
+    # Update deploy state
+    state = load_deploy_state()
+    if "infrastructure" not in state:
+        state["infrastructure"] = {}
+    state["infrastructure"]["coolify"] = {
+        "url": coolify_url,
+    }
+    save_deploy_state(state)
+    console.print("[green]\u2713 State updated[/green]")
+    console.print("\n[bold green]\u2713 Coolify installed and configured![/bold green]")
+
+
+# ---------------------------------------------------------------------------
+# stx deploy configure-domain — setup DNS + SSL
+# ---------------------------------------------------------------------------
+
+
+@click.command("configure-domain")
+@click.option("--domain", default=None, help="Domain name to configure.")
+@click.option("--ip", default=None, help="Server IP address.")
+@click.option("--yes", is_flag=True, help="Skip confirmation prompts.")
+def configure_domain_cmd(domain: str | None, ip: str | None, yes: bool) -> None:
+    """Setup DNS records and SSL for the deployment domain."""
+    from .coolify import CoolifyClient, CoolifyError, load_deploy_state
+
+    console = get_console()
+
+    # Resolve domain and IP
+    env = _read_deploy_env()
+    if not domain:
+        domain = env.get("DEPLOY_DOMAIN")
+    if not domain:
+        domain = click.prompt("Domain name")
+
+    if not ip:
+        state = load_deploy_state()
+        ip = state.get("infrastructure", {}).get("server", {}).get("ip")
+    if not ip:
+        ip = click.prompt("Server IP address")
+
+    console.print(f"[cyan]Domain:[/cyan] {domain}")
+    console.print(f"[cyan]Server IP:[/cyan] {ip}")
+
+    # Display required DNS records
+    console.print("\n[bold]Required DNS records:[/bold]")
+
+    from rich.table import Table
+
+    table = Table()
+    table.add_column("Type", style="cyan")
+    table.add_column("Name")
+    table.add_column("Value")
+    table.add_column("Proxy")
+
+    records = [
+        ("A", domain, ip, "Yes"),
+        ("A", f"*.{domain}", ip, "Yes"),
+        ("A", f"coolify.{domain}", ip, "No (DNS only)"),
+    ]
+    for rtype, name, value, proxy in records:
+        table.add_row(rtype, name, value, proxy)
+
+    console.print(table)
+
+    # Try Cloudflare API if token available
+    cf_token = env.get("CLOUDFLARE_API_TOKEN")
+    if cf_token:
+        console.print("\n[cyan]Cloudflare API token found — attempting DNS setup…[/cyan]")
+
+        if not yes and not click.confirm("Create DNS records via Cloudflare API?", default=True):
+            console.print("[yellow]Skipping Cloudflare DNS setup.[/yellow]")
+        else:
+            _setup_cloudflare_dns(cf_token, domain, ip, console)
+    else:
+        console.print(
+            "\n[yellow]No Cloudflare API token found.[/yellow]\n"
+            "Create the DNS records manually in your DNS provider.\n"
+            "Once DNS propagates, Coolify will handle SSL via Let's Encrypt."
+        )
+
+    # Wait for DNS propagation
+    if click.confirm("\nCheck DNS propagation now?", default=True):
+        console.print("[cyan]Checking DNS…[/cyan]")
+        try:
+            import socket
+
+            resolved = socket.gethostbyname(domain)
+            if resolved == ip:
+                console.print(f"[green]\u2713 {domain} resolves to {ip}[/green]")
+            else:
+                console.print(
+                    f"[yellow]\u26a0 {domain} resolves to {resolved} (expected {ip})[/yellow]"
+                )
+        except socket.gaierror:
+            console.print(f"[yellow]\u26a0 {domain} does not resolve yet[/yellow]")
+
+    # Configure Coolify instance domain
+    try:
+        CoolifyClient.from_env()  # verify connectivity
+        console.print("[cyan]Coolify domain configuration should be set via the UI.[/cyan]")
+        console.print(
+            f"  Go to Settings → FQDN and set it to: https://coolify.{domain}"
+        )
+    except CoolifyError:
+        console.print(
+            "[dim]Coolify client not available — configure domain via the Coolify UI.[/dim]"
+        )
+
+    console.print(f"\n[bold green]\u2713 Domain configuration complete for {domain}[/bold green]")
+
+
+def _setup_cloudflare_dns(
+    token: str, domain: str, ip: str, console: object
+) -> None:
+    """Create DNS records via the Cloudflare API."""
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json",
+    }
+
+    # Get zone ID
+    zone_url = f"https://api.cloudflare.com/client/v4/zones?name={domain}"
+    req = urllib.request.Request(zone_url, headers=headers)
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:  # noqa: S310
+            data = json.loads(resp.read().decode())
+    except (urllib.error.URLError, OSError) as e:
+        console.print(f"[red]Cloudflare API error: {e}[/red]")
+        return
+
+    zones = data.get("result", [])
+    if not zones:
+        console.print(f"[red]Zone '{domain}' not found in Cloudflare.[/red]")
+        return
+
+    zone_id = zones[0]["id"]
+    console.print(f"[green]\u2713 Zone found:[/green] {zone_id}")
+
+    # Create DNS records
+    dns_records = [
+        {"type": "A", "name": domain, "content": ip, "proxied": True},
+        {"type": "A", "name": f"*.{domain}", "content": ip, "proxied": True},
+        {"type": "A", "name": f"coolify.{domain}", "content": ip, "proxied": False},
+    ]
+
+    for record in dns_records:
+        record_data = json.dumps(record).encode()
+        create_url = f"https://api.cloudflare.com/client/v4/zones/{zone_id}/dns_records"
+        req = urllib.request.Request(create_url, data=record_data, headers=headers, method="POST")
+        try:
+            with urllib.request.urlopen(req, timeout=15) as resp:  # noqa: S310
+                result = json.loads(resp.read().decode())
+            if result.get("success"):
+                console.print(f"  [green]\u2713 {record['type']} {record['name']}[/green]")
+            else:
+                errors = result.get("errors", [])
+                msg = errors[0].get("message", "Unknown error") if errors else "Unknown error"
+                console.print(f"  [yellow]\u26a0 {record['name']}: {msg}[/yellow]")
+        except urllib.error.HTTPError as e:
+            body = e.read().decode() if e.fp else ""
+            try:
+                err_data = json.loads(body)
+                errors = err_data.get("errors", [])
+                msg = errors[0].get("message", body) if errors else body
+            except (json.JSONDecodeError, IndexError):
+                msg = body
+            console.print(f"  [yellow]\u26a0 {record['name']}: {msg}[/yellow]")
+        except (urllib.error.URLError, OSError) as e:
+            console.print(f"  [red]{record['name']}: {e}[/red]")

@@ -13,12 +13,19 @@ from .claude_cmd import diff_cmd as claude_diff
 from .claude_cmd import install as claude_install
 from .claude_cmd import list_cmd as claude_list
 from .claude_cmd import update_cmd as claude_update
+from .deploy_cmd import configure_domain_cmd as deploy_configure_domain
 from .deploy_cmd import docker as deploy_docker
 from .deploy_cmd import env_sync_cmd as deploy_env_sync
+from .deploy_cmd import hetzner_cmd as deploy_hetzner
 from .deploy_cmd import huggingface_cmd as deploy_huggingface
+from .deploy_cmd import install_coolify_cmd as deploy_install_coolify
 from .deploy_cmd import preflight as deploy_preflight
+from .deploy_cmd import provision_cmd as deploy_provision
 from .deploy_cmd import render_cmd as deploy_render
+from .deploy_cmd import secure_cmd as deploy_secure
+from .deploy_cmd import setup_cmd as deploy_setup
 from .deploy_cmd import status_cmd as deploy_status
+from .deploy_cmd import update_cmd as deploy_update
 from .install_cmd import install as stx_install
 from .project_cmd import new as project_new
 from .project_cmd import validate as project_validate
@@ -109,6 +116,13 @@ deploy.add_command(deploy_render)
 deploy.add_command(deploy_huggingface)
 deploy.add_command(deploy_status)
 deploy.add_command(deploy_env_sync)
+deploy.add_command(deploy_setup)
+deploy.add_command(deploy_hetzner)
+deploy.add_command(deploy_update)
+deploy.add_command(deploy_provision)
+deploy.add_command(deploy_secure)
+deploy.add_command(deploy_install_coolify)
+deploy.add_command(deploy_configure_domain)
 
 
 # --- Publish subgroup ------------------------------------------------------

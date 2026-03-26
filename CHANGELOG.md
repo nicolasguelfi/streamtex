@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.14] — 2026-03-26
+
+### Fixed
+- **`__version__` desync**: replaced hardcoded `__version__` string in `__init__.py` with dynamic `importlib.metadata.version("streamtex")` — version is now always read from `pyproject.toml`, eliminating the single/double source of truth problem that caused v0.5.13 to display "lib 0.5.12" at runtime.
+
 ## [0.5.13] — 2026-03-26
 
 ### Fixed

@@ -55,6 +55,190 @@ class AppInfo:
     description: str = ""
 
 
+# ── Constants (single source of truth) ─────────────────────────────────
+
+DEFAULT_SSH_KEY_PATH = "~/.ssh/hetzner_streamtex"
+"""Default SSH key path for Hetzner server access."""
+
+DEFAULT_SSH_KEY_NAME = "streamtex-deploy"
+"""Name of the SSH key registered in Hetzner."""
+
+DEFAULT_SSH_USER = "deploy"
+"""Non-root user created during server hardening."""
+
+DEFAULT_SERVER_TYPE = "cax21"
+"""Default Hetzner server type (ARM, 4 vCPU, 8 GB RAM)."""
+
+DEFAULT_SERVER_LOCATION = "fsn1"
+"""Default Hetzner datacenter (Falkenstein, Germany)."""
+
+DEFAULT_SERVER_IMAGE = "ubuntu-24.04"
+"""Default OS image for Hetzner servers."""
+
+DEFAULT_SERVER_NAME = "streamtex-prod"
+"""Default server name in Hetzner."""
+
+DEFAULT_DEPLOY_TIMEOUT = 300
+"""Default timeout in seconds for waiting on deployments."""
+
+STREAMLIT_PORT = 8501
+"""Streamlit default port inside the Docker container."""
+
+COOLIFY_DASHBOARD_PORT = 8000
+"""Coolify dashboard port before domain configuration."""
+
+
+# ── Deploy state schema ───────────────────────────────────────────────
+
+@dataclass
+class ServerInfo:
+    """Hetzner server information."""
+    name: str = ""
+    id: int = 0
+    type: str = DEFAULT_SERVER_TYPE
+    location: str = DEFAULT_SERVER_LOCATION
+    image: str = DEFAULT_SERVER_IMAGE
+    ipv4: str = ""
+    ssh_key_path: str = DEFAULT_SSH_KEY_PATH
+    ssh_key_name: str = DEFAULT_SSH_KEY_NAME
+    ssh_key_id: int = 0
+
+
+@dataclass
+class DomainInfo:
+    """Domain configuration."""
+    base: str = ""
+    registrar: str = ""
+    wildcard_dns: str = ""
+
+
+@dataclass
+class CoolifyInfo:
+    """Coolify installation details."""
+    url: str = ""
+    server_uuid: str = ""
+    project_uuid: str = ""
+    environment: str = "production"
+    environment_uuid: str = ""
+
+
+@dataclass
+class AppEntry:
+    """A deployed application in the state file."""
+    name: str = ""
+    uuid: str = ""
+    subdomain: str = ""
+    url: str = ""
+    folder: str = ""
+    github_repo: str = ""
+    branch: str = "main"
+    deployed_at: str = ""
+
+
+@dataclass
+class DeployState:
+    """Unified state schema for .stx-deploy.json.
+
+    Used by BOTH the Python CLI and the Claude commands.
+    All fields are optional — the state is built up incrementally
+    as each phase completes.
+    """
+    version: str = "2.0"
+    server: ServerInfo | None = None
+    domain: DomainInfo | None = None
+    coolify: CoolifyInfo | None = None
+    applications: list[AppEntry] | None = None
+    phases_completed: dict[str, str] | None = None
+    """Timestamps for each completed phase: provision, secure, install_coolify, configure_domain."""
+
+    cdn: dict | None = None
+    security: dict | None = None
+
+    def to_dict(self) -> dict:
+        """Serialize to a plain dict for JSON storage."""
+        d: dict = {"version": self.version}
+        if self.server:
+            d["infrastructure"] = {"server": {
+                k: v for k, v in self.server.__dict__.items() if v
+            }}
+        if self.domain:
+            d.setdefault("infrastructure", {})["domain"] = {
+                k: v for k, v in self.domain.__dict__.items() if v
+            }
+        if self.coolify:
+            d.setdefault("infrastructure", {})["coolify"] = {
+                k: v for k, v in self.coolify.__dict__.items() if v
+            }
+        if self.cdn:
+            d.setdefault("infrastructure", {})["cdn"] = self.cdn
+        if self.security:
+            d.setdefault("infrastructure", {})["security"] = self.security
+        if self.phases_completed:
+            d["phases_completed"] = self.phases_completed
+        if self.applications:
+            d["applications"] = [
+                {k: v for k, v in app.__dict__.items() if v}
+                for app in self.applications
+            ]
+        return d
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "DeployState":
+        """Deserialize from a plain dict (loaded from JSON)."""
+        infra = data.get("infrastructure", {})
+        server_data = infra.get("server", {})
+        domain_data = infra.get("domain", {})
+        coolify_data = infra.get("coolify", {})
+
+        server = ServerInfo(**{
+            k: v for k, v in server_data.items()
+            if k in ServerInfo.__dataclass_fields__
+        }) if server_data else None
+
+        domain = DomainInfo(**{
+            k: v for k, v in domain_data.items()
+            if k in DomainInfo.__dataclass_fields__
+        }) if domain_data else None
+
+        coolify = CoolifyInfo(**{
+            k: v for k, v in coolify_data.items()
+            if k in CoolifyInfo.__dataclass_fields__
+        }) if coolify_data else None
+
+        apps_data = data.get("applications", [])
+        applications = [
+            AppEntry(**{k: v for k, v in a.items() if k in AppEntry.__dataclass_fields__})
+            for a in apps_data
+        ] if apps_data else None
+
+        return cls(
+            version=data.get("version", "1.0"),
+            server=server,
+            domain=domain,
+            coolify=coolify,
+            applications=applications,
+            phases_completed=data.get("phases_completed"),
+            cdn=infra.get("cdn"),
+            security=infra.get("security"),
+        )
+
+
+def load_typed_state(path: str | Path | None = None) -> DeployState:
+    """Load ``.stx-deploy.json`` as a typed :class:`DeployState`.
+
+    Returns a default (empty) state if the file does not exist.
+    """
+    raw = load_deploy_state(path)
+    if not raw:
+        return DeployState()
+    return DeployState.from_dict(raw)
+
+
+def save_typed_state(state: DeployState, path: str | Path | None = None) -> Path:
+    """Save a :class:`DeployState` to ``.stx-deploy.json``."""
+    return save_deploy_state(state.to_dict(), path)
+
+
 class CoolifyError(Exception):
     """Raised when a Coolify API call fails."""
 
@@ -263,6 +447,50 @@ class CoolifyClient:
             body={"key": key, "value": value, "is_build_time": is_build},
         )
 
+    # ── Application management ────────────────────────────────────────
+
+    def create_app(
+        self,
+        project_uuid: str,
+        server_uuid: str,
+        name: str,
+        repository: str,
+        branch: str = "main",
+        build_pack: str = "dockerfile",
+        dockerfile_location: str = "/Dockerfile",
+        environment_name: str = "production",
+    ) -> dict:
+        """Create a new Coolify application.
+
+        Returns the full application dict including ``uuid``.
+        Note: this requires Coolify v4.0.0-beta.350+.
+        """
+        return self._post("/api/v1/applications", body={
+            "project_uuid": project_uuid,
+            "server_uuid": server_uuid,
+            "environment_name": environment_name,
+            "name": name,
+            "git_repository": repository,
+            "git_branch": branch,
+            "build_pack": build_pack,
+            "dockerfile_location": dockerfile_location,
+        })
+
+    def delete_app(self, uuid: str) -> dict:
+        """Delete an application."""
+        return self._delete(f"/api/v1/applications/{uuid}")
+
+    def verify_token(self) -> bool:
+        """Verify that the API token is valid by listing apps.
+
+        Returns True if the token is valid, False otherwise.
+        """
+        try:
+            self._get("/api/v1/applications")
+            return True
+        except CoolifyError:
+            return False
+
     # ── Domain ─────────────────────────────────────────────────────────
 
     def set_fqdn(self, uuid: str, fqdn: str) -> dict:
@@ -296,6 +524,11 @@ class CoolifyClient:
         url = f"{self.url}{path}"
         data = json.dumps(body or {}).encode() if body else b"{}"
         req = urllib.request.Request(url, data=data, headers=self._headers(), method="PATCH")
+        return self._do_request(req)
+
+    def _delete(self, path: str) -> dict:
+        url = f"{self.url}{path}"
+        req = urllib.request.Request(url, headers=self._headers(), method="DELETE")
         return self._do_request(req)
 
     def _do_request(self, req: urllib.request.Request) -> dict | list:

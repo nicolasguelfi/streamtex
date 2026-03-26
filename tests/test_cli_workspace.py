@@ -389,8 +389,9 @@ def test_status_outside_workspace(tmp_path):
     runner = CliRunner()
     with runner.isolated_filesystem(temp_dir=tmp_path):
         result = runner.invoke(cli, ["status"])
-    assert result.exit_code != 0
-    assert "stx.toml" in result.output
+    # Enhanced status command succeeds even outside a workspace (reduced output)
+    assert result.exit_code == 0
+    assert "not detected" in result.output or "stx install" in result.output
 
 
 # ---------------------------------------------------------------------------

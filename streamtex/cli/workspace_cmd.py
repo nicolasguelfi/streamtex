@@ -198,76 +198,6 @@ def init(path, name, preset):
     console.print("  projects/ directory created")
 
 
-@click.command()
-def status():
-    """Show git status of all repos in the workspace."""
-    ws_root = find_workspace_root()
-    if ws_root is None:
-        raise click.ClickException(
-            "Not inside a StreamTeX workspace (no stx.toml found in parent directories)."
-        )
-
-    config = load_stx_toml(ws_root)
-    repos = config.get("repos", {})
-
-    if not repos:
-        console = get_console()
-        console.print("[yellow]No repos configured in stx.toml[/yellow]")
-        return
-
-    from rich.table import Table
-
-    table = Table(title=f"Workspace: {config.get('workspace', {}).get('name', '?')}")
-    table.add_column("Repo", style="cyan")
-    table.add_column("Branch", style="green")
-    table.add_column("Status")
-    table.add_column("Ahead/Behind")
-
-    hints: list[str] = []
-
-    for repo_name, repo_conf in repos.items():
-        repo_path = os.path.join(ws_root, repo_conf.get("path", repo_name))
-        if not os.path.isdir(repo_path):
-            table.add_row(repo_name, "-", "[red]not cloned[/red]", "-")
-            hints.append(f"  [yellow]{repo_name}[/yellow]: run [bold]stx update[/bold] to clone")
-            continue
-        info = get_repo_status(repo_path)
-        status_text = "[green]clean[/green]" if info["clean"] else "[red]dirty[/red]"
-        ab = f"+{info['ahead']}/-{info['behind']}" if info["ahead"] or info["behind"] else "-"
-        table.add_row(repo_name, info["branch"], status_text, ab)
-
-        if not info["clean"]:
-            dirty_files = _get_dirty_files(repo_path)
-            if dirty_files == ["uv.lock"]:
-                hints.append(
-                    f"  [yellow]{repo_name}[/yellow]: uv.lock modified locally"
-                    " — run [bold]stx update[/bold] to fix"
-                )
-            else:
-                file_list = ", ".join(dirty_files[:5])
-                if len(dirty_files) > 5:
-                    file_list += f" (+{len(dirty_files) - 5} more)"
-                hints.append(
-                    f"  [yellow]{repo_name}[/yellow]: uncommitted changes in {file_list}"
-                    " — commit or stash before updating"
-                )
-        if info["behind"]:
-            hints.append(
-                f"  [yellow]{repo_name}[/yellow]: {info['behind']} commit(s) behind remote"
-                " — run [bold]stx update[/bold] to pull"
-            )
-        if info["ahead"]:
-            hints.append(
-                f"  [yellow]{repo_name}[/yellow]: {info['ahead']} commit(s) ahead of remote"
-                " — run [bold]git push[/bold] in {repo_name}/"
-            )
-
-    console = get_console()
-    console.print(table)
-    if hints:
-        console.print()
-        for hint in hints:
-            console.print(hint)
 
 
 # ---------------------------------------------------------------------------
@@ -723,6 +653,164 @@ def _run_repair_checks(ws_root: str, config: dict, console, *, dry_run: bool = F
 
 
 # ---------------------------------------------------------------------------
+# Project migrations (applied during stx update)
+# ---------------------------------------------------------------------------
+
+
+def _upgrade_projects(
+    repos: dict, ws_root: str, console, *, dry_run: bool = False,
+) -> None:
+    """Apply pending migrations to all projects in the workspace."""
+    from importlib.metadata import version as pkg_version
+
+    from .migrations import detect_project_version, get_pending_migrations
+    from .migrations.registry import _version_tuple, write_version_marker
+
+    try:
+        installed_ver = pkg_version("streamtex")
+    except Exception:
+        console.print("  [yellow]Cannot determine installed version — skipped[/yellow]")
+        return
+
+    # Collect all project paths (from repos + projects/ directory)
+    project_paths: list[tuple[str, str]] = []
+    for repo_name, repo_conf in repos.items():
+        if repo_conf.get("type") == "project":
+            path = os.path.join(ws_root, repo_conf.get("path", repo_name))
+            if os.path.isdir(path) and os.path.isfile(os.path.join(path, "pyproject.toml")):
+                project_paths.append((repo_name, path))
+
+    projects_dir = os.path.join(ws_root, "projects")
+    if os.path.isdir(projects_dir):
+        listed = {p for _, p in project_paths}
+        for entry in sorted(os.listdir(projects_dir)):
+            if entry.startswith(("_", ".")):
+                continue
+            path = os.path.join(projects_dir, entry)
+            if path not in listed and os.path.isfile(os.path.join(path, "pyproject.toml")):
+                project_paths.append((entry, path))
+
+    if not project_paths:
+        console.print("  No projects found.")
+        return
+
+    upgraded = 0
+    skipped = 0
+    for name, path in project_paths:
+        current_ver = detect_project_version(path)
+        if _version_tuple(current_ver) >= _version_tuple(installed_ver):
+            skipped += 1
+            continue
+
+        pending = get_pending_migrations(current_ver, installed_ver)
+        if not pending:
+            skipped += 1
+            continue
+
+        rel = os.path.relpath(path, ws_root)
+        console.print(f"  [cyan]{rel}[/cyan]: {len(pending)} migration(s) ({current_ver} → {installed_ver})")
+
+        for migration in pending:
+            if migration.check(path):
+                result = migration.apply(path, dry_run=dry_run)
+                prefix = "[dim](dry-run)[/dim] " if dry_run else ""
+                if result.applied:
+                    console.print(f"    {prefix}[green]v{result.version}[/green]: {result.description}")
+                    for change in result.changes:
+                        console.print(f"      - {change}")
+                else:
+                    console.print(
+                        f"    {prefix}[dim]v{result.version}: skipped"
+                        f" ({result.skipped_reason})[/dim]"
+                    )
+            else:
+                console.print(f"    [dim]v{migration.version}: already applied[/dim]")
+
+        if not dry_run:
+            write_version_marker(path, installed_ver)
+        upgraded += 1
+
+    if upgraded:
+        console.print(f"\n  {upgraded} upgraded, {skipped} already up to date")
+    else:
+        console.print("  All projects up to date.")
+
+
+# ---------------------------------------------------------------------------
+# CLI tool upgrade (developer workspaces)
+# ---------------------------------------------------------------------------
+
+
+def _get_source_version(lib_path: str) -> str | None:
+    """Read __version__ from the local library source."""
+    init_file = os.path.join(lib_path, "streamtex", "__init__.py")
+    if os.path.isfile(init_file):
+        try:
+            with open(init_file, encoding="utf-8") as f:
+                for line in f:
+                    if line.startswith("__version__"):
+                        return line.split("=", 1)[1].strip().strip("\"'")
+        except OSError:
+            pass
+    return None
+
+
+def _get_installed_cli_version() -> str | None:
+    """Return the currently installed stx CLI version."""
+    try:
+        from importlib.metadata import version as pkg_version
+        return pkg_version("streamtex")
+    except Exception:
+        return None
+
+
+def _upgrade_cli_tool(
+    ws_root: str, lib_path: str, console, *, dry_run: bool = False,
+) -> None:
+    """Reinstall the stx CLI from local source if version differs."""
+    source_ver = _get_source_version(lib_path)
+    installed_ver = _get_installed_cli_version()
+
+    if not source_ver:
+        console.print("  [yellow]Could not read source version — skipped[/yellow]")
+        return
+
+    if source_ver == installed_ver:
+        console.print(
+            f"  CLI [green]{installed_ver}[/green] matches source — "
+            "no upgrade needed"
+        )
+        return
+
+    console.print(
+        f"  CLI [yellow]{installed_ver}[/yellow] differs from "
+        f"source [cyan]{source_ver}[/cyan]"
+    )
+
+    if dry_run:
+        console.print(f'  Would run: uv tool install --force --reinstall "{lib_path}[cli]"')
+        return
+
+    uv = _find_uv()
+    console.print("  Reinstalling CLI from local source …")
+    result = subprocess.run(
+        [uv, "tool", "install", "--force", "--reinstall", f"{lib_path}[cli]"],
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    if result.returncode == 0:
+        console.print(
+            f"  [green]CLI upgraded: {installed_ver} → {source_ver}[/green]"
+        )
+    else:
+        console.print("  [red]CLI upgrade failed[/red]")
+        if result.stderr:
+            for line in result.stderr.strip().splitlines()[:5]:
+                console.print(f"    {line}")
+
+
+# ---------------------------------------------------------------------------
 # clone / link / sync commands (deprecated — kept for backward compat)
 # ---------------------------------------------------------------------------
 
@@ -815,19 +903,32 @@ def sync():
 @click.option("--skip-profiles", is_flag=True, help="Skip Claude profile update step.")
 @click.option("--dry-run", is_flag=True, help="Show steps without executing.")
 @click.option("--repair", is_flag=True, help="Run repair checks (broken venv, missing __init__.py).")
-def update(skip_sync, skip_profiles, dry_run, repair):
+@click.option("--force", is_flag=True, help="Overwrite locally modified profile files (backup in .claude/.backup/).")
+def update(skip_sync, skip_profiles, dry_run, repair, force):
     """Pull repos, clone missing, sync deps, install hooks, update profiles."""
     ws_root, config = _require_workspace()
     repos = config.get("repos", {})
     console = get_console()
 
+    # Does this workspace have a local library repo? (developer preset)
+    _lib_path = None
+    for _rn, _rc in repos.items():
+        if _rc.get("type") == "library":
+            _candidate = os.path.join(ws_root, _rc.get("path", _rn))
+            if os.path.isdir(_candidate):
+                _lib_path = _candidate
+            break
+    _needs_cli_upgrade = _lib_path is not None and not skip_sync
+
     # Dynamic step counter
-    total_steps = 6  # pull, clone, sync, global commands, profiles, hooks
+    total_steps = 7  # pull, clone, sync, migrations, global commands, profiles, hooks
     if skip_sync:
-        total_steps -= 1
+        total_steps -= 2  # skip sync AND migrations (migrations need synced deps)
     if skip_profiles:
         total_steps -= 1
     if repair:
+        total_steps += 1
+    if _needs_cli_upgrade:
         total_steps += 1
     step = 0
 
@@ -942,6 +1043,11 @@ def update(skip_sync, skip_profiles, dry_run, repair):
         else:
             _run_uv_sync(repos, ws_root)
 
+    # --- project migrations ---
+    if not skip_sync:
+        _step("Upgrading projects …")
+        _upgrade_projects(repos, ws_root, console, dry_run=dry_run)
+
     # --- install global commands ---
     _step("Installing global commands …")
     if dry_run:
@@ -968,7 +1074,7 @@ def update(skip_sync, skip_profiles, dry_run, repair):
                     for target_path, profile in targets:
                         rel = os.path.relpath(target_path, ws_root)
                         console.print(f"  [bold cyan]── {rel} [/bold cyan]([cyan]{profile}[/cyan])")
-                        _update_single_target(claude_repo, profile, target_path, False, console)
+                        _update_single_target(claude_repo, profile, target_path, force, console)
                 else:
                     console.print("  [yellow]No projects with Claude profiles found.[/yellow]")
             except click.ClickException:
@@ -977,6 +1083,11 @@ def update(skip_sync, skip_profiles, dry_run, repair):
     # --- install pre-commit hooks ---
     _step("Installing pre-commit hooks …")
     _install_precommit_hooks(ws_root, config, console, dry_run=dry_run)
+
+    # --- CLI tool upgrade (developer only) ---
+    if _needs_cli_upgrade:
+        _step("Checking CLI tool version …")
+        _upgrade_cli_tool(ws_root, _lib_path, console, dry_run=dry_run)
 
     # --- repair checks ---
     if repair:

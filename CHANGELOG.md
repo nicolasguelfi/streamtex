@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.12] — 2026-03-26
+
+### Added
+- **Hetzner/Coolify deployment CLI**: 7 new `stx deploy` commands — `setup`, `provision`, `secure`, `install-coolify`, `configure-domain`, `hetzner`, `update` — covering the full deployment lifecycle from zero.
+- **`coolify.py` API client module**: `CoolifyClient` with `rebuild()`, `restart()`, `create_app()`, `delete_app()`, `wait_healthy()`, `set_env_var()`, `set_fqdn()`, `verify_token()`.
+- **`DeployState` typed schema**: dataclasses for `.stx-deploy.json` (ServerInfo, DomainInfo, CoolifyInfo, AppEntry) with `to_dict()`/`from_dict()` serialization.
+- **Shared constants**: `DEFAULT_SSH_KEY_PATH`, `DEFAULT_SERVER_TYPE`, `STREAMLIT_PORT`, etc. — single source of truth for CLI and Claude commands.
+- **`stx deploy status coolify`**: new platform option to check Coolify service health.
+
+### Changed
+- **`stx deploy update`**: uses `/start` (full rebuild) by default, `--quick` for `/restart` (same image). Previously used `/restart` incorrectly.
+- **Deploy commands refactored**: extracted `_assert_preflight()`, `_ensure_dockerfile()`, `_resolve_server_ip()` helpers to eliminate 60+ lines of duplication.
+- **`render_service_url()`**: accepts configurable domain instead of hardcoding `streamtex.org`.
+- **CLI commands write `phases_completed`**: `provision`, `secure`, `install-coolify`, `configure-domain` now write ISO timestamps to `.stx-deploy.json` for interop with Claude commands.
+
 ## [0.5.11] — 2026-03-25
 
 ### Added

@@ -6,13 +6,30 @@ from unittest.mock import patch
 import pytest
 
 from streamtex.cli.coolify import (
+    COOLIFY_DASHBOARD_PORT,
+    DEFAULT_DEPLOY_TIMEOUT,
+    DEFAULT_SERVER_IMAGE,
+    DEFAULT_SERVER_LOCATION,
+    DEFAULT_SERVER_NAME,
+    DEFAULT_SERVER_TYPE,
+    DEFAULT_SSH_KEY_NAME,
+    DEFAULT_SSH_KEY_PATH,
+    DEFAULT_SSH_USER,
+    STREAMLIT_PORT,
+    AppEntry,
     AppInfo,
     CoolifyClient,
     CoolifyError,
+    CoolifyInfo,
     DeployResult,
+    DeployState,
+    DomainInfo,
+    ServerInfo,
     _parse_env_file,
     load_deploy_state,
+    load_typed_state,
     save_deploy_state,
+    save_typed_state,
 )
 
 # ── _parse_env_file ──────────────────────────────────────────────────────
@@ -235,3 +252,321 @@ class TestStateFile:
         save_deploy_state({"test": True}, path=p)
         assert p.exists()
         assert json.loads(p.read_text())["test"] is True
+
+
+# ── Constants ─────────────────────────────────────────────────────────
+
+class TestConstants:
+    def test_default_ssh_key_path(self):
+        assert DEFAULT_SSH_KEY_PATH == "~/.ssh/hetzner_streamtex"
+
+    def test_default_ssh_key_name(self):
+        assert DEFAULT_SSH_KEY_NAME == "streamtex-deploy"
+
+    def test_default_ssh_user(self):
+        assert DEFAULT_SSH_USER == "deploy"
+
+    def test_default_server_type(self):
+        assert DEFAULT_SERVER_TYPE == "cax21"
+
+    def test_default_server_location(self):
+        assert DEFAULT_SERVER_LOCATION == "fsn1"
+
+    def test_default_server_image(self):
+        assert DEFAULT_SERVER_IMAGE == "ubuntu-24.04"
+
+    def test_default_server_name(self):
+        assert DEFAULT_SERVER_NAME == "streamtex-prod"
+
+    def test_default_deploy_timeout(self):
+        assert DEFAULT_DEPLOY_TIMEOUT == 300
+
+    def test_streamlit_port(self):
+        assert STREAMLIT_PORT == 8501
+
+    def test_coolify_dashboard_port(self):
+        assert COOLIFY_DASHBOARD_PORT == 8000
+
+
+# ── DeployState dataclass ─────────────────────────────────────────────
+
+class TestDeployState:
+    def test_default_construction(self):
+        state = DeployState()
+        assert state.version == "2.0"
+        assert state.server is None
+        assert state.domain is None
+        assert state.coolify is None
+        assert state.applications is None
+        assert state.phases_completed is None
+        assert state.cdn is None
+        assert state.security is None
+
+    def test_to_dict_empty(self):
+        state = DeployState()
+        d = state.to_dict()
+        assert d == {"version": "2.0"}
+
+    def test_to_dict_with_infrastructure(self):
+        state = DeployState(
+            server=ServerInfo(name="test-srv", id=123, ipv4="1.2.3.4"),
+            domain=DomainInfo(base="example.org", registrar="ovh"),
+            coolify=CoolifyInfo(url="https://coolify.example.org", server_uuid="su1"),
+            phases_completed={"provision": "2026-03-20T10:00:00"},
+            applications=[
+                AppEntry(name="app1", uuid="u1", subdomain="app1", url="https://app1.example.org"),
+            ],
+        )
+        d = state.to_dict()
+        assert d["version"] == "2.0"
+        assert d["infrastructure"]["server"]["name"] == "test-srv"
+        assert d["infrastructure"]["server"]["id"] == 123
+        assert d["infrastructure"]["domain"]["base"] == "example.org"
+        assert d["infrastructure"]["coolify"]["url"] == "https://coolify.example.org"
+        assert d["phases_completed"]["provision"] == "2026-03-20T10:00:00"
+        assert len(d["applications"]) == 1
+        assert d["applications"][0]["name"] == "app1"
+
+    def test_from_dict_round_trip(self):
+        original = DeployState(
+            server=ServerInfo(name="srv", id=42, ipv4="10.0.0.1"),
+            domain=DomainInfo(base="test.org"),
+            coolify=CoolifyInfo(url="https://c.test", server_uuid="s1"),
+            phases_completed={"provision": "ts1", "secure": "ts2"},
+            applications=[
+                AppEntry(name="a1", uuid="u1", url="https://a1.test"),
+                AppEntry(name="a2", uuid="u2", folder="manuals/intro"),
+            ],
+        )
+        d = original.to_dict()
+        restored = DeployState.from_dict(d)
+        assert restored.version == original.version
+        assert restored.server.name == "srv"
+        assert restored.server.id == 42
+        assert restored.domain.base == "test.org"
+        assert restored.coolify.url == "https://c.test"
+        assert restored.phases_completed == {"provision": "ts1", "secure": "ts2"}
+        assert len(restored.applications) == 2
+        assert restored.applications[0].name == "a1"
+        assert restored.applications[1].folder == "manuals/intro"
+
+    def test_from_dict_v1_format(self):
+        """Test with a v1-style dict (production .stx-deploy.json format)."""
+        v1_data = {
+            "version": "1.0",
+            "infrastructure": {
+                "server": {"name": "streamtex-prod", "id": 99, "ipv4": "138.199.148.59"},
+                "coolify": {"url": "https://coolify.streamtex.org", "server_uuid": "abc"},
+                "domain": {"base": "streamtex.org", "registrar": "ovh"},
+            },
+            "applications": [
+                {"name": "docs", "uuid": "x1", "subdomain": "docs", "url": "https://docs.streamtex.org"},
+            ],
+            "phases_completed": {"provision": "2026-03-20"},
+        }
+        state = DeployState.from_dict(v1_data)
+        assert state.version == "1.0"
+        assert state.server.name == "streamtex-prod"
+        assert state.server.ipv4 == "138.199.148.59"
+        assert state.coolify.url == "https://coolify.streamtex.org"
+        assert state.domain.base == "streamtex.org"
+        assert len(state.applications) == 1
+        assert state.applications[0].uuid == "x1"
+        assert state.phases_completed["provision"] == "2026-03-20"
+
+    def test_from_dict_empty(self):
+        state = DeployState.from_dict({})
+        assert state.version == "1.0"  # default when missing
+        assert state.server is None
+        assert state.domain is None
+        assert state.coolify is None
+        assert state.applications is None
+        assert state.phases_completed is None
+
+    def test_from_dict_partial_server_only(self):
+        data = {
+            "infrastructure": {
+                "server": {"name": "my-srv", "ipv4": "5.6.7.8"},
+            },
+        }
+        state = DeployState.from_dict(data)
+        assert state.server is not None
+        assert state.server.name == "my-srv"
+        assert state.server.ipv4 == "5.6.7.8"
+        assert state.coolify is None
+        assert state.domain is None
+        assert state.applications is None
+
+
+# ── ServerInfo, DomainInfo, CoolifyInfo, AppEntry ─────────────────────
+
+class TestServerInfo:
+    def test_defaults(self):
+        s = ServerInfo()
+        assert s.name == ""
+        assert s.id == 0
+        assert s.type == DEFAULT_SERVER_TYPE
+        assert s.location == DEFAULT_SERVER_LOCATION
+        assert s.image == DEFAULT_SERVER_IMAGE
+        assert s.ipv4 == ""
+        assert s.ssh_key_path == DEFAULT_SSH_KEY_PATH
+        assert s.ssh_key_name == DEFAULT_SSH_KEY_NAME
+        assert s.ssh_key_id == 0
+
+    def test_with_values(self):
+        s = ServerInfo(name="prod", id=42, ipv4="1.2.3.4", type="cx22")
+        assert s.name == "prod"
+        assert s.id == 42
+        assert s.ipv4 == "1.2.3.4"
+        assert s.type == "cx22"
+
+
+class TestDomainInfo:
+    def test_defaults(self):
+        d = DomainInfo()
+        assert d.base == ""
+        assert d.registrar == ""
+        assert d.wildcard_dns == ""
+
+    def test_with_values(self):
+        d = DomainInfo(base="example.org", registrar="ovh", wildcard_dns="*.example.org")
+        assert d.base == "example.org"
+        assert d.registrar == "ovh"
+
+
+class TestCoolifyInfo:
+    def test_defaults(self):
+        c = CoolifyInfo()
+        assert c.url == ""
+        assert c.server_uuid == ""
+        assert c.project_uuid == ""
+        assert c.environment == "production"
+        assert c.environment_uuid == ""
+
+    def test_with_values(self):
+        c = CoolifyInfo(url="https://c.org", server_uuid="s1", project_uuid="p1")
+        assert c.url == "https://c.org"
+        assert c.server_uuid == "s1"
+
+
+class TestAppEntry:
+    def test_defaults(self):
+        a = AppEntry()
+        assert a.name == ""
+        assert a.uuid == ""
+        assert a.subdomain == ""
+        assert a.url == ""
+        assert a.folder == ""
+        assert a.github_repo == ""
+        assert a.branch == "main"
+        assert a.deployed_at == ""
+
+    def test_with_values(self):
+        a = AppEntry(name="docs", uuid="u1", subdomain="docs",
+                     url="https://docs.example.org", folder="manuals/intro")
+        assert a.name == "docs"
+        assert a.uuid == "u1"
+        assert a.folder == "manuals/intro"
+
+
+# ── load_typed_state / save_typed_state ───────────────────────────────
+
+class TestTypedState:
+    def test_load_typed_state_no_file(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        state = load_typed_state()
+        assert isinstance(state, DeployState)
+        assert state.version == "2.0"
+        assert state.server is None
+
+    def test_save_and_load_round_trip(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        original = DeployState(
+            server=ServerInfo(name="test", id=1, ipv4="10.0.0.1"),
+            coolify=CoolifyInfo(url="https://c.test"),
+            applications=[AppEntry(name="app1", uuid="u1")],
+        )
+        save_typed_state(original)
+        loaded = load_typed_state()
+        assert isinstance(loaded, DeployState)
+        assert loaded.server.name == "test"
+        assert loaded.coolify.url == "https://c.test"
+        assert len(loaded.applications) == 1
+        assert loaded.applications[0].name == "app1"
+
+    def test_save_to_explicit_path(self, tmp_path):
+        p = tmp_path / "state.json"
+        state = DeployState(server=ServerInfo(name="srv"))
+        save_typed_state(state, path=p)
+        loaded = load_typed_state(path=p)
+        assert loaded.server.name == "srv"
+
+
+# ── CoolifyClient new methods (mocked) ───────────────────────────────
+
+class TestCoolifyClientNewMethods:
+    def _client(self):
+        return CoolifyClient("https://coolify.test", "testtoken")
+
+    def test_create_app(self):
+        c = self._client()
+        mock_resp = {"uuid": "new-uuid", "name": "my-app"}
+        with patch.object(c, "_post", return_value=mock_resp) as mock:
+            result = c.create_app(
+                project_uuid="proj1",
+                server_uuid="srv1",
+                name="my-app",
+                repository="owner/repo",
+                branch="main",
+            )
+            mock.assert_called_once_with("/api/v1/applications", body={
+                "project_uuid": "proj1",
+                "server_uuid": "srv1",
+                "environment_name": "production",
+                "name": "my-app",
+                "git_repository": "owner/repo",
+                "git_branch": "main",
+                "build_pack": "dockerfile",
+                "dockerfile_location": "/Dockerfile",
+            })
+            assert result["uuid"] == "new-uuid"
+
+    def test_create_app_custom_params(self):
+        c = self._client()
+        with patch.object(c, "_post", return_value={"uuid": "u"}) as mock:
+            c.create_app(
+                project_uuid="p", server_uuid="s", name="n",
+                repository="r", branch="dev",
+                build_pack="nixpacks", dockerfile_location="/docker/Dockerfile",
+                environment_name="staging",
+            )
+            call_body = mock.call_args[1]["body"] if "body" in mock.call_args[1] else mock.call_args[0][1]
+            # Access via keyword
+            body = mock.call_args.kwargs.get("body", mock.call_args[0][1] if len(mock.call_args[0]) > 1 else None)
+            assert body["build_pack"] == "nixpacks"
+            assert body["environment_name"] == "staging"
+            assert body["git_branch"] == "dev"
+
+    def test_delete_app(self):
+        c = self._client()
+        with patch.object(c, "_delete", return_value={"message": "deleted"}) as mock:
+            result = c.delete_app("uuid-to-delete")
+            mock.assert_called_once_with("/api/v1/applications/uuid-to-delete")
+            assert result["message"] == "deleted"
+
+    def test_verify_token_success(self):
+        c = self._client()
+        with patch.object(c, "_get", return_value=[]):
+            assert c.verify_token() is True
+
+    def test_verify_token_failure(self):
+        c = self._client()
+        with patch.object(c, "_get", side_effect=CoolifyError("HTTP 401")):
+            assert c.verify_token() is False
+
+    def test_stop(self):
+        c = self._client()
+        with patch.object(c, "_post", return_value={"message": "Stop queued."}) as mock:
+            result = c.stop("u1")
+            mock.assert_called_once_with("/api/v1/applications/u1/stop")
+            assert result.success is True

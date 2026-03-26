@@ -24,7 +24,7 @@ import io as _io
 _real_stderr = _sys.stderr
 _sys.stderr = _io.StringIO()
 
-__version__ = "0.5.11"
+__version__ = "0.5.12"
 
 # Core style system
 from .styles import Style, ListStyle, StyleGrid, StxStyles, StreamTeX_Styles, theme

@@ -987,7 +987,7 @@ def huggingface_cmd(
 
 
 @click.command("status")
-@click.argument("platform", type=click.Choice(["render", "huggingface"]))
+@click.argument("platform", type=click.Choice(["render", "huggingface", "coolify"]))
 @click.argument("name", required=False, default=None)
 @click.option("--path", default=".", help="Project path (for service discovery).")
 @click.option("--timeout", default=10, type=int, help="HTTP probe timeout in seconds.")
@@ -997,9 +997,13 @@ def status_cmd(
     path: str,
     timeout: int,
 ) -> None:
-    """Check deployment status for Render or Hugging Face."""
+    """Check deployment status for Render, Hugging Face, or Coolify."""
     console = get_console()
     p = os.path.abspath(path)
+
+    if platform == "coolify":
+        _status_coolify(console, name)
+        return
 
     if platform == "render":
         statuses = check_render_status(p, name=name, timeout=timeout)
@@ -1037,6 +1041,52 @@ def status_cmd(
     for s in statuses:
         if s.status != "live" and s.message:
             console.print(f"  [dim]{s.name}: {s.message}[/dim]")
+
+
+def _status_coolify(console, name: str | None) -> None:
+    """Show Coolify deployment status for all or a specific service."""
+    from rich.table import Table
+
+    from .coolify import CoolifyClient, CoolifyError
+
+    try:
+        client = CoolifyClient.from_env()
+    except CoolifyError as e:
+        console.print(f"[red]{e}[/red]")
+        console.print("Run [cyan]stx deploy setup[/cyan] to configure credentials.")
+        return
+
+    try:
+        apps = client.list_apps()
+    except CoolifyError as e:
+        console.print(f"[red]Failed to list applications: {e}[/red]")
+        return
+
+    if name:
+        apps = [a for a in apps if name.lower() in a.name.lower() or name == a.uuid]
+
+    if not apps:
+        console.print("[yellow]No Coolify applications found.[/yellow]")
+        return
+
+    icons = {
+        "running:healthy": "[green]\u2713 Healthy[/green]",
+        "running:unhealthy": "[yellow]\u26a0 Unhealthy[/yellow]",
+        "running:unknown": "[yellow]? Running[/yellow]",
+        "exited": "[red]\u2717 Exited[/red]",
+        "stopped": "[dim]Stopped[/dim]",
+    }
+
+    table = Table(title="Coolify Deployment Status")
+    table.add_column("Service", style="cyan")
+    table.add_column("Status")
+    table.add_column("URL")
+
+    for app in sorted(apps, key=lambda a: a.name):
+        status_icon = icons.get(app.status, f"[dim]{app.status}[/dim]")
+        table.add_row(app.name, status_icon, app.fqdn)
+
+    console.print(table)
 
 
 # ---------------------------------------------------------------------------

@@ -64,7 +64,7 @@ StreamTeX supports two complementary approaches that produce **exactly the same 
 7. **Built-in diagrams** — Mermaid, PlantUML, TikZ, and LaTeX — no external tools to install.
 8. **Book navigation** — Table of contents, pagination, markers, keyboard navigation. Documents that read like real books.
 9. **The Streamlit ecosystem** — Access all Streamlit widgets while keeping professional typography and layout.
-10. **One-command deployment** — Pre-configured Docker and Render. Local prototype to online document in minutes.
+10. **One-command deployment** — Pre-configured Docker and Hetzner/Coolify. Local prototype to online document in minutes with `stx deploy`.
 
 ### Who is StreamTeX for?
 

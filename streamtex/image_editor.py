@@ -451,9 +451,20 @@ def _render_display_tab(*, name, width, height, key_base):
     changed = False
 
     if mode == "Zoom":
-        # Clear custom values when switching to Zoom
-        if prev_w or prev_h:
+        # Transfer custom width % to zoom when switching back
+        if prev_w:
+            if prev_w.strip().endswith("%"):
+                try:
+                    pct = int(prev_w.strip().rstrip("%"))
+                    if 10 <= pct <= 200:
+                        st.session_state[f"{prefix}_zoom"] = pct
+                        prev_zoom = pct
+                except ValueError:
+                    pass
             st.session_state[f"{prefix}_width"] = ""
+            st.session_state[f"{prefix}_height"] = ""
+            changed = True
+        elif prev_h:
             st.session_state[f"{prefix}_height"] = ""
             changed = True
 

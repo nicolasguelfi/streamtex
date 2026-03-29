@@ -8,6 +8,7 @@ import shutil
 import subprocess
 import sys
 from dataclasses import asdict, dataclass, field
+from pathlib import Path
 
 import click
 
@@ -650,6 +651,15 @@ def status(as_json):
 
     # 6. Recommendations
     _build_recommendations(report)
+
+    # 6b. Dev links
+    try:
+        from .dev_cmd import print_dev_status_section
+        project_dir = ws_root or Path.cwd()
+        if not as_json:
+            print_dev_status_section(project_dir)
+    except Exception:
+        pass
 
     # 7. Output
     if as_json:

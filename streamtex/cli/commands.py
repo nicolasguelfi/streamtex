@@ -26,6 +26,21 @@ from .deploy_cmd import secure_cmd as deploy_secure
 from .deploy_cmd import setup_cmd as deploy_setup
 from .deploy_cmd import status_cmd as deploy_status
 from .deploy_cmd import update_cmd as deploy_update
+from .dev_cmd import (
+    link_cmd as dev_link,
+)
+from .dev_cmd import (
+    register_cmd as dev_register,
+)
+from .dev_cmd import (
+    status_cmd as dev_status,
+)
+from .dev_cmd import (
+    unlink_cmd as dev_unlink,
+)
+from .dev_cmd import (
+    unregister_cmd as dev_unregister,
+)
 from .install_cmd import install as stx_install
 from .project_cmd import new as project_new
 from .project_cmd import validate as project_validate
@@ -144,3 +159,17 @@ def cache():
 
 
 cache.add_command(cache_warmup)
+
+
+# --- Dev subgroup ----------------------------------------------------------
+
+@cli.group()
+def dev():
+    """Manage development links to local source repos."""
+
+
+dev.add_command(dev_register)
+dev.add_command(dev_unregister)
+dev.add_command(dev_link)
+dev.add_command(dev_unlink)
+dev.add_command(dev_status)

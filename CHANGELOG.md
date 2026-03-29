@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.15] — 2026-03-29
+
+### Added
+- **`stx dev` CLI commands**: `register`, `unregister`, `link`, `unlink`, `status` — manage development links between projects and local source repos (streamtex, streamtex-claude, streamtex-docs). Global registration persists in `~/.config/streamtex/dev.json`.
+- **`ModelCapabilities` system**: each AI provider declares supported sizes, qualities, and defaults per model. `get_model_capabilities(provider, model)` returns a `ModelCapabilities` dataclass. The image editor uses this to populate size/quality dropdowns dynamically.
+- **`Wrap.hyphens` style**: `s.text.wrap.hyphens` enables automatic CSS hyphenation (`hyphens: auto; overflow-wrap: break-word`) for large text in narrow containers.
+- **Image Display tab persistence**: `display_zoom`, `display_width`, `display_height`, `display_keep_ratio` fields added to `ImageMetadata`. Display settings from the editor's Display tab are now applied to image rendering automatically.
+
+### Fixed
+- **Marker cross-page navigation**: the marker init now scrolls to the target marker after page transitions instead of leaving the viewport at the top while `currentIdx` points elsewhere. Fixes the issue where LEFT/RIGHT arrows skipped sections after cross-page navigation.
+
 ## [0.5.14] — 2026-03-26
 
 ### Fixed

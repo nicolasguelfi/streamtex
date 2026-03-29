@@ -890,8 +890,32 @@ def inject_marker_navigation(
         var startIdx = hostWin._stxMarkerStartIdx || 0;
         if (startIdx < 0) startIdx = markers.length + startIdx;
         startIdx = Math.max(0, Math.min(startIdx, markers.length - 1));
-        currentIdx = startIdx;
         hostWin._stxMarkerStartIdx = 0;
+
+        /* Scroll to the target marker if it is in the DOM (same page).
+           Without this, doScrollReset() in book.py forces the viewport
+           to the top while currentIdx points to a different marker,
+           causing LEFT/RIGHT to skip sections on cross-page navigation. */
+        var m = markers[startIdx];
+        var target = m ? findMarkerElement(m.anchor) : null;
+        if (target) {
+            currentIdx = startIdx;
+            _navigating = true;
+            scrollToTarget(target);
+            setTimeout(function() { _navigating = false; }, 600);
+        } else {
+            /* Target marker not in DOM (cross-page or iframes not loaded).
+               Detect nearest visible marker to sync with actual viewport. */
+            var best = -1, bestDist = Infinity;
+            for (var i = 0; i < markers.length; i++) {
+                var t = findMarkerElement(markers[i].anchor);
+                if (!t) continue;
+                var d = Math.abs(t.getBoundingClientRect().top - OFFSET);
+                if (d < bestDist) { bestDist = d; best = i; }
+            }
+            currentIdx = (best >= 0) ? best : startIdx;
+        }
+
         /* Restore popup state from previous run if available */
         if (hostWin._stxMarkerPopupState !== undefined) {
             popupOpen = hostWin._stxMarkerPopupState;

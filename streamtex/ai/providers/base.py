@@ -20,6 +20,20 @@ class AIImageResult:
     revised_prompt: Optional[str] = None
 
 
+@dataclass
+class ModelCapabilities:
+    """Supported sizes and quality levels for a specific model.
+
+    Providers override :meth:`AIImageProvider.model_capabilities` to
+    return accurate values per model.  The image editor uses this to
+    populate size/quality dropdowns dynamically.
+    """
+    sizes: list[str]
+    qualities: list[str]
+    default_size: str = "1024x1024"
+    default_quality: str = "standard"
+
+
 class AIImageProvider:
     """Base class for AI image generation providers.
 
@@ -32,6 +46,17 @@ class AIImageProvider:
     def available_models(cls) -> list[str]:
         """Return the list of supported model identifiers."""
         return []
+
+    @classmethod
+    def model_capabilities(cls, model: Optional[str] = None) -> ModelCapabilities:
+        """Return supported sizes/qualities for *model*.
+
+        Subclasses should override this with model-specific values.
+        """
+        return ModelCapabilities(
+            sizes=["1024x1024"],
+            qualities=["standard"],
+        )
 
     def generate(
         self,

@@ -6,7 +6,7 @@ import logging
 import os
 from typing import Optional
 
-from .base import AIImageProvider, AIImageResult
+from .base import AIImageProvider, AIImageResult, ModelCapabilities
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +19,15 @@ class FalProvider(AIImageProvider):
     @classmethod
     def available_models(cls) -> list[str]:
         return ["fal-ai/stable-diffusion-v35-large", "fal-ai/flux/dev/image-to-image"]
+
+    @classmethod
+    def model_capabilities(cls, model: Optional[str] = None) -> ModelCapabilities:
+        return ModelCapabilities(
+            sizes=["512x512", "768x768", "1024x1024", "1024x1536", "1536x1024"],
+            qualities=["standard"],
+            default_size="1024x1024",
+            default_quality="standard",
+        )
 
     def generate(
         self,

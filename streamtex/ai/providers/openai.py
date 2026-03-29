@@ -7,7 +7,7 @@ import logging
 import os
 from typing import Optional
 
-from .base import AIImageProvider, AIImageResult
+from .base import AIImageProvider, AIImageResult, ModelCapabilities
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +20,24 @@ class OpenAIProvider(AIImageProvider):
     @classmethod
     def available_models(cls) -> list[str]:
         return ["gpt-image-1", "dall-e-3"]
+
+    @classmethod
+    def model_capabilities(cls, model: Optional[str] = None) -> ModelCapabilities:
+        model = model or "gpt-image-1"
+        if model == "gpt-image-1":
+            return ModelCapabilities(
+                sizes=["1024x1024", "1024x1536", "1536x1024"],
+                qualities=["auto", "low", "medium", "high"],
+                default_size="1536x1024",
+                default_quality="auto",
+            )
+        # dall-e-3
+        return ModelCapabilities(
+            sizes=["1024x1024", "1024x1792", "1792x1024"],
+            qualities=["standard", "hd"],
+            default_size="1024x1024",
+            default_quality="standard",
+        )
 
     def generate(
         self,

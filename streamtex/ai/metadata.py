@@ -39,6 +39,10 @@ class ImageMetadata:
     quality: Optional[str] = None
     base_image: Optional[str] = None
     revised_prompt: Optional[str] = None
+    display_zoom: Optional[int] = None
+    display_width: Optional[str] = None
+    display_height: Optional[str] = None
+    display_keep_ratio: Optional[bool] = True
 
     def __post_init__(self):
         if not self.timestamp:

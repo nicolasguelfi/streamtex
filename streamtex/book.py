@@ -26,6 +26,7 @@ from .export import (
     get_asset_collector,
     is_export_active,
     reset_export_buffer,
+    set_cache_building,
 )
 from .loading import inject_loading_overlay, remove_loading_overlay, update_loading_progress
 from .marker import MarkerConfig, inject_marker_navigation, marker_count, marker_entries, reset_marker_registry
@@ -1273,73 +1274,78 @@ def _build_page_cache(module_list, toc_config, marker_config, separator,
     else:
         reset_export_buffer(ExportConfig(enabled=False))
 
-    use_search = toc_config is not None and toc_config.search
-    collector = start_collector() if use_search else None
+    # Signal interactive-only widgets (e.g. image editor) to skip rendering
+    set_cache_building(True)
+    try:
+        use_search = toc_config is not None and toc_config.search
+        collector = start_collector() if use_search else None
 
-    # Resolve block spacing for cache build (no profile in cache build)
-    _block_sp = resolve_block_spacing()
+        # Resolve block spacing for cache build (no profile in cache build)
+        _block_sp = resolve_block_spacing()
 
-    hidden = st.empty()
-    with hidden.container(), _isolate_widget_keys():
-        for i, module in enumerate(module_list):
-            toc_before = len(toc_entries()) if toc_config else 0
-            markers_before = len(marker_entries()) if marker_config else 0
+        hidden = st.empty()
+        with hidden.container(), _isolate_widget_keys():
+            for i, module in enumerate(module_list):
+                toc_before = len(toc_entries()) if toc_config else 0
+                markers_before = len(marker_entries()) if marker_config else 0
 
-            if collector is not None:
-                collector.set_block(i)
+                if collector is not None:
+                    collector.set_block(i)
 
-            # Block spacing: inject block.top + set flag
-            if _block_sp.top is not None:
-                st_space("v", _block_sp.top)
-            mark_block_top_injected()
+                # Block spacing: inject block.top + set flag
+                if _block_sp.top is not None:
+                    st_space("v", _block_sp.top)
+                mark_block_top_injected()
 
-            if _warmup_mode:
-                try:
+                if _warmup_mode:
+                    try:
+                        st_include(module, *args, **kwargs)
+                    except Exception:
+                        name = getattr(module, '__name__', str(module))
+                        logger.warning("Warmup: block %s raised — skipping.", name)
+                else:
                     st_include(module, *args, **kwargs)
-                except Exception:
-                    name = getattr(module, '__name__', str(module))
-                    logger.warning("Warmup: block %s raised — skipping.", name)
-            else:
-                st_include(module, *args, **kwargs)
 
-            # Close any open section wrapper + reset per-block override
-            from .slide import _close_section_wrapper_if_open
-            _close_section_wrapper_if_open()
-            reset_block_spacing()
+                # Close any open section wrapper + reset per-block override
+                from .slide import _close_section_wrapper_if_open
+                _close_section_wrapper_if_open()
+                reset_block_spacing()
 
-            # Tag new TOC entries with their page index
-            if toc_config:
-                for entry in toc_entries()[toc_before:]:
-                    if "page_idx" not in entry:
-                        entry["page_idx"] = i
-            # Tag new marker entries with their page index
-            if marker_config:
-                for entry in marker_entries()[markers_before:]:
-                    if "page_idx" not in entry:
-                        entry["page_idx"] = i
+                # Tag new TOC entries with their page index
+                if toc_config:
+                    for entry in toc_entries()[toc_before:]:
+                        if "page_idx" not in entry:
+                            entry["page_idx"] = i
+                # Tag new marker entries with their page index
+                if marker_config:
+                    for entry in marker_entries()[markers_before:]:
+                        if "page_idx" not in entry:
+                            entry["page_idx"] = i
 
-            if progress_callback is not None:
-                _mod_name = getattr(module, '__name__', '').rsplit('.', 1)[-1]
-                progress_callback(i + 1, len(module_list), _mod_name)
+                if progress_callback is not None:
+                    _mod_name = getattr(module, '__name__', '').rsplit('.', 1)[-1]
+                    progress_callback(i + 1, len(module_list), _mod_name)
 
-            if separator and i < len(module_list) - 1:
-                st_include(separator, *args, **kwargs)
+                if separator and i < len(module_list) - 1:
+                    st_include(separator, *args, **kwargs)
 
-            # Block spacing: inject block.bottom after build()
-            if _block_sp.bottom is not None:
-                st_space("v", _block_sp.bottom)
+                # Block spacing: inject block.bottom after build()
+                if _block_sp.bottom is not None:
+                    st_space("v", _block_sp.bottom)
 
-            # Insert slide break between blocks for PDF page-break support.
-            # Without this, the exported HTML has no .stx-slide-break-spacer
-            # elements, so @media print page-break rules have nothing to target.
-            # marker=False: export slide breaks only need the CSS spacer for
-            # page-break-after, not a navigation marker (which would pollute
-            # the marker registry with phantom entries).
-            if export_config is not None and i < len(module_list) - 1:
-                from .slide import SlideBreakConfig, st_slide_break
-                st_slide_break(config=SlideBreakConfig(marker=False))
+                # Insert slide break between blocks for PDF page-break support.
+                # Without this, the exported HTML has no .stx-slide-break-spacer
+                # elements, so @media print page-break rules have nothing to target.
+                # marker=False: export slide breaks only need the CSS spacer for
+                # page-break-after, not a navigation marker (which would pollute
+                # the marker registry with phantom entries).
+                if export_config is not None and i < len(module_list) - 1:
+                    from .slide import SlideBreakConfig, st_slide_break
+                    st_slide_break(config=SlideBreakConfig(marker=False))
 
-    hidden.empty()
+        hidden.empty()
+    finally:
+        set_cache_building(False)
 
     # Store the full-book HTML before resetting the buffer
     if export_config is not None:

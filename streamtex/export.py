@@ -451,6 +451,24 @@ def is_export_active() -> bool:
     return _buffer is not None
 
 
+# ---------------------------------------------------------------------------
+# Cache-build flag — lets interactive-only widgets skip rendering
+# ---------------------------------------------------------------------------
+
+_cache_building: bool = False
+
+
+def set_cache_building(value: bool) -> None:
+    """Set the cache-building flag (called by ``_build_page_cache``)."""
+    global _cache_building
+    _cache_building = value
+
+
+def is_cache_building() -> bool:
+    """Return True when ``_build_page_cache`` is rendering blocks."""
+    return _cache_building
+
+
 def get_asset_collector() -> Optional[AssetCollector]:
     """Return the global asset collector, or None when assets are embedded."""
     return _asset_collector

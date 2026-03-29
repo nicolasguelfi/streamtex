@@ -306,6 +306,8 @@ class Wrap:
     nowrap = Style("text-wrap: nowrap;", "nowrap")
     preline = Style("white-space: pre-line;", "preline")
     """Preserves newlines in source text (\\n → line break), collapses other whitespace."""
+    hyphens = Style("hyphens: auto; overflow-wrap: break-word;", "hyphens")
+    """Enables automatic hyphenation at line breaks (requires lang attribute on parent)."""
 
 
 class Titles:

@@ -159,6 +159,7 @@ from .ai import (
     AIImageConfig, AIImageError, AIImageResult,
     set_ai_image_config, get_ai_image_config,
     generate_image, is_cached, list_providers, get_available_models,
+    get_model_capabilities, ModelCapabilities,
 )
 from .ai_image import st_ai_image, st_ai_image_widget
 

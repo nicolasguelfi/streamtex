@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Dict, List, Type
 
-from .base import AIImageProvider
+from .base import AIImageProvider, ModelCapabilities
 
 _PROVIDERS: Dict[str, Type[AIImageProvider]] = {}
 
@@ -51,3 +51,20 @@ def get_available_models(provider_name: str) -> list[str]:
     if cls is None:
         return []
     return cls.available_models()
+
+
+def get_model_capabilities(
+    provider_name: str, model: str | None = None
+) -> ModelCapabilities:
+    """Return supported sizes/qualities for *provider_name* and *model*.
+
+    Falls back to generic defaults if the provider is unknown.
+    """
+    _register_builtin_providers()
+    cls = _PROVIDERS.get(provider_name)
+    if cls is None:
+        return ModelCapabilities(
+            sizes=["1024x1024"],
+            qualities=["standard"],
+        )
+    return cls.model_capabilities(model)

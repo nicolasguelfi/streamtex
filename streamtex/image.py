@@ -83,6 +83,24 @@ def st_image(
         except Exception:
             pass
 
+    # 1c. Apply display settings from metadata (zoom / manual size).
+    #     Load persisted values from JSON on first access so the zoom
+    #     takes effect even before the user opens the Display tab.
+    if editable and name:
+        _prefix = f"stx_img_display_{name}"
+        if _st and not _st.session_state.get(f"{_prefix}_initialized"):
+            from .image_editor import _load_display_from_metadata
+            _load_display_from_metadata(name, _prefix)
+        _zoom = _st.session_state.get(f"{_prefix}_zoom") if _st else None
+        _dw = _st.session_state.get(f"{_prefix}_width") if _st else None
+        _dh = _st.session_state.get(f"{_prefix}_height") if _st else None
+        if _dw:
+            width = _dw
+        elif _zoom is not None and _zoom != 100:
+            width = f"{_zoom}%"
+        if _dh:
+            height = _dh
+
     # 2. Get the source (URL or Base64)
     img_src = get_image_src(uri)
 

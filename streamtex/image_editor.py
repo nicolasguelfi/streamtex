@@ -50,48 +50,61 @@ def _render_editor_panel(
     if st is None:
         return
 
-    # Check if we're in export mode — skip editor in exports
-    try:
-        from .export import _is_exporting
-        if _is_exporting():
-            return
-    except (ImportError, AttributeError):
-        pass
+    # Skip editor during cache build (interactive-only, no TOC/marker/search value)
+    from .export import is_cache_building
+    if is_cache_building():
+        return
 
     key_base = _stable_key("img_edit", uri, name)
     session_prefix = f"stx_img_editor_{key_base}"
 
-    with st.expander("Edit Image", expanded=False):
-        # --- Tab layout: Source | AI Generate | History ---
-        tabs = ["Source", "AI Generate", "History"]
-        tab_source, tab_ai, tab_history = st.tabs(tabs)
+    # st.container(key=) provides a stable DOM anchor for the editor subtree,
+    # preventing flickering on reruns.  st.expander and st.tabs do not support
+    # key= in Streamlit 1.54 — the keyed container stabilises them instead.
+    with st.container(key=f"editor_{key_base}"):
+        with st.expander("Edit Image", expanded=False):
+            # --- Tab layout: Source | AI Generate | History | Display ---
+            tabs = ["Source", "AI Generate", "History", "Display"]
+            tab_source, tab_ai, tab_history, tab_display = st.tabs(tabs)
 
-        # ===== SOURCE TAB =====
-        with tab_source:
-            _render_source_tab(
-                uri=uri, name=name, key_base=key_base,
-                session_prefix=session_prefix,
-                style=style, width=width, height=height,
-                alt=alt, link=link, hover=hover, light_bg=light_bg,
-            )
+            # ===== SOURCE TAB =====
+            with tab_source:
+                _render_source_tab(
+                    uri=uri, name=name, key_base=key_base,
+                    session_prefix=session_prefix,
+                    style=style, width=width, height=height,
+                    alt=alt, link=link, hover=hover, light_bg=light_bg,
+                )
 
-        # ===== AI GENERATE TAB =====
-        with tab_ai:
-            _render_ai_tab(
-                uri=uri, name=name, prompt=prompt,
-                provider=provider, model=model,
-                ai_size=ai_size, quality=quality,
-                key_base=key_base, session_prefix=session_prefix,
-                style=style, width=width, height=height,
-                alt=alt, link=link, hover=hover, light_bg=light_bg,
-            )
+            # ===== AI GENERATE TAB =====
+            with tab_ai:
+                _render_ai_tab(
+                    uri=uri, name=name, prompt=prompt,
+                    provider=provider, model=model,
+                    ai_size=ai_size, quality=quality,
+                    key_base=key_base, session_prefix=session_prefix,
+                    style=style, width=width, height=height,
+                    alt=alt, link=link, hover=hover, light_bg=light_bg,
+                )
 
-        # ===== HISTORY TAB =====
-        with tab_history:
-            _render_history_tab(
-                name=name, key_base=key_base,
-                session_prefix=session_prefix,
-            )
+            # ===== HISTORY TAB =====
+            with tab_history:
+                _render_history_tab(
+                    name=name, key_base=key_base,
+                    session_prefix=session_prefix,
+                )
+
+            # ===== DISPLAY TAB =====
+            with tab_display:
+                _render_display_tab(
+                    name=name, width=width, height=height,
+                    key_base=key_base,
+                )
+
+    # Inject CSS override OUTSIDE the expander (and outside page cache)
+    # This targets the img by its class name and overrides width/fit/maxh
+    if name:
+        _inject_display_override(name)
 
 
 def _render_source_tab(
@@ -100,7 +113,7 @@ def _render_source_tab(
 ):
     """Source tab: rename, replace from path/URL."""
     # Name field
-    current_name = name or os.path.splitext(os.path.basename(uri))[0] if uri else ""
+    current_name = name or (os.path.splitext(os.path.basename(uri))[0] if uri else "")
     new_name = st.text_input(
         "Image name",
         value=current_name,
@@ -209,11 +222,23 @@ def _render_ai_tab(
             key=f"{key_base}_ai_model",
         )
 
-    # Size and quality
+    # Size and quality — dynamic from model capabilities
+    try:
+        from .ai.providers.registry import get_model_capabilities
+        caps = get_model_capabilities(
+            selected_provider,
+            selected_model if selected_model != "(default)" else None,
+        )
+        sizes = caps.sizes
+        qualities = caps.qualities
+    except Exception:
+        sizes = ["1024x1024", "1024x1536", "1536x1024"]
+        qualities = ["standard", "hd"]
+        caps = None
+
     col3, col4 = st.columns(2)
     with col3:
-        sizes = ["1024x1024", "1024x1536", "1536x1024", "512x512"]
-        default_size = ai_size or "1024x1024"
+        default_size = ai_size if ai_size in sizes else caps.default_size if caps else sizes[0]
         size_idx = sizes.index(default_size) if default_size in sizes else 0
         selected_size = st.selectbox(
             "Size",
@@ -222,8 +247,8 @@ def _render_ai_tab(
             key=f"{key_base}_ai_size",
         )
     with col4:
-        qualities = ["standard", "hd"]
-        q_idx = qualities.index(quality) if quality in qualities else 0
+        q_default = quality if quality in qualities else (caps.default_quality if caps else qualities[0])
+        q_idx = qualities.index(q_default) if q_default in qualities else 0
         selected_quality = st.selectbox(
             "Quality",
             qualities,
@@ -278,7 +303,7 @@ def _render_ai_tab(
                 )
 
                 # Save as managed version
-                img_name = name or os.path.splitext(os.path.basename(uri))[0] if uri else "ai_image"
+                img_name = name or (os.path.splitext(os.path.basename(uri))[0] if uri else "ai_image")
                 _save_managed_image(
                     image_path=file_path,
                     name=img_name,
@@ -337,6 +362,169 @@ def _render_history_tab(*, name, key_base, session_prefix):
                         if result:
                             st.success(f"Restored v{ver_num}")
                             st.rerun()
+
+
+# ---------------------------------------------------------------------------
+# Display tab
+# ---------------------------------------------------------------------------
+
+
+def _inject_display_override(name: str) -> None:
+    """Inject a <style> tag that overrides the image display based on session_state.
+
+    This runs OUTSIDE the page cache and the expander, so it takes effect
+    even when the image HTML itself is cached by st_book's page cache.
+    """
+    if st is None:
+        return
+
+    prefix = f"stx_img_display_{name}"
+
+    # Load from metadata if session_state is empty (first run after restart)
+    _load_display_from_metadata(name, prefix)
+
+    zoom = st.session_state.get(f"{prefix}_zoom")
+    w = st.session_state.get(f"{prefix}_width")
+    h = st.session_state.get(f"{prefix}_height")
+    keep = st.session_state.get(f"{prefix}_keep_ratio", True)
+
+    has_zoom = zoom and zoom != 100
+    if not has_zoom and not w and not h:
+        return
+
+    rules = []
+
+    if has_zoom:
+        # Zoom = proportional resize via width percentage
+        # This changes actual layout size (unlike transform:scale which doesn't)
+        rules.append(f"width: {zoom}% !important;")
+        rules.append("height: auto !important;")
+    else:
+        # Manual width/height
+        if w:
+            rules.append(f"width: {w} !important;")
+        if h:
+            rules.append(f"height: {h} !important;")
+        if keep and w and h:
+            rules.append("object-fit: contain !important;")
+
+    if rules:
+        css = f'<style>img.stx-img-{name} {{ {" ".join(rules)} }}</style>'
+        st.html(css)
+
+
+def _load_display_from_metadata(name: str, prefix: str) -> None:
+    """Load persisted display settings from metadata JSON into session_state.
+
+    Called once per session — if session_state already has values, skip.
+    """
+    init_key = f"{prefix}_initialized"
+    if st.session_state.get(init_key):
+        return
+    st.session_state[init_key] = True
+
+    try:
+        from .ai.history import get_current_metadata
+        meta = get_current_metadata(name)
+        if meta:
+            if meta.display_zoom is not None:
+                st.session_state.setdefault(f"{prefix}_zoom", meta.display_zoom)
+            if meta.display_width is not None:
+                st.session_state.setdefault(f"{prefix}_width", meta.display_width)
+            if meta.display_height is not None:
+                st.session_state.setdefault(f"{prefix}_height", meta.display_height)
+            if meta.display_keep_ratio is not None:
+                st.session_state.setdefault(f"{prefix}_keep_ratio", meta.display_keep_ratio)
+    except Exception:
+        pass
+
+
+def _persist_display_to_metadata(name: str, prefix: str) -> None:
+    """Save current display settings to the metadata JSON."""
+    try:
+        from .ai.history import get_current, get_current_metadata
+        from .ai.metadata import metadata_path_for, save_metadata
+
+        current = get_current(name)
+        if not current:
+            return
+        meta = get_current_metadata(name)
+        if not meta:
+            return
+
+        meta.display_zoom = st.session_state.get(f"{prefix}_zoom")
+        meta.display_width = st.session_state.get(f"{prefix}_width") or None
+        meta.display_height = st.session_state.get(f"{prefix}_height") or None
+        meta.display_keep_ratio = st.session_state.get(f"{prefix}_keep_ratio", True)
+        save_metadata(meta, metadata_path_for(current))
+    except Exception:
+        pass
+
+
+def _render_display_tab(*, name, width, height, key_base):
+    """Display tab: zoom slider + manual width/height with keep-ratio toggle."""
+    if not name:
+        st.caption("Set an image name to enable display adjustments.")
+        return
+
+    prefix = f"stx_img_display_{name}"
+
+    # Load persisted values on first run
+    _load_display_from_metadata(name, prefix)
+
+    # --- Zoom (proportional) ---
+    st.caption("Proportional zoom")
+    current_zoom = st.session_state.get(f"{prefix}_zoom", 100)
+    zoom = st.slider(
+        "Zoom (%)",
+        min_value=10, max_value=200,
+        value=int(current_zoom),
+        step=5,
+        key=f"{key_base}_display_zoom",
+    )
+    st.session_state[f"{prefix}_zoom"] = zoom
+
+    # --- Manual width / height ---
+    st.caption("Manual size (overrides zoom if set)")
+
+    keep_ratio = st.checkbox(
+        "Keep proportions",
+        value=st.session_state.get(f"{prefix}_keep_ratio", True),
+        key=f"{key_base}_display_keep_ratio",
+    )
+    st.session_state[f"{prefix}_keep_ratio"] = keep_ratio
+
+    col1, col2 = st.columns(2)
+    with col1:
+        current_w = st.session_state.get(f"{prefix}_width", "")
+        new_w = st.text_input(
+            "Width",
+            value=current_w,
+            key=f"{key_base}_display_width",
+            placeholder="e.g. 80%, 400px, 50vw",
+        )
+        st.session_state[f"{prefix}_width"] = new_w
+    with col2:
+        current_h = st.session_state.get(f"{prefix}_height", "")
+        new_h = st.text_input(
+            "Height",
+            value=current_h,
+            key=f"{key_base}_display_height",
+            placeholder="e.g. auto, 300px, 40vh",
+        )
+        st.session_state[f"{prefix}_height"] = new_h
+
+    # Persist to metadata JSON on every change
+    _persist_display_to_metadata(name, prefix)
+
+    # Reset
+    if st.button("Reset to default", key=f"{key_base}_display_reset"):
+        st.session_state[f"{prefix}_zoom"] = 100
+        st.session_state[f"{prefix}_width"] = ""
+        st.session_state[f"{prefix}_height"] = ""
+        st.session_state[f"{prefix}_keep_ratio"] = True
+        _persist_display_to_metadata(name, prefix)
+        st.rerun()
 
 
 # ---------------------------------------------------------------------------

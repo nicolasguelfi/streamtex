@@ -6,7 +6,7 @@ import logging
 import os
 from typing import Optional
 
-from .base import AIImageProvider, AIImageResult
+from .base import AIImageProvider, AIImageResult, ModelCapabilities
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +19,15 @@ class GoogleProvider(AIImageProvider):
     @classmethod
     def available_models(cls) -> list[str]:
         return ["imagen-4.0-generate-001", "imagen-3.0-generate-002"]
+
+    @classmethod
+    def model_capabilities(cls, model: Optional[str] = None) -> ModelCapabilities:
+        return ModelCapabilities(
+            sizes=["1024x1024", "1024x1536", "1536x1024"],
+            qualities=["standard"],
+            default_size="1024x1024",
+            default_quality="standard",
+        )
 
     def generate(
         self,

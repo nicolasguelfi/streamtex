@@ -101,10 +101,8 @@ def _render_editor_panel(
                     key_base=key_base,
                 )
 
-    # Inject CSS override OUTSIDE the expander (and outside page cache)
-    # This targets the img by its class name and overrides width/fit/maxh
-    if name:
-        _inject_display_override(name)
+    # Display settings are applied via session_state in st_image() (step 1c)
+    # on the next rerun — no CSS injection needed.
 
 
 def _render_source_tab(
@@ -369,50 +367,6 @@ def _render_history_tab(*, name, key_base, session_prefix):
 # ---------------------------------------------------------------------------
 
 
-def _inject_display_override(name: str) -> None:
-    """Inject a <style> tag that overrides the image display based on session_state.
-
-    This runs OUTSIDE the page cache and the expander, so it takes effect
-    even when the image HTML itself is cached by st_book's page cache.
-    """
-    if st is None:
-        return
-
-    prefix = f"stx_img_display_{name}"
-
-    # Load from metadata if session_state is empty (first run after restart)
-    _load_display_from_metadata(name, prefix)
-
-    zoom = st.session_state.get(f"{prefix}_zoom")
-    w = st.session_state.get(f"{prefix}_width")
-    h = st.session_state.get(f"{prefix}_height")
-    keep = st.session_state.get(f"{prefix}_keep_ratio", True)
-
-    has_zoom = zoom and zoom != 100
-    if not has_zoom and not w and not h:
-        return
-
-    rules = []
-
-    if has_zoom:
-        # Zoom = proportional resize via width percentage
-        # This changes actual layout size (unlike transform:scale which doesn't)
-        rules.append(f"width: {zoom}% !important;")
-        rules.append("height: auto !important;")
-    else:
-        # Manual width/height
-        if w:
-            rules.append(f"width: {w} !important;")
-        if h:
-            rules.append(f"height: {h} !important;")
-        if keep and w and h:
-            rules.append("object-fit: contain !important;")
-
-    if rules:
-        css = f'<style>img.stx-img-{name} {{ {" ".join(rules)} }}</style>'
-        st.html(css)
-
-
 def _load_display_from_metadata(name: str, prefix: str) -> None:
     """Load persisted display settings from metadata JSON into session_state.
 
@@ -472,13 +426,17 @@ def _render_display_tab(*, name, width, height, key_base):
     # Load persisted values on first run
     _load_display_from_metadata(name, prefix)
 
+    # Snapshot current values to detect changes
+    prev_zoom = st.session_state.get(f"{prefix}_zoom", 100)
+    prev_w = st.session_state.get(f"{prefix}_width", "")
+    prev_h = st.session_state.get(f"{prefix}_height", "")
+
     # --- Zoom (proportional) ---
     st.caption("Proportional zoom")
-    current_zoom = st.session_state.get(f"{prefix}_zoom", 100)
     zoom = st.slider(
         "Zoom (%)",
         min_value=10, max_value=200,
-        value=int(current_zoom),
+        value=int(prev_zoom),
         step=5,
         key=f"{key_base}_display_zoom",
     )
@@ -496,19 +454,17 @@ def _render_display_tab(*, name, width, height, key_base):
 
     col1, col2 = st.columns(2)
     with col1:
-        current_w = st.session_state.get(f"{prefix}_width", "")
         new_w = st.text_input(
             "Width",
-            value=current_w,
+            value=prev_w,
             key=f"{key_base}_display_width",
             placeholder="e.g. 80%, 400px, 50vw",
         )
         st.session_state[f"{prefix}_width"] = new_w
     with col2:
-        current_h = st.session_state.get(f"{prefix}_height", "")
         new_h = st.text_input(
             "Height",
-            value=current_h,
+            value=prev_h,
             key=f"{key_base}_display_height",
             placeholder="e.g. auto, 300px, 40vh",
         )
@@ -523,6 +479,12 @@ def _render_display_tab(*, name, width, height, key_base):
         st.session_state[f"{prefix}_width"] = ""
         st.session_state[f"{prefix}_height"] = ""
         st.session_state[f"{prefix}_keep_ratio"] = True
+        _persist_display_to_metadata(name, prefix)
+        st.rerun()
+
+    # Rerun to apply changes — st_image() reads session_state BEFORE
+    # this tab renders, so a rerun is needed for the new values to take effect.
+    if zoom != prev_zoom or new_w != prev_w or new_h != prev_h:
         _persist_display_to_metadata(name, prefix)
         st.rerun()
 

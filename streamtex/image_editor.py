@@ -416,7 +416,7 @@ def _persist_display_to_metadata(name: str, prefix: str) -> None:
 
 
 def _render_display_tab(*, name, width, height, key_base):
-    """Display tab: zoom slider + manual width/height with keep-ratio toggle."""
+    """Display tab: two exclusive modes — Zoom (default) or Custom size."""
     if not name:
         st.caption("Set an image name to enable display adjustments.")
         return
@@ -426,65 +426,95 @@ def _render_display_tab(*, name, width, height, key_base):
     # Load persisted values on first run
     _load_display_from_metadata(name, prefix)
 
-    # Snapshot current values to detect changes
+    # Determine initial mode from persisted state
+    has_custom = bool(
+        st.session_state.get(f"{prefix}_width")
+        or st.session_state.get(f"{prefix}_height")
+    )
+    default_mode = "Custom size" if has_custom else "Zoom"
+
+    # Snapshot for change detection
     prev_zoom = st.session_state.get(f"{prefix}_zoom", 100)
     prev_w = st.session_state.get(f"{prefix}_width", "")
     prev_h = st.session_state.get(f"{prefix}_height", "")
 
-    # --- Zoom (proportional) ---
-    st.caption("Proportional zoom")
-    zoom = st.slider(
-        "Zoom (%)",
-        min_value=10, max_value=200,
-        value=int(prev_zoom),
-        step=5,
-        key=f"{key_base}_display_zoom",
+    # --- Mode selector ---
+    mode = st.radio(
+        "Sizing mode",
+        ["Zoom", "Custom size"],
+        index=0 if default_mode == "Zoom" else 1,
+        key=f"{key_base}_display_mode",
+        horizontal=True,
+        label_visibility="collapsed",
     )
-    st.session_state[f"{prefix}_zoom"] = zoom
 
-    # --- Manual width / height ---
-    st.caption("Manual size (overrides zoom if set)")
+    changed = False
 
-    keep_ratio = st.checkbox(
-        "Keep proportions",
-        value=st.session_state.get(f"{prefix}_keep_ratio", True),
-        key=f"{key_base}_display_keep_ratio",
-    )
-    st.session_state[f"{prefix}_keep_ratio"] = keep_ratio
+    if mode == "Zoom":
+        # Clear custom values when switching to Zoom
+        if prev_w or prev_h:
+            st.session_state[f"{prefix}_width"] = ""
+            st.session_state[f"{prefix}_height"] = ""
+            changed = True
 
-    col1, col2 = st.columns(2)
-    with col1:
-        new_w = st.text_input(
-            "Width",
-            value=prev_w,
-            key=f"{key_base}_display_width",
-            placeholder="e.g. 80%, 400px, 50vw",
+        zoom = st.slider(
+            "Zoom (%)",
+            min_value=10, max_value=200,
+            value=int(prev_zoom),
+            step=5,
+            key=f"{key_base}_display_zoom",
         )
-        st.session_state[f"{prefix}_width"] = new_w
-    with col2:
-        new_h = st.text_input(
-            "Height",
-            value=prev_h,
-            key=f"{key_base}_display_height",
-            placeholder="e.g. auto, 300px, 40vh",
+        st.session_state[f"{prefix}_zoom"] = zoom
+
+        if zoom != prev_zoom:
+            changed = True
+
+        if st.button("Reset to 100%", key=f"{key_base}_display_reset"):
+            st.session_state[f"{prefix}_zoom"] = 100
+            changed = True
+
+    else:
+        # Custom size mode — clear zoom
+        if prev_zoom != 100:
+            st.session_state[f"{prefix}_zoom"] = 100
+            changed = True
+
+        keep_ratio = st.checkbox(
+            "Keep proportions",
+            value=st.session_state.get(f"{prefix}_keep_ratio", True),
+            key=f"{key_base}_display_keep_ratio",
         )
-        st.session_state[f"{prefix}_height"] = new_h
+        st.session_state[f"{prefix}_keep_ratio"] = keep_ratio
 
-    # Persist to metadata JSON on every change
-    _persist_display_to_metadata(name, prefix)
+        col1, col2 = st.columns(2)
+        with col1:
+            new_w = st.text_input(
+                "Width",
+                value=prev_w,
+                key=f"{key_base}_display_width",
+                placeholder="e.g. 80%, 400px, 50vw",
+            )
+            st.session_state[f"{prefix}_width"] = new_w
+        with col2:
+            new_h = st.text_input(
+                "Height",
+                value=prev_h,
+                key=f"{key_base}_display_height",
+                placeholder="e.g. auto, 300px, 40vh",
+            )
+            st.session_state[f"{prefix}_height"] = new_h
 
-    # Reset
-    if st.button("Reset to default", key=f"{key_base}_display_reset"):
-        st.session_state[f"{prefix}_zoom"] = 100
-        st.session_state[f"{prefix}_width"] = ""
-        st.session_state[f"{prefix}_height"] = ""
-        st.session_state[f"{prefix}_keep_ratio"] = True
-        _persist_display_to_metadata(name, prefix)
-        st.rerun()
+        if new_w != prev_w or new_h != prev_h:
+            changed = True
 
-    # Rerun to apply changes — st_image() reads session_state BEFORE
-    # this tab renders, so a rerun is needed for the new values to take effect.
-    if zoom != prev_zoom or new_w != prev_w or new_h != prev_h:
+        if st.button("Reset", key=f"{key_base}_display_reset"):
+            st.session_state[f"{prefix}_width"] = ""
+            st.session_state[f"{prefix}_height"] = ""
+            st.session_state[f"{prefix}_keep_ratio"] = True
+            changed = True
+
+    # Persist + rerun when values changed
+    if changed:
         _persist_display_to_metadata(name, prefix)
         st.rerun()
 

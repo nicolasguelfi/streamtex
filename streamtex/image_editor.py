@@ -474,8 +474,13 @@ def _render_display_tab(*, name, width, height, key_base):
             changed = True
 
     else:
-        # Custom size mode — clear zoom
-        if prev_zoom != 100:
+        # Custom size mode — transfer zoom value to width, then reset zoom
+        if prev_zoom != 100 and not prev_w:
+            st.session_state[f"{prefix}_width"] = f"{prev_zoom}%"
+            prev_w = f"{prev_zoom}%"
+            st.session_state[f"{prefix}_zoom"] = 100
+            changed = True
+        elif prev_zoom != 100:
             st.session_state[f"{prefix}_zoom"] = 100
             changed = True
 

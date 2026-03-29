@@ -942,10 +942,31 @@ def update(skip_sync, skip_profiles, dry_run, repair, force):
     else:
         console.print("[bold]Updating workspace …[/bold]")
 
+    # --- Detect dev-linked repos (skip pull/clone for these) ---
+    _dev_linked: set[str] = set()
+    try:
+        from .dev_config import resolve_repo_path
+        for repo_name in repos:
+            try:
+                _path, is_dev = resolve_repo_path(repo_name, ws_root, config)
+                if is_dev:
+                    _dev_linked.add(repo_name)
+            except FileNotFoundError:
+                pass
+    except Exception:
+        pass
+
     # --- git pull existing repos ---
     _step("Pulling latest changes …")
     pulled = 0
     for repo_name, repo_conf in repos.items():
+        if repo_name in _dev_linked:
+            console.print(
+                f"  [cyan]{repo_name}[/cyan]: dev-linked — skip pull"
+            )
+            pulled += 1
+            continue
+
         rel_path = repo_conf.get("path", repo_name)
         repo_path = os.path.join(ws_root, rel_path)
 
@@ -1001,9 +1022,11 @@ def update(skip_sync, skip_profiles, dry_run, repair, force):
             if result.stderr:
                 console.print(f"    {result.stderr.strip()}")
 
-    # --- clone missing repos ---
+    # --- clone missing repos (skip dev-linked) ---
     missing = []
     for repo_name, repo_conf in repos.items():
+        if repo_name in _dev_linked:
+            continue
         rel_path = repo_conf.get("path", repo_name)
         target_path = os.path.join(ws_root, rel_path)
         url = repo_conf.get("url", "")

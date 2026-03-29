@@ -2,6 +2,7 @@
 
 import os
 
+import pytest
 from click.testing import CliRunner
 
 from streamtex.cli.claude_cmd import (
@@ -18,8 +19,23 @@ from streamtex.cli.claude_cmd import (
 from streamtex.cli.commands import cli
 
 # ---------------------------------------------------------------------------
-# Fixtures: build a minimal workspace with a mock streamtex-claude repo
+# Fixtures
 # ---------------------------------------------------------------------------
+
+
+@pytest.fixture(autouse=True)
+def _isolate_dev_config(monkeypatch):
+    """Prevent global dev config from interfering with workspace tests."""
+    from streamtex.cli.dev_config import GlobalDevConfig, ProjectDevConfig
+    monkeypatch.setattr(
+        "streamtex.cli.dev_config.GlobalDevConfig.load",
+        staticmethod(lambda: GlobalDevConfig()),
+    )
+    monkeypatch.setattr(
+        "streamtex.cli.dev_config.ProjectDevConfig.load",
+        staticmethod(lambda _p: ProjectDevConfig()),
+    )
+
 
 def _make_workspace(tmp_path):
     """Create a workspace with stx.toml and a mock streamtex-claude repo."""
@@ -94,7 +110,6 @@ def test_find_claude_repo(tmp_path):
 
 def test_find_claude_repo_missing(tmp_path):
     import click
-    import pytest
 
     ws = tmp_path / "ws"
     ws.mkdir()

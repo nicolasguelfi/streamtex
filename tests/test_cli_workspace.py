@@ -4,10 +4,25 @@ import os
 import tomllib
 from unittest.mock import patch
 
+import pytest
 from click.testing import CliRunner
 
 from streamtex.cli.commands import cli
 from streamtex.cli.workspace_cmd import generate_stx_toml, load_stx_toml
+
+
+@pytest.fixture(autouse=True)
+def _isolate_dev_config(monkeypatch):
+    """Prevent global dev config from interfering with workspace tests."""
+    from streamtex.cli.dev_config import GlobalDevConfig, ProjectDevConfig
+    monkeypatch.setattr(
+        "streamtex.cli.dev_config.GlobalDevConfig.load",
+        staticmethod(lambda: GlobalDevConfig()),
+    )
+    monkeypatch.setattr(
+        "streamtex.cli.dev_config.ProjectDevConfig.load",
+        staticmethod(lambda _p: ProjectDevConfig()),
+    )
 
 # ---------------------------------------------------------------------------
 # stx.toml generation

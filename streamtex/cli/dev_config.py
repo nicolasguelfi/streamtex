@@ -129,6 +129,51 @@ def validate_repo_path(name: str, path: str | Path) -> Path:
     return p
 
 
+def resolve_repo_path(
+    repo_name: str,
+    ws_root: str | Path,
+    ws_config: dict,
+) -> tuple[str, bool]:
+    """Resolve a repo path, checking dev links before workspace clones.
+
+    Returns ``(absolute_path, is_dev_linked)``.
+
+    Lookup order:
+    1. Project-level dev link (``.stx-dev.json`` in cwd or ws_root)
+    2. Global dev registration (``~/.config/streamtex/dev.json``)
+    3. Workspace clone (from ``stx.toml`` repos section)
+
+    Raises FileNotFoundError if none found.
+    """
+    ws_root = Path(ws_root)
+
+    # 1. Project-level dev link (check cwd first, then ws_root)
+    for search_dir in (Path.cwd(), ws_root):
+        pcfg = ProjectDevConfig.load(search_dir)
+        path = pcfg.linked.get(repo_name)
+        if path and Path(path).is_dir():
+            return str(Path(path).resolve()), True
+
+    # 2. Global dev registration
+    gcfg = GlobalDevConfig.load()
+    path = gcfg.repos.get(repo_name)
+    if path and Path(path).is_dir():
+        return str(Path(path).resolve()), True
+
+    # 3. Workspace clone
+    repos = ws_config.get("repos", {})
+    repo_conf = repos.get(repo_name, {})
+    rel_path = repo_conf.get("path", repo_name)
+    clone_path = ws_root / rel_path
+    if clone_path.is_dir():
+        return str(clone_path.resolve()), False
+
+    raise FileNotFoundError(
+        f"Repo {repo_name!r} not found — "
+        f"register with: stx dev register {repo_name} /path/to/{repo_name}"
+    )
+
+
 def is_editable_install(project_dir: str | Path) -> Optional[str]:
     """Return the editable source path if streamtex is installed as editable,
     or None if it is a regular PyPI install."""

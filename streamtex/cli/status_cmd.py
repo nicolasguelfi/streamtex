@@ -241,6 +241,32 @@ def _get_repos_info(report: StatusReport, ws_root: str, config: dict) -> None:
     """Populate repo status information."""
     repos = config.get("repos", {})
     for repo_name, repo_conf in repos.items():
+        # Check if repo is dev-linked
+        dev_path = None
+        try:
+            from .dev_config import resolve_repo_path
+            path, is_dev = resolve_repo_path(repo_name, ws_root, config)
+            if is_dev:
+                dev_path = path
+        except (FileNotFoundError, Exception):
+            pass
+
+        if dev_path:
+            ri = RepoInfo(
+                name=repo_name,
+                path=dev_path,
+                repo_type=repo_conf.get("type", "") + " (dev-linked)",
+            )
+            info = get_repo_status(dev_path)
+            ri.branch = info["branch"]
+            ri.clean = info["clean"]
+            ri.ahead = info["ahead"]
+            ri.behind = info["behind"]
+            if not info["clean"]:
+                ri.dirty_files = _get_dirty_files(dev_path)
+            report.repos.append(ri)
+            continue
+
         repo_path = os.path.join(ws_root, repo_conf.get("path", repo_name))
         ri = RepoInfo(
             name=repo_name,

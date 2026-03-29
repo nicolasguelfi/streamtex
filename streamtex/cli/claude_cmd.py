@@ -107,14 +107,25 @@ def _render_claude_md_for_target(
 
 
 def find_claude_repo(ws_root: str, config: dict) -> str:
-    """Locate the streamtex-claude repo in the workspace.
+    """Locate the streamtex-claude repo, checking dev links first.
+
+    Lookup order:
+    1. Dev link (project-level or global registration)
+    2. Workspace clone (from stx.toml)
 
     Raises:
         click.ClickException: if the repo cannot be found.
     """
-    repos = config.get("repos", {})
+    # 0. Check dev links first
+    try:
+        from .dev_config import resolve_repo_path
+        path, _is_dev = resolve_repo_path("streamtex-claude", ws_root, config)
+        return path
+    except FileNotFoundError:
+        pass
 
-    # 1. Check [claude].source
+    # 1. Check [claude].source (legacy fallback)
+    repos = config.get("repos", {})
     source = config.get("claude", {}).get("source")
     if source and source in repos:
         repo_path = os.path.join(ws_root, repos[source].get("path", source))
@@ -130,7 +141,8 @@ def find_claude_repo(ws_root: str, config: dict) -> str:
 
     raise click.ClickException(
         "streamtex-claude repo not found in workspace.\n"
-        "Run: stx install --preset user"
+        "Run: stx dev register streamtex-claude /path/to/repo\n"
+        "Or:  stx install --preset user"
     )
 
 

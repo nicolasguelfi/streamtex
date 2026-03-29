@@ -148,3 +148,12 @@ COLLECT -> ASSESS -> PLAN -> PRODUCE -> REVIEW -> FIX -> COMPOUND
 
 CE artifacts are stored in `docs/` (collect/, assess/, plans/, reviews/, solutions/).
 See `.claude/references/ce_cheatsheet_en.md` for the full reference.
+
+## Design Guidelines
+
+Projects can adopt a design guideline for consistent visual design:
+- **Available**: `.claude/designer/guidelines/_index.md` — catalog of built-in guidelines
+- **Project config**: `custom/design-guideline.md` — set default + block overrides
+- **Block annotation**: `# @guideline: <name>` in block files (most specific wins)
+- **Combination**: `# @guideline: A + B` — A has priority, B complements
+- **Built-in**: `maximize-viewport`, `minimalist-visual`, `academic-structured`, `dense-informative`

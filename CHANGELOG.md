@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.16] — 2026-03-29
+
+### Fixed
+- **`stx update` CLI version check**: `_get_source_version` now reads from `pyproject.toml` instead of parsing `__init__.py`, which returned the literal string `_pkg_version("streamtex")` instead of the actual version — causing a reinstall attempt on every `stx update`.
+- **`stx update` Python interpreter mismatch**: `_upgrade_cli_tool` now detects the Python interpreter used by the existing `uv tool` environment and passes `--python` to avoid falling back to the system interpreter (which may not satisfy `requires-python >= 3.11`).
+- **Language consistency**: replaced French "la librairie" with English "the library" in CLAUDE.md terminology section across all profile templates.
+
 ## [0.5.15] — 2026-03-29
 
 ### Added

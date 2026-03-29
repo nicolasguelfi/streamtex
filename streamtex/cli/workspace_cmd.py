@@ -742,14 +742,15 @@ def _upgrade_projects(
 
 
 def _get_source_version(lib_path: str) -> str | None:
-    """Read __version__ from the local library source."""
-    init_file = os.path.join(lib_path, "streamtex", "__init__.py")
-    if os.path.isfile(init_file):
+    """Read the library version from pyproject.toml (single source of truth)."""
+    pyproject = os.path.join(lib_path, "pyproject.toml")
+    if os.path.isfile(pyproject):
         try:
-            with open(init_file, encoding="utf-8") as f:
+            with open(pyproject, encoding="utf-8") as f:
                 for line in f:
-                    if line.startswith("__version__"):
-                        return line.split("=", 1)[1].strip().strip("\"'")
+                    m = re.match(r'^version\s*=\s*"([^"]+)"', line)
+                    if m:
+                        return m.group(1)
         except OSError:
             pass
     return None
@@ -787,14 +788,37 @@ def _upgrade_cli_tool(
         f"source [cyan]{source_ver}[/cyan]"
     )
 
+    # Detect the Python interpreter used by the existing uv tool environment
+    # so we can pass --python and avoid falling back to the system interpreter.
+    uv = _find_uv()
+    tool_python = None
+    try:
+        probe = subprocess.run(
+            [uv, "tool", "run", "--from", "streamtex[cli]", "python", "--version"],
+            capture_output=True, text=True, timeout=15,
+        )
+        if probe.returncode == 0:
+            # Output: "Python 3.11.x" → extract "3.11"
+            m = re.match(r"Python (\d+\.\d+)", probe.stdout.strip())
+            if m:
+                tool_python = m.group(1)
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        pass
+
+    python_flag = f" --python {tool_python}" if tool_python else ""
     if dry_run:
-        console.print(f'  Would run: uv tool install --force --reinstall "{lib_path}[cli]"')
+        console.print(
+            f'  Would run: uv tool install{python_flag} --force --reinstall "{lib_path}[cli]"'
+        )
         return
 
-    uv = _find_uv()
     console.print("  Reinstalling CLI from local source …")
+    cmd = [uv, "tool", "install"]
+    if tool_python:
+        cmd += ["--python", tool_python]
+    cmd += ["--force", "--reinstall", f"{lib_path}[cli]"]
     result = subprocess.run(
-        [uv, "tool", "install", "--force", "--reinstall", f"{lib_path}[cli]"],
+        cmd,
         capture_output=True,
         text=True,
         timeout=120,

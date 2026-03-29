@@ -107,14 +107,26 @@ def _remove_uv_source(project_dir: Path) -> None:
     toml_path.write_text(text, encoding="utf-8")
 
 
-def _uv_sync(project_dir: Path) -> bool:
-    """Run uv sync --reinstall-package streamtex. Returns True on success."""
+def _uv_sync(project_dir: Path, console) -> None:
+    """Run uv sync --reinstall-package streamtex with friendly output."""
+    # Check if already editable-installed at the right path
+    existing = is_editable_install(project_dir)
+
     result = subprocess.run(
         [sys.executable, "-m", "uv", "sync", "--reinstall-package", "streamtex"],
         cwd=str(project_dir),
         capture_output=True, text=True,
     )
-    return result.returncode == 0
+    if result.returncode == 0:
+        console.print("  [green]✓[/green] editable install updated")
+    elif existing:
+        # sync failed but editable link already exists — not a real problem
+        console.print("  [green]✓[/green] editable install already active")
+    else:
+        # Real failure — show why
+        stderr = result.stderr.strip().splitlines()
+        reason = stderr[-1] if stderr else "unknown error"
+        console.print(f"  [red]✗[/red] uv sync failed: {reason}")
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -203,10 +215,7 @@ def link_cmd(repos: tuple[str, ...]) -> None:
         if repo == "streamtex":
             _add_uv_source(project_dir, path)
             console.print(f"[cyan]Linking[/cyan] {repo} → {path}")
-            if _uv_sync(project_dir):
-                console.print("  [green]✓[/green] editable install active")
-            else:
-                console.print("  [red]✗[/red] uv sync failed — check output")
+            _uv_sync(project_dir, console)
         else:
             pcfg.linked[repo] = path
             console.print(f"[green]Linked[/green] {repo} → {path}")
@@ -238,10 +247,17 @@ def unlink_cmd(repos: tuple[str, ...]) -> None:
         if repo == "streamtex":
             _remove_uv_source(project_dir)
             console.print(f"[cyan]Unlinking[/cyan] {repo}")
-            if _uv_sync(project_dir):
+            result = subprocess.run(
+                [sys.executable, "-m", "uv", "sync", "--reinstall-package", "streamtex"],
+                cwd=str(project_dir),
+                capture_output=True, text=True,
+            )
+            if result.returncode == 0:
                 console.print("  [green]✓[/green] reverted to PyPI version")
             else:
-                console.print("  [red]✗[/red] uv sync failed")
+                stderr = result.stderr.strip().splitlines()
+                reason = stderr[-1] if stderr else "unknown error"
+                console.print(f"  [red]✗[/red] uv sync failed: {reason}")
         else:
             if repo in pcfg.linked:
                 del pcfg.linked[repo]

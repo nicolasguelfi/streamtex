@@ -166,7 +166,7 @@ def get_image_src(uri: str) -> str:
         if os.path.exists(file_path):
             mime_type = __get_mime_type(file_path)
             mtime = os.path.getmtime(file_path)
-            encoded_image = __get_base64_encoded_image(file_path, _mtime=mtime)
+            encoded_image = __get_base64_encoded_image(file_path, mtime=mtime)
             if mime_type and encoded_image:
                 # Use base64 encoding for local files with correct MIME type
                 img_src = f"data:{mime_type};base64,{encoded_image}"
@@ -189,7 +189,7 @@ def get_image_src(uri: str) -> str:
                 if os.path.isfile(full_path):
                     mime_type = __get_mime_type(full_path)
                     mtime = os.path.getmtime(full_path)
-                    encoded_image = __get_base64_encoded_image(full_path, _mtime=mtime)
+                    encoded_image = __get_base64_encoded_image(full_path, mtime=mtime)
                     if mime_type and encoded_image:
                         img_src = f"data:{mime_type};base64,{encoded_image}"
                         return img_src

@@ -210,7 +210,9 @@ def inject_marker_navigation(
         "bottom-center": "bottom: calc(24px + env(safe-area-inset-bottom, 0px)); left: 50%; transform: translateX(-50%);",
     }.get(config.nav_position, "bottom: calc(24px + env(safe-area-inset-bottom, 0px)); right: 24px;")
 
-    show_ui = "block" if config.show_nav_ui else "none"
+    import streamlit as _st
+    _show = _st.session_state.get("_stx_show_nav_ui", config.show_nav_ui)
+    show_ui = "block" if _show else "none"
     scroll_offset = 80
     logo_b64 = _LOGO_B64
 
@@ -226,6 +228,7 @@ def inject_marker_navigation(
     var OFFSET = __OFFSET__;
     var currentIdx = 0;
     var _navigating = false;
+    var _initialized = false;
     var popupOpen = __POPUP_OPEN__;
 
     if (!markers.length) return;
@@ -291,6 +294,7 @@ def inject_marker_navigation(
     }
 
     function navigateTo(idx) {
+        if (!_initialized) return;
         if (idx < 0) {
             if (hostWin._stxMarkerBoundary) { hostWin._stxMarkerBoundary('prev'); return; }
             idx = 0;
@@ -589,6 +593,10 @@ def inject_marker_navigation(
 
         /* Clamp nav position to visible viewport */
         function clampNav() {
+            if (nav.style.display === 'none') {
+                try { var s = JSON.parse(localStorage.getItem('stx-marker-pos')); return s || {x:0,y:0}; }
+                catch(e) { return {x:0,y:0}; }
+            }
             var rect = nav.getBoundingClientRect();
             var vw = hostWin.innerWidth || hostDoc.documentElement.clientWidth;
             var vh = hostWin.innerHeight || hostDoc.documentElement.clientHeight;
@@ -809,6 +817,7 @@ def inject_marker_navigation(
         var tag = (e.target.tagName || '').toUpperCase();
         if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT'
             || e.target.isContentEditable) return;
+        if (!_initialized) return;
         if (e.key === 'Escape' && popupOpen) {
             e.preventDefault(); togglePopup(false); return false;
         }
@@ -861,7 +870,7 @@ def inject_marker_navigation(
             /* Only update if at least one marker was found in the DOM
                and we are not in the middle of a programmatic scroll
                (navigateTo sets _navigating=true for 300ms).           */
-            if (best >= 0 && best !== currentIdx && !_navigating) {
+            if (best >= 0 && best !== currentIdx && !_navigating && _initialized) {
                 currentIdx = best; updateUI();
             }
         }, 150);
@@ -887,10 +896,10 @@ def inject_marker_navigation(
 
     /* --- Init --- */
     var initTimer = setTimeout(function() {
-        var startIdx = hostWin._stxMarkerStartIdx || 0;
+        var startIdx = hostWin._stxMarkerStartIdx != null ? hostWin._stxMarkerStartIdx : 0;
         if (startIdx < 0) startIdx = markers.length + startIdx;
         startIdx = Math.max(0, Math.min(startIdx, markers.length - 1));
-        hostWin._stxMarkerStartIdx = 0;
+        hostWin._stxMarkerStartIdx = null;
 
         /* Scroll to the target marker if it is in the DOM (same page).
            Without this, doScrollReset() in book.py forces the viewport
@@ -920,6 +929,7 @@ def inject_marker_navigation(
         if (hostWin._stxMarkerPopupState !== undefined) {
             popupOpen = hostWin._stxMarkerPopupState;
         }
+        _initialized = true;
         updateUI(); scanIframes();
         if (popupOpen) { popup.style.display = 'block'; highlightPopup(); }
     }, 500);

@@ -42,11 +42,11 @@ def _get_mime_type(file_path: str):
 
 
 @st.cache_data(show_spinner=False)
-def _get_base64_encoded_image(file_path: str, _mtime: float = 0):
+def _get_base64_encoded_image(file_path: str, mtime: float = 0):
     """Converts an image to a base64 encoded string.
 
-    The result is cached by Streamlit based on (file_path, _mtime).
-    The _mtime parameter ensures the cache is invalidated when the file
+    The result is cached by Streamlit based on (file_path, mtime).
+    The mtime parameter ensures the cache is invalidated when the file
     changes on disk.
     """
     try:

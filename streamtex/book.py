@@ -621,6 +621,12 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
             )
         _stx_settings = st.expander("Settings")
         with _stx_settings:
+            if marker_config is not None:
+                _stx_settings.toggle(
+                    "Navigation bar",
+                    value=marker_config.show_nav_ui,
+                    key="_stx_show_nav_ui",
+                )
             # ── Profile selector with inline reset ──
             def _format_profile(name):
                 if name == active_name and _profile_modified:
@@ -1844,7 +1850,7 @@ def _inject_paginated_nav_js(current_page, total, marker_config,
        Covers cases where no explicit navigation handler set it
        (e.g. sidebar link click, initial page load, browser refresh).
        Runs synchronously BEFORE marker.py's 500ms init reads it. */
-    if (!hostWin._stxMarkerStartIdx) {
+    if (hostWin._stxMarkerStartIdx == null) {
         var fm = pageFirstMarker[currentPage];
         if (fm !== undefined) hostWin._stxMarkerStartIdx = fm;
     }

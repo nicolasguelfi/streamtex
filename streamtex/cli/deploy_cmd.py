@@ -1495,6 +1495,19 @@ def setup_cmd() -> None:
     console = get_console()
     env_vars: dict[str, str] = {}
 
+    # Load existing values so we can offer them as defaults
+    existing: dict[str, str] = {}
+    try:
+        existing = _read_deploy_env()
+    except click.ClickException:
+        pass
+
+    def _mask(value: str) -> str:
+        """Show first 4 and last 4 chars of a token, mask the rest."""
+        if len(value) <= 10:
+            return value[:2] + "***"
+        return value[:4] + "***" + value[-4:]
+
     console.print("[bold cyan]StreamTeX Deploy Setup[/bold cyan]")
     console.print("This will configure your local environment for Hetzner deployment.\n")
 
@@ -1543,11 +1556,19 @@ def setup_cmd() -> None:
                 console.print("[red]\u2717 SSH key generation failed[/red]")
 
     # 3. Hetzner API token
-    console.print(
-        "\n[cyan]Hetzner API token[/cyan] — "
-        "create one at https://console.hetzner.cloud → Security → API Tokens"
-    )
-    hetzner_token = click.prompt("Hetzner API token", hide_input=True)
+    _h_existing = existing.get("HETZNER_API_TOKEN", "")
+    if _h_existing:
+        console.print(f"\n[cyan]Hetzner API token[/cyan] — current: {_mask(_h_existing)}")
+        hetzner_token = click.prompt(
+            "Hetzner API token (Enter to keep)",
+            default=_h_existing, show_default=False, hide_input=True,
+        )
+    else:
+        console.print(
+            "\n[cyan]Hetzner API token[/cyan] — "
+            "create one at https://console.hetzner.cloud → Security → API Tokens"
+        )
+        hetzner_token = click.prompt("Hetzner API token", hide_input=True)
     env_vars["HETZNER_API_TOKEN"] = hetzner_token
 
     # 4. Register SSH key in Hetzner
@@ -1572,15 +1593,49 @@ def setup_cmd() -> None:
             )
 
     # 5. Domain name
-    domain = click.prompt("Domain name (e.g. streamtex.org)")
+    _d_existing = existing.get("DEPLOY_DOMAIN", "")
+    domain = click.prompt("Domain name (e.g. streamtex.org)", default=_d_existing or None)
     env_vars["DEPLOY_DOMAIN"] = domain
 
-    # 6. Cloudflare API token (optional)
-    if click.confirm("Configure Cloudflare DNS integration?", default=False):
+    # 6. Coolify API token
+    _c_existing = existing.get("COOLIFY_API_TOKEN", "")
+    if _c_existing:
+        console.print(f"\n[cyan]Coolify API token[/cyan] — current: {_mask(_c_existing)}")
+        coolify_token = click.prompt(
+            "Coolify API token (Enter to keep)",
+            default=_c_existing, show_default=False, hide_input=True,
+        )
+    else:
+        console.print(
+            "\n[cyan]Coolify API token[/cyan] — "
+            f"get one at https://coolify.{domain} → Security → API Tokens"
+        )
+        coolify_token = click.prompt(
+            "Coolify API token (or Enter to skip)",
+            default="", show_default=False, hide_input=True,
+        )
+    if coolify_token:
+        env_vars["COOLIFY_API_TOKEN"] = coolify_token
+
+    # 6b. Coolify URL
+    _cu_existing = existing.get("COOLIFY_URL", "")
+    _cu_default = _cu_existing or f"https://coolify.{domain}"
+    env_vars["COOLIFY_URL"] = _cu_default
+
+    # 7. Cloudflare API token (optional)
+    _cf_existing = existing.get("CLOUDFLARE_API_TOKEN", "")
+    if _cf_existing:
+        console.print(f"\n[cyan]Cloudflare API token[/cyan] — current: {_mask(_cf_existing)}")
+        cf_token = click.prompt(
+            "Cloudflare API token (Enter to keep)",
+            default=_cf_existing, show_default=False, hide_input=True,
+        )
+        env_vars["CLOUDFLARE_API_TOKEN"] = cf_token
+    elif click.confirm("Configure Cloudflare DNS integration?", default=False):
         cf_token = click.prompt("Cloudflare API token", hide_input=True)
         env_vars["CLOUDFLARE_API_TOKEN"] = cf_token
 
-    # 7. Save .stx-deploy.env
+    # 8. Save .stx-deploy.env
     env_path = os.path.join(".", ".stx-deploy.env")
     with open(env_path, "w", encoding="utf-8") as f:
         f.write("# StreamTeX Deploy Configuration\n")

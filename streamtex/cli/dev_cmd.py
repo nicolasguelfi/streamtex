@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import subprocess
-import sys
 from pathlib import Path
 
 import click
@@ -113,7 +112,7 @@ def _uv_sync(project_dir: Path, console) -> None:
     existing = is_editable_install(project_dir)
 
     result = subprocess.run(
-        [sys.executable, "-m", "uv", "sync", "--reinstall-package", "streamtex"],
+        ["uv", "sync", "--reinstall-package", "streamtex"],
         cwd=str(project_dir),
         capture_output=True, text=True,
     )
@@ -248,7 +247,7 @@ def unlink_cmd(repos: tuple[str, ...]) -> None:
             _remove_uv_source(project_dir)
             console.print(f"[cyan]Unlinking[/cyan] {repo}")
             result = subprocess.run(
-                [sys.executable, "-m", "uv", "sync", "--reinstall-package", "streamtex"],
+                ["uv", "sync", "--reinstall-package", "streamtex"],
                 cwd=str(project_dir),
                 capture_output=True, text=True,
             )

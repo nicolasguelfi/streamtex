@@ -502,7 +502,7 @@ If StreamTeX is useful to you, consider [sponsoring the project](https://github.
 
 ## Acknowledgments
 
-- **[Armando](https://github.com/Fre-Ar)** — A huge thank you to Armando, who worked alongside me to design and build the very first exploratory prototype that ultimately gave birth to StreamTeX. This project wouldn't be what it is today without that early collaboration.
+- **[Armando Freitas](https://github.com/Fre-Ar)** — A huge thank you to Armando, who worked alongside me to design and build the very first exploratory prototype that ultimately gave birth to StreamTeX. This project wouldn't be what it is today without that early collaboration.
 
 ## License
 

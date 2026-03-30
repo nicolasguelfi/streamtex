@@ -53,6 +53,7 @@ class AppInfo:
     repository: str = ""
     branch: str = ""
     description: str = ""
+    updated_at: str = ""
 
 
 # ── Constants (single source of truth) ─────────────────────────────────
@@ -350,6 +351,7 @@ class CoolifyClient:
                 repository=app.get("git_repository", ""),
                 branch=app.get("git_branch", ""),
                 description=app.get("description", ""),
+                updated_at=app.get("updated_at", ""),
             )
             for app in data
         ]
@@ -365,6 +367,7 @@ class CoolifyClient:
             repository=app.get("git_repository", ""),
             branch=app.get("git_branch", ""),
             description=app.get("description", ""),
+            updated_at=app.get("updated_at", ""),
         )
 
     # ── Deployments ────────────────────────────────────────────────────

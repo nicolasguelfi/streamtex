@@ -1124,11 +1124,13 @@ def _status_coolify(console, name: str | None) -> None:
     table = Table(title="Coolify Deployment Status")
     table.add_column("Service", style="cyan")
     table.add_column("Status")
+    table.add_column("Last Deploy", style="dim")
     table.add_column("URL")
 
     for app in sorted(apps, key=lambda a: a.name):
         status_icon = icons.get(app.status, f"[dim]{app.status}[/dim]")
-        table.add_row(app.name, status_icon, app.fqdn)
+        deploy_time = app.updated_at[:19].replace("T", " ") if app.updated_at else ""
+        table.add_row(app.name, status_icon, deploy_time, app.fqdn)
 
     console.print(table)
 

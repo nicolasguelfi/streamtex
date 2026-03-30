@@ -1129,7 +1129,15 @@ def _status_coolify(console, name: str | None) -> None:
 
     for app in sorted(apps, key=lambda a: a.name):
         status_icon = icons.get(app.status, f"[dim]{app.status}[/dim]")
-        deploy_time = app.updated_at[:19].replace("T", " ") if app.updated_at else ""
+        deploy_time = ""
+        if app.updated_at:
+            from datetime import datetime
+            try:
+                utc_dt = datetime.fromisoformat(app.updated_at.replace("Z", "+00:00"))
+                local_dt = utc_dt.astimezone()
+                deploy_time = local_dt.strftime("%Y-%m-%d %H:%M:%S")
+            except ValueError:
+                deploy_time = app.updated_at[:19].replace("T", " ")
         table.add_row(app.name, status_icon, deploy_time, app.fqdn)
 
     console.print(table)

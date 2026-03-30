@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.17] — 2026-03-30
+
+### Fixed
+- **Marker navigation jump-to-start**: fixed multiple falsy-zero bugs where `_stxMarkerStartIdx = 0` was treated as unset, causing navigation to reset to marker 0 (page "Who?") on Streamlit reruns. All null checks now use `== null` instead of `!value` or `|| 0`.
+- **Navigation during init window**: added `_initialized` guard to `navigateTo()` and `keyHandler()` — keyboard/button navigation is blocked during the 500ms marker init, preventing jumps to wrong pages when `currentIdx` is still 0.
+- **Scroll tracker race condition**: scroll handler now checks `_initialized` flag before updating `currentIdx`, preventing `doScrollReset()` from corrupting marker state during page transitions.
+- **AI image regeneration display**: renamed `_mtime` parameter to `mtime` in `_get_base64_encoded_image()` — Streamlit's `@st.cache_data` excludes underscore-prefixed params from the cache key, causing regenerated images to display stale base64 data.
+
+### Added
+- **Navigation bar toggle**: added a "Navigation bar" toggle at the top of the Settings sidebar expander to show/hide the floating marker navigation widget at runtime. Keyboard navigation continues to work when the bar is hidden.
+- **Nav bar position preservation**: `clampNav()` now skips position persistence when the nav widget is hidden (`display:none`), preventing localStorage from being overwritten with `{x:0, y:0}`.
+
 ## [0.5.16] — 2026-03-29
 
 ### Fixed

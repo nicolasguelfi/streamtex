@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.21] — 2026-03-31
+
+### Fixed
+- **Managed images not shown in deployed (non-editable) mode**: `get_current(name)` lookup was gated behind `editable and name` — deployed apps with `editable=False` never resolved managed images from `static/images/managed/`. Changed condition to `name` only, so managed images are found regardless of editable flag.
+
 ## [0.5.20] — 2026-03-31
 
 ### Fixed

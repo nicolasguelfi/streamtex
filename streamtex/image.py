@@ -75,9 +75,11 @@ def st_image(
     if isinstance(height, int):
         height = f"{height}px"
 
-    # 1b. If editable with a name, prefer the managed version (AI-generated
+    # 1b. If a name is given, prefer the managed version (AI-generated
     #     or replaced via the editor panel) over the original URI.
-    if editable and name:
+    #     This runs regardless of editable so deployed (non-editable) apps
+    #     still find images saved in static/images/managed/.
+    if name:
         try:
             from .ai.history import get_current
             managed = get_current(name)

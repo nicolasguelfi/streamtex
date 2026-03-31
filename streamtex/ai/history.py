@@ -120,7 +120,7 @@ def get_current(name: str, *, managed_dir: Optional[str] = None) -> Optional[str
     """Return the path to the current version of *name*, or None if not found."""
     d = _resolve_managed_dir(managed_dir)
     # Try common extensions
-    for ext in ("png", "jpeg", "jpg", "webp", "svg"):
+    for ext in ("webp", "png", "jpeg", "jpg", "svg"):
         path = _current_path(d, name, ext)
         if os.path.isfile(path):
             return path
@@ -172,7 +172,7 @@ def rollback(name: str, version: int, *, managed_dir: Optional[str] = None) -> O
     # Find the target version file
     target_meta = None
     target_img = None
-    for ext in ("png", "jpeg", "jpg", "webp"):
+    for ext in ("webp", "png", "jpeg", "jpg"):
         candidate = _version_path(d, name, version, ext)
         if os.path.isfile(candidate):
             target_img = candidate

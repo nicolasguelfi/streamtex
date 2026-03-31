@@ -2468,7 +2468,7 @@ wheels = [
 
 [[package]]
 name = "streamtex"
-version = "0.5.18"
+version = "0.5.20"
 source = { editable = "." }
 dependencies = [
     { name = "beautifulsoup4" },
@@ -2487,15 +2487,19 @@ ai = [
     { name = "fal-client" },
     { name = "google-genai" },
     { name = "openai" },
+    { name = "pillow" },
 ]
 ai-fal = [
     { name = "fal-client" },
+    { name = "pillow" },
 ]
 ai-google = [
     { name = "google-genai" },
+    { name = "pillow" },
 ]
 ai-openai = [
     { name = "openai" },
+    { name = "pillow" },
 ]
 cli = [
     { name = "click" },
@@ -2540,6 +2544,10 @@ requires-dist = [
     { name = "mermaid-py", specifier = ">=0.5.0" },
     { name = "openai", marker = "extra == 'ai'", specifier = ">=1.0" },
     { name = "openai", marker = "extra == 'ai-openai'", specifier = ">=1.0" },
+    { name = "pillow", marker = "extra == 'ai'", specifier = ">=10.0" },
+    { name = "pillow", marker = "extra == 'ai-fal'", specifier = ">=10.0" },
+    { name = "pillow", marker = "extra == 'ai-google'", specifier = ">=10.0" },
+    { name = "pillow", marker = "extra == 'ai-openai'", specifier = ">=10.0" },
     { name = "playwright", marker = "extra == 'cli'", specifier = ">=1.40" },
     { name = "playwright", marker = "extra == 'pdf'", specifier = ">=1.40" },
     { name = "python-dotenv", specifier = ">=1.2.1" },

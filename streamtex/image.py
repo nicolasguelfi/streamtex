@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 from typing import Optional
 
@@ -14,6 +15,8 @@ from .utils import (
     __is_url,
     contain_link,
 )
+
+logger = logging.getLogger(__name__)
 
 try:
     import streamlit as _st
@@ -140,8 +143,8 @@ def st_image(
                             prompt=prompt, provider=_prov, model=model,
                             size=_sz, quality=quality,
                         )
-        except Exception:
-            pass  # Fall through to placeholder
+        except Exception as exc:
+            logger.warning("AI auto-generate failed for %r: %s", name or prompt[:50], exc, exc_info=True)
 
     # 3. Show placeholder if image not found
     if not img_src:
@@ -193,6 +196,8 @@ def get_image_src(uri: str) -> str:
     """
     Resolves the image source from a URL, absolute path, relative path, or static file.
     """
+    if not uri:
+        return ""
     img_src = ""
     if __is_url(uri):
         # If it's a URL, use it directly

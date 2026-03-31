@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.20] — 2026-03-31
+
+### Fixed
+- **AI auto-generate not triggering**: `get_image_src("")` returned a non-empty fallback path (`app/static/images/`) instead of empty string, preventing the AI generation fallback from activating. Added early return for empty URI.
+- **Silent AI generation failures**: replaced `except Exception: pass` with `logger.warning(...)` in the auto-generate fallback so API errors are visible in the console.
+
+### Changed
+- **WebP-first lookup**: `get_current()` and `rollback()` in `history.py` now check `.webp` before `.png` for faster resolution when images are in WebP format.
+
 ## [0.5.19] — 2026-03-31
 
 ### Fixed

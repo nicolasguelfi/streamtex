@@ -529,13 +529,13 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
                             separator, *args, **kwargs)
         return
 
-    # --- Loading overlay (before any slow work) ---
+    # --- Password gate (env-driven, no-op locally) ---
+    _password_gate()
+
+    # --- Loading overlay (after gate, before any slow work) ---
     _show_loading = loading and not _warmup_mode
     if _show_loading:
         inject_loading_overlay()
-
-    # --- Password gate (env-driven, no-op locally) ---
-    _password_gate()
     # --- Chrome recommendation banner (JS-injected, no block flow impact) ---
     if chrome_banner:
         st_chrome_banner()
@@ -1263,12 +1263,18 @@ _STX_FULL_EXPORT_HTML_KEY = "_stx_full_export_html"
 def _build_page_cache(module_list, toc_config, marker_config, separator,
                       cache_hash, *args, export_config: ExportConfig | None = None,
                       progress_callback=None,
+                      hidden_container=None,
                       **kwargs):
     """Execute all blocks inside st.empty() to collect TOC/markers, then cache.
 
     When *export_config* is provided the export buffer is active during the
     full render so the complete HTML is captured and stored in session_state
     under ``_STX_FULL_EXPORT_HTML_KEY``.
+
+    *hidden_container* is an optional pre-created ``st.empty()`` in the main
+    area.  When provided it is used instead of creating a new one — this
+    prevents blocks from rendering inside the sidebar when the rebuild is
+    triggered from the export panel.
     """
     reset_toc_registry(toc_config)
     if marker_config is not None:
@@ -1289,7 +1295,7 @@ def _build_page_cache(module_list, toc_config, marker_config, separator,
         # Resolve block spacing for cache build (no profile in cache build)
         _block_sp = resolve_block_spacing()
 
-        hidden = st.empty()
+        hidden = hidden_container if hidden_container is not None else st.empty()
         with hidden.container(), _isolate_widget_keys():
             for i, module in enumerate(module_list):
                 toc_before = len(toc_entries()) if toc_config else 0
@@ -1994,6 +2000,10 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
     # Instead, store a rebuild callback in session_state so the export panel
     # can trigger it on-demand when the user clicks "Generate".
     if export and _STX_FULL_EXPORT_HTML_KEY not in st.session_state:
+        # Pre-create a hidden placeholder in the MAIN area so that when the
+        # export panel (in the sidebar) triggers a rebuild, blocks render here
+        # instead of polluting the sidebar.
+        _main_placeholder = st.empty()
         def _rebuild_full_export():
             _ecfg = ExportConfig(
                 enabled=True, page_title=export_title,
@@ -2001,7 +2011,8 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
             )
             _build_page_cache(module_list, toc_config, marker_config,
                               separator, cache_hash, *args,
-                              export_config=_ecfg, **kwargs)
+                              export_config=_ecfg,
+                              hidden_container=_main_placeholder, **kwargs)
         st.session_state["_stx_export_rebuild_fn"] = _rebuild_full_export
 
     # Remove loading overlay (after cache is ready, before page render)

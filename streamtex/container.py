@@ -36,9 +36,14 @@ def st_block(style: Style = StxStyles.none, _export_wrapper: bool = True):
     )
 
     # 4. Export wrapper (no-op when export is inactive)
-    _export_style = f'{style}{_section_css}' if _section_css else str(style)
+    # Prepend flex-direction:column to mirror Streamlit's stVerticalBlock
+    # (same pattern as st_span which prepends flex-direction:row).
+    # User styles that override display or flex-direction win because
+    # later declarations in the same style attribute take precedence.
+    _base = 'display:flex;flex-direction:column;gap:0.1rem;'
+    _export_style = f'{_base}{style}{_section_css}' if _section_css else f'{_base}{style}'
     if is_export_active() and _export_wrapper:
-        export_push_wrapper(f'<div style="{_export_style}">')
+        export_push_wrapper(f'<div class="stx-block" style="{_export_style}">')
 
     # 4. Create a native Streamlit container
     with st.container():

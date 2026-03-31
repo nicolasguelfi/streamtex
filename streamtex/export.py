@@ -364,6 +364,10 @@ class HtmlExportBuffer:
             f"  padding: {c.page_padding};\n"
             f"{zoom_css}"
             f"}}\n"
+            f"/* Mirror Streamlit stVerticalBlock: all children stretch to full width */\n"
+            f".stx-block > * {{ align-self: stretch; }}\n"
+            f"/* Prevent text-align inheritance into lists (Streamlit isolates via shadow DOM) */\n"
+            f"ol, ul {{ text-align: left; }}\n"
             f"</style>\n"
             f"</head>\n<body>\n"
             f"<div class=\"streamtex-page\">\n"
@@ -566,7 +570,7 @@ def st_html(html: str, *, height: int = 0, light_bg: bool = False,
     else:
         st.html(live)
     if _buffer is not None:
-        _buffer.append(html)
+        _buffer.append(f'<div class="stx-el" style="align-self:stretch">{html}</div>')
     from .search import record_if_active
     record_if_active(html)
 

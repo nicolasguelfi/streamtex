@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.19] — 2026-03-31
+
+### Fixed
+- **HTML/PDF export vertical stacking**: each `st_html()` fragment is now wrapped in a block-level `<div class="stx-el">` to reproduce Streamlit's element container behavior. `st_block()` export prepends `display:flex;flex-direction:column;gap:0.1rem` (mirrors Streamlit's `stVerticalBlock`).
+- **Export alignment**: `.stx-block > * { align-self: stretch }` CSS rule ensures grid/list/block wrappers take full width (prevents `align-items:center` from shrinking children). `ol, ul { text-align: left }` prevents `text-align:center` inheritance through the flat DOM.
+- **Generate button sidebar pollution**: export rebuild now uses a pre-created `st.empty()` placeholder in the main area, preventing blocks from rendering inside the sidebar on first "Generate" click.
+
+### Added
+- **AI auto-generate in `st_image()`**: `st_image(prompt=..., editable=True)` now handles AI generation natively — checks cache, auto-generates if `AIImageConfig.auto_generate=True`, and saves to managed history when `name=` is given.
+- **WebP default for AI images**: new `AIImageConfig.save_format` (default `"webp"`) and `save_quality` (default `90`) fields. Generated images are transcoded via Pillow before saving, yielding ~10× smaller files. Graceful fallback to PNG if Pillow is not installed.
+- **Pillow optional dependency**: added to all `ai` extras (`ai`, `ai-openai`, `ai-google`, `ai-fal`).
+
+### Deprecated
+- **`st_ai_image()`**: now emits `DeprecationWarning` at runtime. Use `st_image(prompt=..., editable=True, name=...)` instead.
+- **`st_ai_image_widget()`**: now emits `DeprecationWarning`. Use `st_image(editable=True)` with the editor panel's AI tab instead.
+
 ## [0.5.18] — 2026-03-30
 
 ### Fixed

@@ -273,3 +273,88 @@ class TestStImage:
         with patch("streamtex.image._render", mock_render):
             st_image(uri="https://example.com/diagram.svg", light_bg=True)
         assert mock_render.call_args.kwargs.get("light_bg") is True
+
+
+# ===================================================================
+# st_image — AI auto_generate integration
+# ===================================================================
+
+class TestStImageAutoGenerate:
+    """Tests for the auto_generate fallback ported from st_ai_image()."""
+
+    def test_cached_prompt_renders_image(self):
+        """prompt + cached → image rendered via cache, no API call."""
+        from streamtex.image import st_image
+        captured = []
+        fake_path = "/tmp/cached.png"
+        with patch("streamtex.image.get_image_src", side_effect=["", "data:image/png;base64,AA=="]), \
+             patch("streamtex.image._render", side_effect=_capture_render(captured)), \
+             patch("streamtex.ai.generate.is_cached", return_value=True), \
+             patch("streamtex.ai.generate.generate_image", return_value=fake_path):
+            result = st_image(uri="", prompt="a cat")
+        assert len(captured) == 1
+        assert "<img" in captured[0]
+
+    def test_auto_generate_true_calls_api(self):
+        """prompt + not cached + auto_generate=True → API called."""
+        from streamtex.ai.config import AIImageConfig, set_ai_image_config
+        from streamtex.image import st_image
+        captured = []
+        fake_path = "/tmp/gen.png"
+        cfg = AIImageConfig(auto_generate=True)
+        set_ai_image_config(cfg)
+        try:
+            with patch("streamtex.image.get_image_src", side_effect=["", "data:image/png;base64,AA=="]), \
+                 patch("streamtex.image._render", side_effect=_capture_render(captured)), \
+                 patch("streamtex.ai.generate.is_cached", return_value=False), \
+                 patch("streamtex.ai.generate.generate_image", return_value=fake_path):
+                st_image(uri="", prompt="a sunset")
+            assert len(captured) == 1
+            assert "<img" in captured[0]
+        finally:
+            set_ai_image_config(None)
+
+    def test_auto_generate_false_shows_placeholder(self):
+        """prompt + not cached + auto_generate=False → placeholder."""
+        from streamtex.ai.config import AIImageConfig, set_ai_image_config
+        from streamtex.image import st_image
+        captured = []
+        cfg = AIImageConfig(auto_generate=False)
+        set_ai_image_config(cfg)
+        try:
+            with patch("streamtex.image.get_image_src", return_value=""), \
+                 patch("streamtex.image._render", side_effect=_capture_render(captured)), \
+                 patch("streamtex.ai.generate.is_cached", return_value=False):
+                st_image(uri="", prompt="a sunset")
+            assert len(captured) == 1
+            assert "Image not found" in captured[0]
+        finally:
+            set_ai_image_config(None)
+
+    def test_auto_generate_saves_managed_version(self):
+        """prompt + name + auto_generate=True → save_version() called."""
+        from streamtex.ai.config import AIImageConfig, set_ai_image_config
+        from streamtex.image import st_image
+        cfg = AIImageConfig(auto_generate=True)
+        set_ai_image_config(cfg)
+        try:
+            with patch("streamtex.image.get_image_src", side_effect=["", "data:image/png;base64,AA=="]), \
+                 patch("streamtex.image._render"), \
+                 patch("streamtex.ai.generate.is_cached", return_value=False), \
+                 patch("streamtex.ai.generate.generate_image", return_value="/tmp/g.png"), \
+                 patch("streamtex.ai.history.save_version") as mock_save:
+                st_image(uri="", prompt="a cat", editable=True, name="hero")
+            mock_save.assert_called_once()
+            assert mock_save.call_args.kwargs["prompt"] == "a cat"
+        finally:
+            set_ai_image_config(None)
+
+    def test_no_prompt_no_generation(self):
+        """uri= without prompt → classic placeholder, no AI logic."""
+        from streamtex.image import st_image
+        captured = []
+        with patch("streamtex.image.get_image_src", return_value=""), \
+             patch("streamtex.image._render", side_effect=_capture_render(captured)):
+            st_image(uri="missing.png")
+        assert len(captured) == 1
+        assert "Image not found" in captured[0]

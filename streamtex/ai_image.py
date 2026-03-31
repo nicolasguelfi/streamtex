@@ -13,6 +13,7 @@ st_image(), ensuring full compatibility with the export pipeline.
 from __future__ import annotations
 
 import os
+import warnings
 from typing import Optional
 
 from .ai.config import AIImageConfig, get_ai_image_config
@@ -74,7 +75,26 @@ def st_ai_image(
 
     Returns:
         Path to the generated image file, or None if not yet generated.
+
+    Migration::
+
+        # Old
+        st_ai_image(prompt="a cat")
+        # New
+        st_image(prompt="a cat", editable=True, name="my_cat")
+
+        # Old (with provider/size)
+        st_ai_image(prompt="a cat", provider="google", size="1024x1024")
+        # New
+        st_image(prompt="a cat", editable=True, name="my_cat",
+                 provider="google", ai_size="1024x1024")
     """
+    warnings.warn(
+        "st_ai_image() is deprecated since v0.4. "
+        "Use st_image(prompt=..., editable=True, name=...) instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     cfg = config or get_ai_image_config() or AIImageConfig()
     prov_name = provider or cfg.provider
     img_size = size or cfg.default_size
@@ -199,7 +219,16 @@ def st_ai_image_widget(
 
     Returns:
         Path to the generated image, or None if not yet generated.
+
+    .. deprecated::
+        Use ``st_image(editable=True)`` with the editor panel's AI tab instead.
     """
+    warnings.warn(
+        "st_ai_image_widget() is deprecated since v0.4. "
+        "Use st_image(editable=True) with the editor panel's AI tab instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     if st is None:
         return None
 

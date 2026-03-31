@@ -104,6 +104,45 @@ def st_image(
     # 2. Get the source (URL or Base64)
     img_src = get_image_src(uri)
 
+    # 2b. AI generation fallback — when prompt is provided but no image exists.
+    #     Checks the AI cache first (no API call), then auto-generates if the
+    #     global AIImageConfig.auto_generate flag is True.  When a name is
+    #     provided the generated image is also saved into the managed/ history
+    #     so that subsequent renders use it directly via step 1b above.
+    if not img_src and prompt:
+        try:
+            from .ai.config import AIImageConfig, get_ai_image_config
+            from .ai.generate import generate_image, is_cached
+
+            cfg = get_ai_image_config() or AIImageConfig()
+            _prov = provider or cfg.provider
+            _sz = ai_size or cfg.default_size
+
+            _should_generate = (
+                is_cached(prompt, provider=_prov, size=_sz,
+                          quality=quality, model=model, config=cfg)
+                or cfg.auto_generate
+            )
+            if _should_generate:
+                _ai_path = generate_image(
+                    prompt, provider=_prov, size=_sz,
+                    quality=quality, model=model, config=cfg,
+                )
+                _ai_src = get_image_src(_ai_path)
+                if _ai_src:
+                    uri = _ai_path
+                    img_src = _ai_src
+                    # Persist into managed/ history when a name is given
+                    if name:
+                        from .ai.history import save_version
+                        save_version(
+                            name, _ai_path, source_type="ai_generated",
+                            prompt=prompt, provider=_prov, model=model,
+                            size=_sz, quality=quality,
+                        )
+        except Exception:
+            pass  # Fall through to placeholder
+
     # 3. Show placeholder if image not found
     if not img_src:
         placeholder = (

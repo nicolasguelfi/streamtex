@@ -136,3 +136,27 @@ class TestDIConfigIntegration:
             assert result is not None
         finally:
             set_ai_image_config(None)
+
+
+# ===================================================================
+# Deprecation warnings
+# ===================================================================
+
+class TestDeprecationWarnings:
+    def test_st_ai_image_emits_warning(self, tmp_path):
+        import pytest
+        cfg = AIImageConfig(output_dir=str(tmp_path), auto_generate=False)
+
+        with patch("streamtex.ai_image.is_cached", return_value=False), \
+             patch("streamtex.ai_image.st", None):
+            with pytest.warns(DeprecationWarning, match="deprecated"):
+                st_ai_image("test prompt", config=cfg)
+
+    def test_st_ai_image_widget_emits_warning(self):
+        import pytest
+
+        from streamtex.ai_image import st_ai_image_widget
+
+        with patch("streamtex.ai_image.st", None):
+            with pytest.warns(DeprecationWarning, match="deprecated"):
+                st_ai_image_widget()

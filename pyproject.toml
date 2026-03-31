@@ -56,10 +56,10 @@ cli = [
     "playwright>=1.40",
 ]
 pdf = ["playwright>=1.40"]
-ai = ["openai>=1.0", "google-genai>=1.0", "fal-client>=0.5"]
-ai-openai = ["openai>=1.0"]
-ai-google = ["google-genai>=1.0"]
-ai-fal = ["fal-client>=0.5"]
+ai = ["openai>=1.0", "google-genai>=1.0", "fal-client>=0.5", "Pillow>=10.0"]
+ai-openai = ["openai>=1.0", "Pillow>=10.0"]
+ai-google = ["google-genai>=1.0", "Pillow>=10.0"]
+ai-fal = ["fal-client>=0.5", "Pillow>=10.0"]
 
 [project.urls]
 Homepage = "https://github.com/nicolasguelfi/streamtex"

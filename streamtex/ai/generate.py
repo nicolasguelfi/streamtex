@@ -43,7 +43,7 @@ def _resolve_output_dir(config: AIImageConfig) -> str:
 
 def _find_cached(output_dir: str, cache_key: str) -> Optional[str]:
     """Return the path of a cached image if it exists."""
-    for ext in ("png", "jpeg", "jpg"):
+    for ext in ("webp", "png", "jpeg", "jpg"):
         path = os.path.join(output_dir, f"{cache_key}.{ext}")
         if os.path.isfile(path):
             return path
@@ -116,13 +116,37 @@ def generate_image(
     except Exception as e:
         raise AIImageError(f"Image generation failed ({prov_name}): {e}") from e
 
+    # Transcode to configured save_format (default: webp for ~10× smaller files)
+    image_bytes = result.image_bytes
+    target_fmt = cfg.save_format.lower()
+
+    if target_fmt in ("webp", "jpeg") and target_fmt != result.format:
+        try:
+            import io
+
+            from PIL import Image
+
+            img = Image.open(io.BytesIO(image_bytes))
+            if target_fmt == "jpeg" and img.mode in ("RGBA", "P"):
+                img = img.convert("RGB")
+            buf = io.BytesIO()
+            pil_fmt = "WEBP" if target_fmt == "webp" else "JPEG"
+            img.save(buf, format=pil_fmt, quality=cfg.save_quality)
+            image_bytes = buf.getvalue()
+            ext = target_fmt
+            logger.debug("Transcoded to %s (quality=%d)", ext, cfg.save_quality)
+        except (ImportError, Exception) as exc:
+            logger.debug("Transcoding skipped (%s) — keeping original %s format", exc, result.format)
+            ext = result.format if result.format in ("png", "jpeg") else "png"
+    else:
+        ext = target_fmt if target_fmt in ("png", "jpeg", "webp") else result.format
+
     # Save
-    ext = result.format if result.format in ("png", "jpeg") else "png"
     file_path = os.path.join(output_dir, f"{cache_key}.{ext}")
     if save:
         with open(file_path, "wb") as f:
-            f.write(result.image_bytes)
-        logger.info("AI image saved: %s", file_path)
+            f.write(image_bytes)
+        logger.info("AI image saved: %s (%d bytes)", file_path, len(image_bytes))
 
     return file_path
 

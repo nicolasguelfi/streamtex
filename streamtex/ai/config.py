@@ -34,6 +34,12 @@ class AIImageConfig:
         auto_generate: When False (default), new images require a manual
             click on a "Generate" button. When True, images are generated
             automatically on first run (still cached on disk afterwards).
+        save_format: Disk format for newly generated images. ``"webp"``
+            (default) gives ~10× smaller files than PNG with no visible
+            quality loss at ``save_quality=90``.  Set to ``"png"`` for
+            lossless pixel-perfect output, or ``"jpeg"`` for photos.
+        save_quality: Compression quality for lossy formats (WebP, JPEG).
+            1–100, default 90.  Ignored when ``save_format="png"``.
         api_keys: Optional dict of provider-specific API keys.
             Keys: "openai", "google", "fal". Values: API key strings.
             If not provided, keys are resolved from environment variables.
@@ -46,6 +52,8 @@ class AIImageConfig:
     default_size: str = "1024x1024"
     output_dir: str = "static/images/ai"
     auto_generate: bool = False
+    save_format: str = "webp"
+    save_quality: int = 90
     api_keys: Dict[str, str] = field(default_factory=dict)
     project_root: Optional[str] = None
 

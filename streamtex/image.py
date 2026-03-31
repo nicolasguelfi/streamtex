@@ -90,8 +90,8 @@ def st_image(
 
     # 1c. Apply display settings from metadata (zoom / manual size).
     #     Load persisted values from JSON on first access so the zoom
-    #     takes effect even before the user opens the Display tab.
-    if editable and name:
+    #     takes effect even in non-editable (deployed) mode.
+    if name:
         _prefix = f"stx_img_display_{name}"
         if _st and not _st.session_state.get(f"{_prefix}_initialized"):
             from .image_editor import _load_display_from_metadata

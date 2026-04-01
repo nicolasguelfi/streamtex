@@ -318,13 +318,14 @@ def _offer_export_downloads(html: str, base_name: str,
                     effective_html = full_book_html
 
             if want_html:
-                # Apply enrichment (TOC sidebar, markers, search) if requested
+                # Enrich a separate copy — keep effective_html raw for PDF
+                html_download = effective_html
                 if enrich_nav:
                     try:
                         from .export_enrich import enrich_export_html
                         _cache = st.session_state.get(_STX_CACHE_KEY, {})
-                        effective_html = enrich_export_html(
-                            effective_html,
+                        html_download = enrich_export_html(
+                            html_download,
                             toc=_cache.get("toc"),
                             markers=_cache.get("markers"),
                             search_index=_cache.get("search_index"),
@@ -332,10 +333,10 @@ def _offer_export_downloads(html: str, base_name: str,
                         # Apply custom title override
                         if enrich_title:
                             import re as _re
-                            effective_html = _re.sub(
+                            html_download = _re.sub(
                                 r"<title>[^<]*</title>",
                                 f"<title>{enrich_title}</title>",
-                                effective_html,
+                                html_download,
                                 count=1,
                             )
                     except Exception:
@@ -344,9 +345,9 @@ def _offer_export_downloads(html: str, base_name: str,
                 collector = get_asset_collector()
                 if collector:
                     # External mode: create ZIP with HTML + data/ folder
-                    results["zip"] = collector.to_zip(effective_html, base_name)
+                    results["zip"] = collector.to_zip(html_download, base_name)
                 else:
-                    results["html"] = effective_html
+                    results["html"] = html_download
             if want_pdf and pdf_available:
                 _pdf_mode = (PdfMode.PAGINATED if section_breaks == _BREAK_PAGE
                              else PdfMode.CONTINUOUS)

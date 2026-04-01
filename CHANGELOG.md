@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.4] — 2026-04-01
+
+### Fixed
+- **AI managed images in Docker**: `_detect_project_root()` now prefers CWD (with `book.py`) over `__main__.__file__`, fixing 27 missing images in static HTML export when running via `uv run stx` in containers.
+
 ## [0.6.3] — 2026-04-01
 
 ### Added

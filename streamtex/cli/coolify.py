@@ -91,6 +91,14 @@ NGINX_PORT = 80
 SERVE_MODES = ("dual", "static-only", "streamlit-only")
 """Valid values for the STX_SERVE_MODE environment variable."""
 
+MAX_CONCURRENT_DEPLOYS = 4
+"""Maximum number of simultaneous rebuilds on a single server.
+
+The cax21 (4 vCPU, 8 GB RAM) hangs when too many Docker builds run at once.
+Callers should batch rebuilds in groups of this size and wait for each batch
+to become healthy before starting the next.
+"""
+
 COOLIFY_DASHBOARD_PORT = 8000
 """Coolify dashboard port before domain configuration."""
 
@@ -424,6 +432,46 @@ class CoolifyClient:
             )
         except CoolifyError as e:
             return DeployResult(uuid=uuid, success=False, message=str(e))
+
+    def rebuild_batch(
+        self,
+        uuids: list[str],
+        *,
+        batch_size: int = MAX_CONCURRENT_DEPLOYS,
+        timeout: int = DEFAULT_DEPLOY_TIMEOUT,
+        console=None,
+    ) -> list[DeployResult]:
+        """Rebuild multiple applications in batches, waiting between each.
+
+        Avoids overloading the server by limiting concurrent Docker builds.
+        Returns the list of DeployResult for all applications.
+        """
+        results: list[DeployResult] = []
+        for i in range(0, len(uuids), batch_size):
+            batch = uuids[i : i + batch_size]
+            batch_num = i // batch_size + 1
+            total_batches = (len(uuids) + batch_size - 1) // batch_size
+            if console:
+                console.print(
+                    f"[cyan]Batch {batch_num}/{total_batches}: "
+                    f"rebuilding {len(batch)} service(s)…[/cyan]"
+                )
+            for uid in batch:
+                r = self.rebuild(uid)
+                results.append(r)
+                if console:
+                    icon = "[green]✓[/green]" if r.success else "[red]✗[/red]"
+                    console.print(f"  {icon} {uid[:12]}: {r.message}")
+            # Wait for this batch to finish before starting the next
+            if i + batch_size < len(uuids):
+                for uid in batch:
+                    healthy = self.wait_healthy(uid, timeout=timeout)
+                    if console and not healthy:
+                        console.print(
+                            f"  [yellow]⚠ {uid[:12]} did not reach healthy "
+                            f"within {timeout}s[/yellow]"
+                        )
+        return results
 
     def stop(self, uuid: str) -> DeployResult:
         """Stop an application."""

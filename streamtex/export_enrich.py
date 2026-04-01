@@ -5,8 +5,10 @@ fully navigable static document.  All generated content is pure HTML/CSS/JS
 with zero server-side dependencies.
 """
 
+import base64
 import json
 import re
+from pathlib import Path
 
 # ---------------------------------------------------------------------------
 # Prop E — Auto-detect title from TOC
@@ -187,25 +189,30 @@ _SIDEBAR_CSS = """
 """
 
 
-_STX_LOGO_SVG = (
-    '<svg width="20" height="20" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">'
-    '<rect width="100" height="100" rx="16" fill="#FF4B4B"/>'
-    '<path d="M30 35h40M30 50h40M30 65h25" stroke="#fff" stroke-width="8" '
-    'stroke-linecap="round"/></svg>'
-)
+_LOGO_TINY_PATH = Path(__file__).parent / "static" / "logo-stx-tiny.png"
+_LOGO_B64: str = ""
+if _LOGO_TINY_PATH.exists():
+    _LOGO_B64 = base64.b64encode(_LOGO_TINY_PATH.read_bytes()).decode()
 
 
 def _build_sidebar_html(toc: list[dict], has_search: bool = False) -> str:
     """Build the sidebar TOC HTML from cache data."""
     parts = ['<nav id="stx-sidebar" class="stx-export-sidebar">']
-    # Header: collapse button + clickable StreamTeX logo
+    # Header: collapse button + "Powered with StreamTeX" logo
+    _logo_img = ""
+    if _LOGO_B64:
+        _logo_img = (
+            f'<img src="data:image/png;base64,{_LOGO_B64}" '
+            f'width="20" height="20" alt="StreamTeX" '
+            f'style="border-radius:4px;" />'
+        )
     parts.append(
         '<div class="stx-sidebar-header">'
         '<button class="stx-sidebar-collapse" id="stx-sidebar-collapse" '
         'aria-label="Hide sidebar" title="Hide sidebar">&#9776;</button>'
         f'<a class="stx-sidebar-logo" href="https://streamtex.org" '
         f'target="_blank" rel="noopener" title="streamtex.org">'
-        f'{_STX_LOGO_SVG}<span>StreamTeX</span></a>'
+        f'{_logo_img}<span>Powered with StreamTeX</span></a>'
         '</div>'
     )
     if has_search:
@@ -391,9 +398,9 @@ _MARKER_NAV_JS = """
   document.addEventListener('keydown', function(e) {
     var tag = (e.target.tagName || '').toLowerCase();
     if (tag === 'input' || tag === 'textarea') return;
-    if (e.key === 'PageDown' || (e.key === 'ArrowRight' && e.ctrlKey)) {
+    if (e.key === 'PageDown' || e.key === 'ArrowRight' || e.key === 'ArrowDown') {
       e.preventDefault(); navigateTo(currentIdx + 1);
-    } else if (e.key === 'PageUp' || (e.key === 'ArrowLeft' && e.ctrlKey)) {
+    } else if (e.key === 'PageUp' || e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
       e.preventDefault(); navigateTo(currentIdx - 1);
     } else if (e.key === 'Escape') {
       popup.style.display = 'none';

@@ -60,6 +60,11 @@ logger = logging.getLogger(__name__)
 # Warmup mode flag — set by CLI ``stx cache warmup`` for headless cache build.
 _warmup_mode = False
 
+# Optional ExportConfig for headless export — set by CLI ``stx export html``.
+# When set (not None) during warmup, _warmup_build_cache will activate the
+# export buffer so the full-book HTML is captured alongside the cache.
+_warmup_export_config: "ExportConfig | None" = None
+
 # Counter for unique section CSS class names (Phase 2/3)
 _block_css_counter = 0
 
@@ -190,6 +195,31 @@ def _offer_export_downloads(html: str, base_name: str,
                 key=f"_stx_export_breaks_{_pk}",
             )
 
+            # ── HTML enrichment options ─────────────────────────
+            enrich_nav = False
+            enrich_title = ""
+            if want_html:
+                st.markdown("**HTML navigation**")
+                enrich_nav = st.checkbox(
+                    "Enriched navigation (TOC sidebar, markers, search)",
+                    value=True,
+                    key=f"_stx_export_enrich_{_pk}",
+                )
+                if enrich_nav:
+                    # Auto-detect title from cache TOC
+                    _cache = st.session_state.get(_STX_CACHE_KEY, {})
+                    _toc = _cache.get("toc", [])
+                    _auto = ""
+                    for _e in _toc:
+                        if _e.get("level") == 1:
+                            _auto = _e.get("_reg_label") or _e.get("title", "")
+                            break
+                    enrich_title = st.text_input(
+                        "Document title",
+                        value=_auto,
+                        key=f"_stx_export_title_{_pk}",
+                    )
+
             # ── PDF layout (only when PDF is checked) ────────────
             # Variables with safe defaults for the submit handler
             pdf_format = defaults.format
@@ -288,6 +318,29 @@ def _offer_export_downloads(html: str, base_name: str,
                     effective_html = full_book_html
 
             if want_html:
+                # Apply enrichment (TOC sidebar, markers, search) if requested
+                if enrich_nav:
+                    try:
+                        from .export_enrich import enrich_export_html
+                        _cache = st.session_state.get(_STX_CACHE_KEY, {})
+                        effective_html = enrich_export_html(
+                            effective_html,
+                            toc=_cache.get("toc"),
+                            markers=_cache.get("markers"),
+                            search_index=_cache.get("search_index"),
+                        )
+                        # Apply custom title override
+                        if enrich_title:
+                            import re as _re
+                            effective_html = _re.sub(
+                                r"<title>[^<]*</title>",
+                                f"<title>{enrich_title}</title>",
+                                effective_html,
+                                count=1,
+                            )
+                    except Exception:
+                        pass  # fallback to raw HTML
+
                 collector = get_asset_collector()
                 if collector:
                     # External mode: create ZIP with HTML + data/ folder
@@ -1368,6 +1421,14 @@ def _build_page_cache(module_list, toc_config, marker_config, separator,
 
     search_index = stop_collector() if use_search else None
 
+    # Store navigation data for CLI export enrichment (sidebar, markers, search)
+    if export_config is not None:
+        st.session_state["_stx_export_nav"] = {
+            "toc": copy.deepcopy(toc_entries()) if toc_config else [],
+            "markers": copy.deepcopy(marker_entries()) if marker_config else [],
+            "search_index": search_index,
+        }
+
     # Persist cited bibliography keys so st_bibliography(only_cited=True) works
     # in paginated mode (cite() calls only run during cache build, not per-page).
     from .bib import get_bib_registry as _get_bib_registry
@@ -1390,12 +1451,22 @@ def _warmup_build_cache(module_list, toc_config, marker_config, separator,
     Called by ``st_book()`` when ``_warmup_mode`` is True.
     Skips all sidebar / banner / page rendering — only builds the cache
     (TOC, markers, search index) and writes it to disk.
+
+    When ``_warmup_export_config`` is set, the export buffer is activated
+    so the full-book HTML is captured in session_state alongside the cache.
     """
     cache_hash = _compute_cache_hash(module_list)
     cache_path = _resolve_cache_path(module_list)
-    reset_export_buffer(ExportConfig(enabled=False))
-    _build_page_cache(module_list, toc_config, marker_config,
-                      separator, cache_hash, *args, **kwargs)
+    # Use the export config if set by CLI ``stx export html``, otherwise disable
+    export_cfg = _warmup_export_config
+    if export_cfg is not None:
+        _build_page_cache(module_list, toc_config, marker_config,
+                          separator, cache_hash, *args,
+                          export_config=export_cfg, **kwargs)
+    else:
+        reset_export_buffer(ExportConfig(enabled=False))
+        _build_page_cache(module_list, toc_config, marker_config,
+                          separator, cache_hash, *args, **kwargs)
     cache = st.session_state.get(_STX_CACHE_KEY)
     if cache and cache_path:
         _save_file_cache(cache_path, cache)

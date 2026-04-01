@@ -7,20 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.6.2] — 2026-04-01
 
-### Fixed
-- **Dual-mode deployment now works end-to-end**: Traefik labels are updated alongside `ports_exposes` when changing serve mode — previously only the Coolify config changed but Traefik kept routing to port 8501.
-- **`stx export html` no longer fails silently in Docker**: `rich` and `jinja2` are now installed in generated Dockerfiles via `uv pip install rich jinja2`, fixing the missing `[cli]` extra dependency.
-- **`set_env_var` handles existing vars**: Coolify API returns 409 when a var already exists — `CoolifyClient.set_env_var()` now falls back to PATCH automatically.
-- **`set_env_var` no longer sends `is_build_time` by default**: the field is only included when explicitly requested, fixing 422 errors on newer Coolify versions.
-
 ### Added
-- **Post-deploy smoke test**: `stx deploy hetzner` and `stx deploy update` now verify that `/html/` returns nginx (not Tornado) and `/` returns 200 after deployment.
-- **`cli` extra included by default**: `PRESET_EXTRAS` includes `cli` in all presets, `generate_pyproject_toml()` always adds `cli`, and all project templates ship with `streamtex[cli]`.
-- **Deploy files in project scaffold**: `stx project new` generates `Dockerfile`, `nginx.conf`, and `entrypoint.sh` alongside the project files.
-- **`autoindex on`** in nginx config as fallback when `index.html` is missing.
+- **PDF bookmarks from TOC**: `export_pdf()` now generates native PDF bookmarks (outlines) from the table of contents. Invisible headings are injected at TOC anchor positions; Chromium builds the bookmark tree with `outline=True` + `tagged=True`.
+- **Dark theme in static HTML export**: `stx export html` reads `.streamlit/config.toml` before entering headless context and preserves dark theme colors. New CLI options: `--theme auto|dark|light`, `--theme-bg`, `--theme-text`.
+- **Post-deploy smoke test**: `stx deploy hetzner` and `stx deploy update` verify `/html/` returns Nginx and `/` returns 200.
+- **`cli` extra included by default**: all presets and project templates ship with `streamtex[cli]`.
+- **Deploy files in project scaffold**: `stx project new` generates `Dockerfile`, `nginx.conf`, and `entrypoint.sh`.
+- **Concurrent deploy limit**: `MAX_CONCURRENT_DEPLOYS=4` and `rebuild_batch()` for server-wide throttling.
+- **Nginx 302 redirect** for `/html/` instead of meta refresh.
+
+### Fixed
+- **Dual-mode deployment end-to-end**: Traefik labels updated alongside `ports_exposes` when changing serve mode.
+- **`stx export html` in Docker**: `rich` and `jinja2` installed via `[cli]` extra.
+- **`set_env_var`**: handles existing vars (409 → PATCH fallback), omits `is_build_time` when False.
 
 ### Changed
-- **Default serve mode is `dual`**: `stx deploy hetzner --serve-mode` defaults to `dual` instead of `streamlit-only`.
+- **Default serve mode is `dual`**: `stx deploy hetzner --serve-mode` defaults to `dual`.
 
 ## [0.6.1] — 2026-04-01
 

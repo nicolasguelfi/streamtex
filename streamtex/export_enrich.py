@@ -99,14 +99,36 @@ _SIDEBAR_CSS = """
     color: #e0e0e0;
   }
 }
-.stx-export-sidebar .stx-sidebar-title {
-  font-size: 13px; font-weight: 700; color: #888;
-  text-transform: uppercase; letter-spacing: 0.5px;
+.stx-sidebar-header {
+  display: flex; align-items: center; gap: 8px;
   margin-bottom: 12px; padding-bottom: 8px;
   border-bottom: 1px solid #e0e0e0;
 }
 @media (prefers-color-scheme: dark) {
-  .stx-export-sidebar .stx-sidebar-title { border-bottom-color: #444; }
+  .stx-sidebar-header { border-bottom-color: #444; }
+}
+.stx-sidebar-header .stx-sidebar-collapse {
+  background: none; border: none; cursor: pointer;
+  font-size: 18px; line-height: 1; padding: 2px 6px;
+  color: #888; border-radius: 4px; flex-shrink: 0;
+}
+.stx-sidebar-header .stx-sidebar-collapse:hover { background: #e8e8e8; }
+@media (prefers-color-scheme: dark) {
+  .stx-sidebar-header .stx-sidebar-collapse { color: #aaa; }
+  .stx-sidebar-header .stx-sidebar-collapse:hover { background: #333; }
+}
+.stx-sidebar-logo {
+  display: flex; align-items: center; gap: 6px;
+  text-decoration: none; color: inherit; flex: 1;
+  min-width: 0;
+}
+.stx-sidebar-logo svg { flex-shrink: 0; }
+.stx-sidebar-logo span {
+  font-size: 14px; font-weight: 700; color: #555;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+@media (prefers-color-scheme: dark) {
+  .stx-sidebar-logo span { color: #ccc; }
 }
 .stx-export-sidebar .stx-search-box {
   width: 100%; padding: 6px 10px; border: 1px solid #ccc;
@@ -136,13 +158,14 @@ _SIDEBAR_CSS = """
 /* Main content offset — transitions with sidebar */
 .streamtex-page { margin-left: 280px; transition: margin-left 0.25s; }
 
-/* Toggle button — always visible */
+/* External toggle — only visible when sidebar is hidden */
 .stx-sidebar-toggle {
-  position: fixed; top: 12px; left: 12px;
+  display: none; position: fixed; top: 12px; left: 12px;
   z-index: 1001; background: #f8f9fa; border: 1px solid #ddd;
   border-radius: 6px; padding: 6px 10px; cursor: pointer;
-  font-size: 18px; line-height: 1; transition: left 0.25s;
+  font-size: 18px; line-height: 1;
 }
+.stx-sidebar-hidden .stx-sidebar-toggle { display: block; }
 @media (prefers-color-scheme: dark) {
   .stx-sidebar-toggle { background: #1a1a2e; border-color: #555; color: #e0e0e0; }
 }
@@ -164,10 +187,27 @@ _SIDEBAR_CSS = """
 """
 
 
+_STX_LOGO_SVG = (
+    '<svg width="20" height="20" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">'
+    '<rect width="100" height="100" rx="16" fill="#FF4B4B"/>'
+    '<path d="M30 35h40M30 50h40M30 65h25" stroke="#fff" stroke-width="8" '
+    'stroke-linecap="round"/></svg>'
+)
+
+
 def _build_sidebar_html(toc: list[dict], has_search: bool = False) -> str:
     """Build the sidebar TOC HTML from cache data."""
     parts = ['<nav id="stx-sidebar" class="stx-export-sidebar">']
-    parts.append('<div class="stx-sidebar-title">Contents</div>')
+    # Header: collapse button + clickable StreamTeX logo
+    parts.append(
+        '<div class="stx-sidebar-header">'
+        '<button class="stx-sidebar-collapse" id="stx-sidebar-collapse" '
+        'aria-label="Hide sidebar" title="Hide sidebar">&#9776;</button>'
+        f'<a class="stx-sidebar-logo" href="https://streamtex.org" '
+        f'target="_blank" rel="noopener" title="streamtex.org">'
+        f'{_STX_LOGO_SVG}<span>StreamTeX</span></a>'
+        '</div>'
+    )
     if has_search:
         parts.append(
             '<input id="stx-search" class="stx-search-box" '
@@ -427,23 +467,35 @@ _SEARCH_JS = """
 
 _SIDEBAR_TOGGLE_JS = """
 (function() {
-  var btn = document.getElementById('stx-sidebar-toggle');
+  var extBtn = document.getElementById('stx-sidebar-toggle');
+  var colBtn = document.getElementById('stx-sidebar-collapse');
   var sidebar = document.getElementById('stx-sidebar');
-  if (!btn || !sidebar) return;
+  if (!sidebar) return;
   var body = document.body;
-  btn.addEventListener('click', function() {
+
+  function hideSidebar() {
     if (window.innerWidth <= 768) {
-      // Mobile: slide open/close
-      sidebar.classList.toggle('stx-sidebar-open');
+      sidebar.classList.remove('stx-sidebar-open');
     } else {
-      // Desktop: toggle hidden class on body
-      body.classList.toggle('stx-sidebar-hidden');
-      // Persist preference
-      var v = body.classList.contains('stx-sidebar-hidden') ? 'hidden' : 'visible';
-      try { localStorage.setItem('stx-sidebar', v); } catch(e) {}
+      body.classList.add('stx-sidebar-hidden');
+      try { localStorage.setItem('stx-sidebar', 'hidden'); } catch(e) {}
     }
-  });
-  // Close sidebar when clicking a link (mobile)
+  }
+  function showSidebar() {
+    if (window.innerWidth <= 768) {
+      sidebar.classList.add('stx-sidebar-open');
+    } else {
+      body.classList.remove('stx-sidebar-hidden');
+      try { localStorage.setItem('stx-sidebar', 'visible'); } catch(e) {}
+    }
+  }
+
+  // Collapse button inside sidebar -> hide
+  if (colBtn) colBtn.addEventListener('click', hideSidebar);
+  // External toggle button -> show
+  if (extBtn) extBtn.addEventListener('click', showSidebar);
+
+  // Close sidebar when clicking a TOC link (mobile)
   sidebar.addEventListener('click', function(e) {
     if (e.target.tagName === 'A' && window.innerWidth <= 768) {
       sidebar.classList.remove('stx-sidebar-open');

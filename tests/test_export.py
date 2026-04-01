@@ -2,6 +2,7 @@
 
 import os
 import re
+import tempfile
 from unittest.mock import patch
 
 import streamtex.export as export_mod
@@ -42,6 +43,45 @@ class TestExportConfig:
     def test_custom_zoom(self):
         cfg = ExportConfig(enabled=True, zoom=0.8)
         assert cfg.zoom == 0.8
+
+    def test_theme_overrides_default_none(self):
+        cfg = ExportConfig()
+        assert cfg.theme_bg is None
+        assert cfg.theme_text is None
+        assert cfg.theme_primary is None
+
+    def test_theme_overrides_set(self):
+        cfg = ExportConfig(theme_bg="#0e1117", theme_text="#fafafa", theme_primary="#ff4b4b")
+        assert cfg.theme_bg == "#0e1117"
+        assert cfg.theme_text == "#fafafa"
+        assert cfg.theme_primary == "#ff4b4b"
+
+
+class TestThemeInExport:
+    """Theme colors are applied in generate_full_html() from ExportConfig overrides."""
+
+    def test_dark_theme_override_in_html(self):
+        cfg = ExportConfig(enabled=True, theme_bg="#0e1117", theme_text="#fafafa")
+        buf = HtmlExportBuffer(cfg)
+        buf.append("<p>Dark content</p>")
+        html = buf.generate_full_html()
+        assert "background: #0e1117" in html
+        assert "color: #fafafa" in html
+
+    def test_light_theme_fallback_without_override(self):
+        cfg = ExportConfig(enabled=True)
+        buf = HtmlExportBuffer(cfg)
+        buf.append("<p>Light content</p>")
+        html = buf.generate_full_html()
+        # Without override, falls back to _get_theme_color defaults
+        assert "background:" in html
+
+    def test_primary_color_override(self):
+        cfg = ExportConfig(enabled=True, theme_primary="#4da6ff")
+        buf = HtmlExportBuffer(cfg)
+        buf.append("<p>Content</p>")
+        html = buf.generate_full_html()
+        assert "color: #4da6ff" in html
 
 
 # ---------------------------------------------------------------------------
@@ -467,3 +507,62 @@ class TestBuildExportFilename:
         path = build_export_filename(cfg, "fallback")
         basename = os.path.basename(path)
         assert re.match(r"report-\d{6}-\d{6}\.pdf$", basename)
+
+
+# ---------------------------------------------------------------------------
+# _read_streamlit_theme
+# ---------------------------------------------------------------------------
+
+class TestReadStreamlitTheme:
+    """Tests for theme auto-detection from .streamlit/config.toml."""
+
+    def _write_config(self, tmpdir, content):
+        st_dir = os.path.join(tmpdir, ".streamlit")
+        os.makedirs(st_dir, exist_ok=True)
+        with open(os.path.join(st_dir, "config.toml"), "w") as f:
+            f.write(content)
+
+    def test_dark_base_resolves_colors(self):
+        from streamtex.cli.export_cmd import _read_streamlit_theme
+        with tempfile.TemporaryDirectory() as d:
+            self._write_config(d, '[theme]\nbase = "dark"\n')
+            t = _read_streamlit_theme(d)
+            assert t["bg"] == "#0e1117"
+            assert t["text"] == "#fafafa"
+
+    def test_light_base_resolves_colors(self):
+        from streamtex.cli.export_cmd import _read_streamlit_theme
+        with tempfile.TemporaryDirectory() as d:
+            self._write_config(d, '[theme]\nbase = "light"\n')
+            t = _read_streamlit_theme(d)
+            assert t["bg"] == "#ffffff"
+            assert t["text"] == "#31333f"
+
+    def test_explicit_colors_override_base(self):
+        from streamtex.cli.export_cmd import _read_streamlit_theme
+        with tempfile.TemporaryDirectory() as d:
+            self._write_config(d, '[theme]\nbase = "dark"\nbackgroundColor = "#111"\ntextColor = "#eee"\n')
+            t = _read_streamlit_theme(d)
+            assert t["bg"] == "#111"
+            assert t["text"] == "#eee"
+
+    def test_no_config_returns_empty(self):
+        from streamtex.cli.export_cmd import _read_streamlit_theme
+        with tempfile.TemporaryDirectory() as d:
+            t = _read_streamlit_theme(d)
+            assert t == {}
+
+    def test_no_theme_section_returns_empty(self):
+        from streamtex.cli.export_cmd import _read_streamlit_theme
+        with tempfile.TemporaryDirectory() as d:
+            self._write_config(d, '[server]\nport = 8501\n')
+            t = _read_streamlit_theme(d)
+            assert t == {}
+
+    def test_partial_colors(self):
+        from streamtex.cli.export_cmd import _read_streamlit_theme
+        with tempfile.TemporaryDirectory() as d:
+            self._write_config(d, '[theme]\nbase = "dark"\nbackgroundColor = "#222"\n')
+            t = _read_streamlit_theme(d)
+            assert t["bg"] == "#222"
+            assert t["text"] == "#fafafa"  # from dark defaults

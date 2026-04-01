@@ -81,10 +81,22 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/
 # fetches the latest PyPI packages.
 ARG SOURCE_COMMIT=unknown
 
-# Install dependencies
-COPY pyproject.toml uv.lock ./
+# Install dependencies + CLI extras (rich/jinja2 for stx export html)
+# .stx-version is copied first: changing the required version invalidates the cache.
+COPY .stx-version pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev && \\
-    uv pip install rich jinja2
+    uv pip install rich jinja2 && \\
+    uv run playwright install --with-deps chromium
+
+# Fail the build if the installed streamtex version is older than required.
+RUN REQUIRED=$(cat .stx-version | tr -d '[:space:]') && \\
+    INSTALLED=$(uv run python -c "from importlib.metadata import version; print(version('streamtex'))") && \\
+    echo "streamtex: required >= ${REQUIRED}, installed ${INSTALLED}" && \\
+    uv run python -c "import sys; \\
+r = tuple(int(x) for x in '${REQUIRED}'.split('.')); \\
+i = tuple(int(x) for x in '${INSTALLED}'.split('.')); \\
+sys.exit(1) if i < r else sys.exit(0)" || \\
+    { echo "ERROR: streamtex ${INSTALLED} < ${REQUIRED} — aborting build"; exit 1; }
 
 # Copy project files
 COPY . .
@@ -97,10 +109,10 @@ COPY entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 
 # Pre-generate static HTML + default nginx redirect snippet.
-# The entrypoint will clean and regenerate at runtime for the active project.
+# The entrypoint will clean and regenerate at runtime for the active FOLDER.
 RUN mkdir -p /app/static-html && \\
     echo 'return 302 /html/;' > /app/static-html/.nginx-redirect.conf && \\
-    (uv run stx export html --output /app/static-html/ . || true)
+    (uv run stx export html --theme auto --output /app/static-html/ . || true)
 
 # STX_SERVE_MODE controls which services start (set at runtime)
 #   dual           = Nginx (:80) + Streamlit (:8501) — default
@@ -229,13 +241,19 @@ def generate_entrypoint() -> str:
 #   streamlit-only Streamlit only — legacy behaviour (no Nginx)
 #
 # Env vars:
+#   FOLDER          optional subdirectory to serve (e.g. modules/my_module)
 #   STX_SERVE_MODE  dual | static-only | streamlit-only (default: dual)
 
 set -e
 
 MODE="${STX_SERVE_MODE:-dual}"
 
-echo "[entrypoint] Mode: ${MODE}"
+# If FOLDER is set, cd into it (multi-module deployments like ai4se6d)
+if [ -n "${FOLDER}" ]; then
+    cd /app/${FOLDER}
+fi
+
+echo "[entrypoint] Mode: ${MODE} | Dir: $(pwd)"
 
 # --- Always: refresh cache and generate static HTML ---
 
@@ -251,7 +269,7 @@ fi
 # Generate static HTML export — clean first to remove stale exports
 rm -rf /app/static-html/*
 echo "[entrypoint] Generating static HTML..."
-uv run stx export html --output /app/static-html/ . 2>/dev/null || true
+uv run stx export html --theme auto --output /app/static-html/ . 2>/dev/null || true
 
 # Derive base_name (same as export CLI: basename of cwd, strip stx_manual_ prefix)
 BASE_NAME=$(basename "$(pwd)" | sed 's/^stx_manual_//')

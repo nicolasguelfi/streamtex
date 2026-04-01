@@ -98,6 +98,16 @@ class ExportConfig:
     asset_mode: AssetMode = AssetMode.EXTERNAL
     """How media assets are stored: ``EMBEDDED`` (base64) or ``EXTERNAL`` (files in data/)."""
 
+    theme_bg: str | None = None
+    """Override background color for the exported HTML (e.g. ``"#0e1117"`` for dark).
+    When set, takes precedence over Streamlit theme detection."""
+
+    theme_text: str | None = None
+    """Override text color for the exported HTML (e.g. ``"#fafafa"`` for dark)."""
+
+    theme_primary: str | None = None
+    """Override link/primary color for the exported HTML."""
+
 
 # ---------------------------------------------------------------------------
 # Asset collector — extracts and deduplicates media from HTML
@@ -343,9 +353,9 @@ class HtmlExportBuffer:
         body = self.get_body_html()
         css = _load_default_css()
         c = self.config
-        bg = _get_theme_color("theme.backgroundColor", "#fff")
-        text = _get_theme_color("theme.textColor", "#333")
-        link = _get_theme_color("theme.primaryColor", "#1155cc")
+        bg = c.theme_bg or _get_theme_color("theme.backgroundColor", "#fff")
+        text = c.theme_text or _get_theme_color("theme.textColor", "#333")
+        link = c.theme_primary or _get_theme_color("theme.primaryColor", "#1155cc")
         zoom_css = f"  zoom: {c.zoom};\n" if c.zoom != 1.0 else ""
         return (
             "<!DOCTYPE html>\n"

@@ -96,8 +96,10 @@ COPY nginx.conf /etc/nginx/nginx.conf
 COPY entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 
-# Pre-generate static HTML for the project (served by Nginx on /html/).
+# Pre-generate static HTML + default nginx redirect snippet.
+# The entrypoint will clean and regenerate at runtime for the active project.
 RUN mkdir -p /app/static-html && \\
+    echo 'return 302 /html/;' > /app/static-html/.nginx-redirect.conf && \\
     (uv run stx export html --output /app/static-html/ . || true)
 
 # STX_SERVE_MODE controls which services start (set at runtime)
@@ -108,9 +110,9 @@ ENV STX_SERVE_MODE="dual"
 
 EXPOSE 80 8501
 
-# Health check: try Nginx first (dual/static-only), then Streamlit (streamlit-only)
-HEALTHCHECK CMD curl --fail http://localhost:80/html/ 2>/dev/null \\
-    || curl --fail http://localhost:8501/_stcore/health
+# Health check: Streamlit first, then Nginx static
+HEALTHCHECK CMD curl --fail http://localhost:8501/_stcore/health 2>/dev/null \\
+    || curl -fsL http://localhost:80/html/ -o /dev/null
 
 ENTRYPOINT ["/app/entrypoint.sh"]
 """
@@ -159,11 +161,17 @@ http {
         listen 80;
         server_name _;
 
-        # --- Static HTML export (always served directly) ---
+        # --- Static HTML export ---
 
+        # Exact match: /html/ redirects to the correct exported file.
+        # The entrypoint writes a snippet to /app/static-html/.nginx-redirect.conf
+        location = /html/ {
+            include /app/static-html/.nginx-redirect.conf;
+        }
+
+        # Prefix match: serve exported files directly
         location /html/ {
             alias /app/static-html/;
-            index index.html;
             autoindex on;
             expires 1h;
             add_header Cache-Control "public, max-age=3600";
@@ -240,19 +248,17 @@ if [ "$MODE" != "static-only" ]; then
     uv run stx cache warmup . 2>/dev/null || true
 fi
 
-# Generate static HTML export
+# Generate static HTML export — clean first to remove stale exports
+rm -rf /app/static-html/*
 echo "[entrypoint] Generating static HTML..."
 uv run stx export html --output /app/static-html/ . 2>/dev/null || true
 
-# Create a simple index.html that redirects if the export didn't produce one
-if [ ! -f /app/static-html/index.html ]; then
-    HTML_FILE=$(find /app/static-html/ -name "*.html" -maxdepth 2 | head -1)
-    if [ -n "$HTML_FILE" ]; then
-        REL_PATH="${HTML_FILE#/app/static-html/}"
-        echo "<meta http-equiv=\\"refresh\\" content=\\"0;url=${REL_PATH}\\">" \\
-            > /app/static-html/index.html
-    fi
-fi
+# Derive base_name (same as export CLI: basename of cwd, strip stx_manual_ prefix)
+BASE_NAME=$(basename "$(pwd)" | sed 's/^stx_manual_//')
+TARGET="${BASE_NAME}/${BASE_NAME}.html"
+echo "[entrypoint] Static HTML: /html/ → ${TARGET}"
+# Nginx snippet: 302 redirect from /html/ to the correct exported file
+echo "return 302 /html/${TARGET};" > /app/static-html/.nginx-redirect.conf
 
 # --- Start services based on mode ---
 

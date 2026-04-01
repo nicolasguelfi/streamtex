@@ -8,19 +8,38 @@ from typing import Dict, Optional
 
 
 def _detect_project_root() -> str:
-    """Detect the project root from the main Streamlit script.
+    """Detect the project root directory for a StreamTeX project.
 
-    Falls back to ``os.getcwd()`` when the main script cannot be determined.
+    Resolution order:
+    1. ``os.getcwd()`` if it contains ``book.py`` (most reliable in CLI
+       and Docker contexts where the caller has already ``cd``'d into
+       the project).
+    2. Directory of ``__main__.__file__`` if it contains ``book.py``
+       (works when Streamlit runs ``book.py`` directly).
+    3. ``os.getcwd()`` as final fallback.
     """
+    # 1. CWD is the strongest signal — CLI commands and Docker entrypoints
+    #    always cd into the project before running.
+    cwd = os.getcwd()
+    if os.path.isfile(os.path.join(cwd, "book.py")):
+        return cwd
+
+    # 2. __main__.__file__ — works when Streamlit runs book.py directly
+    #    (e.g. `streamlit run book.py`).  We only trust it if book.py
+    #    lives in that directory; otherwise it's a CLI wrapper script.
     try:
         import __main__
 
         main_file = getattr(__main__, "__file__", None)
         if main_file:
-            return os.path.dirname(os.path.abspath(main_file))
+            main_dir = os.path.dirname(os.path.abspath(main_file))
+            if os.path.isfile(os.path.join(main_dir, "book.py")):
+                return main_dir
     except Exception:
         pass
-    return os.getcwd()
+
+    # 3. Fallback to CWD even without book.py (e.g. tests, notebooks)
+    return cwd
 
 
 @dataclass

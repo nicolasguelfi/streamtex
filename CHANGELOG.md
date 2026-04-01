@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.23] — 2026-04-01
+
+### Added
+- **Horizontal scaling**: `stx deploy scale TARGET --replicas N` command to scale Coolify services. Creates multiple containers behind the same FQDN — Traefik load-balances automatically.
+- **AppEntry.replicas** and **replica_uuids** fields in `.stx-deploy.json` state schema.
+- **CoolifyClient.scale_app()**, **rebuild_all_replicas()**, **restart_all_replicas()** methods.
+- **Replica-aware status**: `stx deploy status coolify` shows replica count (e.g. `3/3`) per service.
+- **Replica-aware update**: `stx deploy update` rebuilds primary + all replicas.
+- 15 unit tests for scaling logic.
+
 ## [0.5.22] — 2026-03-31
 
 ### Fixed

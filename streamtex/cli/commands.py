@@ -22,6 +22,7 @@ from .deploy_cmd import install_coolify_cmd as deploy_install_coolify
 from .deploy_cmd import preflight as deploy_preflight
 from .deploy_cmd import provision_cmd as deploy_provision
 from .deploy_cmd import render_cmd as deploy_render
+from .deploy_cmd import scale_cmd as deploy_scale
 from .deploy_cmd import secure_cmd as deploy_secure
 from .deploy_cmd import setup_cmd as deploy_setup
 from .deploy_cmd import status_cmd as deploy_status
@@ -138,6 +139,7 @@ deploy.add_command(deploy_provision)
 deploy.add_command(deploy_secure)
 deploy.add_command(deploy_install_coolify)
 deploy.add_command(deploy_configure_domain)
+deploy.add_command(deploy_scale)
 
 
 # --- Publish subgroup ------------------------------------------------------

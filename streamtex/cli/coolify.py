@@ -134,6 +134,16 @@ class AppEntry:
     github_repo: str = ""
     branch: str = "main"
     deployed_at: str = ""
+    replicas: int = 1
+    replica_uuids: list[str] | None = None
+
+    @property
+    def all_uuids(self) -> list[str]:
+        """Return primary UUID + all replica UUIDs."""
+        uuids = [self.uuid] if self.uuid else []
+        if self.replica_uuids:
+            uuids.extend(self.replica_uuids)
+        return uuids
 
 
 @dataclass
@@ -178,7 +188,8 @@ class DeployState:
             d["phases_completed"] = self.phases_completed
         if self.applications:
             d["applications"] = [
-                {k: v for k, v in app.__dict__.items() if v}
+                {k: v for k, v in app.__dict__.items()
+                 if v and not (k == "replicas" and v == 1)}
                 for app in self.applications
             ]
         return d
@@ -479,9 +490,174 @@ class CoolifyClient:
             "dockerfile_location": dockerfile_location,
         })
 
+    def create_public_app(
+        self,
+        project_uuid: str,
+        server_uuid: str,
+        name: str,
+        repository: str,
+        branch: str = "main",
+        build_pack: str = "dockerfile",
+        dockerfile_location: str = "/Dockerfile",
+        environment_name: str = "production",
+        ports_exposes: str = "8501",
+    ) -> dict:
+        """Create a Coolify application from a public git repository.
+
+        Uses the ``/applications/public`` endpoint which does not require
+        a Coolify-managed git source.  Returns a dict with ``uuid`` and
+        ``domains`` keys.
+        """
+        return self._post("/api/v1/applications/public", body={
+            "project_uuid": project_uuid,
+            "server_uuid": server_uuid,
+            "environment_name": environment_name,
+            "build_pack": build_pack,
+            "name": name,
+            "git_repository": repository,
+            "git_branch": branch,
+            "dockerfile_location": dockerfile_location,
+            "ports_exposes": ports_exposes,
+            "instant_deploy": False,
+        })
+
+    def update_app(self, uuid: str, **fields: object) -> dict:
+        """Update application fields (domains, health_check_path, etc.)."""
+        return self._patch(f"/api/v1/applications/{uuid}", body=fields)
+
     def delete_app(self, uuid: str) -> dict:
         """Delete an application."""
         return self._delete(f"/api/v1/applications/{uuid}")
+
+    # ── Scaling (replicas) ────────────────────────────────────────────
+
+    def scale_app(
+        self,
+        app: AppEntry,
+        target_replicas: int,
+        project_uuid: str,
+        server_uuid: str,
+    ) -> AppEntry:
+        """Scale an application to *target_replicas* containers.
+
+        Creates or deletes Coolify applications so that the total number
+        of containers (primary + replicas) equals *target_replicas*.
+        All replicas share the same FQDN so Traefik load-balances across them.
+
+        Returns the updated :class:`AppEntry` with new replica UUIDs.
+        """
+        if target_replicas < 1:
+            raise CoolifyError("replicas must be >= 1")
+
+        current = 1 + len(app.replica_uuids or [])
+
+        if target_replicas == current:
+            return app
+
+        if target_replicas > current:
+            app = self._scale_up(app, current, target_replicas,
+                                 project_uuid, server_uuid)
+        else:
+            app = self._scale_down(app, current, target_replicas)
+
+        app.replicas = target_replicas
+        return app
+
+    def _scale_up(
+        self, app: AppEntry, current: int, target: int,
+        project_uuid: str, server_uuid: str,
+    ) -> AppEntry:
+        """Create additional replicas."""
+        # Read primary config to replicate
+        primary = self._get(f"/api/v1/applications/{app.uuid}")
+        fqdn = primary.get("fqdn", app.url)
+        repository = primary.get("git_repository", app.github_repo)
+        branch = primary.get("git_branch", app.branch)
+        dockerfile = primary.get("dockerfile_location", "/Dockerfile")
+        health_path = primary.get("health_check_path", "/_stcore/health")
+
+        # Read env vars from primary
+        env_vars = self.get_env_vars(app.uuid)
+
+        if app.replica_uuids is None:
+            app.replica_uuids = []
+
+        for i in range(current, target):
+            replica_name = f"{app.name}-r{i + 1}"
+
+            # Create replica app
+            result = self.create_public_app(
+                project_uuid=project_uuid,
+                server_uuid=server_uuid,
+                name=replica_name,
+                repository=repository,
+                branch=branch,
+                dockerfile_location=dockerfile,
+            )
+            replica_uuid = result.get("uuid", "")
+            if not replica_uuid:
+                raise CoolifyError(f"Failed to create replica {replica_name}")
+
+            # Set same FQDN (Traefik will load-balance)
+            self.update_app(
+                replica_uuid,
+                domains=fqdn,
+                health_check_path=health_path,
+                health_check_enabled=True,
+            )
+
+            # Copy env vars from primary
+            for ev in env_vars:
+                if isinstance(ev, dict) and ev.get("key"):
+                    is_preview = ev.get("is_preview", False)
+                    if not is_preview:
+                        self.set_env_var(
+                            replica_uuid, ev["key"], ev.get("value", ""),
+                        )
+
+            # Trigger build
+            self.rebuild(replica_uuid)
+
+            app.replica_uuids.append(replica_uuid)
+
+        return app
+
+    def _scale_down(self, app: AppEntry, current: int, target: int) -> AppEntry:
+        """Remove excess replicas (from the end)."""
+        if not app.replica_uuids:
+            return app
+
+        to_remove = current - target
+        removed = []
+        for _ in range(to_remove):
+            if not app.replica_uuids:
+                break
+            replica_uuid = app.replica_uuids.pop()
+            try:
+                self.stop(replica_uuid)
+                self.delete_app(replica_uuid)
+            except CoolifyError:
+                pass  # best-effort cleanup
+            removed.append(replica_uuid)
+
+        if not app.replica_uuids:
+            app.replica_uuids = None
+
+        return app
+
+    def rebuild_all_replicas(self, app: AppEntry) -> list[DeployResult]:
+        """Rebuild the primary application and all its replicas."""
+        results = []
+        for uuid in app.all_uuids:
+            results.append(self.rebuild(uuid))
+        return results
+
+    def restart_all_replicas(self, app: AppEntry) -> list[DeployResult]:
+        """Restart the primary application and all its replicas."""
+        results = []
+        for uuid in app.all_uuids:
+            results.append(self.restart(uuid))
+        return results
 
     def verify_token(self) -> bool:
         """Verify that the API token is valid by listing apps.

@@ -1091,7 +1091,7 @@ def _status_coolify(console, name: str | None) -> None:
     """Show Coolify deployment status for all or a specific service."""
     from rich.table import Table
 
-    from .coolify import CoolifyClient, CoolifyError
+    from .coolify import CoolifyClient, CoolifyError, load_typed_state
 
     try:
         client = CoolifyClient.from_env()
@@ -1113,21 +1113,47 @@ def _status_coolify(console, name: str | None) -> None:
         console.print("[yellow]No Coolify applications found.[/yellow]")
         return
 
+    # Build a set of replica UUIDs so we can hide them from the main table
+    # and show a replica count on the primary instead.
+    state = load_typed_state()
+    replica_uuid_set: set[str] = set()
+    replica_info: dict[str, tuple[int, int]] = {}  # primary_uuid → (total, healthy)
+    if state.applications:
+        for entry in state.applications:
+            if entry.replica_uuids:
+                for ru in entry.replica_uuids:
+                    replica_uuid_set.add(ru)
+                # Count healthy replicas
+                total = 1 + len(entry.replica_uuids)
+                healthy = 0
+                for uid in entry.all_uuids:
+                    for a in apps:
+                        if a.uuid == uid and "healthy" in a.status:
+                            healthy += 1
+                            break
+                replica_info[entry.uuid] = (total, healthy)
+
     icons = {
         "running:healthy": "[green]\u2713 Healthy[/green]",
         "running:unhealthy": "[yellow]\u26a0 Unhealthy[/yellow]",
         "running:unknown": "[yellow]? Running[/yellow]",
         "exited": "[red]\u2717 Exited[/red]",
+        "exited:unhealthy": "[red]\u2717 Exited[/red]",
         "stopped": "[dim]Stopped[/dim]",
     }
 
     table = Table(title="Coolify Deployment Status")
     table.add_column("Service", style="cyan")
     table.add_column("Status")
+    table.add_column("Replicas", justify="center")
     table.add_column("Last Deploy", style="dim")
     table.add_column("URL")
 
     for app in sorted(apps, key=lambda a: a.name):
+        # Skip replica entries — they're shown as part of the primary
+        if app.uuid in replica_uuid_set:
+            continue
+
         status_icon = icons.get(app.status, f"[dim]{app.status}[/dim]")
         deploy_time = ""
         if app.updated_at:
@@ -1138,7 +1164,16 @@ def _status_coolify(console, name: str | None) -> None:
                 deploy_time = local_dt.strftime("%Y-%m-%d %H:%M:%S")
             except ValueError:
                 deploy_time = app.updated_at[:19].replace("T", " ")
-        table.add_row(app.name, status_icon, deploy_time, app.fqdn)
+
+        # Replica info
+        if app.uuid in replica_info:
+            total, healthy = replica_info[app.uuid]
+            color = "green" if healthy == total else "yellow"
+            replica_str = f"[{color}]{healthy}/{total}[/{color}]"
+        else:
+            replica_str = "[dim]1[/dim]"
+
+        table.add_row(app.name, status_icon, replica_str, deploy_time, app.fqdn)
 
     console.print(table)
 
@@ -1898,19 +1933,36 @@ def update_cmd(target: str | None, quick: bool, yes: bool) -> None:
             console.print("[yellow]Aborted.[/yellow]")
             return
 
-    console.print(f"[cyan]Triggering {action}…[/cyan]")
-    if quick:
-        result = client.restart(app_uuid)
+    # Collect all UUIDs (primary + replicas) from typed state
+    from .coolify import load_typed_state
+    state = load_typed_state()
+    all_uuids = [app_uuid]
+    if state.applications:
+        for entry in state.applications:
+            if entry.uuid == app_uuid and entry.replica_uuids:
+                all_uuids.extend(entry.replica_uuids)
+                break
+
+    if len(all_uuids) > 1:
+        n = len(all_uuids)
+        console.print(f"[cyan]Triggering {action} for {n} containers (primary + {n - 1} replicas)…[/cyan]")
     else:
-        result = client.rebuild(app_uuid)
+        console.print(f"[cyan]Triggering {action}…[/cyan]")
 
-    if not result.success:
-        raise click.ClickException(f"{action.capitalize()} failed: {result.message}")
+    for uid in all_uuids:
+        if quick:
+            result = client.restart(uid)
+        else:
+            result = client.rebuild(uid)
 
-    console.print(f"[bold green]\u2713 {action.capitalize()} triggered:[/bold green] {result.message}")
+        if not result.success:
+            console.print(f"[red]{action.capitalize()} failed for {uid}: {result.message}[/red]")
+        else:
+            label = "primary" if uid == app_uuid else f"replica {uid[:12]}"
+            console.print(f"[green]\u2713 {action.capitalize()} triggered ({label})[/green]")
 
     if not quick:
-        console.print("[cyan]Waiting for service to become healthy…[/cyan]")
+        console.print("[cyan]Waiting for primary to become healthy…[/cyan]")
         healthy = client.wait_healthy(app_uuid, timeout=DEFAULT_DEPLOY_TIMEOUT)
         if healthy:
             console.print("[bold green]\u2713 Service is healthy![/bold green]")
@@ -1925,6 +1977,133 @@ def _looks_like_uuid(value: str) -> bool:
     return len(value) > 8 and "-" in value and all(
         c.isalnum() or c == "-" for c in value
     )
+
+
+# ---------------------------------------------------------------------------
+# stx deploy scale — horizontal scaling via replicas
+# ---------------------------------------------------------------------------
+
+
+@click.command("scale")
+@click.argument("target")
+@click.option("--replicas", "-r", type=int, required=True, help="Target number of containers (1 = no replicas).")
+@click.option("--yes", is_flag=True, help="Skip confirmation prompts.")
+def scale_cmd(target: str, replicas: int, yes: bool) -> None:
+    """Scale a Coolify service to N replicas.
+
+    TARGET can be a service name, subdomain, or Coolify UUID.
+    All replicas share the same URL — Traefik load-balances across them.
+
+    \b
+    Examples:
+      stx deploy scale ai4se6d-genai-intro --replicas 3   # scale up
+      stx deploy scale ai4se6d-genai-intro --replicas 1   # scale down
+    """
+    from .coolify import (
+        AppEntry,
+        CoolifyClient,
+        CoolifyError,
+        load_typed_state,
+        save_typed_state,
+    )
+
+    console = get_console()
+
+    if replicas < 1:
+        raise click.ClickException("--replicas must be >= 1")
+
+    # 1. Connect to Coolify
+    try:
+        client = CoolifyClient.from_env()
+    except CoolifyError as e:
+        raise click.ClickException(str(e)) from e
+
+    # 2. Load deploy state and find the app
+    state = load_typed_state()
+    if not state.applications:
+        raise click.ClickException(
+            "No applications in .stx-deploy.json. Deploy first with: stx deploy hetzner"
+        )
+
+    app: AppEntry | None = None
+    for a in state.applications:
+        if (
+            a.name == target
+            or a.subdomain == target
+            or a.uuid == target
+            or a.url and target in a.url
+        ):
+            app = a
+            break
+
+    # Fallback: match against Coolify apps list
+    if not app:
+        try:
+            coolify_apps = client.list_apps()
+            for ca in coolify_apps:
+                if ca.name == target or ca.uuid == target:
+                    app = AppEntry(
+                        name=ca.name,
+                        uuid=ca.uuid,
+                        url=ca.fqdn,
+                        github_repo=ca.repository,
+                        branch=ca.branch,
+                    )
+                    # Add to state for future use
+                    state.applications.append(app)
+                    break
+        except CoolifyError:
+            pass
+
+    if not app:
+        raise click.ClickException(
+            f"Could not find service '{target}'. "
+            "Check with: stx deploy status coolify"
+        )
+
+    current = 1 + len(app.replica_uuids or [])
+    if replicas == current:
+        console.print(f"[green]{app.name} already has {current} replica(s).[/green]")
+        return
+
+    action = "Scale up" if replicas > current else "Scale down"
+    console.print(
+        f"[cyan]{action}:[/cyan] {app.name} from {current} → {replicas} replica(s)"
+    )
+
+    if not yes:
+        if not click.confirm("Proceed?", default=True):
+            console.print("[yellow]Aborted.[/yellow]")
+            return
+
+    # 3. Resolve Coolify project/server UUIDs
+    project_uuid = ""
+    server_uuid = ""
+    if state.coolify:
+        project_uuid = state.coolify.project_uuid
+        server_uuid = state.coolify.server_uuid
+
+    if not project_uuid or not server_uuid:
+        raise click.ClickException(
+            "Missing Coolify project_uuid or server_uuid in .stx-deploy.json. "
+            "Run: stx deploy setup"
+        )
+
+    # 4. Scale
+    try:
+        app = client.scale_app(app, replicas, project_uuid, server_uuid)
+    except CoolifyError as e:
+        raise click.ClickException(f"Scaling failed: {e}") from e
+
+    # 5. Save updated state
+    save_typed_state(state)
+
+    console.print(
+        f"[bold green]\u2713 {app.name} scaled to {replicas} replica(s)[/bold green]"
+    )
+    if app.replica_uuids:
+        for i, ru in enumerate(app.replica_uuids, 2):
+            console.print(f"  Replica {i}: {ru}")
 
 
 # ---------------------------------------------------------------------------

@@ -992,6 +992,81 @@ def _ensure_dockerfile(path: str, console) -> None:
     _ensure_deploy_files(path, console)
 
 
+def _smoke_test_deploy(fqdn: str, serve_mode: str, console, *, timeout: int = 30) -> bool:
+    """Run post-deploy smoke tests to verify the service is correctly configured.
+
+    For dual/static-only modes, checks that /html/ returns 200 from Nginx.
+    For all modes, checks that the root URL returns 200.
+    Returns True if all checks pass.
+    """
+    import time
+
+    base_url = fqdn.rstrip("/")
+    all_ok = True
+
+    # Give the service a moment to fully start after health check passes
+    time.sleep(3)
+
+    # Check 1: Root URL should respond
+    console.print("[cyan]Smoke test: checking root URL…[/cyan]")
+    try:
+        req = urllib.request.Request(f"{base_url}/", method="HEAD")
+        req.add_header("User-Agent", "stx-deploy-smoketest/1.0")
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            server = resp.headers.get("Server", "unknown")
+            console.print(f"[green]✓ GET / → {resp.status} (server: {server})[/green]")
+    except Exception as e:
+        console.print(f"[red]✗ GET / failed: {e}[/red]")
+        all_ok = False
+
+    # Check 2: For dual/static-only, /html/ must be served by Nginx (not Tornado/Streamlit)
+    if serve_mode in ("dual", "static-only"):
+        console.print("[cyan]Smoke test: checking /html/ static route…[/cyan]")
+        try:
+            req = urllib.request.Request(f"{base_url}/html/", method="GET")
+            req.add_header("User-Agent", "stx-deploy-smoketest/1.0")
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                server = resp.headers.get("Server", "unknown")
+                served_by = resp.headers.get("X-Served-By", "")
+
+                if "nginx" in server.lower():
+                    console.print(
+                        f"[green]✓ GET /html/ → {resp.status} "
+                        f"(server: {server}, x-served-by: {served_by})[/green]"
+                    )
+                elif "tornado" in server.lower():
+                    console.print(
+                        f"[red]✗ GET /html/ → {resp.status} but server is {server} "
+                        f"(expected nginx). Nginx is not receiving traffic — "
+                        f"check that the exposed port in Coolify is 80, not 8501.[/red]"
+                    )
+                    all_ok = False
+                else:
+                    console.print(
+                        f"[yellow]⚠ GET /html/ → {resp.status} "
+                        f"(server: {server}) — cannot confirm Nginx is active[/yellow]"
+                    )
+        except urllib.error.HTTPError as e:
+            console.print(
+                f"[red]✗ GET /html/ → HTTP {e.code} "
+                f"(server: {e.headers.get('Server', 'unknown')})[/red]"
+            )
+            all_ok = False
+        except Exception as e:
+            console.print(f"[red]✗ GET /html/ failed: {e}[/red]")
+            all_ok = False
+
+    if all_ok:
+        console.print("[bold green]✓ All smoke tests passed[/bold green]")
+    else:
+        console.print(
+            "[bold red]✗ Smoke tests failed[/bold red] — "
+            "the service is running but may not be correctly configured."
+        )
+
+    return all_ok
+
+
 def _resolve_server_ip(cli_ip: str | None = None, state: dict | None = None) -> str:
     """Resolve server IP from CLI arg, state file, or prompt."""
     if cli_ip:
@@ -2075,6 +2150,10 @@ def hetzner_cmd(path: str, subdomain: str | None, uuid: str | None, serve_mode: 
             "Check the Coolify dashboard for deployment logs."
         )
 
+    # 10b. Post-deploy smoke test
+    if healthy:
+        _smoke_test_deploy(fqdn, serve_mode, console)
+
     # 11. Update .stx-deploy.json
     state = load_deploy_state()
     if "services" not in state:
@@ -2227,6 +2306,38 @@ def update_cmd(target: str | None, quick: bool, serve_mode: str | None, yes: boo
             console.print(
                 "[yellow]\u26a0 Service did not reach healthy state within timeout.[/yellow]"
             )
+
+        # Post-deploy smoke test
+        if healthy:
+            # Resolve FQDN and effective serve_mode from deploy state
+            state = load_deploy_state()
+            svc_fqdn = None
+            effective_mode = serve_mode or "dual"
+            services = state.get("services", {})
+            for _name, svc_info in services.items():
+                if isinstance(svc_info, dict) and svc_info.get("uuid") == app_uuid:
+                    svc_fqdn = svc_info.get("fqdn")
+                    if not serve_mode:
+                        effective_mode = svc_info.get("serve_mode", "dual")
+                    break
+            # Also check applications array (typed state format)
+            if not svc_fqdn:
+                for app in state.get("applications", []):
+                    if isinstance(app, dict) and app.get("uuid") == app_uuid:
+                        url = app.get("url") or app.get("subdomain", "")
+                        if url and not url.startswith("http"):
+                            url = f"https://{url}"
+                        svc_fqdn = url
+                        if not serve_mode:
+                            effective_mode = app.get("serve_mode", "dual")
+                        break
+            if svc_fqdn:
+                _smoke_test_deploy(svc_fqdn, effective_mode, console)
+            else:
+                console.print(
+                    "[yellow]⚠ Could not resolve FQDN for smoke test — "
+                    "skipping post-deploy verification.[/yellow]"
+                )
 
 
 def _looks_like_uuid(value: str) -> bool:

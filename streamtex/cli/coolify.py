@@ -463,11 +463,19 @@ class CoolifyClient:
         return self._get(f"/api/v1/applications/{uuid}/envs")
 
     def set_env_var(self, uuid: str, key: str, value: str, is_build: bool = False) -> dict:
-        """Set an environment variable on an application."""
-        return self._post(
-            f"/api/v1/applications/{uuid}/envs",
-            body={"key": key, "value": value, "is_build_time": is_build},
-        )
+        """Create or update an environment variable on an application.
+
+        Uses POST to create; on 409 (already exists), falls back to PATCH.
+        """
+        body: dict = {"key": key, "value": value}
+        if is_build:
+            body["is_build_time"] = True
+        try:
+            return self._post(f"/api/v1/applications/{uuid}/envs", body=body)
+        except CoolifyError as e:
+            if "409" in str(e):
+                return self._patch(f"/api/v1/applications/{uuid}/envs", body=body)
+            raise
 
     # ── Application management ────────────────────────────────────────
 

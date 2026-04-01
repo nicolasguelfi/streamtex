@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.6.2] — 2026-04-01
+## [0.6.3] — 2026-04-01
 
 ### Added
 - **PDF bookmarks from TOC**: `export_pdf()` now generates native PDF bookmarks (outlines) from the table of contents. Invisible headings are injected at TOC anchor positions; Chromium builds the bookmark tree with `outline=True` + `tagged=True`.

@@ -92,11 +92,15 @@ SERVE_MODES = ("dual", "static-only", "streamlit-only")
 """Valid values for the STX_SERVE_MODE environment variable."""
 
 MAX_CONCURRENT_DEPLOYS = 4
-"""Maximum number of simultaneous rebuilds on a single server.
+"""Maximum number of simultaneous Docker builds on the server, ALL sources combined.
 
 The cax21 (4 vCPU, 8 GB RAM) hangs when too many Docker builds run at once.
-Callers should batch rebuilds in groups of this size and wait for each batch
-to become healthy before starting the next.
+This limit applies **server-wide**: auto-deploys from GitHub pushes, manual API
+rebuilds, and workflow-triggered deploys all share the same resources.
+
+CRITICAL: never push multiple repos at the same time if both have auto-deploy —
+push one, wait for its builds to complete, then push the next. Never trigger
+manual rebuilds on top of auto-deploys (the push already triggers the build).
 """
 
 COOLIFY_DASHBOARD_PORT = 8000

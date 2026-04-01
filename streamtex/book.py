@@ -329,6 +329,8 @@ def _offer_export_downloads(html: str, base_name: str,
                             toc=_cache.get("toc"),
                             markers=_cache.get("markers"),
                             search_index=_cache.get("search_index"),
+                            doc_version=_cache.get("doc_version", ""),
+                            lib_version=_cache.get("lib_version", ""),
                         )
                         # Apply custom title override
                         if enrich_title:
@@ -577,6 +579,12 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
         banner_config = BannerConfig(color=monties_color)
     else:
         banner_config = BannerConfig(color=banner_color)
+    # --- Store version info for export enrichment ---
+    if doc_version:
+        from . import __version__ as _lib_ver
+        st.session_state["_stx_doc_version"] = doc_version
+        st.session_state["_stx_lib_version"] = _lib_ver
+
     # --- Headless warmup: build + save cache, then return ---
     if _warmup_mode:
         _warmup_build_cache(module_list, toc_config, marker_config,
@@ -1442,6 +1450,8 @@ def _build_page_cache(module_list, toc_config, marker_config, separator,
         "total": len(module_list),
         "search_index": search_index,
         "cited_keys": _bib_cited,
+        "doc_version": st.session_state.get("_stx_doc_version", ""),
+        "lib_version": st.session_state.get("_stx_lib_version", ""),
     }
 
 

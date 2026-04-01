@@ -105,11 +105,14 @@ def export_html(path, output, asset_mode, title, no_nav):
     # Enrich HTML with navigation (sidebar TOC, marker bar, search)
     if not no_nav and nav_data:
         from ..export_enrich import enrich_export_html
+        _cache_data = st.session_state.get("_stx_page_cache", {})
         full_html = enrich_export_html(
             full_html,
             toc=nav_data.get("toc"),
             markers=nav_data.get("markers"),
             search_index=nav_data.get("search_index"),
+            doc_version=_cache_data.get("doc_version", ""),
+            lib_version=_cache_data.get("lib_version", ""),
         )
         features = []
         if nav_data.get("toc"):

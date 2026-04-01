@@ -195,7 +195,8 @@ if _LOGO_TINY_PATH.exists():
     _LOGO_B64 = base64.b64encode(_LOGO_TINY_PATH.read_bytes()).decode()
 
 
-def _build_sidebar_html(toc: list[dict], has_search: bool = False) -> str:
+def _build_sidebar_html(toc: list[dict], has_search: bool = False,
+                        doc_version: str = "", lib_version: str = "") -> str:
     """Build the sidebar TOC HTML from cache data."""
     parts = ['<nav id="stx-sidebar" class="stx-export-sidebar">']
     # Header: collapse button + "Powered with StreamTeX" logo
@@ -229,6 +230,16 @@ def _build_sidebar_html(toc: list[dict], has_search: bool = False) -> str:
         parts.append(
             f'<div class="stx-toc-entry {lvl_class}" data-stx-block="{block_idx}">'
             f'<a href="#{anchor}">{title}</a></div>'
+        )
+    # Version footer
+    if doc_version:
+        _ver_text = f"docs {doc_version}"
+        if lib_version:
+            _ver_text += f" &middot; lib {lib_version}"
+        parts.append(
+            f'<div style="margin-top:16px;padding-top:8px;'
+            f'border-top:1px solid #e0e0e0;font-size:11px;color:#999;">'
+            f'{_ver_text}</div>'
         )
     parts.append('<div style="height:40px;"></div>')  # bottom spacer
     parts.append('</nav>')
@@ -534,6 +545,8 @@ def enrich_export_html(
     toc: list[dict] | None = None,
     markers: list[dict] | None = None,
     search_index: dict | None = None,
+    doc_version: str = "",
+    lib_version: str = "",
 ) -> str:
     """Transform raw export HTML into a fully navigable static document.
 
@@ -596,7 +609,8 @@ def enrich_export_html(
 
     # --- Build and inject sidebar HTML after <body> ---
     if has_toc:
-        sidebar_html = _build_sidebar_html(toc, has_search=has_search)
+        sidebar_html = _build_sidebar_html(toc, has_search=has_search,
+                                           doc_version=doc_version, lib_version=lib_version)
         raw_html = raw_html.replace("<body>", "<body>\n" + sidebar_html, 1)
 
     # --- Build JS block ---

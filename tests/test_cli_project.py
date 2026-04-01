@@ -61,6 +61,19 @@ def test_generate_pyproject_toml_valid():
     assert any("streamtex" in d for d in deps)
 
 
+def test_generate_pyproject_toml_always_includes_cli():
+    """cli extra is always present for dual-mode deployment support."""
+    # Without extras
+    content = generate_pyproject_toml("demo")
+    assert "cli" in content
+
+    # With extras
+    content = generate_pyproject_toml("demo", extras=["pdf", "ai"])
+    assert "cli" in content
+    assert "pdf" in content
+    assert "ai" in content
+
+
 def test_generate_streamlit_config_valid():
     content = generate_streamlit_config()
     data = tomllib.loads(content)
@@ -98,6 +111,9 @@ def test_scaffold_creates_all_files(tmp_path):
         "pyproject.toml",
         "setup.py",
         ".gitignore",
+        "Dockerfile",
+        "nginx.conf",
+        "entrypoint.sh",
     ]
     for f in expected:
         assert os.path.isfile(os.path.join(target, f)), f"Missing: {f}"

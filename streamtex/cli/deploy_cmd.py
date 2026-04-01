@@ -83,7 +83,8 @@ ARG SOURCE_COMMIT=unknown
 
 # Install dependencies
 COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen --no-dev
+RUN uv sync --frozen --no-dev && \\
+    uv pip install rich jinja2
 
 # Copy project files
 COPY . .
@@ -163,6 +164,7 @@ http {
         location /html/ {
             alias /app/static-html/;
             index index.html;
+            autoindex on;
             expires 1h;
             add_header Cache-Control "public, max-age=3600";
             add_header X-Served-By "static";

@@ -176,11 +176,10 @@ def generate_pyproject_toml(name: str, extras: list[str] | None = None) -> str:
         Optional list of streamtex extras (e.g. ``["pdf", "ai", "inspector"]``).
         When provided, the streamtex dependency becomes ``streamtex[pdf,ai,inspector]>=0.3.0``.
     """
-    if extras:
-        extras_str = ",".join(extras)
-        stx_dep = f'"streamtex[{extras_str}]>=0.3.0"'
-    else:
-        stx_dep = '"streamtex>=0.3.0"'
+    # Always include "cli" for dual-mode deployment (stx export html needs rich/jinja2)
+    all_extras = list(dict.fromkeys(["cli"] + (extras or [])))
+    extras_str = ",".join(all_extras)
+    stx_dep = f'"streamtex[{extras_str}]>=0.3.0"'
 
     return f"""\
 [project]
@@ -308,6 +307,13 @@ def scaffold_project(
     _write("setup.py", generate_setup_py(name))
     _write(".gitignore", generate_gitignore())
     _write(".pre-commit-config.yaml", generate_pre_commit_config())
+
+    # Deployment files (dual-mode: Nginx + Streamlit)
+    from .deploy_cmd import generate_dockerfile, generate_entrypoint, generate_nginx_conf
+
+    _write("Dockerfile", generate_dockerfile())
+    _write("nginx.conf", generate_nginx_conf())
+    _write("entrypoint.sh", generate_entrypoint())
 
     # static/images/ (empty directory)
     images_dir = os.path.join(target_dir, "static", "images")

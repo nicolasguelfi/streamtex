@@ -191,9 +191,18 @@ def test_preflight_no_static_dir(tmp_path):
     assert check.status == "warn"
 
 
+def test_preflight_dockerfile_present(tmp_path):
+    proj = _make_deploy_project(tmp_path)
+    # scaffold_project now creates Dockerfile alongside the project
+    checks = run_preflight(str(proj), skip_tests=True, skip_lint=True)
+    check = next(c for c in checks if c.name == "Dockerfile")
+    assert check.status == "pass"
+
+
 def test_preflight_no_dockerfile(tmp_path):
     proj = _make_deploy_project(tmp_path)
-    # scaffold_project doesn't create Dockerfile, so it should be missing
+    # Remove the Dockerfile to test the warning path
+    os.remove(os.path.join(str(proj), "Dockerfile"))
     checks = run_preflight(str(proj), skip_tests=True, skip_lint=True)
     check = next(c for c in checks if c.name == "Dockerfile")
     assert check.status == "warn"
@@ -335,7 +344,11 @@ def test_docker_command_build_only(tmp_path):
 
 def test_docker_command_generates_dockerfile(tmp_path):
     proj = _make_deploy_project(tmp_path)
-    # No Dockerfile initially
+    # Remove deploy files created by scaffold to test generation
+    for f in ["Dockerfile", "nginx.conf", "entrypoint.sh"]:
+        fp = proj / f
+        if fp.is_file():
+            fp.unlink()
 
     # Init git for preflight
     subprocess.run(["git", "init", str(proj)], capture_output=True)
@@ -357,6 +370,8 @@ def test_docker_command_generates_dockerfile(tmp_path):
     assert result.exit_code == 0, result.output
     assert "Dockerfile generated" in result.output
     assert (proj / "Dockerfile").is_file()
+    assert (proj / "nginx.conf").is_file()
+    assert (proj / "entrypoint.sh").is_file()
 
 
 def test_docker_command_custom_port(tmp_path):
@@ -1049,7 +1064,11 @@ def test_huggingface_command_skip_push(tmp_path):
 
 def test_huggingface_command_generates_dockerfile(tmp_path):
     proj = _make_deploy_project(tmp_path)
-    # No Dockerfile
+    # Remove deploy files created by scaffold to test generation
+    for f in ["Dockerfile", "nginx.conf", "entrypoint.sh"]:
+        fp = proj / f
+        if fp.is_file():
+            fp.unlink()
 
     subprocess.run(["git", "init", str(proj)], capture_output=True)
     subprocess.run(["git", "-C", str(proj), "add", "."], capture_output=True)

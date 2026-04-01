@@ -27,11 +27,11 @@ PRESET_ORDER = ["basic", "user", "standard", "power", "developer"]
 
 # Extras automatically added to projects based on preset level
 PRESET_EXTRAS = {
-    "basic": ["pdf"],
-    "user": ["pdf"],
-    "standard": ["pdf", "ai"],
-    "power": ["pdf", "ai", "inspector"],
-    "developer": ["pdf", "ai", "inspector"],
+    "basic": ["cli", "pdf"],
+    "user": ["cli", "pdf"],
+    "standard": ["cli", "pdf", "ai"],
+    "power": ["cli", "pdf", "ai", "inspector"],
+    "developer": ["cli", "pdf", "ai", "inspector"],
 }
 
 ALL_REPOS = {

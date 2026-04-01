@@ -85,6 +85,12 @@ DEFAULT_DEPLOY_TIMEOUT = 300
 STREAMLIT_PORT = 8501
 """Streamlit default port inside the Docker container."""
 
+NGINX_PORT = 80
+"""Nginx port inside the Docker container (dual / static-only modes)."""
+
+SERVE_MODES = ("dual", "static-only", "streamlit-only")
+"""Valid values for the STX_SERVE_MODE environment variable."""
+
 COOLIFY_DASHBOARD_PORT = 8000
 """Coolify dashboard port before domain configuration."""
 
@@ -136,6 +142,8 @@ class AppEntry:
     deployed_at: str = ""
     replicas: int = 1
     replica_uuids: list[str] | None = None
+    serve_mode: str = "streamlit-only"
+    """Service mode: dual, static-only, or streamlit-only (default for backwards compat)."""
 
     @property
     def all_uuids(self) -> list[str]:

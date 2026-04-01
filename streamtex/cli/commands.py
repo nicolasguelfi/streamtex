@@ -42,6 +42,7 @@ from .dev_cmd import (
 from .dev_cmd import (
     unregister_cmd as dev_unregister,
 )
+from .export_cmd import export_html
 from .install_cmd import install as stx_install
 from .project_cmd import new as project_new
 from .project_cmd import validate as project_validate
@@ -161,6 +162,16 @@ def cache():
 
 
 cache.add_command(cache_warmup)
+
+
+# --- Export subgroup ------------------------------------------------------
+
+@cli.group()
+def export():
+    """Export StreamTeX projects to static formats."""
+
+
+export.add_command(export_html)
 
 
 # --- Dev subgroup ----------------------------------------------------------

@@ -1142,9 +1142,17 @@ def _status_coolify(console, name: str | None) -> None:
         "stopped": "[dim]Stopped[/dim]",
     }
 
+    # Build serve_mode lookup from typed state
+    serve_mode_map: dict[str, str] = {}
+    if state.applications:
+        for entry in state.applications:
+            if entry.serve_mode != "streamlit-only":
+                serve_mode_map[entry.uuid] = entry.serve_mode
+
     table = Table(title="Coolify Deployment Status")
     table.add_column("Service", style="cyan")
     table.add_column("Status")
+    table.add_column("Mode", style="dim")
     table.add_column("Replicas", justify="center")
     table.add_column("Last Deploy", style="dim")
     table.add_column("URL")
@@ -1173,7 +1181,8 @@ def _status_coolify(console, name: str | None) -> None:
         else:
             replica_str = "[dim]1[/dim]"
 
-        table.add_row(app.name, status_icon, replica_str, deploy_time, app.fqdn)
+        mode_str = serve_mode_map.get(app.uuid, "streamlit")
+        table.add_row(app.name, status_icon, mode_str, replica_str, deploy_time, app.fqdn)
 
     console.print(table)
 
@@ -1704,8 +1713,11 @@ def setup_cmd() -> None:
 @click.argument("path", default=".")
 @click.option("--subdomain", default=None, help="Subdomain for the service.")
 @click.option("--uuid", default=None, help="Coolify application UUID (skip creation).")
+@click.option("--serve-mode", type=click.Choice(["dual", "static-only", "streamlit-only"]),
+              default="streamlit-only",
+              help="Service mode: dual (Nginx+Streamlit), static-only (Nginx), or streamlit-only (legacy).")
 @click.option("--yes", is_flag=True, help="Skip confirmation prompts.")
-def hetzner_cmd(path: str, subdomain: str | None, uuid: str | None, yes: bool) -> None:
+def hetzner_cmd(path: str, subdomain: str | None, uuid: str | None, serve_mode: str, yes: bool) -> None:
     """Deploy a StreamTeX project to Hetzner via Coolify."""
     from .coolify import CoolifyClient, CoolifyError, load_deploy_state, save_deploy_state
 
@@ -1810,6 +1822,21 @@ def hetzner_cmd(path: str, subdomain: str | None, uuid: str | None, yes: bool) -
         except CoolifyError as e:
             console.print(f"[yellow]\u26a0 Could not set FOLDER: {e}[/yellow]")
 
+    # 7b. Set STX_SERVE_MODE and adjust exposed port
+    if serve_mode != "streamlit-only":
+        console.print(f"[cyan]Setting STX_SERVE_MODE={serve_mode}[/cyan]")
+        try:
+            client.set_env_var(app_uuid, "STX_SERVE_MODE", serve_mode)
+        except CoolifyError as e:
+            console.print(f"[yellow]\u26a0 Could not set STX_SERVE_MODE: {e}[/yellow]")
+        # In dual/static-only modes, Nginx listens on port 80
+        try:
+            from .coolify import NGINX_PORT
+            client.update_app(app_uuid, ports_exposes=str(NGINX_PORT))
+            console.print(f"[green]\u2713 Exposed port set to {NGINX_PORT} (Nginx)[/green]")
+        except CoolifyError as e:
+            console.print(f"[yellow]\u26a0 Could not set port: {e}[/yellow]")
+
     # 8. Set FQDN
     try:
         client.set_fqdn(app_uuid, fqdn)
@@ -1858,8 +1885,11 @@ def hetzner_cmd(path: str, subdomain: str | None, uuid: str | None, yes: bool) -
 @click.command("update")
 @click.argument("target", required=False, default=None)
 @click.option("--quick", is_flag=True, help="Quick restart (no rebuild).")
+@click.option("--serve-mode", type=click.Choice(["dual", "static-only", "streamlit-only"]),
+              default=None,
+              help="Change service mode before rebuild: dual, static-only, or streamlit-only.")
 @click.option("--yes", is_flag=True, help="Skip confirmation prompts.")
-def update_cmd(target: str | None, quick: bool, yes: bool) -> None:
+def update_cmd(target: str | None, quick: bool, serve_mode: str | None, yes: bool) -> None:
     """Rebuild or restart a Coolify service.
 
     TARGET can be a service name, subdomain, or Coolify UUID.
@@ -1942,6 +1972,19 @@ def update_cmd(target: str | None, quick: bool, yes: bool) -> None:
             if entry.uuid == app_uuid and entry.replica_uuids:
                 all_uuids.extend(entry.replica_uuids)
                 break
+
+    # Apply serve-mode change if requested
+    if serve_mode:
+        console.print(f"[cyan]Setting STX_SERVE_MODE={serve_mode}[/cyan]")
+        try:
+            client.set_env_var(app_uuid, "STX_SERVE_MODE", serve_mode)
+            # Adjust exposed port: Nginx (80) for dual/static-only, Streamlit (8501) for streamlit-only
+            from .coolify import NGINX_PORT, STREAMLIT_PORT
+            port = STREAMLIT_PORT if serve_mode == "streamlit-only" else NGINX_PORT
+            client.update_app(app_uuid, ports_exposes=str(port))
+            console.print(f"[green]\u2713 Serve mode set to {serve_mode} (port {port})[/green]")
+        except CoolifyError as e:
+            console.print(f"[yellow]\u26a0 Could not set serve mode: {e}[/yellow]")
 
     if len(all_uuids) > 1:
         n = len(all_uuids)

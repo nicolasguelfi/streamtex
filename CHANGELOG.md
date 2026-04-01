@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] — 2026-04-01
+
+### Added
+- **Enriched HTML export from sidebar**: "Download as HTML" now offers a checkbox "Enriched navigation" (TOC sidebar, marker bar, search) and a customizable document title — equivalent to CLI `--no-nav` and `--title`.
+- **Collapsible sidebar in HTML export**: hamburger button inside the sidebar hides/shows it with smooth transition. Preference persisted in localStorage.
+- **"Powered with StreamTeX"**: sidebar header shows the real StreamTeX logo (logo-stx-tiny.png) linked to streamtex.org.
+- **Serve modes** (`--serve-mode`): `dual` (Nginx + Streamlit), `static-only`, `streamlit-only` on `stx deploy hetzner` and `stx deploy update`.
+- **`stx export html`** CLI command with `--output`, `--asset-mode`, `--title`, `--no-nav` options.
+- **Horizontal scaling**: `stx deploy scale TARGET --replicas N` for load-balanced containers.
+
+### Fixed
+- **PDF export no longer includes sidebar TOC**: enrichment applied to HTML copy only, raw HTML preserved for PDF.
+- **Keyboard navigation in HTML export**: Arrow keys (all 4) + PageUp/PageDown navigate between markers (previously required Ctrl+Arrow).
+
 ## [0.5.23] — 2026-04-01
 
 ### Added

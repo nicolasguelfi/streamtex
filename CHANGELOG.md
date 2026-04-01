@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.1] — 2026-04-01
+
+### Added
+- **Dual-mode Dockerfile generator**: `generate_dockerfile()` now produces a container running both Nginx (static HTML on `/html/`) and Streamlit (interactive on `/`), controlled by `STX_SERVE_MODE` env var.
+- **Nginx config generator**: `generate_nginx_conf()` for static file serving alongside Streamlit.
+- **Entrypoint script generator**: `generate_entrypoint()` manages dual-mode startup with health checks.
+- **Coherence audit expansion**: 45 checks (was 28) — added 13 AI-quality checks (ghost API, dead code, explanation drift, cross-block contradictions, test quality, secret leaks, etc.) and 4 CLI checks (help↔code, stx-guide↔CLI, deploy↔Docker, optional deps↔imports).
+
+### Changed
+- **Deploy CLI**: `stx deploy` templates updated for dual-mode serving with Nginx + Streamlit.
+
 ## [0.6.0] — 2026-04-01
 
 ### Added

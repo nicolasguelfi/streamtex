@@ -50,27 +50,228 @@ class DeployStatus:
 
 
 # ---------------------------------------------------------------------------
-# Dockerfile template
+# Deployment file templates (Dockerfile, nginx.conf, entrypoint.sh)
 # ---------------------------------------------------------------------------
 
 
 def generate_dockerfile() -> str:
-    """Generate a simplified Dockerfile for StreamTeX projects."""
+    """Generate a dual-mode Dockerfile for StreamTeX projects.
+
+    The container runs both Nginx (static HTML on /html/) and Streamlit
+    (interactive on /). The serve mode is controlled at runtime by the
+    ``STX_SERVE_MODE`` environment variable (default: ``dual``).
+    """
     return """\
 FROM python:3.13-slim
+
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 \\
-    STREAMLIT_SERVER_HEADLESS=true UV_LINK_MODE=copy
+    STREAMLIT_SERVER_HEADLESS=true STREAMLIT_BROWSER_GATHERUSAGESTATS=false \\
+    UV_LINK_MODE=copy
+
 WORKDIR /app
-RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+
+RUN apt-get update && apt-get install -y --no-install-recommends \\
+        curl nginx-light \\
+    && rm -rf /var/lib/apt/lists/*
+
+# Install uv
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/
+
+# Cache-bust: changing SOURCE_COMMIT invalidates layers so uv sync
+# fetches the latest PyPI packages.
+ARG SOURCE_COMMIT=unknown
+
+# Install dependencies
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev
+
+# Copy project files
 COPY . .
-ENV PORT=8501
-EXPOSE 8501
-HEALTHCHECK CMD curl --fail http://localhost:8501/_stcore/health
-ENTRYPOINT ["uv", "run", "streamlit", "run", "book.py", \\
-            "--server.port=8501", "--server.address=0.0.0.0"]
+
+# Nginx configuration for dual-mode (Streamlit + static HTML)
+COPY nginx.conf /etc/nginx/nginx.conf
+
+# Entrypoint script (supports dual / static-only / streamlit-only modes)
+COPY entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
+# Pre-generate static HTML for the project (served by Nginx on /html/).
+RUN mkdir -p /app/static-html && \\
+    (uv run stx export html --output /app/static-html/ . || true)
+
+# STX_SERVE_MODE controls which services start (set at runtime)
+#   dual           = Nginx (:80) + Streamlit (:8501) — default
+#   static-only    = Nginx (:80) only
+#   streamlit-only = Streamlit (:8501) only — legacy behaviour
+ENV STX_SERVE_MODE="dual"
+
+EXPOSE 80 8501
+
+# Health check: try Nginx first (dual/static-only), then Streamlit (streamlit-only)
+HEALTHCHECK CMD curl --fail http://localhost:80/html/ 2>/dev/null \\
+    || curl --fail http://localhost:8501/_stcore/health
+
+ENTRYPOINT ["/app/entrypoint.sh"]
+"""
+
+
+def generate_nginx_conf() -> str:
+    """Generate Nginx configuration for dual-mode serving.
+
+    Routes:
+      /html/  -> static HTML export (always available)
+      /       -> Streamlit app (with automatic fallback to /html/ on error)
+    """
+    return """\
+# StreamTeX dual-mode Nginx configuration
+# Serves both Streamlit (interactive) and static HTML exports.
+#
+# Routes:
+#   /html/          -> static HTML export (always available)
+#   /               -> Streamlit app (with automatic fallback to /html/ on error)
+#   /_stcore/health -> proxied to Streamlit (Coolify/Traefik health check)
+
+worker_processes auto;
+pid /tmp/nginx.pid;
+error_log /dev/stderr warn;
+
+events {
+    worker_connections 1024;
+}
+
+http {
+    include       /etc/nginx/mime.types;
+    default_type  application/octet-stream;
+
+    access_log /dev/stdout;
+    sendfile   on;
+
+    gzip on;
+    gzip_types text/html text/css application/javascript image/svg+xml application/json;
+    gzip_min_length 1024;
+
+    upstream streamlit {
+        server 127.0.0.1:8501;
+    }
+
+    server {
+        listen 80;
+        server_name _;
+
+        # --- Static HTML export (always served directly) ---
+
+        location /html/ {
+            alias /app/static-html/;
+            index index.html;
+            expires 1h;
+            add_header Cache-Control "public, max-age=3600";
+            add_header X-Served-By "static";
+        }
+
+        # --- Health check (Coolify/Traefik) ---
+        # Try Streamlit first; if it's down, return 200 anyway
+        # so the container stays alive in static-only mode.
+
+        location = /_stcore/health {
+            proxy_pass http://streamlit/_stcore/health;
+            proxy_connect_timeout 2s;
+            proxy_read_timeout 5s;
+            error_page 502 503 504 = @health_fallback;
+        }
+
+        location @health_fallback {
+            return 200 "ok\\n";
+            add_header Content-Type text/plain;
+        }
+
+        # --- Streamlit app (interactive, with WebSocket support) ---
+
+        location / {
+            proxy_pass http://streamlit;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_read_timeout 86400;
+
+            # If Streamlit is down or overloaded, redirect to static HTML
+            error_page 502 503 504 = @fallback_static;
+        }
+
+        location @fallback_static {
+            return 302 /html/;
+        }
+    }
+}
+"""
+
+
+def generate_entrypoint() -> str:
+    """Generate the container entrypoint script for dual-mode serving."""
+    return """\
+#!/bin/bash
+# StreamTeX container entrypoint — supports three serve modes:
+#   dual           (default) Nginx + Streamlit — static fallback on error
+#   static-only    Nginx only — no Streamlit, minimal resources
+#   streamlit-only Streamlit only — legacy behaviour (no Nginx)
+#
+# Env vars:
+#   STX_SERVE_MODE  dual | static-only | streamlit-only (default: dual)
+
+set -e
+
+MODE="${STX_SERVE_MODE:-dual}"
+
+echo "[entrypoint] Mode: ${MODE}"
+
+# --- Always: refresh cache and generate static HTML ---
+
+# Clear stale caches
+rm -rf .stx_cache .streamlit/cache
+
+# Re-warm the page cache (for Streamlit fast first load)
+if [ "$MODE" != "static-only" ]; then
+    echo "[entrypoint] Warming up page cache..."
+    uv run stx cache warmup . 2>/dev/null || true
+fi
+
+# Generate static HTML export
+echo "[entrypoint] Generating static HTML..."
+uv run stx export html --output /app/static-html/ . 2>/dev/null || true
+
+# Create a simple index.html that redirects if the export didn't produce one
+if [ ! -f /app/static-html/index.html ]; then
+    HTML_FILE=$(find /app/static-html/ -name "*.html" -maxdepth 2 | head -1)
+    if [ -n "$HTML_FILE" ]; then
+        REL_PATH="${HTML_FILE#/app/static-html/}"
+        echo "<meta http-equiv=\\"refresh\\" content=\\"0;url=${REL_PATH}\\">" \\
+            > /app/static-html/index.html
+    fi
+fi
+
+# --- Start services based on mode ---
+
+case "$MODE" in
+    static-only)
+        echo "[entrypoint] Starting Nginx (static-only)..."
+        exec nginx -g "daemon off;"
+        ;;
+    streamlit-only)
+        echo "[entrypoint] Starting Streamlit (no Nginx)..."
+        exec uv run streamlit run book.py \\
+            --server.port=8501 --server.address=0.0.0.0
+        ;;
+    dual|*)
+        echo "[entrypoint] Starting Nginx + Streamlit (dual mode)..."
+        # Nginx in background, Streamlit as PID 1 (receives signals)
+        nginx
+        exec uv run streamlit run book.py \\
+            --server.port=8501 --server.address=0.0.0.0
+        ;;
+esac
 """
 
 
@@ -770,14 +971,25 @@ def _assert_preflight(path: str, console, skip_tests: bool = True, skip_lint: bo
         raise click.ClickException("Preflight failed. Run 'stx deploy preflight' for details.")
 
 
+def _ensure_deploy_files(path: str, console) -> None:
+    """Generate Dockerfile, nginx.conf, and entrypoint.sh if they don't exist."""
+    files = {
+        "Dockerfile": generate_dockerfile,
+        "nginx.conf": generate_nginx_conf,
+        "entrypoint.sh": generate_entrypoint,
+    }
+    for filename, generator in files.items():
+        filepath = os.path.join(path, filename)
+        if not os.path.isfile(filepath):
+            content = generator()
+            with open(filepath, "w", encoding="utf-8") as f:
+                f.write(content)
+            console.print(f"[green]\u2713 {filename} generated[/green]")
+
+
 def _ensure_dockerfile(path: str, console) -> None:
-    """Generate Dockerfile if it doesn't exist."""
-    dockerfile_path = os.path.join(path, "Dockerfile")
-    if not os.path.isfile(dockerfile_path):
-        content = generate_dockerfile()
-        with open(dockerfile_path, "w", encoding="utf-8") as f:
-            f.write(content)
-        console.print("[green]\u2713 Dockerfile generated[/green]")
+    """Generate all deployment files (Dockerfile, nginx.conf, entrypoint.sh)."""
+    _ensure_deploy_files(path, console)
 
 
 def _resolve_server_ip(cli_ip: str | None = None, state: dict | None = None) -> str:
@@ -1714,8 +1926,8 @@ def setup_cmd() -> None:
 @click.option("--subdomain", default=None, help="Subdomain for the service.")
 @click.option("--uuid", default=None, help="Coolify application UUID (skip creation).")
 @click.option("--serve-mode", type=click.Choice(["dual", "static-only", "streamlit-only"]),
-              default="streamlit-only",
-              help="Service mode: dual (Nginx+Streamlit), static-only (Nginx), or streamlit-only (legacy).")
+              default="dual",
+              help="Service mode: dual (Nginx+Streamlit, default), static-only (Nginx), or streamlit-only (legacy).")
 @click.option("--yes", is_flag=True, help="Skip confirmation prompts.")
 def hetzner_cmd(path: str, subdomain: str | None, uuid: str | None, serve_mode: str, yes: bool) -> None:
     """Deploy a StreamTeX project to Hetzner via Coolify."""
@@ -1823,19 +2035,20 @@ def hetzner_cmd(path: str, subdomain: str | None, uuid: str | None, serve_mode: 
             console.print(f"[yellow]\u26a0 Could not set FOLDER: {e}[/yellow]")
 
     # 7b. Set STX_SERVE_MODE and adjust exposed port
-    if serve_mode != "streamlit-only":
-        console.print(f"[cyan]Setting STX_SERVE_MODE={serve_mode}[/cyan]")
-        try:
-            client.set_env_var(app_uuid, "STX_SERVE_MODE", serve_mode)
-        except CoolifyError as e:
-            console.print(f"[yellow]\u26a0 Could not set STX_SERVE_MODE: {e}[/yellow]")
-        # In dual/static-only modes, Nginx listens on port 80
-        try:
-            from .coolify import NGINX_PORT
-            client.update_app(app_uuid, ports_exposes=str(NGINX_PORT))
-            console.print(f"[green]\u2713 Exposed port set to {NGINX_PORT} (Nginx)[/green]")
-        except CoolifyError as e:
-            console.print(f"[yellow]\u26a0 Could not set port: {e}[/yellow]")
+    console.print(f"[cyan]Setting STX_SERVE_MODE={serve_mode}[/cyan]")
+    try:
+        client.set_env_var(app_uuid, "STX_SERVE_MODE", serve_mode)
+    except CoolifyError as e:
+        console.print(f"[yellow]\u26a0 Could not set STX_SERVE_MODE: {e}[/yellow]")
+
+    # Set the exposed port: Nginx (:80) for dual/static-only, Streamlit (:8501) for streamlit-only
+    from .coolify import NGINX_PORT
+    exposed_port = STREAMLIT_PORT if serve_mode == "streamlit-only" else NGINX_PORT
+    try:
+        client.update_app(app_uuid, ports_exposes=str(exposed_port))
+        console.print(f"[green]\u2713 Exposed port set to {exposed_port}[/green]")
+    except CoolifyError as e:
+        console.print(f"[yellow]\u26a0 Could not set port: {e}[/yellow]")
 
     # 8. Set FQDN
     try:
@@ -1871,6 +2084,7 @@ def hetzner_cmd(path: str, subdomain: str | None, uuid: str | None, serve_mode: 
         "subdomain": subdomain,
         "fqdn": fqdn,
         "repo": repo,
+        "serve_mode": serve_mode,
     }
     save_deploy_state(state)
     console.print("[green]\u2713 State saved to .stx-deploy.json[/green]")

@@ -59,8 +59,8 @@ def _make_deploy_project(tmp_path):
 
 def test_generate_dockerfile_has_streamlit():
     content = generate_dockerfile()
-    assert '"streamlit"' in content
-    assert '"book.py"' in content
+    assert "STREAMLIT" in content
+    assert "uv sync" in content
 
 
 def test_generate_dockerfile_has_healthcheck():

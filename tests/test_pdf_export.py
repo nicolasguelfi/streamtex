@@ -7,6 +7,7 @@ from streamtex.pdf_export import (
     PdfMode,
     _compute_viewport_width,
     _inject_content_width_css,
+    _inject_toc_headings,
     _page_dimensions_mm,
     _parse_margin,
     inject_print_css,
@@ -285,3 +286,92 @@ class TestInjectContentWidthCss:
         html = "<html><body>No head</body></html>"
         result = _inject_content_width_css(html, 80)
         assert result == html
+
+
+class TestInjectTocHeadings:
+    """Tests for _inject_toc_headings — TOC → PDF bookmark headings."""
+
+    _BASE_HTML = (
+        '<html><head><title>T</title></head><body>'
+        '<div id="1-intro" style="color:red;">Introduction</div>'
+        '<p>Content here</p>'
+        "<div id='2-chapter' style='font-size:20px;'>Chapter</div>"
+        '</body></html>'
+    )
+
+    def test_empty_toc_returns_unchanged(self):
+        result = _inject_toc_headings(self._BASE_HTML, [])
+        assert result == self._BASE_HTML
+
+    def test_none_toc_returns_unchanged(self):
+        result = _inject_toc_headings(self._BASE_HTML, None)
+        assert result == self._BASE_HTML
+
+    def test_injects_h1_at_anchor(self):
+        toc = [{"key_anchor": "1-intro", "title": "Introduction", "level": 1}]
+        result = _inject_toc_headings(self._BASE_HTML, toc)
+        assert '<h1 class="stx-pdf-outline-heading">Introduction</h1>' in result
+
+    def test_injects_h2_at_anchor(self):
+        toc = [{"key_anchor": "2-chapter", "title": "Chapter Two", "level": 2}]
+        result = _inject_toc_headings(self._BASE_HTML, toc)
+        assert '<h2 class="stx-pdf-outline-heading">Chapter Two</h2>' in result
+
+    def test_heading_injected_after_anchor_tag(self):
+        toc = [{"key_anchor": "1-intro", "title": "Intro", "level": 1}]
+        result = _inject_toc_headings(self._BASE_HTML, toc)
+        idx_anchor = result.index('id="1-intro"')
+        idx_close = result.index(">", idx_anchor)
+        idx_heading = result.index('<h1 class="stx-pdf-outline-heading">')
+        assert idx_heading == idx_close + 1
+
+    def test_multiple_toc_entries(self):
+        toc = [
+            {"key_anchor": "1-intro", "title": "Introduction", "level": 1},
+            {"key_anchor": "2-chapter", "title": "Chapter", "level": 2},
+        ]
+        result = _inject_toc_headings(self._BASE_HTML, toc)
+        assert '<h1 class="stx-pdf-outline-heading">Introduction</h1>' in result
+        assert '<h2 class="stx-pdf-outline-heading">Chapter</h2>' in result
+
+    def test_css_injected_in_head(self):
+        toc = [{"key_anchor": "1-intro", "title": "Intro", "level": 1}]
+        result = _inject_toc_headings(self._BASE_HTML, toc)
+        assert ".stx-pdf-outline-heading" in result
+        assert result.index(".stx-pdf-outline-heading") < result.index("</head>")
+
+    def test_level_clamped_to_1_min(self):
+        toc = [{"key_anchor": "1-intro", "title": "Intro", "level": 0}]
+        result = _inject_toc_headings(self._BASE_HTML, toc)
+        assert "<h1 " in result
+
+    def test_level_clamped_to_6_max(self):
+        toc = [{"key_anchor": "1-intro", "title": "Intro", "level": 9}]
+        result = _inject_toc_headings(self._BASE_HTML, toc)
+        assert "<h6 " in result
+
+    def test_missing_anchor_skipped(self):
+        toc = [{"key_anchor": "nonexistent", "title": "Ghost", "level": 1}]
+        result = _inject_toc_headings(self._BASE_HTML, toc)
+        assert "Ghost" not in result
+
+    def test_entry_without_title_skipped(self):
+        toc = [{"key_anchor": "1-intro", "title": "", "level": 1}]
+        result = _inject_toc_headings(self._BASE_HTML, toc)
+        assert "<h1" not in result
+
+    def test_entry_without_anchor_skipped(self):
+        toc = [{"key_anchor": "", "title": "Intro", "level": 1}]
+        result = _inject_toc_headings(self._BASE_HTML, toc)
+        assert "stx-pdf-outline-heading" not in result
+
+    def test_single_quoted_id_attribute(self):
+        toc = [{"key_anchor": "2-chapter", "title": "Chapter", "level": 2}]
+        result = _inject_toc_headings(self._BASE_HTML, toc)
+        assert '<h2 class="stx-pdf-outline-heading">Chapter</h2>' in result
+
+    def test_preserves_original_content(self):
+        toc = [{"key_anchor": "1-intro", "title": "Intro", "level": 1}]
+        result = _inject_toc_headings(self._BASE_HTML, toc)
+        assert "Introduction</div>" in result
+        assert "<p>Content here</p>" in result

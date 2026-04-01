@@ -219,7 +219,7 @@ class TestCoolifyAPI:
             c.set_env_var("u1", "FOO", "bar")
             mock.assert_called_once_with(
                 "/api/v1/applications/u1/envs",
-                body={"key": "FOO", "value": "bar", "is_build_time": False},
+                body={"key": "FOO", "value": "bar"},
             )
 
     def test_set_fqdn(self):

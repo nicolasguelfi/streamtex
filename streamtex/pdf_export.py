@@ -291,6 +291,81 @@ def _inject_content_width_css(html: str, content_width: int) -> str:
 
 
 # ---------------------------------------------------------------------------
+# TOC → PDF Bookmarks
+# ---------------------------------------------------------------------------
+
+# CSS for headings injected into the HTML for PDF outline generation.
+# Chromium requires headings to remain in normal document flow to include
+# them in the PDF outline tree.  Using ``position: absolute``, ``clip``,
+# or ``overflow: hidden`` causes Chromium to skip the heading entirely.
+# Instead we use near-zero font size with transparent color — the heading
+# occupies no visual space but stays in flow for the outline parser.
+_OUTLINE_HEADING_CSS = (
+    ".stx-pdf-outline-heading {"
+    " font-size: 0.1px;"
+    " line-height: 0;"
+    " margin: 0;"
+    " padding: 0;"
+    " color: transparent;"
+    "}"
+)
+
+
+def _inject_toc_headings(html: str, toc: list[dict]) -> str:
+    """Inject invisible ``<h1>``–``<h6>`` headings at TOC anchor positions.
+
+    Chromium generates PDF bookmarks (outlines) from the heading hierarchy
+    in the DOM.  StreamTeX does not use native ``<hN>`` tags — it renders
+    styled ``<div>``/``<p>`` elements with ``id=`` anchors instead.
+
+    This function finds each TOC anchor in the HTML and inserts a
+    screen-reader-only ``<hN>`` element right after the opening tag,
+    so Chromium sees a proper heading tree and builds the bookmark panel.
+
+    Args:
+        html: Complete HTML document string.
+        toc: List of TOC entry dicts with ``key_anchor``, ``title``, ``level``.
+
+    Returns:
+        HTML with hidden headings injected and outline CSS added.
+    """
+    if not toc:
+        return html
+
+    injected = False
+    for entry in toc:
+        anchor = entry.get("key_anchor", "")
+        title = entry.get("title", "")
+        level = min(max(entry.get("level", 1), 1), 6)
+        if not anchor or not title:
+            continue
+
+        # Find the element with id="<anchor>" and inject <hN> right after it.
+        # Pattern: id='anchor' or id="anchor" followed by the rest of the tag.
+        for quote in ('"', "'"):
+            target = f"id={quote}{anchor}{quote}"
+            if target not in html:
+                continue
+            # Inject the heading right after the closing > of the element
+            # that carries the anchor id.
+            idx = html.index(target)
+            close_bracket = html.index(">", idx)
+            heading = (
+                f'<h{level} class="stx-pdf-outline-heading">'
+                f'{title}</h{level}>'
+            )
+            html = html[:close_bracket + 1] + heading + html[close_bracket + 1:]
+            injected = True
+            break
+
+    # Only add CSS if at least one heading was injected
+    if injected:
+        html = html.replace("</head>", f"<style>{_OUTLINE_HEADING_CSS}</style>\n</head>")
+
+    return html
+
+
+# ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
@@ -298,6 +373,7 @@ def export_pdf(
     html: str,
     output_path: Optional[str] = None,
     config: Optional[PdfConfig] = None,
+    toc: Optional[list[dict]] = None,
 ) -> bytes:
     """Export an HTML document to PDF using Playwright (Chromium headless).
 
@@ -309,6 +385,10 @@ def export_pdf(
     ``content_width`` (10–100%) to narrow the content area while keeping the
     background full-bleed (same logic as ``PageLayout(width=...)``).
 
+    When ``toc`` is provided, invisible HTML headings are injected at the
+    anchor positions and Chromium generates native PDF bookmarks (outlines)
+    that appear in the reader's sidebar panel.
+
     Args:
         html: Complete HTML document (e.g. from ``generate_export_html()``).
         output_path: Optional file path to write the PDF. If None, PDF is
@@ -316,6 +396,9 @@ def export_pdf(
         config: PDF configuration. Defaults to PdfConfig().
             Set ``theme_bg`` and ``theme_text`` on the config to match the
             current Streamlit theme (``book.py`` does this automatically).
+        toc: Optional list of TOC entry dicts (from cache or ``toc_entries()``).
+            Each dict must have ``key_anchor``, ``title``, and ``level`` keys.
+            When provided, PDF bookmarks are generated from the TOC hierarchy.
 
     Returns:
         PDF content as bytes.
@@ -338,6 +421,12 @@ def export_pdf(
 
     # Inject content-width CSS if narrower than 100%
     html = _inject_content_width_css(html, cfg.content_width)
+
+    # Inject TOC headings for PDF bookmark generation
+    use_outline = False
+    if toc:
+        html = _inject_toc_headings(html, toc)
+        use_outline = True
 
     text = cfg.theme_text
 
@@ -393,6 +482,8 @@ def export_pdf(
             display_header_footer=display_header_footer,
             header_template=header or "<span></span>",
             footer_template=footer or "<span></span>",
+            outline=use_outline,
+            tagged=use_outline,
         )
         browser.close()
 

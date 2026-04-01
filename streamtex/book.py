@@ -372,7 +372,8 @@ def _offer_export_downloads(html: str, base_name: str,
                             theme_bg=st.session_state.get(_STX_THEME_BG_KEY, "#fff"),
                             theme_text=st.session_state.get(_STX_THEME_TEXT_KEY, "#333"),
                         )
-                        results["pdf"] = export_pdf(effective_html, config=cfg)
+                        _toc = st.session_state.get(_STX_CACHE_KEY, {}).get("toc")
+                        results["pdf"] = export_pdf(effective_html, config=cfg, toc=_toc)
                     except Exception as exc:
                         st.error(f"PDF generation failed: {exc}")
             st.session_state[state_key] = results
@@ -433,7 +434,8 @@ def _run_auto_exports(
                 # Inject theme colours from session state
                 pdf_cfg.theme_bg = st.session_state.get(_STX_THEME_BG_KEY, "#fff")
                 pdf_cfg.theme_text = st.session_state.get(_STX_THEME_TEXT_KEY, "#333")
-                export_pdf(html, output_path=path, config=pdf_cfg)
+                _toc = st.session_state.get(_STX_CACHE_KEY, {}).get("toc")
+                export_pdf(html, output_path=path, config=pdf_cfg, toc=_toc)
             else:
                 from pathlib import Path as _P
                 collector = get_asset_collector()

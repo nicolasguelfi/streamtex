@@ -103,6 +103,48 @@ def inject_zoom_logic(page_width_pct: int = 100, zoom_pct: int = 100):
     st.html(css)
 
 
+def set_zoom(factor: int) -> None:
+    """Set the CSS zoom for all subsequent content in the current scope.
+
+    Unlike :func:`st_zoom` (context manager), this is an imperative call
+    with no automatic cleanup.  The zoom remains active until:
+
+    - :func:`reset_zoom` is called,
+    - the next ``st_slide_break()`` clears it, or
+    - ``st_book`` cleans up after ``build()`` returns.
+
+    Args:
+        factor: Zoom percentage.  ``100`` = normal, ``50`` = half,
+            ``200`` = double.
+
+    Example::
+
+        set_zoom(75)
+        st_write(s.body, "Dense content at 75%")
+        st_write(s.body, "Still 75%")
+        reset_zoom()
+        st_write(s.body, "Back to inherited zoom")
+    """
+    from .spacing import set_section_zoom
+
+    set_section_zoom(factor)
+
+
+def reset_zoom() -> None:
+    """Restore the zoom to the value inherited from the spacing hierarchy.
+
+    Resolves the current effective section zoom from the 5-level override
+    hierarchy (built-in → global → profile → block) and re-applies it,
+    effectively undoing any prior :func:`set_zoom` call.
+
+    Safe to call even if :func:`set_zoom` was never called.
+    """
+    from .spacing import resolve_section_spacing, set_section_zoom
+
+    inherited = resolve_section_spacing()
+    set_section_zoom(inherited.zoom)
+
+
 @contextmanager
 def st_zoom(factor: int = 100):
     """Apply a CSS zoom factor to all enclosed content.

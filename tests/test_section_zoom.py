@@ -366,3 +366,87 @@ class TestStZoomContextManager:
                 pass
             mock_push.assert_not_called()
             mock_pop.assert_not_called()
+
+
+# ── set_zoom / reset_zoom imperative API ─────────────────────────────────
+
+
+class TestSetZoom:
+    """Tests for the set_zoom() imperative function."""
+
+    def test_sets_section_zoom(self):
+        from streamtex.zoom import set_zoom
+
+        set_zoom(75)
+        assert get_section_zoom() == 75
+
+    def test_overwrite(self):
+        from streamtex.zoom import set_zoom
+
+        set_zoom(75)
+        set_zoom(120)
+        assert get_section_zoom() == 120
+
+    def test_100_is_not_none(self):
+        from streamtex.zoom import set_zoom
+
+        set_zoom(100)
+        assert get_section_zoom() == 100
+
+
+class TestResetZoom:
+    """Tests for the reset_zoom() function."""
+
+    def test_clears_to_none_when_no_hierarchy(self):
+        from streamtex.zoom import reset_zoom, set_zoom
+
+        set_zoom(75)
+        reset_zoom()
+        assert get_section_zoom() is None
+
+    def test_restores_global_section_zoom(self):
+        from streamtex.zoom import reset_zoom, set_zoom
+
+        set_spacing(SpacingConfig(section=Spacing(zoom=80)))
+        set_zoom(50)
+        assert get_section_zoom() == 50
+        reset_zoom()
+        assert get_section_zoom() == 80
+
+    def test_restores_profile_zoom(self):
+        from streamtex.zoom import reset_zoom, set_zoom
+
+        profile = PresentationProfile(
+            name="Dense",
+            spacing=SpacingConfig(section=Spacing(zoom=70)),
+        )
+        set_active_profile(profile)
+        set_zoom(150)
+        reset_zoom()
+        assert get_section_zoom() == 70
+
+    def test_restores_block_override_zoom(self):
+        from streamtex.zoom import reset_zoom, set_zoom
+
+        set_spacing(SpacingConfig(section=Spacing(zoom=80)))
+        set_block_spacing(Spacing(zoom=60))
+        set_zoom(200)
+        reset_zoom()
+        assert get_section_zoom() == 60  # block wins over global
+
+    def test_safe_without_prior_set_zoom(self):
+        from streamtex.zoom import reset_zoom
+
+        # Should not raise even if set_zoom was never called
+        reset_zoom()
+        assert get_section_zoom() is None
+
+    def test_set_reset_set_cycle(self):
+        from streamtex.zoom import reset_zoom, set_zoom
+
+        set_zoom(50)
+        assert get_section_zoom() == 50
+        reset_zoom()
+        assert get_section_zoom() is None
+        set_zoom(120)
+        assert get_section_zoom() == 120

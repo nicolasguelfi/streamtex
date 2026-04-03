@@ -315,6 +315,14 @@ def scaffold_project(
     _write("nginx.conf", generate_nginx_conf())
     _write("entrypoint.sh", generate_entrypoint())
 
+    # .stx-version — minimum streamtex version for Docker build guard
+    from importlib.metadata import version as pkg_version
+    try:
+        stx_ver = pkg_version("streamtex")
+    except Exception:
+        stx_ver = "0.3.0"
+    _write(".stx-version", stx_ver + "\n")
+
     # static/images/ (empty directory)
     images_dir = os.path.join(target_dir, "static", "images")
     os.makedirs(images_dir, exist_ok=True)

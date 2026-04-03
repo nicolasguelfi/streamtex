@@ -114,6 +114,7 @@ def test_scaffold_creates_all_files(tmp_path):
         "Dockerfile",
         "nginx.conf",
         "entrypoint.sh",
+        ".stx-version",
     ]
     for f in expected:
         assert os.path.isfile(os.path.join(target, f)), f"Missing: {f}"

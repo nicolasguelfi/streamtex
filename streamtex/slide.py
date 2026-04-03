@@ -8,7 +8,13 @@ import streamlit as st
 
 from .export import _render
 from .marker import st_marker
-from .spacing import Spacing, consume_block_top_injected, resolve_section_spacing, set_section_horizontal
+from .spacing import (
+    Spacing,
+    consume_block_top_injected,
+    resolve_section_spacing,
+    set_section_horizontal,
+    set_section_zoom,
+)
 
 
 class SlideBreakMode(Enum):
@@ -235,6 +241,7 @@ def st_slide_break(
     marker_label: str = "",
     config: Optional[SlideBreakConfig] = None,
     spacing: Optional[Spacing] = None,
+    zoom: Optional[int] = None,
 ) -> None:
     """Presentation section break: styled rule + viewport spacer + hidden marker.
 
@@ -253,17 +260,34 @@ def st_slide_break(
                 set by set_slide_break_config().
         spacing: Per-call section spacing override.  Takes precedence over
                  ``config.spacing`` and all other levels.
+        zoom: Shortcut for ``spacing=Spacing(zoom=N)``.  Sets the CSS zoom
+              percentage for all content until the next slide break.
+              ``100`` = normal, ``75`` = 75%, ``150`` = 150%.
+              When both *zoom* and *spacing.zoom* are set, *zoom* wins.
     """
     from .space import st_space
 
     cfg, enabled = _effective_config(config)
 
-    # Deactivate horizontal spacing from the previous section
+    # Deactivate horizontal spacing and zoom from the previous section
     set_section_horizontal(None)
+    set_section_zoom(None)
+
+    # Merge zoom= shortcut into call-site spacing
+    call_site = spacing or cfg.spacing
+    if zoom is not None:
+        if call_site is not None:
+            call_site = Spacing(
+                top=call_site.top, bottom=call_site.bottom,
+                left=call_site.left, right=call_site.right,
+                width=call_site.width, zoom=zoom,
+            )
+        else:
+            call_site = Spacing(zoom=zoom)
 
     # Resolve section spacing: direct param > config.spacing > block > profile > global
     effective_spacing = resolve_section_spacing(
-        call_site=spacing or cfg.spacing,
+        call_site=call_site,
     )
 
     # Inject section.bottom before the break visual (space after previous section)
@@ -315,18 +339,20 @@ def st_slide_break(
 # ---------------------------------------------------------------------------
 
 def _close_section_wrapper_if_open() -> None:
-    """Deactivate section-level horizontal spacing.
+    """Deactivate section-level horizontal spacing and zoom.
 
     Called by ``st_book`` after each ``build()`` to ensure cleanup.
     """
     set_section_horizontal(None)
+    set_section_zoom(None)
 
 
 def _activate_section_horizontal(spacing: Spacing) -> None:
-    """Activate horizontal padding on all subsequent ``_render()`` calls.
+    """Activate horizontal padding and zoom on all subsequent ``_render()`` calls.
 
     When ``left`` or ``right`` is set, ``st_html()`` in ``export.py``
     wraps each HTML fragment with a ``<div>`` that applies the padding.
+    When ``zoom`` is set, a CSS ``zoom`` property is added to the wrapper.
     The state is cleared at the next ``st_slide_break`` or block end.
     """
     has_horizontal = (
@@ -337,3 +363,8 @@ def _activate_section_horizontal(spacing: Spacing) -> None:
         set_section_horizontal(spacing)
     else:
         set_section_horizontal(None)
+
+    if spacing.zoom is not None:
+        set_section_zoom(spacing.zoom)
+    else:
+        set_section_zoom(None)

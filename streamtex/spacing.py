@@ -54,6 +54,12 @@ class Spacing:
     locally.  ``None`` = inherit from ``PageLayout.width`` (sidebar slider).
     When set alone (no left/right), content is centered (auto margins)."""
 
+    zoom: int | None = None
+    """CSS zoom level as % applied to this scope (block or section).
+    ``100`` = normal size, ``50`` = half, ``200`` = double.
+    ``None`` = inherit from parent level in the override hierarchy.
+    Composes multiplicatively with the global page zoom."""
+
 
 @dataclass
 class SpacingConfig:
@@ -205,6 +211,27 @@ def get_section_horizontal() -> Spacing | None:
     return _section_horizontal
 
 
+# ── Section-level zoom state (Phase: per-section zoom) ───────────────────
+
+_section_zoom: int | None = None
+
+
+def set_section_zoom(zoom: int | None) -> None:
+    """Activate CSS zoom for the current section.
+
+    When set, :func:`st_html` (the rendering gateway) wraps each
+    HTML fragment with ``zoom: <value>``.
+    Call with ``None`` to deactivate.
+    """
+    global _section_zoom
+    _section_zoom = zoom
+
+
+def get_section_zoom() -> int | None:
+    """Return the active section zoom percentage, or ``None``."""
+    return _section_zoom
+
+
 # ── Resolution ────────────────────────────────────────────────────────────
 
 
@@ -274,8 +301,13 @@ def resolve_block_spacing(
         _extract_spacing_field(base.block, "width"),
         _BUILTIN_BLOCK.width,
     )
+    zoom = _resolve_field(
+        _profile_spacing(profile, "block", "zoom"),
+        _extract_spacing_field(base.block, "zoom"),
+        _BUILTIN_BLOCK.zoom,
+    )
 
-    return Spacing(top=top, bottom=bottom, left=left, right=right, width=width)
+    return Spacing(top=top, bottom=bottom, left=left, right=right, width=width, zoom=zoom)
 
 
 def resolve_section_spacing(
@@ -296,7 +328,7 @@ def resolve_section_spacing(
     block_override = get_block_spacing()
 
     fields = {}
-    for f in ("top", "bottom", "left", "right", "width"):
+    for f in ("top", "bottom", "left", "right", "width", "zoom"):
         fields[f] = _resolve_field(
             _extract_spacing_field(call_site, f),        # L5
             _extract_spacing_field(block_override, f),   # L4

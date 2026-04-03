@@ -88,7 +88,7 @@ from .presentation import (
 from .enums import Tags
 
 # Zoom
-from .zoom import add_zoom_options, inject_zoom_logic
+from .zoom import add_zoom_options, inject_zoom_logic, st_zoom
 
 # Export
 from .export import AssetMode, ExportConfig, ExportMode, st_export, st_html

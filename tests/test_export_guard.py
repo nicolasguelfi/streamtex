@@ -18,7 +18,7 @@ EXPECTED_ST_HTML_COUNTS = {
     "container.py": 2,      # 2 fused CSS+marker calls (1 per st_block, 1 per st_span)
     "grid.py": 2,           # 1 CSS + 1 hidden marker
     "list.py": 4,           # 2 CSS injections + 2 hidden markers
-    "zoom.py": 1,           # CSS injection
+    "zoom.py": 2,           # 1 CSS injection (inject_zoom_logic) + 1 CSS+marker (st_zoom)
     "presentation.py": 1,  # CSS injection (presentation mode)
     "link_preview.py": 2,   # CSS + JS scaffold
     "bib_preview.py": 1,    # CSS only (JS via components.html)

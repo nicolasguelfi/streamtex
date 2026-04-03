@@ -78,12 +78,13 @@ def _inject_block_horizontal_css(block_spacing) -> None:
     """
     global _block_css_counter
 
-    has_horizontal = (
+    has_override = (
         block_spacing.left is not None
         or block_spacing.right is not None
         or block_spacing.width is not None
+        or block_spacing.zoom is not None
     )
-    if not has_horizontal:
+    if not has_override:
         return
 
     _block_css_counter += 1
@@ -95,6 +96,8 @@ def _inject_block_horizontal_css(block_spacing) -> None:
         rules.append(f"padding-left: {block_spacing.left} !important;")
     if block_spacing.right is not None:
         rules.append(f"padding-right: {block_spacing.right} !important;")
+    if block_spacing.zoom is not None:
+        rules.append(f"zoom: {block_spacing.zoom / 100} !important;")
 
     css = (
         f'<style>.stx-block-spacing-{_block_css_counter} '

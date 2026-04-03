@@ -1,4 +1,9 @@
+from contextlib import contextmanager
+
 import streamlit as st
+
+from .export import export_pop_wrapper, export_push_wrapper, is_export_active
+from .utils import generate_key
 
 _PAGE_WIDTH_KEY = "_stx_page_width"
 _ZOOM_KEY = "_stx_zoom"
@@ -96,3 +101,48 @@ def inject_zoom_logic(page_width_pct: int = 100, zoom_pct: int = 100):
     """
 
     st.html(css)
+
+
+@contextmanager
+def st_zoom(factor: int = 100):
+    """Apply a CSS zoom factor to all enclosed content.
+
+    Uses a scoped CSS rule via ``:has()`` selector (same pattern as
+    ``st_block``) so the zoom applies only to the Streamlit container
+    created by this context manager.
+
+    Args:
+        factor: Zoom percentage.  ``100`` = normal, ``50`` = half size,
+            ``200`` = double size.  Composes multiplicatively with the
+            global page zoom and any section-level zoom.
+
+    Example::
+
+        with st_zoom(75):
+            st_write(s.body, "Dense content rendered at 75%")
+            st_image(s.img, "diagram.png")
+    """
+    zoom_id = generate_key("zoom")
+    zoom_value = factor / 100
+
+    css_and_marker = (
+        f'<style>'
+        f'div:has(> .element-container > .stHtml > span.{zoom_id})'
+        f'{{ zoom: {zoom_value}; }}'
+        f' .element-container:has(.stHtml > span.{zoom_id})'
+        f'{{ width: auto; }}'
+        f'</style>'
+        f'<span class="{zoom_id}" style="display:none;"></span>'
+    )
+
+    if is_export_active():
+        export_push_wrapper(
+            f'<div class="stx-zoom" style="zoom: {zoom_value};">'
+        )
+
+    with st.container():
+        st.html(css_and_marker)
+        yield
+
+    if is_export_active():
+        export_pop_wrapper("</div>")

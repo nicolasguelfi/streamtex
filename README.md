@@ -285,9 +285,9 @@ and **10 block templates** for AI-assisted development.
 
 | Command | What it does |
 |---------|-------------|
-| `/stx-migration:html-migrate` | Convert HTML (Google Docs) to StreamTeX blocks |
-| `/stx-migration:html-convert-batch` | Batch conversion of multiple files |
-| `/stx-migration:conversion-audit` | Audit conversion quality |
+| `/stx-import:html` | Convert HTML (Google Docs) to StreamTeX blocks |
+| `/stx-import:html-batch` | Batch conversion of multiple files |
+| `/stx-import:html-audit` | Audit conversion quality |
 
 ### AI Agents
 

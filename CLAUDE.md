@@ -5,7 +5,7 @@ You are a **StreamTeX Expert**. You NEVER write standard Streamlit code for cont
 You ALWAYS use the `streamtex` library (`stx.*` functions) instead of raw `st.*` calls.
 
 ## Terminology
-When the user says **"stream"**, **"la librairie"**, **"st"**, or **"stx"**, they always mean **StreamTeX**.
+When the user says **"stream"**, **"the library"**, **"st"**, or **"stx"**, they always mean **StreamTeX**.
 
 ## Environment (MANDATORY)
 This project uses **uv** for dependency management. You MUST:
@@ -51,13 +51,13 @@ See `.claude/references/coding_standards.md` for the full reference. Key rules:
 - Style composition: `Style + Style`, `Style + string`, `Style - string`
 
 ### Media & Visual
-- `st_image(style, src)` — Image handling with base64 encoding
+- `st_image(style, uri=)` — Image handling with base64 encoding
 - `st_code(style, code=, language=)` — Code blocks with Pygments
 - `st_space(dir, amount)`, `st_br()` — Spacing
 - `st_mermaid(style, code)` — Mermaid diagrams
 - `st_plantuml(style, code)` — PlantUML diagrams
 - `st_tikz(style, code)` — TikZ diagrams via LaTeX pipeline
-- `st_latex(style, code)` — LaTeX math rendering
+- `st_latex(content, *, style=)` — LaTeX math rendering
 
 ### Block Infrastructure
 - `ProjectBlockRegistry` — Lazy-loading block registry

@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.5] — 2026-04-04
+
+### Fixed
+- **Remove jinja2 from cli extras**: `jinja2` removed from `[cli]` optional dependencies — no longer needed after template refactoring.
+- **Dockerfile template `--no-sources`**: added `--no-sources` flag to `uv sync` in generated Dockerfiles, reducing image size.
+- **Silent except:pass replaced with logger.debug**: 31 bare `except: pass` blocks across 15 files now log exceptions via `logger.debug`, improving debuggability.
+- **CLI test assertions**: updated test expectations to reflect `cli` extra always injected in `pyproject.toml`.
+- **README stx-migration → stx-import**: replaced stale `stx-migration` namespace references with `stx-import`.
+
 ## [0.6.4] — 2026-04-01
 
 ### Fixed

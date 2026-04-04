@@ -145,8 +145,10 @@ COLLECT -> ASSESS -> PLAN -> PRODUCE -> REVIEW -> FIX -> COMPOUND
 6. **Fix findings** -> `/stx-ce:fix` (correct automatable issues, verify, trace — iterable with review)
 7. **Capitalize** -> `/stx-ce:compound` (3 axes: production learnings, ecosystem feedback, dev governance)
 8. **Full cycle** -> `/stx-ce:go "description"` (autonomous with 3 validation gates)
+9. **Pause session** -> `/stx-ce:pause` (checkpoint in-progress work, decisions, context)
+10. **Resume session** -> `/stx-ce:continue` (restore checkpoint, detect drift, propose actions)
 
-CE artifacts are stored in `docs/` (collect/, assess/, plans/, reviews/, solutions/).
+CE artifacts are stored in `docs/` (collect/, assess/, plans/, reviews/, solutions/, ce-checkpoint.md).
 See `.claude/references/ce_cheatsheet_en.md` for the full reference.
 
 ## Design Guidelines

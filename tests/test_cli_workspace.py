@@ -594,14 +594,14 @@ def test_generate_stx_toml_preset_developer():
 def test_generate_pyproject_toml_no_extras():
     from streamtex.cli.project_cmd import generate_pyproject_toml
     content = generate_pyproject_toml("test-proj")
-    assert '"streamtex>=0.3.0"' in content
-    assert "[" not in content.split("streamtex")[1].split(">=")[0]  # no extras brackets
+    # cli is always injected automatically
+    assert '"streamtex[cli]>=0.3.0"' in content
 
 
 def test_generate_pyproject_toml_with_extras():
     from streamtex.cli.project_cmd import generate_pyproject_toml
     content = generate_pyproject_toml("test-proj", extras=["pdf", "ai", "inspector"])
-    assert '"streamtex[pdf,ai,inspector]>=0.3.0"' in content
+    assert '"streamtex[cli,pdf,ai,inspector]>=0.3.0"' in content
 
 
 def test_scaffold_project_with_extras(tmp_path):
@@ -624,11 +624,11 @@ def test_scaffold_project_with_extras(tmp_path):
 
 def test_preset_extras_mapping():
     from streamtex.cli.workspace_cmd import PRESET_EXTRAS
-    assert PRESET_EXTRAS["basic"] == ["pdf"]
-    assert PRESET_EXTRAS["user"] == ["pdf"]
-    assert PRESET_EXTRAS["standard"] == ["pdf", "ai"]
-    assert PRESET_EXTRAS["power"] == ["pdf", "ai", "inspector"]
-    assert PRESET_EXTRAS["developer"] == ["pdf", "ai", "inspector"]
+    assert PRESET_EXTRAS["basic"] == ["cli", "pdf"]
+    assert PRESET_EXTRAS["user"] == ["cli", "pdf"]
+    assert PRESET_EXTRAS["standard"] == ["cli", "pdf", "ai"]
+    assert PRESET_EXTRAS["power"] == ["cli", "pdf", "ai", "inspector"]
+    assert PRESET_EXTRAS["developer"] == ["cli", "pdf", "ai", "inspector"]
 
 
 # ---------------------------------------------------------------------------

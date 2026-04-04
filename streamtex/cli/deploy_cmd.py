@@ -84,7 +84,7 @@ ARG SOURCE_COMMIT=unknown
 # Install dependencies + CLI extras (rich/jinja2 for stx export html)
 # .stx-version is copied first: changing the required version invalidates the cache.
 COPY .stx-version pyproject.toml uv.lock ./
-RUN uv sync --frozen --no-dev && \\
+RUN uv sync --frozen --no-dev --no-sources && \\
     uv pip install rich jinja2 && \\
     uv run playwright install --with-deps chromium
 

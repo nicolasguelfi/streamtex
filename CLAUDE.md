@@ -114,20 +114,20 @@ Always prefer showing real examples from manual blocks over generating code from
 - To add a slash command: create `.claude/commands/my-cmd/run.md` (commands go in `commands/`, not `custom/commands/`)
 - See `.claude/custom/README.md` for full details
 
-## Workflows — stx-designer Commands
+## Workflows — stx-block Commands
 
-The `stx-designer` commands cover the full project lifecycle:
+The `stx-block` commands cover the full project lifecycle:
 
-1. **Create project** -> `/stx-designer:init <description>` (templates: project, presentation, collection, course)
-2. **Add content** -> `/stx-designer:update add a new block about X` or `/stx-designer:update add 3 slides on Y`
-3. **Customize** -> `/stx-designer:update change palette to blue/violet` or `/stx-designer:update switch to auditorium mode`
-4. **Migrate HTML** -> `/stx-designer:update --migrate convert intro.html`
-5. **Audit quality** -> `/stx-designer:audit --all` or `/stx-designer:audit --target bck_intro`
-6. **Fix issues** -> `/stx-designer:fix --all` or `/stx-designer:fix --target bck_intro`
-7. **Specialized tools** -> `/stx-designer:tool survey-convert`
-8. **Help** -> `/stx-designer:init --help` (cheatsheet for all commands)
-9. **Testing** -> `uv run pytest tests/ -v` (`/stx-developer:test-run`)
-10. **Linting** -> `uv run ruff check` (`/stx-developer:lint`)
+1. **Create project** -> `/stx-block:init <description>` (templates: project, presentation, collection, course)
+2. **Add content** -> `/stx-block:update add a new block about X` or `/stx-block:update add 3 slides on Y`
+3. **Customize** -> `/stx-block:update change palette to blue/violet` or `/stx-block:customize`
+4. **Migrate HTML** -> `/stx-block:update --migrate convert intro.html`
+5. **Audit quality** -> `/stx-block:audit --all` or `/stx-block:audit --target bck_intro`
+6. **Fix issues** -> `/stx-block:fix --all` or `/stx-block:fix --target bck_intro`
+7. **Specialized tools** -> `/stx-block:tool survey-convert`
+8. **Help** -> `/stx-block:init --help` (cheatsheet for all commands)
+9. **Testing** -> `uv run pytest tests/ -v` (`/stx-block:test`)
+10. **Linting** -> `uv run ruff check` (`/stx-block:lint`)
 
 ## Workflows — stx-ce Compound Document Engineering
 
@@ -140,7 +140,7 @@ COLLECT -> ASSESS -> PLAN -> PRODUCE -> REVIEW -> FIX -> COMPOUND
 1. **Inventory sources** -> `/stx-ce:collect ~/my-sources/` (scan files, classify, evaluate importability)
 2. **Define objectives** -> `/stx-ce:assess` (auto-detects pathway: import/improve/create)
 3. **Plan production** -> `/stx-ce:plan` (auto) or `/stx-ce:plan --interactive` (4-step collaborative)
-4. **Execute plan** -> `/stx-ce:produce` (orchestrates stx-designer + stx-import commands)
+4. **Execute plan** -> `/stx-ce:produce` (orchestrates stx-block + stx-import commands)
 5. **Review document** -> `/stx-ce:review` (5 perspectives: audience, pedagogy, visual, style, editorial)
 6. **Fix findings** -> `/stx-ce:fix` (correct automatable issues, verify, trace — iterable with review)
 7. **Capitalize** -> `/stx-ce:compound` (3 axes: production learnings, ecosystem feedback, dev governance)

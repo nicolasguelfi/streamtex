@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.6] — 2026-04-05
+
+### Added
+- **`/stx-ce:pause` command**: new session checkpoint command that captures in-progress work items, decisions log, pending issues, and context for the next session. Writes `docs/ce-checkpoint.md`.
+- **Checkpoint template**: new `checkpoint.md` template for structured session state capture.
+- **Checkpoint restoration in `/stx-ce:continue`**: Step 0 reads `docs/ce-checkpoint.md` if present, displays a restoration banner, integrates checkpoint items as HIGH-priority proposals, and archives the checkpoint after use.
+- **Checkpoint display in `/stx-ce:status`**: dashboard now shows checkpoint info when `docs/ce-checkpoint.md` exists.
+
+### Changed
+- **CE cheatsheet**: updated to 12 commands (was 11) and 17 templates (was 16), added `/stx-ce:pause` section, updated `/stx-ce:continue` section with checkpoint restore step.
+
 ## [0.6.5] — 2026-04-04
 
 ### Fixed

@@ -1,5 +1,6 @@
 """Workspace commands: init, update, status, upgrade (+ deprecated clone/link/sync/hooks)."""
 
+import logging
 import os
 import re
 import shutil
@@ -10,6 +11,8 @@ from pathlib import Path
 import click
 
 from .console import get_console
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Preset definitions
@@ -154,7 +157,7 @@ def get_repo_status(repo_path: str) -> dict:
                 result["ahead"] = int(parts[0])
                 result["behind"] = int(parts[1])
     except (subprocess.TimeoutExpired, OSError):
-        pass
+        logger.debug("Failed to get git repo status for %s", repo_path, exc_info=True)
 
     return result
 
@@ -613,7 +616,7 @@ def _run_repair_checks(ws_root: str, config: dict, console, *, dry_run: bool = F
                                     )
                             break
             except OSError:
-                pass
+                logger.debug("Failed to check .venv health for project %s", name, exc_info=True)
 
         # 2. Missing custom/__init__.py
         custom_dir = os.path.join(path, "custom")
@@ -752,7 +755,7 @@ def _get_source_version(lib_path: str) -> str | None:
                     if m:
                         return m.group(1)
         except OSError:
-            pass
+            logger.debug("Failed to read pyproject.toml for library version", exc_info=True)
     return None
 
 
@@ -803,7 +806,7 @@ def _upgrade_cli_tool(
             if m:
                 tool_python = m.group(1)
     except (subprocess.TimeoutExpired, FileNotFoundError):
-        pass
+        logger.debug("Failed to probe uv tool Python version", exc_info=True)
 
     python_flag = f" --python {tool_python}" if tool_python else ""
     if dry_run:
@@ -976,9 +979,9 @@ def update(skip_sync, skip_profiles, dry_run, repair, force):
                 if is_dev:
                     _dev_linked.add(repo_name)
             except FileNotFoundError:
-                pass
+                logger.debug("Failed to resolve dev-link for repo %s", repo_name, exc_info=True)
     except Exception:
-        pass
+        logger.debug("Failed to detect dev-linked repos", exc_info=True)
 
     # --- git pull existing repos ---
     _step("Pulling latest changes …")

@@ -1,6 +1,7 @@
 """Enhanced status command: comprehensive StreamTeX environment diagnostic."""
 
 import json as _json
+import logging
 import os
 import platform
 import re
@@ -19,6 +20,8 @@ from .workspace_cmd import (
     get_repo_status,
     load_stx_toml,
 )
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Data structures
@@ -165,7 +168,7 @@ def _detect_install_type(report: StatusReport) -> None:
                 report.install_location = location
                 return
     except Exception:
-        pass
+        logger.debug("Failed to read direct_url.json for install type detection", exc_info=True)
 
     # Method 2: Check if stx binary is a uv tool install
     # uv tool installs go to ~/.local/bin/ (symlink) or ~/.local/share/uv/tools/
@@ -220,7 +223,7 @@ def _get_source_version(ws_root: str, config: dict) -> tuple[str | None, str | N
                     if match:
                         return (match.group(1), lib_path)
                 except OSError:
-                    pass
+                    logger.debug("Failed to read __init__.py for source version", exc_info=True)
             # Fallback: pyproject.toml
             pyproject = os.path.join(lib_path, "pyproject.toml")
             if os.path.isfile(pyproject):
@@ -233,7 +236,7 @@ def _get_source_version(ws_root: str, config: dict) -> tuple[str | None, str | N
                     if ver:
                         return (ver, lib_path)
                 except (OSError, ValueError):
-                    pass
+                    logger.debug("Failed to parse pyproject.toml for source version", exc_info=True)
     return (None, None)
 
 
@@ -249,7 +252,7 @@ def _get_repos_info(report: StatusReport, ws_root: str, config: dict) -> None:
             if is_dev:
                 dev_path = path
         except (FileNotFoundError, Exception):
-            pass
+            logger.debug("Failed to resolve dev-link path for repo %s", repo_name, exc_info=True)
 
         if dev_path:
             ri = RepoInfo(
@@ -557,7 +560,7 @@ def _print_rich(report: StatusReport) -> None:
             try:
                 rel_path = os.path.relpath(report.source_path, os.getcwd())
             except ValueError:
-                pass
+                logger.debug("Failed to compute relative path for source location", exc_info=True)
         console.print(f"  Source:      {report.source_version}  [dim]({rel_path})[/dim]")
 
     if report.pypi_version is not None:
@@ -659,7 +662,7 @@ def status(as_json):
             report.workspace_name = config.get("workspace", {}).get("name")
             report.workspace_preset = config.get("workspace", {}).get("preset")
         except Exception:
-            pass
+            logger.debug("Failed to load workspace configuration", exc_info=True)
 
     # 3. Venv detection
     _detect_venv_status(report, ws_root)
@@ -685,7 +688,7 @@ def status(as_json):
         if not as_json:
             print_dev_status_section(project_dir)
     except Exception:
-        pass
+        logger.debug("Failed to print dev status section", exc_info=True)
 
     # 7. Output
     if as_json:

@@ -14,12 +14,15 @@ Usage::
 """
 
 import json
+import logging
 import os
 import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -504,7 +507,7 @@ class CoolifyClient:
                 if "error" in app.status or "exited" in app.status:
                     return False
             except CoolifyError:
-                pass
+                logger.debug("Failed to poll app health status for %s", uuid, exc_info=True)
             time.sleep(poll_interval)
         return False
 

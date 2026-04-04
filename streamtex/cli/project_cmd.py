@@ -1,5 +1,6 @@
 """Project commands: new and validate."""
 
+import logging
 import os
 import shutil
 import subprocess
@@ -9,6 +10,8 @@ import click
 
 from .console import get_console
 from .workspace_cmd import find_workspace_root
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Template generators (pure functions)
@@ -627,7 +630,7 @@ def new(
             preset = config.get("preset", "developer")
             extras = PRESET_EXTRAS.get(preset, []) or None
         except Exception:
-            pass
+            logger.debug("Failed to load workspace preset extras", exc_info=True)
 
     # 2. Scaffold files (rich template or minimal)
     if template:

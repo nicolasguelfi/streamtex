@@ -1,6 +1,7 @@
 """Claude AI profile commands: install, list, update, and diff."""
 
 import filecmp
+import logging
 import os
 import shutil
 from dataclasses import dataclass
@@ -10,6 +11,8 @@ import click
 
 from .console import get_console
 from .workspace_cmd import find_workspace_root, load_stx_toml
+
+logger = logging.getLogger(__name__)
 
 _CUSTOM_README = """\
 # .claude/custom/ — User Customizations
@@ -122,7 +125,7 @@ def find_claude_repo(ws_root: str, config: dict) -> str:
         path, _is_dev = resolve_repo_path("streamtex-claude", ws_root, config)
         return path
     except FileNotFoundError:
-        pass
+        logger.debug("Failed to resolve dev-link for streamtex-claude repo", exc_info=True)
 
     # 1. Check [claude].source (legacy fallback)
     repos = config.get("repos", {})

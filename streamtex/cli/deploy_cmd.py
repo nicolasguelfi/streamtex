@@ -2,6 +2,7 @@
 
 import glob
 import json
+import logging
 import os
 import re
 import shutil
@@ -24,6 +25,8 @@ from .coolify import (
     DEFAULT_SSH_KEY_PATH,
     STREAMLIT_PORT,
 )
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Data structures
@@ -2447,7 +2450,7 @@ def scale_cmd(target: str, replicas: int, yes: bool) -> None:
                     state.applications.append(app)
                     break
         except CoolifyError:
-            pass
+            logger.debug("Failed to look up Coolify application for target %s", target, exc_info=True)
 
     if not app:
         raise click.ClickException(

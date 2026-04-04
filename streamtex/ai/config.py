@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import logging
 import os
 from dataclasses import dataclass, field
 from typing import Dict, Optional
+
+logger = logging.getLogger(__name__)
 
 
 def _detect_project_root() -> str:
@@ -36,7 +39,7 @@ def _detect_project_root() -> str:
             if os.path.isfile(os.path.join(main_dir, "book.py")):
                 return main_dir
     except Exception:
-        pass
+        logger.debug("Failed to detect project root from __main__.__file__", exc_info=True)
 
     # 3. Fallback to CWD even without book.py (e.g. tests, notebooks)
     return cwd

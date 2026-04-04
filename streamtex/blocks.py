@@ -1,9 +1,12 @@
 """Lazy block registry for multi-source block loading."""
 
 import importlib.util
+import logging
 import os
 from pathlib import Path
 from typing import Dict, List, Optional
+
+logger = logging.getLogger(__name__)
 
 
 class LazyBlockRegistry:
@@ -203,7 +206,7 @@ class ProjectBlockRegistry:
                     if "_load_atomic" in content or "load_atomic_block" in content or "st_include" in content:
                         composites.add(path.stem)
             except (IOError, UnicodeDecodeError):
-                pass
+                logger.debug("Failed to read block file '%s' for composite detection", path, exc_info=True)
         return composites
 
     def get(self, block_name: str) -> object:

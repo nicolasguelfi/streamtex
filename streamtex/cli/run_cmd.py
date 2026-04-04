@@ -1,5 +1,6 @@
 """Run command: launch a StreamTeX project with Streamlit."""
 
+import logging
 import os
 import platform
 import shutil
@@ -12,6 +13,8 @@ import time
 import click
 
 from .console import get_console
+
+logger = logging.getLogger(__name__)
 
 # Browser launch commands per OS
 _BROWSER_COMMANDS = {
@@ -128,7 +131,7 @@ def _kill_port(port: int) -> bool:
                     console.print(f"[yellow]Killed process {pid} on port {port}[/yellow]")
                     return True
         except (subprocess.TimeoutExpired, OSError):
-            pass
+            logger.debug("Failed to kill process on port %s (Windows)", port, exc_info=True)
         return False
 
     # macOS / Linux: lsof

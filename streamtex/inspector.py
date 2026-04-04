@@ -9,6 +9,7 @@ Disabled by default; opt-in via ``InspectorConfig(enabled=True)``.
 import ast
 import hashlib
 import json
+import logging
 import os
 import shutil
 from dataclasses import dataclass
@@ -16,6 +17,8 @@ from pathlib import Path
 from typing import Callable, Dict, List, Optional
 
 import streamlit as st
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Session state keys
@@ -317,7 +320,7 @@ def discover_sources(module, category_registry: FileCategoryRegistry) -> List[So
                             _add(resolved)
                             resolved_ok = True
                     except Exception:
-                        pass
+                        logger.debug("Failed to resolve static path for '%s'", val, exc_info=True)
                     # Fallback: recursive search in {project_root}/static/
                     if not resolved_ok:
                         project_root = _find_project_root(py_path)
@@ -608,7 +611,7 @@ def _save_and_reload(file_path: str, editor_key: str, backup: bool):
             try:
                 shutil.copy2(fp, fp + ".bak")
             except OSError:
-                pass
+                logger.debug("Failed to create backup of '%s'", fp, exc_info=True)
         try:
             with open(fp, "w", encoding="utf-8") as f:
                 f.write(content)

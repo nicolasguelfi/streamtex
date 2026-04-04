@@ -1,10 +1,13 @@
 """Migration v0.4.6 — Add preset extras (pdf, ai, inspector) and structural files."""
 
+import logging
 import os
 import re
 
 from .base import Migration, MigrationResult
 from .registry import register
+
+logger = logging.getLogger(__name__)
 
 
 def _get_workspace_extras(project_path: str) -> list[str]:
@@ -18,7 +21,7 @@ def _get_workspace_extras(project_path: str) -> list[str]:
             preset = config.get("workspace", {}).get("preset", "standard")
             return PRESET_EXTRAS.get(preset, ["pdf"])
     except Exception:
-        pass
+        logger.debug("Failed to determine workspace extras from preset", exc_info=True)
     return ["pdf"]
 
 

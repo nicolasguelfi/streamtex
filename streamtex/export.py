@@ -10,6 +10,7 @@ import base64
 import hashlib
 import importlib.resources as resources
 import io
+import logging
 import os
 import re
 import zipfile
@@ -22,13 +23,12 @@ from typing import TYPE_CHECKING, Optional
 
 import streamlit as st
 
+from .constants import PAGE_PADDING, PAGE_WIDTH
+
 if TYPE_CHECKING:
     from .pdf_export import PdfConfig
 
-# ---------------------------------------------------------------------------
-# Configuration
-# ---------------------------------------------------------------------------
-from .constants import PAGE_PADDING, PAGE_WIDTH
+logger = logging.getLogger(__name__)
 
 
 class ExportMode(Enum):
@@ -402,7 +402,7 @@ def _get_theme_color(option: str, fallback: str) -> str:
         if val:
             return val
     except Exception:
-        pass
+        logger.debug("Failed to read Streamlit theme option '%s'", option, exc_info=True)
     # Detect dark theme base and provide matching defaults
     try:
         base = st.get_option("theme.base")
@@ -414,7 +414,7 @@ def _get_theme_color(option: str, fallback: str) -> str:
             }
             return _dark_defaults.get(option, fallback)
     except Exception:
-        pass
+        logger.debug("Failed to detect dark theme base", exc_info=True)
     return fallback
 
 

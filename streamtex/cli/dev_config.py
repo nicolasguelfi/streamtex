@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 # Official repos that can be linked
 REPOS = ("streamtex", "streamtex-claude", "streamtex-docs")
@@ -124,7 +127,7 @@ def validate_repo_path(name: str, path: str | Path) -> Path:
                     f"({marker_file} does not contain {marker_content!r}): {p}"
                 )
         except OSError:
-            pass
+            logger.debug("Failed to read marker file for repo validation", exc_info=True)
 
     return p
 
@@ -188,5 +191,5 @@ def is_editable_install(project_dir: str | Path) -> Optional[str]:
             if line.startswith("Editable project location:"):
                 return line.split(":", 1)[1].strip()
     except Exception:
-        pass
+        logger.debug("Failed to detect editable install location via uv pip show", exc_info=True)
     return None

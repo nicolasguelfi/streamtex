@@ -11,10 +11,13 @@ Renders an expandable panel allowing users to:
 from __future__ import annotations
 
 import hashlib
+import logging
 import os
 from typing import Optional
 
 from .styles import Style
+
+logger = logging.getLogger(__name__)
 
 try:
     import streamlit as st
@@ -390,7 +393,7 @@ def _load_display_from_metadata(name: str, prefix: str) -> None:
             if meta.display_keep_ratio is not None:
                 st.session_state.setdefault(f"{prefix}_keep_ratio", meta.display_keep_ratio)
     except Exception:
-        pass
+        logger.debug("Failed to load display settings from metadata", exc_info=True)
 
 
 def _persist_display_to_metadata(name: str, prefix: str) -> None:
@@ -412,7 +415,7 @@ def _persist_display_to_metadata(name: str, prefix: str) -> None:
         meta.display_keep_ratio = st.session_state.get(f"{prefix}_keep_ratio", True)
         save_metadata(meta, metadata_path_for(current))
     except Exception:
-        pass
+        logger.debug("Failed to persist display settings to metadata", exc_info=True)
 
 
 def _render_display_tab(*, name, width, height, key_base):
@@ -460,7 +463,7 @@ def _render_display_tab(*, name, width, height, key_base):
                         st.session_state[f"{prefix}_zoom"] = pct
                         prev_zoom = pct
                 except ValueError:
-                    pass
+                    logger.debug("Failed to parse zoom percentage from width value", exc_info=True)
             st.session_state[f"{prefix}_width"] = ""
             st.session_state[f"{prefix}_height"] = ""
             changed = True

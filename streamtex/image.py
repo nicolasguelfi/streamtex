@@ -86,7 +86,7 @@ def st_image(
             if managed:
                 uri = managed
         except Exception:
-            pass
+            logger.debug("Failed to resolve managed image for '%s'", name, exc_info=True)
 
     # 1c. Apply display settings from metadata (zoom / manual size).
     #     Load persisted values from JSON on first access so the zoom

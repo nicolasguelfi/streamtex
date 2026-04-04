@@ -176,7 +176,7 @@ def generate_pyproject_toml(name: str, extras: list[str] | None = None) -> str:
         Optional list of streamtex extras (e.g. ``["pdf", "ai", "inspector"]``).
         When provided, the streamtex dependency becomes ``streamtex[pdf,ai,inspector]>=0.3.0``.
     """
-    # Always include "cli" for dual-mode deployment (stx export html needs rich/jinja2)
+    # Always include "cli" for dual-mode deployment (stx export html needs rich)
     all_extras = list(dict.fromkeys(["cli"] + (extras or [])))
     extras_str = ",".join(all_extras)
     stx_dep = f'"streamtex[{extras_str}]>=0.3.0"'

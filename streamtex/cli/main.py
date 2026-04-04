@@ -95,8 +95,8 @@ def app() -> None:
             "    uv add \"streamtex[cli]\"          # if using uv\n"
             "    pip install \"streamtex[cli]\"      # if using pip\n\n"
             "Or install click and rich directly:\n\n"
-            "    uv add click rich jinja2           # if using uv\n"
-            "    pip install click rich jinja2       # if using pip",
+            "    uv add click rich                  # if using uv\n"
+            "    pip install click rich              # if using pip",
             file=sys.stderr,
         )
         sys.exit(1)

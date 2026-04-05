@@ -16,7 +16,8 @@ def st_write(
     link:str="", no_link_decor:bool=False, hover:bool=True,
     toc_lvl: Optional[str] = None, label: str = "",
     marker: Optional[bool] = None,
-    spacing: Optional[Spacing] = None ):
+    spacing: Optional[Spacing] = None,
+    breaks: bool = True ):
     """
     Function to write a styled string with optional link reference and table of content entry.
 
@@ -29,6 +30,9 @@ def st_write(
     :param toc_lvl: A numeric string that may start with '+' or '-' (e.g. '1', '-1' or '+1')
         denoting the toc level of this content. This allows the text to be part of a hierarchical TOC.
     :param label: An optional label to use for the TOC entry. If not provided, a truncated version of `txt` is used.
+    :param breaks: If True (default), newlines in text are converted to ``<br>`` for visible line breaks.
+        If False, all newlines and ``<br>`` tags are removed (collapsed to spaces) — useful when
+        source code is split across lines for readability but should render as a single line.
     :param spacing: Optional section spacing override for this title.
         Only effective when ``toc_lvl`` is set and ``auto_marker_on_toc`` is active.
         Injects ``spacing.top`` before the title when it creates a marker.
@@ -56,6 +60,9 @@ def st_write(
     container_style, final_txt = _parse_args(*args, style=style, no_link_decor=no_link_decor, hover=hover)
     final_txt = textwrap.dedent(final_txt)
 
+    # Handle line breaks
+    final_txt = _apply_breaks(final_txt, breaks)
+
     # Handle ToC registration and element id
     final_txt, key_anchor = _handle_toc(final_txt, toc_lvl, label, marker, spacing=spacing)
     elementId = f" id='{key_anchor}'" if key_anchor else ""
@@ -70,6 +77,15 @@ def st_write(
     txt_tag = contain_link(txt_tag, link, no_link_decor, hover)
 
     _render(txt_tag)
+
+def _apply_breaks(text: str, breaks: bool) -> str:
+    """Convert or strip line breaks depending on the breaks flag."""
+    if breaks:
+        text = text.replace("\n", "<br>")
+    else:
+        text = text.replace("<br/>", " ").replace("<br>", " ").replace("<br />", " ").replace("\n", " ")
+    return text
+
 
 def _parse_args(*args, style: Style = StxStyles.none, no_link_decor:bool=False, hover:bool=False):
     """

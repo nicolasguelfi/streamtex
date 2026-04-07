@@ -384,6 +384,7 @@ def _load_display_from_metadata(name: str, prefix: str) -> None:
         from .ai.history import get_current_metadata
         meta = get_current_metadata(name)
         if meta:
+            logger.warning("[DIAG:LOAD] '%s' zoom=%s width=%s", name, meta.display_zoom, meta.display_width)
             if meta.display_zoom is not None:
                 st.session_state.setdefault(f"{prefix}_zoom", meta.display_zoom)
             if meta.display_width is not None:
@@ -392,8 +393,10 @@ def _load_display_from_metadata(name: str, prefix: str) -> None:
                 st.session_state.setdefault(f"{prefix}_height", meta.display_height)
             if meta.display_keep_ratio is not None:
                 st.session_state.setdefault(f"{prefix}_keep_ratio", meta.display_keep_ratio)
+        else:
+            logger.warning("[DIAG:LOAD] '%s' get_current_metadata returned None — no metadata file found", name)
     except Exception:
-        logger.debug("Failed to load display settings from metadata", exc_info=True)
+        logger.warning("[DIAG:LOAD] '%s' EXCEPTION — zoom NOT loaded, flag set", name, exc_info=True)
 
 
 def _persist_display_to_metadata(name: str, prefix: str) -> None:
@@ -404,18 +407,22 @@ def _persist_display_to_metadata(name: str, prefix: str) -> None:
 
         current = get_current(name)
         if not current:
+            logger.warning("[DIAG:PERSIST] '%s' get_current() returned None — cannot persist zoom", name)
             return
         meta = get_current_metadata(name)
         if not meta:
+            logger.warning("[DIAG:PERSIST] '%s' get_current_metadata() returned None — cannot persist zoom", name)
             return
 
         meta.display_zoom = st.session_state.get(f"{prefix}_zoom")
         meta.display_width = st.session_state.get(f"{prefix}_width") or None
         meta.display_height = st.session_state.get(f"{prefix}_height") or None
         meta.display_keep_ratio = st.session_state.get(f"{prefix}_keep_ratio", True)
-        save_metadata(meta, metadata_path_for(current))
+        json_path = metadata_path_for(current)
+        save_metadata(meta, json_path)
+        logger.warning("[DIAG:PERSIST] '%s' saved display_zoom=%s to %s", name, meta.display_zoom, json_path)
     except Exception:
-        logger.debug("Failed to persist display settings to metadata", exc_info=True)
+        logger.warning("[DIAG:PERSIST] '%s' EXCEPTION in _persist_display_to_metadata", name, exc_info=True)
 
 
 def _render_display_tab(*, name, width, height, key_base):

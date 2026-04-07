@@ -93,12 +93,14 @@ def st_image(
     #     takes effect even in non-editable (deployed) mode.
     if name:
         _prefix = f"stx_img_display_{name}"
-        if _st and not _st.session_state.get(f"{_prefix}_initialized"):
+        _already_init = _st.session_state.get(f"{_prefix}_initialized") if _st else False
+        if _st and not _already_init:
             from .image_editor import _load_display_from_metadata
             _load_display_from_metadata(name, _prefix)
         _zoom = _st.session_state.get(f"{_prefix}_zoom") if _st else None
         _dw = _st.session_state.get(f"{_prefix}_width") if _st else None
         _dh = _st.session_state.get(f"{_prefix}_height") if _st else None
+        logger.warning("[DIAG:APPLY] '%s' already_init=%s, zoom=%s, dw=%s, dh=%s, original_width=%s", name, _already_init, _zoom, _dw, _dh, width)
         if _dw:
             width = _dw
         elif _zoom is not None and _zoom != 100:

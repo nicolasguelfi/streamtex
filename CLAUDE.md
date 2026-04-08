@@ -134,7 +134,7 @@ The `stx-block` commands cover the full project lifecycle:
 The `stx-ce` commands provide a structured methodology for document production:
 
 ```
-COLLECT -> ASSESS -> PLAN -> PRODUCE -> REVIEW -> FIX -> COMPOUND
+COLLECT -> ASSESS -> PLAN -> PRODUCE -> REVIEW -> FIX -> COMPOUND -> INTEGRATE
 ```
 
 1. **Inventory sources** -> `/stx-ce:collect ~/my-sources/` (scan files, classify, evaluate importability)
@@ -144,11 +144,10 @@ COLLECT -> ASSESS -> PLAN -> PRODUCE -> REVIEW -> FIX -> COMPOUND
 5. **Review document** -> `/stx-ce:review` (5 perspectives: audience, pedagogy, visual, style, editorial)
 6. **Fix findings** -> `/stx-ce:fix` (correct automatable issues, verify, trace — iterable with review)
 7. **Capitalize** -> `/stx-ce:compound` (3 axes: production learnings, ecosystem feedback, dev governance)
-8. **Full cycle** -> `/stx-ce:go "description"` (autonomous with 3 validation gates)
-9. **Pause session** -> `/stx-ce:pause` (checkpoint in-progress work, decisions, context)
-10. **Resume session** -> `/stx-ce:continue` (restore checkpoint, detect drift, propose actions)
+8. **Integrate** -> `/stx-ce:integrate` (route solutions to lib issues, skill updates, or custom rules)
+9. **Full cycle** -> `/stx-ce:go "description"` (autonomous with 4 validation gates)
 
-CE artifacts are stored in `docs/` (collect/, assess/, plans/, reviews/, solutions/, ce-checkpoint.md).
+CE artifacts are stored in `docs/` (collect/, assess/, plans/, reviews/, solutions/).
 See `.claude/references/ce_cheatsheet_en.md` for the full reference.
 
 ## Design Guidelines

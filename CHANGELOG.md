@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.9] — 2026-04-08
+
+### Added
+- **Negative spacing in `st_space()`**: support for negative `size` values (e.g. `"-2em"`, `-3`). Negative vertical spacing uses `margin-top` instead of `height`; negative horizontal uses `margin-left` instead of `padding-left`. Enables pulling content closer together or overlapping elements.
+
 ## [0.6.8] — 2026-04-07
 
 ### Added

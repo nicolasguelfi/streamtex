@@ -1,4 +1,4 @@
-name: Auto-tag release
+name: Auto-tag and publish
 
 on:
   push:
@@ -8,10 +8,14 @@ on:
 
 permissions:
   contents: write
+  id-token: write
 
 jobs:
-  tag:
+  release:
     runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/streamtex/
     steps:
       - uses: actions/checkout@v4
         with:
@@ -30,13 +34,40 @@ jobs:
             echo "bumped=false" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Install uv
+        if: steps.version.outputs.bumped == 'true'
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install Python
+        if: steps.version.outputs.bumped == 'true'
+        run: uv python install
+
+      - name: Install dependencies
+        if: steps.version.outputs.bumped == 'true'
+        run: uv sync --frozen
+
+      - name: Run tests
+        if: steps.version.outputs.bumped == 'true'
+        run: uv run pytest tests/ -v
+
+      - name: Lint
+        if: steps.version.outputs.bumped == 'true'
+        run: uv run ruff check streamtex/
+
+      - name: Build package
+        if: steps.version.outputs.bumped == 'true'
+        run: uv build
+
+      - name: Publish to PyPI
+        if: steps.version.outputs.bumped == 'true'
+        uses: pypa/gh-action-pypi-publish@release/v1
+
       - name: Create GitHub release
         if: steps.version.outputs.bumped == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           VERSION="v${{ steps.version.outputs.new }}"
-          # Extract changelog section for this version
           BODY=$(awk "/^## \[${VERSION#v}\]/{found=1; next} /^## \[/{if(found) exit} found{print}" CHANGELOG.md)
           if [ -z "$BODY" ]; then
             BODY="Release $VERSION"

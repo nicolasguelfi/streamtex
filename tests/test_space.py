@@ -87,10 +87,10 @@ class TestStSpace:
             mock_render.assert_called_once_with('<div style="height: 50%;"></div>')
 
     def test_negative_int_size(self):
-        """Test st_space with negative integer (edge case)"""
+        """Test st_space with negative integer uses margin-top"""
         with patch('streamtex.space._render') as mock_render:
             st_space("v", -5)
-            mock_render.assert_called_once_with('<div style="height: -5em;"></div>')
+            mock_render.assert_called_once_with('<div style="margin-top: -5em;"></div>')
 
     def test_render_called_once_vertical(self):
         """Test that _render is called exactly once for vertical space"""

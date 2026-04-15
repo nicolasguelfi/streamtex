@@ -69,8 +69,16 @@ class SlideBreakDisplayConfig:
     mode: SlideBreakMode = SlideBreakMode.FULL
     """Display mode: FULL, RULE_ONLY, SPACER_ONLY, MARKER_ONLY, HIDDEN."""
 
-    space: int = 5
-    """Vertical spacing in vh units.  No min/max."""
+    before: int = 0
+    """Vertical spacing before the rule in vh units."""
+
+    after: int = 5
+    """Vertical spacing after the rule in vh units."""
+
+    @property
+    def space(self) -> int:
+        """Backward-compatible alias for *after*."""
+        return self.after
 
 
 @dataclass
@@ -130,7 +138,7 @@ class PresentationProfile:
                 layout=PageLayout(width=100, zoom=100),
                 breaks=SlideBreakDisplayConfig(
                     mode=SlideBreakMode.FULL,
-                    space=5,
+                    after=5,
                 ),
             ),
             cls(
@@ -168,6 +176,8 @@ _MODE_LABELS: dict[SlideBreakMode, str] = {
     SlideBreakMode.FULL: "Full",
     SlideBreakMode.RULE_ONLY: "Rule only",
     SlideBreakMode.SPACER_ONLY: "Spacer only",
+    SlideBreakMode.MARKER_ONLY: "Marker only",
+    SlideBreakMode.HIDDEN: "Hidden",
 }
 
 
@@ -182,7 +192,7 @@ def _get_field_mapping() -> list[tuple[str, Callable]]:
     """
     from .book import _STX_VIEW_MODE_KEY
     from .code import _WRAP_ALL_KEY
-    from .slide import _BREAK_ENABLED_KEY, _BREAK_MODE_KEY, _BREAK_SPACE_KEY
+    from .slide import _BREAK_AFTER_KEY, _BREAK_BEFORE_KEY, _BREAK_ENABLED_KEY, _BREAK_MODE_KEY
     from .zoom import _PAGE_WIDTH_KEY, _ZOOM_KEY
 
     return [
@@ -192,7 +202,8 @@ def _get_field_mapping() -> list[tuple[str, Callable]]:
         (_WRAP_ALL_KEY, lambda p: p.wrap),
         (_BREAK_ENABLED_KEY, lambda p: p.breaks.enabled),
         (_BREAK_MODE_KEY, lambda p: _MODE_LABELS.get(p.breaks.mode, "Full")),
-        (_BREAK_SPACE_KEY, lambda p: p.breaks.space),
+        (_BREAK_BEFORE_KEY, lambda p: p.breaks.before),
+        (_BREAK_AFTER_KEY, lambda p: p.breaks.after),
     ]
 
 
@@ -270,7 +281,8 @@ class ProfileConfig:
                     "breaks": {
                         "enabled": p.breaks.enabled,
                         "mode": _MODE_LABELS.get(p.breaks.mode, "Full"),
-                        "space": p.breaks.space,
+                        "before": p.breaks.before,
+                        "after": p.breaks.after,
                     },
                 }
                 for p in self.profiles
@@ -310,13 +322,16 @@ class ProfileConfig:
                 width=layout_data.get("width", 90),
                 zoom=layout_data.get("zoom", 100),
             )
+            # Backward compat: old files have "space" instead of "before"/"after"
+            legacy_space = breaks_data.get("space")
             breaks = SlideBreakDisplayConfig(
                 enabled=breaks_data.get("enabled", True),
                 mode=label_to_mode.get(
                     breaks_data.get("mode", "Full"),
                     SlideBreakMode.FULL,
                 ),
-                space=breaks_data.get("space", 5),
+                before=breaks_data.get("before", 0),
+                after=breaks_data.get("after", legacy_space if legacy_space is not None else 5),
             )
             profiles.append(
                 PresentationProfile(

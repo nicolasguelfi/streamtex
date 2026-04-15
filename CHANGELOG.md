@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.10] — 2026-04-15
+
+### Added
+- **Slide break before/after spacing**: `SlideBreakDisplayConfig` now has `before` and `after` fields (replacing single `space`), allowing independent control of vertical spacing above and below the horizontal rule. Backward-compatible `space` property alias retained.
+- **`space_before` in `SlideBreakConfig`**: new CSS-level `space_before` field for spacer div rendered before the rule.
+- **`marker_hidden` in `SlideBreakConfig`**: controls whether navigation markers appear in the popup marker list (visible) or remain counter-only (hidden).
+- **`MARKER_ONLY` and `HIDDEN` slide break modes**: two new `SlideBreakMode` variants now available in the sidebar selectbox.
+- **Print CSS for before-spacer**: `.stx-slide-break-spacer-before` collapses to `height: 0` in print media.
+
+### Fixed
+- **`test_negative_int_size`**: test assertion corrected to match `margin-top` (not `height`) for negative `st_space()` values, aligning with the v0.6.9 implementation.
+
 ## [0.6.9] — 2026-04-08
 
 ### Added

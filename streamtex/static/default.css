@@ -348,6 +348,7 @@ li {
 /* --- Slide break print rules (Ctrl+P / browser print) --- */
 @media print {
     .stx-slide-break-rule { display: none !important; }
+    .stx-slide-break-spacer-before { height: 0 !important; }
     .stx-slide-break-spacer {
         height: 0 !important;
         page-break-after: always;

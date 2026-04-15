@@ -68,13 +68,19 @@ class TestSlideBreakDisplayConfig:
         config = SlideBreakDisplayConfig()
         assert config.enabled is True
         assert config.mode == SlideBreakMode.FULL
-        assert config.space == 5
+        assert config.before == 0
+        assert config.after == 5
+        assert config.space == 5  # backward-compat property
 
-    def test_no_range_limit_on_space(self):
-        config = SlideBreakDisplayConfig(space=200)
-        assert config.space == 200
-        config2 = SlideBreakDisplayConfig(space=-10)
-        assert config2.space == -10
+    def test_no_range_limit_on_after(self):
+        config = SlideBreakDisplayConfig(after=200)
+        assert config.after == 200
+        config2 = SlideBreakDisplayConfig(after=-10)
+        assert config2.after == -10
+
+    def test_no_range_limit_on_before(self):
+        config = SlideBreakDisplayConfig(before=200)
+        assert config.before == 200
 
 
 # ── ViewMode ──────────────────────────────────────────────────────────────
@@ -109,13 +115,15 @@ class TestPresentationProfile:
             breaks=SlideBreakDisplayConfig(
                 enabled=True,
                 mode=SlideBreakMode.FULL,
-                space=100,
+                before=10,
+                after=100,
             ),
         )
         assert p.mode == ViewMode.PAGINATED
         assert p.layout.width == 100
         assert p.wrap is False
-        assert p.breaks.space == 100
+        assert p.breaks.before == 10
+        assert p.breaks.after == 100
 
     def test_mobile_profile(self):
         """Standard mobile profile: full width, reduced zoom."""
@@ -163,19 +171,20 @@ class TestApplyProfile:
             breaks=SlideBreakDisplayConfig(
                 enabled=False,
                 mode=SlideBreakMode.RULE_ONLY,
-                space=30,
+                before=10,
+                after=30,
             ),
         )
         apply_profile(p)
         assert session_state[_ACTIVE_PROFILE_KEY] == "Test"
-        # 7 field keys + 1 active profile key = 8
-        assert len(session_state) == 8
+        # 8 field keys + 1 active profile key = 9
+        assert len(session_state) == 9
 
     def test_extreme_values_applied(self, session_state):
         p = PresentationProfile(
             name="Extreme",
             layout=PageLayout(width=500, zoom=-20),
-            breaks=SlideBreakDisplayConfig(space=999),
+            breaks=SlideBreakDisplayConfig(before=500, after=999),
         )
         apply_profile(p)
         assert session_state[_ACTIVE_PROFILE_KEY] == "Extreme"
@@ -370,14 +379,15 @@ class TestProfileConfig:
                 PresentationProfile(
                     "Big",
                     layout=PageLayout(width=500, zoom=-20),
-                    breaks=SlideBreakDisplayConfig(space=999),
+                    breaks=SlideBreakDisplayConfig(before=500, after=999),
                 ),
             ],
         )
         restored = ProfileConfig.from_json(config.to_json())
         assert restored.profiles[0].layout.width == 500
         assert restored.profiles[0].layout.zoom == -20
-        assert restored.profiles[0].breaks.space == 999
+        assert restored.profiles[0].breaks.before == 500
+        assert restored.profiles[0].breaks.after == 999
 
     def test_version_field(self):
         config = ProfileConfig(name="v", profiles=[])
@@ -408,6 +418,32 @@ class TestProfileConfig:
         )
         restored = ProfileConfig.from_json(config.to_json())
         assert restored.profiles[0].breaks.mode == SlideBreakMode.RULE_ONLY
+
+    def test_hidden_mode_serialization(self):
+        config = ProfileConfig(
+            name="hidden",
+            profiles=[
+                PresentationProfile(
+                    "H",
+                    breaks=SlideBreakDisplayConfig(mode=SlideBreakMode.HIDDEN),
+                ),
+            ],
+        )
+        restored = ProfileConfig.from_json(config.to_json())
+        assert restored.profiles[0].breaks.mode == SlideBreakMode.HIDDEN
+
+    def test_marker_only_mode_serialization(self):
+        config = ProfileConfig(
+            name="marker",
+            profiles=[
+                PresentationProfile(
+                    "M",
+                    breaks=SlideBreakDisplayConfig(mode=SlideBreakMode.MARKER_ONLY),
+                ),
+            ],
+        )
+        restored = ProfileConfig.from_json(config.to_json())
+        assert restored.profiles[0].breaks.mode == SlideBreakMode.MARKER_ONLY
 
     def test_wrap_serialization(self):
         config = ProfileConfig(
@@ -440,7 +476,8 @@ class TestProfileConfig:
         assert p["wrap"] is True
         assert p["breaks"]["enabled"] is True
         assert p["breaks"]["mode"] == "Full"
-        assert p["breaks"]["space"] == 5
+        assert p["breaks"]["before"] == 0
+        assert p["breaks"]["after"] == 5
 
     def test_from_dict_defaults(self):
         """Missing fields in JSON should use sensible defaults."""

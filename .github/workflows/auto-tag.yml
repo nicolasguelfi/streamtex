@@ -1,0 +1,47 @@
+name: Auto-tag release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "pyproject.toml"
+
+permissions:
+  contents: write
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Detect version bump
+        id: version
+        run: |
+          NEW=$(grep '^version' pyproject.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
+          OLD=$(git show HEAD~1:pyproject.toml 2>/dev/null | grep '^version' | head -1 | sed 's/.*"\(.*\)".*/\1/' || echo "")
+          echo "new=$NEW" >> "$GITHUB_OUTPUT"
+          echo "old=$OLD" >> "$GITHUB_OUTPUT"
+          if [ "$NEW" != "$OLD" ] && [ -n "$NEW" ]; then
+            echo "bumped=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "bumped=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create GitHub release
+        if: steps.version.outputs.bumped == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="v${{ steps.version.outputs.new }}"
+          # Extract changelog section for this version
+          BODY=$(awk "/^## \[${VERSION#v}\]/{found=1; next} /^## \[/{if(found) exit} found{print}" CHANGELOG.md)
+          if [ -z "$BODY" ]; then
+            BODY="Release $VERSION"
+          fi
+          gh release create "$VERSION" \
+            --title "$VERSION" \
+            --notes "$BODY" \
+            --target main

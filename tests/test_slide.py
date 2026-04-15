@@ -3,9 +3,10 @@
 from unittest.mock import MagicMock, patch
 
 from streamtex.slide import (
+    _BREAK_AFTER_KEY,
+    _BREAK_BEFORE_KEY,
     _BREAK_ENABLED_KEY,
     _BREAK_MODE_KEY,
-    _BREAK_SPACE_KEY,
     _MODE_LABELS,
     SlideBreakConfig,
     SlideBreakMode,
@@ -40,19 +41,26 @@ class TestSlideBreakConfig:
         cfg = SlideBreakConfig()
         assert cfg.mode == SlideBreakMode.FULL
         assert cfg.space == "5vh"
+        assert cfg.space_before == "0vh"
         assert cfg.thickness == "1px"
         assert cfg.color == "128, 128, 128"
         assert cfg.opacity == 0.5
         assert cfg.marker is True
+        assert cfg.marker_hidden is True
+
+    def test_marker_hidden_default(self):
+        cfg = SlideBreakConfig(marker_hidden=False)
+        assert cfg.marker_hidden is False
 
     def test_custom_values(self):
         cfg = SlideBreakConfig(
             mode=SlideBreakMode.RULE_ONLY,
-            space="80vh", thickness="2px",
+            space="80vh", space_before="10vh", thickness="2px",
             color="79, 172, 254", opacity=0.5, marker=False,
         )
         assert cfg.mode == SlideBreakMode.RULE_ONLY
         assert cfg.space == "80vh"
+        assert cfg.space_before == "10vh"
         assert cfg.thickness == "2px"
         assert cfg.color == "79, 172, 254"
         assert cfg.opacity == 0.5
@@ -99,8 +107,39 @@ class TestStSlideBreak:
             assert 'class="stx-slide-break-rule"' in rule_call
             assert 'class="stx-slide-break-spacer"' in spacer_call
 
+    def test_full_mode_with_before_renders_three_elements(self):
+        cfg = SlideBreakConfig(mode=SlideBreakMode.FULL, space_before="10vh")
+        with patch("streamtex.slide._render") as mock_render, \
+             patch("streamtex.slide.st_marker"):
+            st_slide_break(config=cfg)
+            assert mock_render.call_count == 3
+            before_call = mock_render.call_args_list[0][0][0]
+            rule_call = mock_render.call_args_list[1][0][0]
+            spacer_call = mock_render.call_args_list[2][0][0]
+            assert 'class="stx-slide-break-spacer-before"' in before_call
+            assert "10vh" in before_call
+            assert 'class="stx-slide-break-rule"' in rule_call
+            assert 'class="stx-slide-break-spacer"' in spacer_call
+
+    def test_full_mode_zero_before_no_before_spacer(self):
+        cfg = SlideBreakConfig(mode=SlideBreakMode.FULL, space_before="0vh")
+        with patch("streamtex.slide._render") as mock_render, \
+             patch("streamtex.slide.st_marker"):
+            st_slide_break(config=cfg)
+            assert mock_render.call_count == 2
+            calls = [c[0][0] for c in mock_render.call_args_list]
+            assert not any("spacer-before" in c for c in calls)
+
     def test_rule_only_mode_renders_rule_no_spacer(self):
         cfg = SlideBreakConfig(mode=SlideBreakMode.RULE_ONLY)
+        with patch("streamtex.slide._render") as mock_render, \
+             patch("streamtex.slide.st_marker"):
+            st_slide_break(config=cfg)
+            assert mock_render.call_count == 1
+            assert 'stx-slide-break-rule' in mock_render.call_args_list[0][0][0]
+
+    def test_rule_only_mode_no_before_spacer(self):
+        cfg = SlideBreakConfig(mode=SlideBreakMode.RULE_ONLY, space_before="10vh")
         with patch("streamtex.slide._render") as mock_render, \
              patch("streamtex.slide.st_marker"):
             st_slide_break(config=cfg)
@@ -114,6 +153,18 @@ class TestStSlideBreak:
             st_slide_break(config=cfg)
             assert mock_render.call_count == 1
             assert 'stx-slide-break-spacer' in mock_render.call_args_list[0][0][0]
+
+    def test_spacer_only_with_before(self):
+        cfg = SlideBreakConfig(mode=SlideBreakMode.SPACER_ONLY, space_before="20vh")
+        with patch("streamtex.slide._render") as mock_render, \
+             patch("streamtex.slide.st_marker"):
+            st_slide_break(config=cfg)
+            assert mock_render.call_count == 2
+            before_call = mock_render.call_args_list[0][0][0]
+            spacer_call = mock_render.call_args_list[1][0][0]
+            assert "stx-slide-break-spacer-before" in before_call
+            assert "20vh" in before_call
+            assert "stx-slide-break-spacer" in spacer_call
 
     def test_marker_only_mode_renders_marker_only(self):
         cfg = SlideBreakConfig(mode=SlideBreakMode.MARKER_ONLY)
@@ -163,6 +214,26 @@ class TestStSlideBreak:
              patch("streamtex.slide.st_marker") as mock_marker:
             st_slide_break(config=cfg)
             mock_marker.assert_not_called()
+
+    def test_marker_hidden_from_config(self):
+        cfg = SlideBreakConfig(marker_hidden=False)
+        with patch("streamtex.slide._render"), \
+             patch("streamtex.slide.st_marker") as mock_marker:
+            st_slide_break(marker_label="Visible", config=cfg)
+            mock_marker.assert_called_once_with("Visible", hidden=False)
+
+    def test_marker_hidden_per_call_override(self):
+        cfg = SlideBreakConfig(marker_hidden=True)
+        with patch("streamtex.slide._render"), \
+             patch("streamtex.slide.st_marker") as mock_marker:
+            st_slide_break(marker_label="Override", config=cfg, marker_hidden=False)
+            mock_marker.assert_called_once_with("Override", hidden=False)
+
+    def test_marker_hidden_default_is_true(self):
+        with patch("streamtex.slide._render"), \
+             patch("streamtex.slide.st_marker") as mock_marker:
+            st_slide_break(marker_label="Default")
+            mock_marker.assert_called_once_with("Default", hidden=True)
 
     def test_custom_config_applies(self):
         cfg = SlideBreakConfig(
@@ -229,7 +300,8 @@ class TestSessionStateOverride:
         mock_state = {
             _BREAK_ENABLED_KEY: True,
             _BREAK_MODE_KEY: "Rule only",
-            _BREAK_SPACE_KEY: 60,
+            _BREAK_BEFORE_KEY: 0,
+            _BREAK_AFTER_KEY: 60,
         }
         with patch("streamtex.slide.st.session_state", mock_state), \
              patch("streamtex.slide._render") as mock_render, \
@@ -242,7 +314,8 @@ class TestSessionStateOverride:
         mock_state = {
             _BREAK_ENABLED_KEY: True,
             _BREAK_MODE_KEY: "Spacer only",
-            _BREAK_SPACE_KEY: 80,
+            _BREAK_BEFORE_KEY: 0,
+            _BREAK_AFTER_KEY: 80,
         }
         with patch("streamtex.slide.st.session_state", mock_state), \
              patch("streamtex.slide._render") as mock_render, \
@@ -253,11 +326,12 @@ class TestSessionStateOverride:
             assert "stx-slide-break-spacer" in html
             assert "80vh" in html
 
-    def test_session_state_space_value_applied(self):
+    def test_session_state_after_value_applied(self):
         mock_state = {
             _BREAK_ENABLED_KEY: True,
             _BREAK_MODE_KEY: "Full",
-            _BREAK_SPACE_KEY: 90,
+            _BREAK_BEFORE_KEY: 0,
+            _BREAK_AFTER_KEY: 90,
         }
         with patch("streamtex.slide.st.session_state", mock_state), \
              patch("streamtex.slide._render") as mock_render, \
@@ -265,6 +339,22 @@ class TestSessionStateOverride:
             st_slide_break()
             spacer_html = mock_render.call_args_list[1][0][0]
             assert "90vh" in spacer_html
+
+    def test_session_state_before_value_applied(self):
+        mock_state = {
+            _BREAK_ENABLED_KEY: True,
+            _BREAK_MODE_KEY: "Full",
+            _BREAK_BEFORE_KEY: 20,
+            _BREAK_AFTER_KEY: 5,
+        }
+        with patch("streamtex.slide.st.session_state", mock_state), \
+             patch("streamtex.slide._render") as mock_render, \
+             patch("streamtex.slide.st_marker"):
+            st_slide_break()
+            assert mock_render.call_count == 3
+            before_html = mock_render.call_args_list[0][0][0]
+            assert "stx-slide-break-spacer-before" in before_html
+            assert "20vh" in before_html
 
     def test_no_session_state_uses_config(self):
         """When no sidebar keys exist, config is used as-is."""
@@ -282,7 +372,8 @@ class TestSessionStateOverride:
         mock_state = {
             _BREAK_ENABLED_KEY: True,
             _BREAK_MODE_KEY: "Rule only",
-            _BREAK_SPACE_KEY: 30,
+            _BREAK_BEFORE_KEY: 10,
+            _BREAK_AFTER_KEY: 30,
         }
         cfg = SlideBreakConfig(mode=SlideBreakMode.SPACER_ONLY, space="99vh")
         with patch("streamtex.slide.st.session_state", mock_state), \
@@ -292,7 +383,7 @@ class TestSessionStateOverride:
             # _effective_config still applies session state overrides
             # because sidebar is active (enabled key exists)
             st_slide_break(config=cfg)
-            # Session state overrides: mode=Rule only, space=30vh
+            # Session state overrides: mode=Rule only, before=10, after=30
             assert mock_render.call_count == 1
             assert "stx-slide-break-rule" in mock_render.call_args_list[0][0][0]
 
@@ -309,7 +400,8 @@ class TestAddSlideBreakOptions:
             add_slide_break_options(container=ctx)
             assert _BREAK_ENABLED_KEY in mock_state
             assert _BREAK_MODE_KEY in mock_state
-            assert _BREAK_SPACE_KEY in mock_state
+            assert _BREAK_BEFORE_KEY in mock_state
+            assert _BREAK_AFTER_KEY in mock_state
 
     def test_default_mode_stored_as_label_string(self):
         mock_state = {}
@@ -319,11 +411,70 @@ class TestAddSlideBreakOptions:
                                     container=ctx)
             assert mock_state[_BREAK_MODE_KEY] == "Rule only"
 
-    def test_mode_labels_cover_three_visual_modes(self):
-        assert len(_MODE_LABELS) == 3
+    def test_mode_labels_cover_all_modes(self):
+        assert len(_MODE_LABELS) == 5
         assert SlideBreakMode.FULL in _MODE_LABELS.values()
         assert SlideBreakMode.RULE_ONLY in _MODE_LABELS.values()
         assert SlideBreakMode.SPACER_ONLY in _MODE_LABELS.values()
+        assert SlideBreakMode.MARKER_ONLY in _MODE_LABELS.values()
+        assert SlideBreakMode.HIDDEN in _MODE_LABELS.values()
+
+    def test_default_mode_from_global_config(self):
+        """When default_mode is None, reads from global config."""
+        mock_state = {}
+        ctx = MagicMock()
+        original = get_slide_break_config()
+        set_slide_break_config(SlideBreakConfig(mode=SlideBreakMode.HIDDEN))
+        with patch("streamtex.slide.st.session_state", mock_state):
+            add_slide_break_options(container=ctx)
+            assert mock_state[_BREAK_MODE_KEY] == "Hidden"
+        set_slide_break_config(original)
+
+    def test_explicit_default_mode_overrides_config(self):
+        """Explicit default_mode= takes precedence over global config."""
+        mock_state = {}
+        ctx = MagicMock()
+        original = get_slide_break_config()
+        set_slide_break_config(SlideBreakConfig(mode=SlideBreakMode.HIDDEN))
+        with patch("streamtex.slide.st.session_state", mock_state):
+            add_slide_break_options(default_mode=SlideBreakMode.FULL, container=ctx)
+            assert mock_state[_BREAK_MODE_KEY] == "Full"
+        set_slide_break_config(original)
+
+    def test_default_before_from_config(self):
+        mock_state = {}
+        ctx = MagicMock()
+        original = get_slide_break_config()
+        set_slide_break_config(SlideBreakConfig(space_before="15vh"))
+        with patch("streamtex.slide.st.session_state", mock_state):
+            add_slide_break_options(container=ctx)
+            assert mock_state[_BREAK_BEFORE_KEY] == 15
+        set_slide_break_config(original)
+
+    def test_default_after_from_config(self):
+        mock_state = {}
+        ctx = MagicMock()
+        original = get_slide_break_config()
+        set_slide_break_config(SlideBreakConfig(space="30vh"))
+        with patch("streamtex.slide.st.session_state", mock_state):
+            add_slide_break_options(container=ctx)
+            assert mock_state[_BREAK_AFTER_KEY] == 30
+        set_slide_break_config(original)
+
+    def test_default_space_backward_compat(self):
+        """default_space= still works as fallback for default_after."""
+        mock_state = {}
+        ctx = MagicMock()
+        with patch("streamtex.slide.st.session_state", mock_state):
+            add_slide_break_options(default_space=70, container=ctx)
+            assert mock_state[_BREAK_AFTER_KEY] == 70
+
+    def test_default_after_overrides_default_space(self):
+        mock_state = {}
+        ctx = MagicMock()
+        with patch("streamtex.slide.st.session_state", mock_state):
+            add_slide_break_options(default_space=70, default_after=40, container=ctx)
+            assert mock_state[_BREAK_AFTER_KEY] == 40
 
 
 # ── Mode rendering matrix ───────────────────────────────────────────────
@@ -348,7 +499,9 @@ class TestModeRenderingMatrix:
 
                 render_calls = [c[0][0] for c in mock_render.call_args_list]
                 has_rule = any("stx-slide-break-rule" in c for c in render_calls)
-                has_spacer = any("stx-slide-break-spacer" in c for c in render_calls)
+                has_spacer = any("stx-slide-break-spacer" in c
+                                 and "spacer-before" not in c
+                                 for c in render_calls)
                 has_marker = mock_marker.called
 
                 assert has_rule == expected["rule"], \

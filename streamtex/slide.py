@@ -62,6 +62,9 @@ class SlideBreakConfig:
     space: str = "5vh"
     """Vertical space after the rule (CSS value). 100vh = one full viewport."""
 
+    space_before: str = "0vh"
+    """Vertical space before the rule (CSS value). Rendered as a spacer div."""
+
     rule_margin_top: str = "5em"
     """Space before the horizontal rule (CSS value, e.g. "2em", "20px")."""
 
@@ -78,7 +81,11 @@ class SlideBreakConfig:
     """Rule opacity from 0.0 (invisible) to 1.0 (fully opaque)."""
 
     marker: bool = True
-    """Create a hidden navigation marker so PageDown stops at this break."""
+    """Create a navigation marker so PageDown stops at this break."""
+
+    marker_hidden: bool = True
+    """When True, the marker is hidden (counter only, not in popup).
+    When False, the marker is visible in the popup marker list."""
 
     fullscreen: bool = False
     """When True, force space='100vh' so each slide fills the viewport."""
@@ -116,13 +123,16 @@ def get_slide_break_config() -> SlideBreakConfig:
 
 _BREAK_ENABLED_KEY = "_stx_slide_break_enabled"
 _BREAK_MODE_KEY = "_stx_slide_break_mode"
-_BREAK_SPACE_KEY = "_stx_slide_break_space"
+_BREAK_BEFORE_KEY = "_stx_slide_break_before"
+_BREAK_AFTER_KEY = "_stx_slide_break_after"
 
 # Mode label → SlideBreakMode mapping for the sidebar selectbox
 _MODE_LABELS = {
     "Full": SlideBreakMode.FULL,
     "Rule only": SlideBreakMode.RULE_ONLY,
     "Spacer only": SlideBreakMode.SPACER_ONLY,
+    "Marker only": SlideBreakMode.MARKER_ONLY,
+    "Hidden": SlideBreakMode.HIDDEN,
 }
 
 
@@ -144,28 +154,44 @@ def _parse_space_vh(space: str) -> int:
 
 def add_slide_break_options(
     default_enabled: bool = True,
-    default_mode: SlideBreakMode = SlideBreakMode.FULL,
+    default_mode: Optional[SlideBreakMode] = None,
     default_space: Optional[int] = None,
+    default_before: Optional[int] = None,
+    default_after: Optional[int] = None,
     container=None,
 ) -> None:
     """Add slide break controls to the sidebar.
 
     Mirrors the pattern of :func:`add_zoom_options`: the presenter can
-    toggle breaks on/off, choose a display style, and adjust spacing.
+    toggle breaks on/off, choose a display style, and adjust spacing
+    before and after the horizontal rule.
     Values are stored in session state and read directly by
     :func:`st_slide_break` on each render (Python-side control).
 
     Call once in ``book.py``, alongside ``add_zoom_options()``.
 
     :param default_enabled: Initial toggle state (default True).
-    :param default_mode: Initial display mode (default FULL).
-    :param default_space: Initial spacing in vh. When ``None`` (the
+    :param default_mode: Initial display mode.  When ``None`` (the
         default), the value is read from the global
         :class:`SlideBreakConfig` set by ``set_slide_break_config()``.
+    :param default_space: Deprecated — use *default_after* instead.
+        When set (and *default_after* is ``None``), used as the
+        initial "After" value for backward compatibility.
+    :param default_before: Initial "Before" spacing in vh.  When ``None``,
+        the value is read from the global :class:`SlideBreakConfig`.
+    :param default_after: Initial "After" spacing in vh.  When ``None``,
+        the value is read from the global :class:`SlideBreakConfig`.
     :param container: Streamlit container to render into (default: sidebar).
     """
-    if default_space is None:
-        default_space = _parse_space_vh(_config.space)
+    if default_mode is None:
+        default_mode = _config.mode
+    if default_before is None:
+        default_before = _parse_space_vh(_config.space_before)
+    if default_after is None:
+        if default_space is not None:
+            default_after = default_space
+        else:
+            default_after = _parse_space_vh(_config.space)
 
     if _BREAK_ENABLED_KEY not in st.session_state:
         st.session_state[_BREAK_ENABLED_KEY] = default_enabled
@@ -173,8 +199,10 @@ def add_slide_break_options(
         st.session_state[_BREAK_MODE_KEY] = next(
             k for k, v in _MODE_LABELS.items() if v == default_mode
         )
-    if _BREAK_SPACE_KEY not in st.session_state:
-        st.session_state[_BREAK_SPACE_KEY] = default_space
+    if _BREAK_BEFORE_KEY not in st.session_state:
+        st.session_state[_BREAK_BEFORE_KEY] = default_before
+    if _BREAK_AFTER_KEY not in st.session_state:
+        st.session_state[_BREAK_AFTER_KEY] = default_after
 
     ctx = container if container is not None else st.sidebar
     ctx.toggle("Slide breaks", key=_BREAK_ENABLED_KEY)
@@ -185,11 +213,18 @@ def add_slide_break_options(
             key=_BREAK_MODE_KEY,
         )
         ctx.number_input(
-            "Space (vh)",
+            "Before (vh)",
             min_value=0,
             max_value=100,
             step=10,
-            key=_BREAK_SPACE_KEY,
+            key=_BREAK_BEFORE_KEY,
+        )
+        ctx.number_input(
+            "After (vh)",
+            min_value=0,
+            max_value=100,
+            step=10,
+            key=_BREAK_AFTER_KEY,
         )
 
 
@@ -218,20 +253,23 @@ def _effective_config(
     if not enabled_val:
         return cfg, False
 
-    # Override mode and space from sidebar
+    # Override mode and before/after from sidebar
     mode_label = st.session_state.get(_BREAK_MODE_KEY, "Full")
     sidebar_mode = _MODE_LABELS.get(mode_label, cfg.mode)
-    space_vh = st.session_state.get(_BREAK_SPACE_KEY, 5)
+    before_vh = st.session_state.get(_BREAK_BEFORE_KEY, 0)
+    after_vh = st.session_state.get(_BREAK_AFTER_KEY, 5)
 
     return SlideBreakConfig(
         mode=sidebar_mode,
-        space=f"{space_vh}vh",
+        space=f"{after_vh}vh",
+        space_before=f"{before_vh}vh",
         rule_margin_top=cfg.rule_margin_top,
         rule_margin_bottom=cfg.rule_margin_bottom,
         thickness=cfg.thickness,
         color=cfg.color,
         opacity=cfg.opacity,
         marker=cfg.marker,
+        marker_hidden=cfg.marker_hidden,
         fullscreen=cfg.fullscreen,
         spacing=cfg.spacing,
     ), True
@@ -242,20 +280,20 @@ def st_slide_break(
     config: Optional[SlideBreakConfig] = None,
     spacing: Optional[Spacing] = None,
     zoom: Optional[int] = None,
+    marker_hidden: Optional[bool] = None,
 ) -> None:
-    """Presentation section break: styled rule + viewport spacer + hidden marker.
+    """Presentation section break: styled rule + viewport spacer + marker.
 
     Inserts a horizontal rule followed by a large vertical space so that
-    the next section starts off-screen. By default, places a hidden
-    navigation marker so PageUp/PageDown stops here without appearing
-    in the sidebar marker list or TOC.
+    the next section starts off-screen. By default, places a navigation
+    marker so PageUp/PageDown stops here.
 
     When the sidebar widget :func:`add_slide_break_options` is active, its
     values (toggle, mode, spacing) override the static config directly
     via Python-side session state — no CSS variable propagation needed.
 
     Args:
-        marker_label: Label for the hidden marker. Auto-generated if empty.
+        marker_label: Label for the marker. Auto-generated if empty.
         config: Per-call config override. Falls back to the global config
                 set by set_slide_break_config().
         spacing: Per-call section spacing override.  Takes precedence over
@@ -264,6 +302,8 @@ def st_slide_break(
               percentage for all content until the next slide break.
               ``100`` = normal, ``75`` = 75%, ``150`` = 150%.
               When both *zoom* and *spacing.zoom* are set, *zoom* wins.
+        marker_hidden: Per-call override for marker visibility.  When
+              ``None`` (the default), uses ``config.marker_hidden``.
     """
     from .space import st_space
 
@@ -306,6 +346,7 @@ def st_slide_break(
 
     # Fullscreen mode forces 100vh spacing
     effective_space = "100vh" if cfg.fullscreen else cfg.space
+    effective_space_before = cfg.space_before
 
     rule_css = (
         f"border: none; "
@@ -313,17 +354,22 @@ def st_slide_break(
         f"rgba({cfg.color}, {cfg.opacity}); "
         f"margin-top: {cfg.rule_margin_top}; margin-bottom: {cfg.rule_margin_bottom};"
     )
+    spacer_before_css = f"height: {effective_space_before};"
     spacer_css = f"height: {effective_space};"
 
     show_rule = cfg.mode in (SlideBreakMode.FULL, SlideBreakMode.RULE_ONLY)
     show_spacer = cfg.mode in (SlideBreakMode.FULL, SlideBreakMode.SPACER_ONLY)
 
+    # Before-spacer: rendered before the rule when space_before > 0
+    if show_spacer and effective_space_before and effective_space_before != "0vh":
+        _render(f'<div class="stx-slide-break-spacer-before" style="{spacer_before_css}"></div>')
     if show_rule:
         _render(f'<hr class="stx-slide-break-rule" style="{rule_css}">')
     if show_spacer:
         _render(f'<div class="stx-slide-break-spacer" style="{spacer_css}"></div>')
     if cfg.marker and cfg.mode != SlideBreakMode.HIDDEN:
-        st_marker(marker_label, hidden=True)
+        _hidden = marker_hidden if marker_hidden is not None else cfg.marker_hidden
+        st_marker(marker_label, hidden=_hidden)
 
     # Inject section.top after the break visual (space before next section)
     # Skip if block.top was already injected for this block (first break)

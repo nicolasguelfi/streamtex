@@ -27,11 +27,43 @@ class ModelCapabilities:
     Providers override :meth:`AIImageProvider.model_capabilities` to
     return accurate values per model.  The image editor uses this to
     populate size/quality dropdowns dynamically.
+
+    Attributes:
+        sizes: White-listed ``"WxH"`` strings exposed in the size dropdown.
+        qualities: White-listed quality labels exposed in the quality dropdown.
+        default_size: Pre-selected size when the editor opens.
+        default_quality: Pre-selected quality when the editor opens.
+        supports_custom: When True, the editor exposes a ``"Custom..."``
+            entry that lets the user enter arbitrary width/height. The
+            provider must also override :meth:`AIImageProvider.validate_size`
+            to express its constraints (bounds, multiples, total pixels...).
     """
     sizes: list[str]
     qualities: list[str]
     default_size: str = "1024x1024"
     default_quality: str = "standard"
+    supports_custom: bool = False
+
+
+@dataclass
+class SizeValidation:
+    """Outcome of :meth:`AIImageProvider.validate_size`.
+
+    Attributes:
+        valid: True when the size can be sent to the provider as-is or
+            after applying ``normalized``.
+        normalized: Canonical ``"WxH"`` string the editor should use for
+            generation. May differ from the input when the provider rounds
+            dimensions to satisfy its constraints (e.g. multiples of 64).
+        warning: Non-fatal advisory shown to the user (e.g. extreme aspect
+            ratio likely to degrade quality). Generation can still proceed.
+        error: Fatal explanation when ``valid`` is False (e.g. out of bounds,
+            total pixels exceeded). Generation must be blocked.
+    """
+    valid: bool
+    normalized: Optional[str] = None
+    warning: Optional[str] = None
+    error: Optional[str] = None
 
 
 class AIImageProvider:
@@ -56,6 +88,36 @@ class AIImageProvider:
         return ModelCapabilities(
             sizes=["1024x1024"],
             qualities=["standard"],
+        )
+
+    @classmethod
+    def validate_size(
+        cls, size: str, model: Optional[str] = None
+    ) -> SizeValidation:
+        """Validate a ``"WxH"`` size string against this provider.
+
+        Default implementation accepts only sizes listed in
+        :meth:`model_capabilities`. Providers that support arbitrary
+        dimensions (e.g. fal.ai) should override and set
+        ``ModelCapabilities.supports_custom = True``.
+
+        Args:
+            size: User-entered ``"WxH"`` size, e.g. ``"1280x256"``.
+            model: Optional model identifier. Constraints can vary per model.
+
+        Returns:
+            :class:`SizeValidation` describing whether the size is usable
+            and what (if anything) the editor should normalise or warn about.
+        """
+        caps = cls.model_capabilities(model)
+        if size in caps.sizes:
+            return SizeValidation(valid=True, normalized=size)
+        return SizeValidation(
+            valid=False,
+            error=(
+                f"Size {size!r} is not supported by provider {cls.name!r}. "
+                f"Allowed: {', '.join(caps.sizes)}."
+            ),
         )
 
     def generate(

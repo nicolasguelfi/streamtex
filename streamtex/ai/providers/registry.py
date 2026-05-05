@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Dict, List, Type
 
-from .base import AIImageProvider, ModelCapabilities
+from .base import AIImageProvider, ModelCapabilities, SizeValidation
 
 _PROVIDERS: Dict[str, Type[AIImageProvider]] = {}
 
@@ -68,3 +68,20 @@ def get_model_capabilities(
             qualities=["standard"],
         )
     return cls.model_capabilities(model)
+
+
+def validate_size(
+    provider_name: str, size: str, model: str | None = None
+) -> SizeValidation:
+    """Validate a ``"WxH"`` size against *provider_name* / *model*.
+
+    Falls back to a generic reject when the provider is unknown.
+    """
+    _register_builtin_providers()
+    cls = _PROVIDERS.get(provider_name)
+    if cls is None:
+        return SizeValidation(
+            valid=False,
+            error=f"Unknown provider {provider_name!r}.",
+        )
+    return cls.validate_size(size, model)

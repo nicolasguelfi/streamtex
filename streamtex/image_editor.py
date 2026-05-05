@@ -237,14 +237,36 @@ def _render_ai_tab(
         qualities = ["standard", "hd"]
         caps = None
 
+    # Size selectbox — append a "Custom..." sentinel when the provider supports
+    # arbitrary dimensions (e.g. fal.ai). The provider validates and may
+    # normalise the user input via validate_size().
+    supports_custom = bool(caps.supports_custom) if caps else False
+    custom_label = "Custom..."
+    display_sizes = list(sizes)
+    if supports_custom:
+        display_sizes.append(custom_label)
+
+    # Round-trip: if a previously saved image had a custom size that is not in
+    # the whitelist, pre-select "Custom..." and we'll seed the inputs below.
+    default_is_custom = bool(
+        supports_custom
+        and ai_size
+        and isinstance(ai_size, str)
+        and ai_size not in sizes
+        and "x" in ai_size.lower()
+    )
+    if default_is_custom:
+        default_index = display_sizes.index(custom_label)
+    else:
+        default_size = ai_size if ai_size in sizes else (caps.default_size if caps else sizes[0])
+        default_index = display_sizes.index(default_size) if default_size in display_sizes else 0
+
     col3, col4 = st.columns(2)
     with col3:
-        default_size = ai_size if ai_size in sizes else caps.default_size if caps else sizes[0]
-        size_idx = sizes.index(default_size) if default_size in sizes else 0
-        selected_size = st.selectbox(
+        selected_size_label = st.selectbox(
             "Size",
-            sizes,
-            index=size_idx,
+            display_sizes,
+            index=default_index,
             key=f"{key_base}_ai_size",
         )
     with col4:
@@ -256,6 +278,71 @@ def _render_ai_tab(
             index=q_idx,
             key=f"{key_base}_ai_quality",
         )
+
+    # Resolve the effective size: either the selected preset, or the validated
+    # custom dimensions. effective_size is None when validation fails, which
+    # disables the Generate button below.
+    size_validation = None
+    if selected_size_label == custom_label:
+        if default_is_custom and ai_size:
+            try:
+                w_str, h_str = ai_size.lower().split("x")
+                init_w, init_h = int(w_str), int(h_str)
+            except (ValueError, AttributeError):
+                init_w, init_h = 1280, 256
+        else:
+            init_w, init_h = 1280, 256
+
+        cw_col, ch_col = st.columns(2)
+        with cw_col:
+            custom_w = st.number_input(
+                "Width (px)",
+                min_value=64,
+                max_value=4096,
+                value=init_w,
+                step=64,
+                key=f"{key_base}_ai_size_custom_w",
+            )
+        with ch_col:
+            custom_h = st.number_input(
+                "Height (px)",
+                min_value=64,
+                max_value=4096,
+                value=init_h,
+                step=64,
+                key=f"{key_base}_ai_size_custom_h",
+            )
+
+        candidate = f"{int(custom_w)}x{int(custom_h)}"
+        try:
+            from .ai.providers.registry import validate_size as _validate_size
+            size_validation = _validate_size(
+                selected_provider,
+                candidate,
+                selected_model if selected_model != "(default)" else None,
+            )
+        except Exception:
+            size_validation = None
+
+        if size_validation is None or not size_validation.valid:
+            if size_validation and size_validation.error:
+                st.error(size_validation.error)
+            effective_size = None
+        else:
+            effective_size = size_validation.normalized or candidate
+            if size_validation.warning:
+                st.warning(size_validation.warning)
+            try:
+                ew_str, eh_str = effective_size.lower().split("x")
+                ew, eh = int(ew_str), int(eh_str)
+                ratio = max(ew, eh) / min(ew, eh)
+                st.caption(
+                    f"Effective: {effective_size} ({ratio:.2f}:1, {ew * eh:,} px)"
+                )
+            except (ValueError, ZeroDivisionError):
+                pass
+    else:
+        effective_size = selected_size_label
 
     # Prompt
     current_prompt = prompt or ""
@@ -274,10 +361,22 @@ def _render_ai_tab(
             key=f"{key_base}_use_base",
         )
 
-    # Generate button
-    if st.button("Generate", key=f"{key_base}_ai_generate", type="primary"):
+    # Generate button — disabled when a custom size failed validation so the
+    # user has to fix the dimensions before firing an API call.
+    generate_disabled = (
+        selected_size_label == custom_label and not effective_size
+    )
+    if st.button(
+        "Generate",
+        key=f"{key_base}_ai_generate",
+        type="primary",
+        disabled=generate_disabled,
+    ):
         if not user_prompt.strip():
             st.error("Please enter a prompt")
+            return
+        if not effective_size:
+            st.error("Custom size is invalid. Adjust width/height.")
             return
 
         with st.spinner("Generating image..."):
@@ -296,7 +395,7 @@ def _render_ai_tab(
                 file_path = generate_image(
                     user_prompt.strip(),
                     provider=selected_provider,
-                    size=selected_size,
+                    size=effective_size,
                     quality=selected_quality,
                     model=selected_model if selected_model != "(default)" else None,
                     config=cfg,
@@ -312,7 +411,7 @@ def _render_ai_tab(
                     prompt=user_prompt.strip(),
                     provider=selected_provider,
                     model=selected_model if selected_model != "(default)" else None,
-                    size=selected_size,
+                    size=effective_size,
                     quality=selected_quality,
                     base_image=uri if use_base else None,
                 )

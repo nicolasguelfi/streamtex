@@ -158,3 +158,35 @@ Projects can adopt a design guideline for consistent visual design:
 - **Block annotation**: `# @guideline: <name>` in block files (most specific wins)
 - **Combination**: `# @guideline: A + B` — A has priority, B complements
 - **Built-in**: `maximize-viewport`, `minimalist-visual`, `academic-structured`, `dense-informative`
+
+## StreamTeX Patterns (graphic design patterns)
+
+If the project contains a `streamtex-patterns/` folder (default location:
+`.claude/custom/streamtex-patterns/`), it defines reusable graphic design
+patterns (named grids, callouts, hero stats, slide headings, etc.) that
+the user can invoke by name when creating or editing blocks.
+
+**Mandatory rules**:
+1. **Before generating or modifying any StreamTeX block**, read
+   `<patterns-dir>/_pattern_library.md` to know which patterns are available.
+2. When the user names a pattern in any prompt (e.g. *"use grid_boston"*,
+   *"like stat_hero"*), read the full `<patterns-dir>/<name>.md` file
+   **before** generating code.
+3. Strictly respect each pattern's `INVARIANTS` section. Adjust only within
+   `PARAMS`. Refuse anything matching `INTERDITS` and propose a new pattern
+   instead.
+4. The pattern's code skeleton is a **starting point** — adapt it to the
+   project's `custom/styles.py` and palette.
+5. If the user describes something that matches no existing pattern but is
+   reusable, suggest `/stx-pattern:new` to capture it.
+
+**Difference with blueprints**:
+- A **blueprint** = a complete block type (`title`, `conclusion`, `exercise`).
+- A **pattern** = a reusable composition primitive used inside a block
+  (`grid_boston`, `callout_critical`, `ptn_slide_heading`).
+
+A block can combine: 1 blueprint × N patterns × style conventions.
+
+**Commands**: `/stx-pattern:list` `/stx-pattern:show <name>`
+`/stx-pattern:new` `/stx-pattern:reindex` `/stx-pattern:validate`.
+See the `pattern-library` skill for the full mechanism.

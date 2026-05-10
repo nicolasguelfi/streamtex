@@ -76,6 +76,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - **Default serve mode is `dual`**: `stx deploy hetzner --serve-mode` defaults to `dual`.
 
+## [0.6.2] — 2026-04-01
+
+Intermediate release published to PyPI between 0.6.1 and 0.6.3. Introduced the
+dual-mode deployment scaffold (Nginx static + Streamlit interactive) and PDF
+TOC bookmarks. The polished/end-to-end versions of these features ship in
+0.6.3, which supersedes 0.6.2 for new installs.
+
+### Added
+- **Dual-mode deployment templates**: Nginx + Streamlit Dockerfile/nginx.conf/entrypoint scaffold (`generate_dockerfile`, `generate_nginx_conf`, `generate_entrypoint`).
+- **PDF bookmarks (initial)**: `export_pdf()` outline generation from TOC anchors.
+
 ## [0.6.1] — 2026-04-01
 
 ### Added
@@ -100,16 +111,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **PDF export no longer includes sidebar TOC**: enrichment applied to HTML copy only, raw HTML preserved for PDF.
 - **Keyboard navigation in HTML export**: Arrow keys (all 4) + PageUp/PageDown navigate between markers (previously required Ctrl+Arrow).
-
-## [0.5.23] — 2026-04-01
-
-### Added
-- **Horizontal scaling**: `stx deploy scale TARGET --replicas N` command to scale Coolify services. Creates multiple containers behind the same FQDN — Traefik load-balances automatically.
-- **AppEntry.replicas** and **replica_uuids** fields in `.stx-deploy.json` state schema.
-- **CoolifyClient.scale_app()**, **rebuild_all_replicas()**, **restart_all_replicas()** methods.
-- **Replica-aware status**: `stx deploy status coolify` shows replica count (e.g. `3/3`) per service.
-- **Replica-aware update**: `stx deploy update` rebuilds primary + all replicas.
-- 15 unit tests for scaling logic.
 
 ## [0.5.22] — 2026-03-31
 

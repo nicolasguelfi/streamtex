@@ -175,7 +175,7 @@ stx claude install project .
 Open in Claude Code or Cursor, then use slash commands:
 
 ```
-/stx-project:project-init
+/stx-block:init
 > "Create a Docker course with 12 slides, dark theme,
 >  table of contents and page navigation"
 ```
@@ -260,26 +260,30 @@ uv add "streamtex[cli]"          # stx CLI (already installed as a global tool a
 
 ## AI-Powered Features
 
-StreamTeX ships with **22 slash commands**, **4 specialized agents**,
-and **10 block templates** for AI-assisted development.
+StreamTeX ships with the **stx-block** (15 commands) and **stx-ce** (13 commands)
+slash command groups, **3 specialized agents**, and **4 project templates**
+for AI-assisted development.
 
 ### Project Creation & Customization
 
 | Command | What it does |
 |---------|-------------|
-| `/stx-project:project-init` | Create a complete project from a natural-language description |
-| `/stx-project:project-customize` | Change theme, typography, navigation without editing code |
-| `/stx-project:course-generate` | Generate `book.py` structure from a CSV block list |
-| `/stx-project:collection-new` | Create a multi-project hub |
+| `/stx-block:init` | Create a complete project from a natural-language description |
+| `/stx-block:customize` | Change theme, typography, navigation without editing code |
+| `/stx-block:course-generate` | Generate `book.py` structure from a CSV block list |
+| `/stx-block:collection-new` | Create a multi-project hub |
+| `/stx-block:upgrade` | Upgrade project boilerplate to the latest template |
 
 ### Design & Content
 
 | Command | What it does |
 |---------|-------------|
-| `/stx-designer:slide-new` | Create slides from descriptions |
-| `/stx-designer:slide-audit` | Validate design rules (font sizes, line lengths, spacing) |
-| `/stx-designer:slide-fix` | Auto-fix design violations |
-| `/stx-designer:style-audit` | Check styles for consistency |
+| `/stx-block:slide-new` | Create slides from descriptions |
+| `/stx-block:new` | Create a new content block |
+| `/stx-block:audit` | Validate design rules (font sizes, line lengths, spacing, structure) |
+| `/stx-block:fix` | Auto-fix violations found by audit |
+| `/stx-block:style-refactor` | Deduplicate and consolidate styles |
+| `/stx-block:preview` | Validate block structure and assets without running |
 
 ### Migration
 
@@ -307,10 +311,10 @@ StreamTeX provides installable AI profiles via
 
 | Profile | Audience | Commands | Agents |
 |---------|----------|:--------:|:------:|
-| **project** | Content creators | 19 | 3 |
-| **presentation** | Live presenters | +3 | +1 |
-| **documentation** | Manual authors | 10 | 2 |
-| **library** | Library developers | 3 | — |
+| **project** | Content creators | 28 (15 stx-block + 13 stx-ce) | 21 (3 designer + 18 ce) |
+| **presentation** | Live presenters | +3 stx-presentation | +1 |
+| **documentation** | Manual authors | inherits project + adds stx-coherence/stx-pattern | 2 |
+| **library** | Library developers | inherits + adds stx-coherence | — |
 
 Install a profile:
 
@@ -488,7 +492,7 @@ Found a bug? Have a suggestion? We'd love to hear from you.
 
 When reporting a bug, please include:
 1. The **full error traceback** (copy-paste from the terminal)
-2. The **command** you ran (e.g. `stx project new`, `/stx-designer:init`, `stx run`)
+2. The **command** you ran (e.g. `stx project new`, `/stx-block:init`, `stx run`)
 3. Your **StreamTeX version** (`uv pip show streamtex | grep Version`)
 
 ## Contributing

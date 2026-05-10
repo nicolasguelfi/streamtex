@@ -62,7 +62,7 @@ You now have access to all slash commands and agents.
 In Claude Code or Cursor, type:
 
 ```
-/stx-project:project-init
+/stx-block:init
 ```
 
 Then describe what you want in natural language:
@@ -115,24 +115,25 @@ Your project opens in the browser, ready to use.
 ### Pathway 1 — Create a presentation from scratch
 
 ```
-/stx-project:project-init          → Describe your project
-/stx-designer:slide-new            → Add or refine individual slides
-/stx-designer:slide-audit          → Check design rule compliance
-/stx-designer:slide-fix            → Auto-fix violations
+/stx-block:init                    → Describe your project
+/stx-block:slide-new               → Add or refine individual slides
+/stx-block:audit --target <name>   → Check design rule compliance
+/stx-block:fix --target <name>     → Auto-fix violations
 ```
 
 ### Pathway 2 — Convert Google Docs to StreamTeX
 
 ```
-/stx-migration:html-migrate        → Convert one HTML file
-/stx-migration:html-convert-batch  → Convert all HTML files in a directory
-/stx-migration:conversion-audit    → Verify conversion quality
+/stx-import:html                   → Convert one HTML file
+/stx-import:html-batch             → Convert all HTML files in a directory
+/stx-import:html-audit             → Verify conversion quality
 ```
 
 ### Pathway 3 — Customize an existing project
 
 ```
-/stx-project:project-customize     → Describe changes in natural language
+/stx-block:customize               → Describe changes in natural language
+/stx-block:update                  → Incremental adjustments (theme, nav, content)
 ```
 
 Example: *"Switch to light theme, add green accent color, enable TOC sidebar"*
@@ -142,65 +143,118 @@ The agent proposes a diff preview, then applies changes safely.
 ### Pathway 4 — Generate a course from a CSV plan
 
 ```
-/stx-project:course-generate       → Generate book.py from blocks.csv
+/stx-block:course-generate         → Generate book.py from blocks.csv
 ```
 
 Prepare a `blocks.csv` file listing block names and order,
 then let the agent generate the full `book.py` configuration.
 
+### Pathway 5 — Compound document engineering (CE cycle)
+
+```
+/stx-ce:collect <sources/>         → Inventory and classify source material
+/stx-ce:assess                     → Auto-detect import / improve / create pathway
+/stx-ce:plan                       → Plan production (or --interactive)
+/stx-ce:produce                    → Execute plan (orchestrates stx-block + stx-import)
+/stx-ce:review                     → Multi-perspective review (audience, pedagogy, etc.)
+/stx-ce:fix                        → Auto-fix review findings
+/stx-ce:compound                   → Capitalize learnings as solutions
+/stx-ce:integrate                  → Route solutions to lib issues / skill updates
+```
+
+Or run the full cycle autonomously with `/stx-ce:go "<description>"`.
+
 ---
 
 ## Command Reference
 
-### Project Commands (5)
+### Project Lifecycle — `stx-block` (15 commands)
+
+The `stx-block` namespace covers the entire project lifecycle, from creation to
+audit/fix loops. Most users only need `init`, `update`, `audit`, and `fix` —
+the rest are specialized variations.
 
 | Command | What it does |
 |---------|-------------|
-| `/stx-project:project-init` | Create a complete project from a natural-language description. The Project Architect agent proposes structure, blocks, colors, and features — generates all files after your approval. |
-| `/stx-project:project-customize` | Modify theme, colors, typography, navigation, or features of an existing project. Reads current configuration, proposes a diff preview, applies changes safely without deleting content. |
-| `/stx-project:course-generate` | Generate `book.py` from a `blocks.csv` file listing block names and order. |
-| `/stx-project:collection-new` | Create a multi-project collection hub with TOML configuration. |
-| `/stx-project:project-upgrade` | Upgrade project boilerplate files to the latest template structure. |
+| `/stx-block:init` | Create a complete project from a natural-language description. The Project Architect agent proposes structure, blocks, colors, and features — generates all files after your approval. Templates: `project` (default), `presentation`, `collection`, `course`. |
+| `/stx-block:update` | Add content, customize theme, migrate HTML, export — covers all post-creation modifications. Sub-flags: `--upgrade`, `--migrate`, `--export`. |
+| `/stx-block:audit` | Validate quality (structure, styles, design rules, presentation compliance). Use `--all` or `--target <name>`. Replaces the legacy `slide-audit`/`style-audit`. |
+| `/stx-block:fix` | Auto-fix violations found by audit. Use `--all` or `--target <name>`. Replaces the legacy `slide-fix`. |
+| `/stx-block:tool <name>` | Run specialized tools (e.g. `survey-convert`). |
+| `/stx-block:slide-new` | Create a new slide following visual design rules. Enforces ~45-char lines, 32pt body text, canonical structure. |
+| `/stx-block:new` | Create a new content block with automatic blueprint matching against 10 block templates. |
+| `/stx-block:preview` | Validate block structure, image assets, style references, and TOC entries without running the app. |
+| `/stx-block:style-refactor` | Extract repeated style patterns into `BlockStyles` or `custom/styles.py`. Optimizes naming and composition. |
+| `/stx-block:customize` | Modify theme, colors, typography, navigation, or features of an existing project. Reads current configuration, proposes a diff preview. |
+| `/stx-block:upgrade` | Upgrade project boilerplate files to the latest template structure. |
+| `/stx-block:collection-new` | Create a multi-project collection hub with TOML configuration. |
+| `/stx-block:course-generate` | Generate `book.py` from a `blocks.csv` file listing block names and order. |
+| `/stx-block:test` | Run the test suite with `pytest` (via `uv run`). Analyzes failures and reports pass/fail counts. |
+| `/stx-block:lint` | Run `ruff` linter. Auto-fixes where possible, reports remaining manual issues. |
 
-### Designer Commands (7)
+### Compound Document Engineering — `stx-ce` (13 commands)
+
+A structured methodology for document production. Phases: `COLLECT → ASSESS →
+PLAN → PRODUCE → REVIEW → FIX → COMPOUND → INTEGRATE`. CE artifacts live in
+`docs/`. See `.claude/references/ce_cheatsheet_en.md` for the full reference.
+
+| Command | Phase |
+|---------|-------|
+| `/stx-ce:collect <sources/>` | Inventory + classify source material |
+| `/stx-ce:assess` | Auto-detect pathway (import / improve / create) |
+| `/stx-ce:plan` | Plan production (auto or `--interactive`) |
+| `/stx-ce:produce` | Execute plan (orchestrates stx-block + stx-import) |
+| `/stx-ce:review` | Multi-perspective review (5 axes) |
+| `/stx-ce:fix` | Correct review findings + verify |
+| `/stx-ce:compound` | Capitalize learnings as solutions |
+| `/stx-ce:integrate` | Route solutions to lib issues / skill updates / custom rules |
+| `/stx-ce:go "<description>"` | Full autonomous cycle with 4 validation gates |
+| `/stx-ce:status` | Show CE cycle status |
+| `/stx-ce:task` | Ad-hoc task with lifecycle reconciliation |
+| `/stx-ce:continue` | Resume work with context briefing |
+| `/stx-ce:pause` | Save session checkpoint before pausing |
+
+### Import — `stx-import` (6 commands, shared)
 
 | Command | What it does |
 |---------|-------------|
-| `/stx-designer:slide-new` | Create a new slide following visual design rules. Enforces ~45-char lines, 32pt body text, proper structure (explanation, code, demo, details). |
-| `/stx-designer:block-new` | Create a content block with automatic blueprint matching. Matches your description against 10 block templates and generates appropriate structure. |
-| `/stx-designer:slide-audit` | Validate a slide against design rules. Checks line lengths, font sizes, imports, structure, TOC entries. Reports errors and warnings with line numbers. |
-| `/stx-designer:slide-fix` | Auto-fix all design violations found by audit. Breaks long lines, adds `show_code()`, corrects font sizes, fixes spacing. |
-| `/stx-designer:style-audit` | Check styles for consistency. Detects raw HTML/CSS, hardcoded colors, duplicate styles, non-English names, dark mode issues. |
-| `/stx-designer:style-refactor` | Extract repeated style patterns into `BlockStyles` or `custom/styles.py`. Optimizes naming and composition. |
-| `/stx-designer:block-preview` | Validate block structure, image assets, style references, and TOC entries without running the app. |
+| `/stx-import:html` | Convert HTML content (Google Docs export) to a StreamTeX block. |
+| `/stx-import:html-batch` | Batch convert all HTML files in a directory. Supports `--all`, `--filter`, `--dry-run`, `--force`, `--limit`. |
+| `/stx-import:html-block` | Convert a single saved HTML block with detailed color mapping. |
+| `/stx-import:html-audit` | Audit conversion quality (color fidelity, components, no raw HTML). |
+| `/stx-import:marp` | Import a Marp project into StreamTeX. |
+| `/stx-import:marp-analyze` | Analyze a Marp project before import. |
+| `/stx-import:latex` | Import LaTeX documents into StreamTeX. |
 
-### Migration Commands (5)
+### Presentation overlay — `stx-presentation` (3 commands)
 
-| Command | What it does |
-|---------|-------------|
-| `/stx-migration:html-migrate` | Convert HTML content (e.g., Google Docs export) to a StreamTeX block. Analyzes colors, layout, and formatting — generates clean block with styles. |
-| `/stx-migration:html-convert-batch` | Batch convert all HTML files in a directory. Supports `--all`, `--filter`, `--dry-run`, `--force`, `--limit`. |
-| `/stx-migration:html-convert-block` | Convert a single saved HTML block with detailed color mapping and style consolidation. |
-| `/stx-migration:html-export` | Configure HTML export in `book.py` and audit widgets for export compatibility. |
-| `/stx-migration:conversion-audit` | Verify a converted block for color fidelity, proper components, and no residual raw HTML/CSS. |
-
-### Developer Commands (3)
+*Available with the `presentation` profile only — extends `project`.*
 
 | Command | What it does |
 |---------|-------------|
-| `/stx-developer:test-run` | Run the test suite with `pytest`. Analyzes failures and reports pass/fail counts. |
-| `/stx-developer:lint` | Run `ruff` linter. Auto-fixes where possible, reports remaining manual issues. |
-| `/stx-developer:deploy` | Deploy to Docker, Hugging Face Spaces, or GCP. Runs pre-deployment checks (tests, lint, requirements, git status). |
+| `/stx-presentation:presentation-audit` | Check slide for live projection compliance: font sizes (48pt+ body), keyword length (5-7 words), contrast, spacing. |
+| `/stx-presentation:presentation-fix` | Auto-fix font sizes, text length, contrast, and visual anchor issues for live projection. |
+| `/stx-presentation:survey-convert` | Convert survey screenshots (e.g., Stack Overflow Developer Survey) into code-generated presentation blocks. |
 
-### Presentation-Only Commands (3)
+### Deploy — `stx-deploy` (shared)
 
-*Available with the `presentation` profile only.*
+`/stx-deploy:preflight`, `/stx-deploy:provision`, `/stx-deploy:setup`,
+`/stx-deploy:secure`, `/stx-deploy:install-coolify`, `/stx-deploy:configure-domain`,
+`/stx-deploy:deploy`, `/stx-deploy:deploy-batch`, `/stx-deploy:update`,
+`/stx-deploy:scale`, `/stx-deploy:setup-loadbalancer`, `/stx-deploy:status`,
+`/stx-deploy:go` — full Hetzner/Coolify deployment pipeline.
 
-| Command | What it does |
-|---------|-------------|
-| `/stx-designer:presentation-audit` | Check slide for live projection compliance: font sizes (48pt+ body), keyword length (5-7 words), contrast, spacing. |
-| `/stx-designer:presentation-fix` | Auto-fix font sizes, text length, contrast, and visual anchor issues for live projection. |
-| `/stx-designer:survey-convert` | Convert survey screenshots (e.g., Stack Overflow Developer Survey) into code-generated presentation blocks. |
+### Issues — `stx-issue` (6 commands, shared)
+
+`/stx-issue:bug`, `/stx-issue:feature`, `/stx-issue:question`, `/stx-issue:docs`,
+`/stx-issue:comment`, `/stx-issue:list` — create and manage GitHub issues with
+auto-collected environment metadata.
+
+### Patterns — `stx-pattern` (5 commands, shared)
+
+`/stx-pattern:list`, `/stx-pattern:show`, `/stx-pattern:new`,
+`/stx-pattern:reindex`, `/stx-pattern:validate` — manage the reusable design
+patterns catalog (see Section 4i in stx-guide).
 
 ---
 
@@ -213,14 +267,14 @@ StreamTeX includes 4 specialized AI agents that work autonomously within their d
 - **Role**: Design project structure from natural language descriptions
 - **Principles**: One block = one idea, max 15 blocks, logical ordering (intro, concepts, demos, synthesis, conclusion)
 - **Output**: Proposed plan with block list, features, color palette — requires your confirmation
-- **Trigger**: Activated automatically by `/stx-project:project-init`
+- **Trigger**: Activated automatically by `/stx-block:init`
 
 ### Slide Designer
 
 - **Role**: Create visually polished, pedagogically structured slides
 - **Principles**: ~45-char lines, 32pt body text, canonical structure (explanation, code, demo, details)
 - **Anti-patterns detected**: String concatenation, missing `show_code()`, code without demo, unclear error boxes
-- **Trigger**: Activated by `/stx-designer:slide-new`
+- **Trigger**: Activated by `/stx-block:slide-new`
 
 ### Slide Reviewer
 
@@ -247,30 +301,29 @@ StreamTeX provides 4 installable AI profiles via
 ### `project` (recommended for most users)
 
 - **Audience**: Content creators, teachers, presenters
-- **Commands**: 19 (designer + migration + project + developer)
-- **Agents**: Project Architect, Slide Designer, Slide Reviewer
-- **Skills**: Block blueprints, visual design rules, style conventions, quick reference
+- **Commands**: 28 (15 stx-block + 13 stx-ce) plus shared groups (stx-issue, stx-import, stx-export, stx-deploy, stx-pattern)
+- **Agents**: 21 (3 designer + 18 ce specialists)
+- **Skills**: 21 (8 designer + 13 ce)
 - **Install**: `stx claude install project ./my-project`
 
 ### `presentation` (extends project)
 
 - **Audience**: Live presenters (amphitheater, conference)
-- **Adds**: 3 commands + 1 agent + 2 skills on top of `project`
+- **Adds**: 3 stx-presentation commands + 1 agent + 3 skills on top of `project`
 - **Key difference**: Enforces large fonts (48pt+), keyword-only bullets, high contrast for 10-20m distance
 - **Install**: `stx claude install presentation ./my-project`
 
 ### `documentation` (manual authoring)
 
 - **Audience**: Technical writers, manual authors
-- **Commands**: 10 (designer + project + developer)
-- **Agents**: Slide Designer, Slide Reviewer
-- **Focus**: Multi-manual coordination, course generation
+- **Inherits** `project`. Adds shared `stx-coherence` and `stx-pattern` command groups for cross-manual coherence audits and pattern management.
+- **Focus**: Multi-manual coordination, course generation, ecosystem-wide audits
 - **Install**: `stx claude install documentation ./my-project`
 
 ### `library` (core development)
 
 - **Audience**: StreamTeX library contributors
-- **Commands**: 3 (test, lint, deploy)
+- **Inherits** `project`. Adds shared `stx-coherence` for ecosystem-wide audits.
 - **Skills**: Architecture reference, testing patterns
 - **Install**: `stx claude install library ./streamtex`
 
@@ -278,7 +331,7 @@ StreamTeX provides 4 installable AI profiles via
 
 ## Block Blueprint Catalog
 
-When you create blocks with `/stx-designer:block-new` or `/stx-project:project-init`,
+When you create blocks with `/stx-block:new` or `/stx-block:init`,
 the agent matches your description against these 12 templates:
 
 | # | Blueprint | Use case |
@@ -378,20 +431,20 @@ st_image(uri=path, width="100%")
 
 ### Iterating with AI
 
-- Start with `/stx-project:project-init` for the overall structure
-- Use `/stx-designer:slide-new` to refine individual slides
-- Run `/stx-designer:slide-audit` periodically to catch design issues
-- Use `/stx-project:project-customize` to adjust theme and navigation at any time
+- Start with `/stx-block:init` for the overall structure
+- Use `/stx-block:slide-new` to refine individual slides
+- Run `/stx-block:audit --all` periodically to catch design issues
+- Use `/stx-block:customize` (or `/stx-block:update`) to adjust theme and navigation at any time
 
 ### Combining commands
 
 Commands can be chained in a natural conversation:
 
 > "Create a new slide about Docker volumes with a code example"
-> → agent uses `/stx-designer:slide-new` + blueprint #6 (code demo)
+> → agent uses `/stx-block:slide-new` + blueprint #6 (code demo)
 
 > "Audit all my slides for design compliance"
-> → agent runs `/stx-designer:slide-audit` on each block file
+> → agent runs `/stx-block:audit --all`
 
 ### When to switch to code
 
@@ -446,11 +499,11 @@ Commands are simple markdown files with instructions for the AI assistant.
 ### How do I deploy my project?
 
 ```bash
-/stx-developer:deploy
+/stx-deploy:preflight
+/stx-deploy:deploy
 ```
 
-The deploy command supports Docker, Hugging Face Spaces, and GCP targets.
-It runs pre-flight checks (tests, linting, requirements) before deploying.
+The `stx-deploy` command group drives the full Hetzner/Coolify deployment pipeline (preflight, provision, secure, install-coolify, configure-domain, deploy, scale, status). For local Docker testing, use `stx deploy docker .` from the CLI directly.
 
 ### How does Render auto-deploy work?
 

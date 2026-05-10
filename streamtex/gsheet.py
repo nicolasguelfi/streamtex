@@ -262,8 +262,8 @@ def _load_service_account(sheet_id: str, tab: str, cell_range: Optional[str],
         from googleapiclient.discovery import build
     except ImportError:
         raise GSheetError(
-            "Google Sheets API v4 requires:\n"
-            "  uv add google-api-python-client google-auth\n"
+            "Google Sheets API v4 requires the gsheet extras:\n"
+            "  uv add 'streamtex[gsheet]'\n"
             "Install these to use auth_mode='service_account'."
         )
 
@@ -300,8 +300,8 @@ def _load_oauth2(sheet_id: str, tab: str, cell_range: Optional[str],
         from googleapiclient.discovery import build
     except ImportError:
         raise GSheetError(
-            "OAuth2 requires:\n"
-            "  uv add google-api-python-client google-auth-oauthlib\n"
+            "OAuth2 requires the gsheet extras:\n"
+            "  uv add 'streamtex[gsheet]'\n"
             "Install these to use auth_mode='oauth2'."
         )
 

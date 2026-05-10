@@ -2,11 +2,22 @@
 
 from unittest.mock import patch
 
+import pytest
+
+from streamtex import loading
 from streamtex.loading import (
     inject_loading_overlay,
     remove_loading_overlay,
     update_loading_progress,
 )
+
+
+@pytest.fixture(autouse=True)
+def _reset_progress_throttle():
+    """Clear the inter-test progress-emit throttle so each test sees a fresh slate."""
+    loading._last_progress_emit = 0.0
+    yield
+    loading._last_progress_emit = 0.0
 
 # ---------------------------------------------------------------------------
 # inject_loading_overlay
@@ -134,6 +145,45 @@ class TestUpdateLoadingProgress:
         update_loading_progress(3, 10)
         html_arg = mock_components.html.call_args[0][0]
         assert "stx-loading-heartbeat" in html_arg
+
+
+# ---------------------------------------------------------------------------
+# Progress throttle (Chrome iframe-storm guard)
+# ---------------------------------------------------------------------------
+
+class TestProgressThrottle:
+    """Tests for the time-based throttle on progress iframe injection."""
+
+    @patch("streamtex.loading.components")
+    def test_intermediate_calls_within_window_are_throttled(self, mock_components):
+        """Two intermediate updates within the throttle window emit one iframe."""
+        update_loading_progress(3, 100)
+        update_loading_progress(4, 100)
+        assert mock_components.html.call_count == 1
+
+    @patch("streamtex.loading.components")
+    def test_initial_call_always_emits(self, mock_components):
+        """current=0 (transition to progress mode) bypasses the throttle."""
+        update_loading_progress(5, 100)  # primes _last_progress_emit
+        update_loading_progress(0, 100)  # initial signal — must emit
+        assert mock_components.html.call_count == 2
+
+    @patch("streamtex.loading.components")
+    def test_final_call_always_emits(self, mock_components):
+        """The terminal current==total call bypasses the throttle (so 100% is shown)."""
+        update_loading_progress(99, 100)  # primes _last_progress_emit
+        update_loading_progress(100, 100)  # final — must emit
+        assert mock_components.html.call_count == 2
+
+    @patch("streamtex.loading.components")
+    def test_inject_resets_throttle(self, mock_components):
+        """A new overlay injection resets the throttle so the next progress call emits."""
+        update_loading_progress(5, 100)
+        # Without reset the next intermediate call would be throttled.
+        inject_loading_overlay()
+        update_loading_progress(6, 100)
+        # 1 update + 1 inject + 1 update = 3 iframes
+        assert mock_components.html.call_count == 3
 
 
 # ---------------------------------------------------------------------------

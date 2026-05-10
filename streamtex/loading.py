@@ -10,10 +10,19 @@ The overlay is injected into the parent Streamlit document via JS
 from __future__ import annotations
 
 import logging
+import time
 
 import streamlit.components.v1 as components
 
 logger = logging.getLogger(__name__)
+
+# Throttle interval for progress iframe injection. Each call emits a
+# `components.html(...)` iframe into the parent document; with many blocks
+# Chrome stalls under the combined load of per-iframe site-isolation +
+# open MutationObservers (link_preview, marker, bib_preview). 0.1 s caps
+# the storm at ~10 iframes/sec while keeping the overlay visibly responsive.
+_PROGRESS_THROTTLE_S = 0.1
+_last_progress_emit = 0.0
 
 # ---------------------------------------------------------------------------
 # HTML/CSS/JS templates
@@ -148,6 +157,8 @@ _REMOVE_JS = """\
 
 def inject_loading_overlay() -> None:
     """Create the full-screen loading overlay on the parent document."""
+    global _last_progress_emit
+    _last_progress_emit = 0.0
     js = _INJECT_JS.replace("__CSS__", _OVERLAY_CSS.replace("`", "\\`"))
     components.html(js, height=0)
 
@@ -164,6 +175,15 @@ def update_loading_progress(current: int, total: int, module_name: str = "") -> 
     module_name:
         Short display name of the module being rendered (e.g. ``bck_intro``).
     """
+    global _last_progress_emit
+    # Always emit the initial transition (current=0) and the final 100%
+    # (current>=total) so the overlay reaches a clean terminal state.
+    is_terminal = current <= 0 or (total > 0 and current >= total)
+    now = time.monotonic()
+    if not is_terminal and now - _last_progress_emit < _PROGRESS_THROTTLE_S:
+        return
+    _last_progress_emit = now
+
     pct = int(100 * current / total) if total > 0 else 0
     # Sanitise module name for JS string literal
     safe_name = module_name.replace("\\", "\\\\").replace("'", "\\'")

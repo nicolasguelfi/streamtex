@@ -1,14 +1,12 @@
-"""Unit tests for streamtex.marker_runtime — Phase 0 scaffold.
+"""Unit tests for streamtex.marker_runtime.
 
 Validates that:
-  - the env-flag gating works (legacy :has() path is the default);
   - inject_marker_runtime() is idempotent within a session;
   - the global stylesheet and JS observer assets ship inside the package
-    and contain the expected anchors (so subsequent phases can rely on them).
+    and contain the expected anchors.
 """
 from __future__ import annotations
 
-import os
 from unittest.mock import patch
 
 import pytest
@@ -20,7 +18,6 @@ from streamtex.marker_runtime import (
     _JS_PATH,
     _SESSION_KEY,
     inject_marker_runtime,
-    is_marker_runtime_enabled,
 )
 
 
@@ -35,74 +32,31 @@ def _reset_marker_session():
 
 
 # ---------------------------------------------------------------------------
-# is_marker_runtime_enabled
-# ---------------------------------------------------------------------------
-
-class TestIsMarkerRuntimeEnabled:
-    def test_enabled_by_default(self):
-        """Phase 4 (0.6.15) flipped the default to ON."""
-        with patch.dict(os.environ, {}, clear=False):
-            os.environ.pop("STX_USE_MARKER_RUNTIME", None)
-            os.environ.pop("STX_USE_LEGACY_HAS", None)
-            assert is_marker_runtime_enabled() is True
-
-    def test_enabled_by_flag(self):
-        with patch.dict(os.environ, {"STX_USE_MARKER_RUNTIME": "1"}, clear=False):
-            os.environ.pop("STX_USE_LEGACY_HAS", None)
-            assert is_marker_runtime_enabled() is True
-
-    def test_explicit_zero_disables(self):
-        """STX_USE_MARKER_RUNTIME=0 is the explicit opt-out (Phase 4 only)."""
-        with patch.dict(os.environ, {"STX_USE_MARKER_RUNTIME": "0"}, clear=False):
-            os.environ.pop("STX_USE_LEGACY_HAS", None)
-            assert is_marker_runtime_enabled() is False
-
-    def test_legacy_override_wins(self):
-        """STX_USE_LEGACY_HAS=1 is the escape hatch — wins over MARKER=1."""
-        with patch.dict(os.environ, {
-            "STX_USE_MARKER_RUNTIME": "1",
-            "STX_USE_LEGACY_HAS": "1",
-        }, clear=False):
-            assert is_marker_runtime_enabled() is False
-
-
-# ---------------------------------------------------------------------------
 # inject_marker_runtime
 # ---------------------------------------------------------------------------
 
 class TestInjectMarkerRuntime:
-    def test_noop_when_disabled(self):
-        """With the Phase 4 default flip, disabling requires STX_USE_LEGACY_HAS=1."""
-        with patch.dict(os.environ, {"STX_USE_LEGACY_HAS": "1"}, clear=False):
-            os.environ.pop("STX_USE_MARKER_RUNTIME", None)
-            with patch("streamtex.marker_runtime.st.html") as mock_html:
-                inject_marker_runtime()
-                mock_html.assert_not_called()
-            assert _SESSION_KEY not in st.session_state
-
-    def test_injects_once_when_enabled(self):
-        with patch.dict(os.environ, {"STX_USE_MARKER_RUNTIME": "1"}, clear=False):
-            with patch("streamtex.marker_runtime.st.html") as mock_html:
-                inject_marker_runtime()
-                inject_marker_runtime()  # second call same session
-                assert mock_html.call_count == 1
-            assert st.session_state.get(_SESSION_KEY) is True
+    def test_injects_once_per_session(self):
+        with patch("streamtex.marker_runtime.st.html") as mock_html:
+            inject_marker_runtime()
+            inject_marker_runtime()  # second call same session
+            assert mock_html.call_count == 1
+        assert st.session_state.get(_SESSION_KEY) is True
 
     def test_emits_style_and_script_tags(self):
-        with patch.dict(os.environ, {"STX_USE_MARKER_RUNTIME": "1"}, clear=False):
-            captured = {}
+        captured = {}
 
-            def _capture(html: str) -> None:
-                captured["html"] = html
+        def _capture(html: str) -> None:
+            captured["html"] = html
 
-            with patch("streamtex.marker_runtime.st.html", side_effect=_capture):
-                inject_marker_runtime()
-            assert "<style>" in captured["html"]
-            assert "<script>" in captured["html"]
-            # Observer asset signature.
-            assert "__stxMarkerObs" in captured["html"]
-            # Phase-0 CSS includes the universal marker-cell rule.
-            assert "stx-marker-cell" in captured["html"]
+        with patch("streamtex.marker_runtime.st.html", side_effect=_capture):
+            inject_marker_runtime()
+        assert "<style>" in captured["html"]
+        assert "<script>" in captured["html"]
+        # Observer asset signature.
+        assert "__stxMarkerObs" in captured["html"]
+        # Universal marker-cell rule lives in the global stylesheet.
+        assert "stx-marker-cell" in captured["html"]
 
 
 # ---------------------------------------------------------------------------
@@ -134,7 +88,6 @@ class TestStaticAssets:
         `data-stx-uid`, so multiple marker kinds (e.g. list-item wrapping
         st_block) can coexist without uid collision."""
         js = _JS_PATH.read_text(encoding="utf-8")
-        # Look for the kind-prefix concatenation pattern.
         assert "'data-stx-' + kind + '-uid'" in js
 
     def test_css_hides_marker_cells(self):
@@ -150,4 +103,3 @@ class TestStaticAssets:
 class TestModuleSurface:
     def test_public_symbols(self):
         assert callable(marker_runtime.inject_marker_runtime)
-        assert callable(marker_runtime.is_marker_runtime_enabled)

@@ -321,7 +321,8 @@ class TestSlideBreakZoomParam:
 class TestStZoomContextManager:
     """Tests for the st_zoom() context manager."""
 
-    def test_injects_zoom_css(self):
+    def test_injects_zoom_factor_attribute(self):
+        """The zoom factor is forwarded as data-stx-zoom-factor on the marker."""
         from streamtex.zoom import st_zoom
 
         with patch("streamtex.zoom.st.container") as mock_ct, \
@@ -330,10 +331,11 @@ class TestStZoomContextManager:
             mock_ct.return_value.__exit__ = lambda s, *a: False
             with st_zoom(75):
                 pass
-            css = mock_html.call_args[0][0]
-            assert "zoom: 0.75" in css
+            html = mock_html.call_args[0][0]
+            assert 'data-stx-zoom-factor="0.75"' in html
+            assert 'data-stx-kind="zoom"' in html
 
-    def test_default_100_no_visible_change(self):
+    def test_default_100_emits_factor_1(self):
         from streamtex.zoom import st_zoom
 
         with patch("streamtex.zoom.st.container") as mock_ct, \
@@ -342,10 +344,10 @@ class TestStZoomContextManager:
             mock_ct.return_value.__exit__ = lambda s, *a: False
             with st_zoom(100):
                 pass
-            css = mock_html.call_args[0][0]
-            assert "zoom: 1.0" in css
+            html = mock_html.call_args[0][0]
+            assert 'data-stx-zoom-factor="1.0"' in html
 
-    def test_zoom_200(self):
+    def test_zoom_200_emits_factor_2(self):
         from streamtex.zoom import st_zoom
 
         with patch("streamtex.zoom.st.container") as mock_ct, \
@@ -354,8 +356,8 @@ class TestStZoomContextManager:
             mock_ct.return_value.__exit__ = lambda s, *a: False
             with st_zoom(200):
                 pass
-            css = mock_html.call_args[0][0]
-            assert "zoom: 2.0" in css
+            html = mock_html.call_args[0][0]
+            assert 'data-stx-zoom-factor="2.0"' in html
 
     def test_export_wrapper(self):
         from streamtex.zoom import st_zoom

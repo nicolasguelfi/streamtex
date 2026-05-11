@@ -240,27 +240,18 @@ class TestStGrid:
             assert controller.cols == 2
 
     def test_st_grid_with_int_cols_generates_template(self, mock_streamlit):
-        """Test st_grid with int cols generates correct CSS template."""
+        """Test st_grid with int cols forwards the template via data attribute."""
         with st_grid(cols=3) as controller:
             pass
-
-        # Check that st.html was called with CSS containing the template
-        html_calls = mock_streamlit["html"].call_args_list
-
-        # First call should be the CSS injection
-        css_call = html_calls[0]
-        css_html = css_call[0][0]
-        assert "grid-template-columns: 1fr 1fr 1fr;" in css_html
+        joined = "".join(c[0][0] for c in mock_streamlit["html"].call_args_list)
+        assert 'data-stx-grid-template="1fr 1fr 1fr"' in joined
 
     def test_st_grid_with_string_cols_uses_as_is(self, mock_streamlit):
-        """Test st_grid with string cols uses the string directly."""
+        """Test st_grid with string cols forwards the string verbatim."""
         with st_grid(cols="200px 1fr") as controller:
             pass
-
-        html_calls = mock_streamlit["html"].call_args_list
-        css_call = html_calls[0]
-        css_html = css_call[0][0]
-        assert "grid-template-columns: 200px 1fr;" in css_html
+        joined = "".join(c[0][0] for c in mock_streamlit["html"].call_args_list)
+        assert 'data-stx-grid-template="200px 1fr"' in joined
 
     def test_st_grid_with_empty_string_cols_raises(self, mock_streamlit):
         """Test that st_grid with empty string cols raises ValueError (C5 validation)."""
@@ -275,36 +266,28 @@ class TestStGrid:
                 pass
 
     def test_st_grid_with_gap_parameter(self, mock_streamlit):
-        """Test st_grid with explicit gap parameter (C2 feature)."""
+        """Test st_grid with explicit gap parameter forwards data-stx-grid-gap."""
         with st_grid(cols=2, gap="24px") as controller:
             pass
-
-        html_calls = mock_streamlit["html"].call_args_list
-        css_call = html_calls[0]
-        css_html = css_call[0][0]
-        assert "gap: 24px;" in css_html
+        joined = "".join(c[0][0] for c in mock_streamlit["html"].call_args_list)
+        assert 'data-stx-grid-gap="24px"' in joined
 
     def test_st_grid_default_gap_is_zero(self, mock_streamlit):
         """Test st_grid default gap value is 0."""
         with st_grid(cols=2) as controller:
             pass
-
-        html_calls = mock_streamlit["html"].call_args_list
-        css_call = html_calls[0]
-        css_html = css_call[0][0]
-        assert "gap: 0;" in css_html
+        joined = "".join(c[0][0] for c in mock_streamlit["html"].call_args_list)
+        assert 'data-stx-grid-gap="0"' in joined
 
     def test_st_grid_with_grid_style(self, mock_streamlit):
-        """Test st_grid applies grid_style to the grid container."""
+        """Test st_grid applies grid_style via per-instance attribute-selector stylesheet."""
         grid_style = Style("border: 1px solid red;", "bordered_grid")
 
         with st_grid(cols=2, grid_style=grid_style) as controller:
             pass
-
-        html_calls = mock_streamlit["html"].call_args_list
-        css_call = html_calls[0]
-        css_html = css_call[0][0]
-        assert "border: 1px solid red;" in css_html
+        joined = "".join(c[0][0] for c in mock_streamlit["html"].call_args_list)
+        assert "border: 1px solid red;" in joined
+        assert '[data-stx-grid-uid="css-grid-' in joined
 
     def test_st_grid_generates_unique_grid_id(self, mock_streamlit):
         """Test that st_grid generates unique grid IDs for multiple grids."""
@@ -330,14 +313,13 @@ class TestStGrid:
         if len(grid_ids) == 2:
             assert grid_ids[0] != grid_ids[1]
 
-    def test_st_grid_calls_st_html_multiple_times(self, mock_streamlit):
-        """Test that st_grid calls st.html for CSS and marker."""
+    def test_st_grid_calls_st_html_at_least_once(self, mock_streamlit):
+        """Test that st_grid calls st.html at least once for the marker span."""
         with st_grid(cols=2) as controller:
             pass
 
-        # Should have called st.html multiple times (CSS + marker)
         html_calls = mock_streamlit["html"].call_args_list
-        assert len(html_calls) >= 2
+        assert len(html_calls) >= 1
 
     def test_st_grid_marker_hidden(self, mock_streamlit):
         """Test that the marker span is hidden."""
@@ -379,11 +361,8 @@ class TestStGrid:
 
         with st_grid(cols=template) as controller:
             pass
-
-        html_calls = mock_streamlit["html"].call_args_list
-        css_call = html_calls[0]
-        css_html = css_call[0][0]
-        assert f"grid-template-columns: {template};" in css_html
+        joined = "".join(c[0][0] for c in mock_streamlit["html"].call_args_list)
+        assert f'data-stx-grid-template="{template}"' in joined
 
     def test_st_grid_all_gaps_values(self, mock_streamlit):
         """Test st_grid with various gap values."""
@@ -394,11 +373,8 @@ class TestStGrid:
 
             with st_grid(cols=2, gap=gap_val) as controller:
                 pass
-
-            html_calls = mock_streamlit["html"].call_args_list
-            css_call = html_calls[0]
-            css_html = css_call[0][0]
-            assert f"gap: {gap_val};" in css_html
+            joined = "".join(c[0][0] for c in mock_streamlit["html"].call_args_list)
+            assert f'data-stx-grid-gap="{gap_val}"' in joined
 
     def test_st_grid_export_wrapper_inactive(self, mock_streamlit):
         """Test st_grid export wrapper is no-op when export is inactive."""
@@ -636,14 +612,12 @@ class TestStGridResponsive:
     """Tests for st_grid responsive mode."""
 
     def test_st_grid_responsive_flag(self, mock_streamlit):
-        """Test st_grid with responsive=True generates auto-fit/minmax CSS."""
+        """Test st_grid with responsive=True forwards auto-fit/minmax template."""
         with st_grid(cols=3, responsive=True) as controller:
             pass
-
-        html_calls = mock_streamlit["html"].call_args_list
-        css_html = html_calls[0][0][0]
-        assert "auto-fit" in css_html
-        assert "minmax(280px, 1fr)" in css_html
+        joined = "".join(c[0][0] for c in mock_streamlit["html"].call_args_list)
+        assert "auto-fit" in joined
+        assert "minmax(280px, 1fr)" in joined
 
     def test_st_grid_responsive_with_min_width(self, mock_streamlit):
         """Test st_grid responsive with explicit min_width."""
@@ -651,27 +625,23 @@ class TestStGridResponsive:
             pass
 
         html_calls = mock_streamlit["html"].call_args_list
-        css_html = html_calls[0][0][0]
-        assert "minmax(400px, 1fr)" in css_html
+        joined = "".join(c[0][0] for c in html_calls)
+        assert "minmax(400px, 1fr)" in joined
 
     def test_st_grid_responsive_string_cols_ignored(self, mock_streamlit):
         """Test responsive flag is ignored when cols is a string."""
         with st_grid(cols="auto 1fr", responsive=True) as controller:
             pass
-
-        html_calls = mock_streamlit["html"].call_args_list
-        css_html = html_calls[0][0][0]
-        assert "grid-template-columns: auto 1fr;" in css_html
+        joined = "".join(c[0][0] for c in mock_streamlit["html"].call_args_list)
+        assert 'data-stx-grid-template="auto 1fr"' in joined
 
     def test_st_grid_min_width_implies_responsive(self, mock_streamlit):
         """Test min_width parameter implicitly activates responsive mode."""
         with st_grid(cols=3, min_width=250) as controller:
             pass
-
-        html_calls = mock_streamlit["html"].call_args_list
-        css_html = html_calls[0][0][0]
-        assert "auto-fit" in css_html
-        assert "minmax(250px, 1fr)" in css_html
+        joined = "".join(c[0][0] for c in mock_streamlit["html"].call_args_list)
+        assert "auto-fit" in joined
+        assert "minmax(250px, 1fr)" in joined
 
     def test_st_grid_responsive_controller_cols(self, mock_streamlit):
         """Test that responsive mode preserves intended_cols on the controller."""

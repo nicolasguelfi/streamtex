@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.16] — 2026-05-12
+
+### Removed
+- **Legacy `:has()` scoping pattern** (Phase 5 — final phase of the `:has()` removal plan). Removed from `streamtex/container.py`, `streamtex/list.py`, `streamtex/grid.py`, `streamtex/zoom.py`, `streamtex/block_helpers.py`. The marker-runtime path is now the only path; there is no fallback.
+- Environment variables `STX_USE_MARKER_RUNTIME` and `STX_USE_LEGACY_HAS` are removed. `is_marker_runtime_enabled()` is removed from `streamtex/marker_runtime.py`. Setting either env var has no effect.
+- Progress-emit throttle in `streamtex/loading.py` (introduced in 0.6.11). It was a defensive patch built on an incorrect hypothesis (iframe storm) and is no longer needed once the actual cause — `:has()` selector explosion — is gone.
+- `TestProgressThrottle` test class in `tests/test_loading.py` (4 tests).
+- All `_force_legacy_by_default` and `_marker_runtime_on` test fixtures across `tests/test_container.py`, `tests/test_list.py`, `tests/test_grid.py`, `tests/test_zoom.py`, `tests/test_section_zoom.py` — no longer needed.
+- `TestStBlockMarkerPath` / `TestStSpanMarkerPath` / `TestStGridMarkerPath` / `TestStZoomMarkerPath` / `TestStListMarkerPath` / `TestListItemMarkerPath` classes folded into the regular test classes (the marker pattern is the only behavior).
+
+### Changed
+- `tests/test_export_guard.py`: `container.py` 2, `grid.py` 1 (was 3 with dual paths), `list.py` 2 (was 6), `block_helpers.py` 1 (was 3) — reflecting the now-single emit path.
+- Several legacy-asserting tests in `tests/test_container.py`, `tests/test_list.py`, `tests/test_grid.py`, `tests/test_section_zoom.py` rewritten to assert the marker emit pattern.
+
+### Notes
+- The freeze fix is now permanent. Users on `0.6.15` who set `STX_USE_LEGACY_HAS=1` as a workaround must remove it before upgrading.
+- See `documentation/maintenance/freeze-has/fix-plan.md`.
+
 ## [0.6.15] — 2026-05-12
 
 ### Changed

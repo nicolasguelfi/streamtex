@@ -3,7 +3,6 @@ from contextlib import contextmanager
 import streamlit as st
 
 from .export import export_pop_wrapper, export_push_wrapper, is_export_active
-from .marker_runtime import is_marker_runtime_enabled
 from .utils import generate_key
 
 _PAGE_WIDTH_KEY = "_stx_page_width"
@@ -150,9 +149,11 @@ def reset_zoom() -> None:
 def st_zoom(factor: int = 100):
     """Apply a CSS zoom factor to all enclosed content.
 
-    Uses a scoped CSS rule via ``:has()`` selector (same pattern as
-    ``st_block``) so the zoom applies only to the Streamlit container
-    created by this context manager.
+    Uses the marker-runtime scoping mechanism (same pattern as
+    :func:`st_block`): a sentinel ``data-stx-kind="zoom"`` span carries
+    the zoom factor as ``data-stx-zoom-factor``; the global ``.stx-zoom``
+    rule consumes it via ``zoom: var(--stx-zoom-factor)``.  Scope is
+    limited to the Streamlit container created by this context manager.
 
     Args:
         factor: Zoom percentage.  ``100`` = normal, ``50`` = half size,
@@ -168,26 +169,14 @@ def st_zoom(factor: int = 100):
     zoom_id = generate_key("zoom")
     zoom_value = factor / 100
 
-    if is_marker_runtime_enabled():
-        # Marker path: the zoom factor is forwarded by the observer as
-        # `--stx-zoom-factor` and consumed by the global `.stx-zoom` rule.
-        css_and_marker = (
-            f'<span class="stx-marker {zoom_id}" '
-            f'data-stx-kind="zoom" data-stx-uid="{zoom_id}" '
-            f'data-stx-zoom-factor="{zoom_value}" '
-            f'style="display:none;"></span>'
-        )
-    else:
-        # Legacy :has() path.
-        css_and_marker = (
-            f'<style>'
-            f'div:has(> .element-container > .stHtml > span.{zoom_id})'
-            f'{{ zoom: {zoom_value}; }}'
-            f' .element-container:has(.stHtml > span.{zoom_id})'
-            f'{{ width: auto; }}'
-            f'</style>'
-            f'<span class="{zoom_id}" style="display:none;"></span>'
-        )
+    # The zoom factor is forwarded by the marker observer as `--stx-zoom-factor`
+    # and consumed by the global `.stx-zoom { zoom: var(--stx-zoom-factor) }` rule.
+    css_and_marker = (
+        f'<span class="stx-marker {zoom_id}" '
+        f'data-stx-kind="zoom" data-stx-uid="{zoom_id}" '
+        f'data-stx-zoom-factor="{zoom_value}" '
+        f'style="display:none;"></span>'
+    )
 
     if is_export_active():
         export_push_wrapper(

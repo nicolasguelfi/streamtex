@@ -5,7 +5,6 @@ import streamlit as st
 
 from .container import st_block
 from .export import export_pop_wrapper, export_push_wrapper, is_export_active
-from .marker_runtime import is_marker_runtime_enabled
 from .styles import StxStyles, Style, StyleGrid
 from .utils import generate_key
 
@@ -47,88 +46,36 @@ def _build_grid_payload(grid_id: str, template: str, gap_value: str,
                         grid_style: Style, breakpoint: str | None) -> str:
     """Return the CSS+marker payload that scopes ``st_grid`` to its container.
 
-    * **Legacy**: 4 ``:has()``-scoped rules turn the parent ``stVerticalBlock``
-      into a CSS grid, plus an optional ``@container`` breakpoint rule.
-    * **Marker runtime**: a sentinel span with ``data-stx-kind="grid"`` and
-      ``data-stx-grid-template`` / ``data-stx-grid-gap`` attributes that the
-      observer forwards as CSS custom properties.  All universal layout
-      rules (display:grid, align-items:stretch, cells width:auto, hide non-
-      cell element-containers) live in the global stylesheet under
-      ``.stx-grid``.  Optional ``grid_style`` and ``breakpoint`` overrides
-      are emitted as tiny per-instance stylesheets keyed by
-      ``[data-stx-grid-uid="…"]`` (no ``:has()``).
+    Emits a sentinel ``data-stx-kind="grid"`` span with ``data-stx-grid-template``
+    and ``data-stx-grid-gap`` attributes that the observer forwards as CSS
+    custom properties.  Universal layout rules (display:grid, align-items:
+    stretch, cells width:auto, hide non-cell element-containers) live in the
+    global stylesheet under ``.stx-grid``.  Optional ``grid_style`` and
+    ``breakpoint`` overrides are emitted as tiny per-instance stylesheets
+    keyed by the ``[data-stx-grid-uid="…"]`` attribute selector — the
+    ``@container`` block stays per-instance because container-query
+    conditions cannot consume ``var()`` reliably across browsers.
     """
-    if is_marker_runtime_enabled():
-        extras = ''
-        if str(grid_style).strip():
-            extras += (
-                f'[data-stx-grid-uid="{grid_id}"]{{{grid_style!s}}}'
-            )
-        if breakpoint:
-            # CSS `@container` query conditions cannot consume `var()`
-            # reliably across browsers, so the breakpoint stays per-instance.
-            extras += (
-                f'.stMainBlockContainer{{container-type:inline-size;}}'
-                f'@container (max-width: {breakpoint}){{'
-                f'[data-stx-grid-uid="{grid_id}"]{{grid-template-columns:1fr!important;}}'
-                f'}}'
-            )
-        inline_css = f'<style>{extras}</style>' if extras else ''
-        return (
-            f'{inline_css}'
-            f'<span class="stx-marker {grid_id}" '
-            f'data-stx-kind="grid" data-stx-uid="{grid_id}" '
-            f'data-stx-grid-template="{template}" data-stx-grid-gap="{gap_value}" '
-            f'style="display:none"></span>'
+    extras = ''
+    if str(grid_style).strip():
+        extras += (
+            f'[data-stx-grid-uid="{grid_id}"]{{{grid_style!s}}}'
         )
-
-    # Legacy :has() path.
-    return f"""
-    <style>
-        /* 1. Turn the container into a Grid */
-        div[data-testid="stVerticalBlock"]:has(> .element-container .stHtml span.{grid_id}) {{
-            display: grid;
-            grid-template-columns: {template};
-            gap: {gap_value};
-            align-items: stretch; /* Ensures equal height cells */
-        }}
-
-        /* 2. Hide Non-Cell Elements */
-        /* Streamlit injects script tags and empty divs for st.html().
-           We must force them to not take up grid slots. */
-        div[data-testid="stVerticalBlock"]:has(> .element-container .stHtml span.{grid_id}) > .element-container:has(style),
-        div[data-testid="stVerticalBlock"]:has(> .element-container .stHtml span.{grid_id}) > .element-container:has(span.{grid_id}),
-        div[data-testid="stVerticalBlock"]:has(> .element-container .stHtml span.{grid_id}) > .element-container:has(script) {{
-            display: none !important;
-        }}
-
-        /* 3. Ensure Cells (stVerticalBlocks inside the grid) behave */
-        /* The direct children of the grid are the 'cells'. */
-        div[data-testid="stVerticalBlock"]:has(> .element-container .stHtml span.{grid_id}) > .stVerticalBlock {{
-            width: auto !important; /* Override Streamlit's width logic */
-            min-width: 0; /* Prevent grid blowout from large images */
-            overflow-wrap: break-word; /* Wrap long words inside cells */
-            word-break: break-word; /* Fallback for older browsers */
-        }}
-
-        /* Apply Wrapper Style to the grid container itself if needed,
-           or we can wrap it. Here we apply to the grid container. */
-        div[data-testid="stVerticalBlock"]:has(> .element-container .stHtml span.{grid_id}) {{
-            {grid_style!s}
-        }}
-        {"" if not breakpoint else f'''
-        /* Container query: responds to actual content width, not viewport */
-        .stMainBlockContainer {{
-            container-type: inline-size;
-        }}
-        @container (max-width: {breakpoint}) {{
-            div[data-testid="stVerticalBlock"]:has(> .element-container .stHtml span.{grid_id}) {{
-                grid-template-columns: 1fr !important;
-            }}
-        }}
-        '''}
-    </style>
-    """
+    if breakpoint:
+        extras += (
+            f'.stMainBlockContainer{{container-type:inline-size;}}'
+            f'@container (max-width: {breakpoint}){{'
+            f'[data-stx-grid-uid="{grid_id}"]{{grid-template-columns:1fr!important;}}'
+            f'}}'
+        )
+    inline_css = f'<style>{extras}</style>' if extras else ''
+    return (
+        f'{inline_css}'
+        f'<span class="stx-marker {grid_id}" '
+        f'data-stx-kind="grid" data-stx-uid="{grid_id}" '
+        f'data-stx-grid-template="{template}" data-stx-grid-gap="{gap_value}" '
+        f'style="display:none"></span>'
+    )
 
 
 class GridController:
@@ -283,26 +230,18 @@ def st_grid(
     # 2b. Resolve gap value (explicit gap parameter takes priority over grid_style)
     gap_value = gap if gap else "0"
 
-    # 3. Build CSS or marker payload
-    css_or_marker = _build_grid_payload(grid_id, template, gap_value, grid_style, breakpoint)
-
-    # Legacy: emit CSS up-front (outside the container).
-    # Marker:  marker span goes inside the container so its `closest(
-    #          [data-testid="stVerticalBlock"])` returns the grid container.
-    if not is_marker_runtime_enabled():
-        st.html(css_or_marker)
+    # 3. Build marker payload
+    marker = _build_grid_payload(grid_id, template, gap_value, grid_style, breakpoint)
 
     # 4. Export wrapper (no-op when export is inactive)
     if is_export_active():
         export_push_wrapper(
             f'<div style="display:grid;grid-template-columns:{template};gap:{gap_value};align-items:stretch;{grid_style}">')
 
-    # 5. Render
+    # 5. Render — the marker span goes INSIDE the container so its
+    # `closest('[data-testid="stVerticalBlock"]')` returns the grid container.
     with st.container():
-        if is_marker_runtime_enabled():
-            st.html(css_or_marker)
-        else:
-            st.html(f'<span class="{grid_id}" style="display:none"></span>')
+        st.html(marker)
 
         controller = GridController(template, cell_styles, intended_cols=intended_cols)
         yield controller

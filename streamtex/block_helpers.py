@@ -20,54 +20,32 @@ from streamtex.utils import generate_key
 def _render_md_body(body: str) -> None:
     """Render Markdown with StxStyles.big, overriding Streamlit's <p>/<li> font-size.
 
-    Two code paths share the same call site:
-
-    * **Legacy**: uses the same ``:has()`` scoping mechanism as ``st_block``
-      but adds explicit CSS rules for ``<p>`` and ``<li>`` descendants so
-      that Streamlit's own font-size declarations are overridden.
-    * **Marker runtime**: emits a sentinel ``data-stx-kind="md-big"`` span
-      together with a tiny per-instance stylesheet keyed by
-      ``[data-stx-md-big-uid="…"]`` — preserves the legacy cascade
-      (``p`` and ``li`` descendants get the same override) without any
-      ``:has()`` selector.
+    Emits a sentinel ``data-stx-kind="md-big"`` marker span together with a
+    tiny per-instance stylesheet keyed by ``[data-stx-md-big-uid="…"]``.
+    The per-instance stylesheet (not the global one under ``.stx-md-big``)
+    carries the actual font-size override because ``StxStyles.big`` may
+    vary per project — this keeps the override truly per-instance while
+    avoiding any ``:has()`` selector.  The cascade reaches the container's
+    ``<p>`` and ``<li>`` descendants exactly like the historical rule.
     """
-    from streamtex.marker_runtime import is_marker_runtime_enabled
-
     uid = generate_key("md")
     big_css = str(StxStyles.big)
-
-    if is_marker_runtime_enabled():
-        # Per-instance attribute-selector stylesheet covers the container +
-        # its <p>/<li> descendants without :has().  Marker span carries the
-        # uid + kind for the observer.
-        inline_css = (
-            f"<style>"
-            f'[data-stx-md-big-uid="{uid}"] {{ {big_css} }} '
-            f'[data-stx-md-big-uid="{uid}"] p,'
-            f'[data-stx-md-big-uid="{uid}"] li {{ {big_css} }}'
-            f"</style>"
-        )
-        marker_html = (
-            f'{inline_css}'
-            f'<span class="stx-marker {uid}" '
-            f'data-stx-kind="md-big" data-stx-uid="{uid}" '
-            f'style="display:none"></span>'
-        )
-        with st.container():
-            st.html(marker_html)
-            st.markdown(body, unsafe_allow_html=True)
-    else:
-        sel = f"div:has(> .element-container > .stHtml > span.{uid})"
-        st.html(
-            f"<style>"
-            f"{sel} {{ {big_css} }} "
-            f"{sel} p, {sel} li {{ {big_css} }} "
-            f".element-container:has(.stHtml > span.{uid}) {{ width: auto; }}"
-            f"</style>"
-        )
-        with st.container():
-            st.html(f'<span class="{uid}" style="display:none"></span>')
-            st.markdown(body, unsafe_allow_html=True)
+    inline_css = (
+        f"<style>"
+        f'[data-stx-md-big-uid="{uid}"] {{ {big_css} }} '
+        f'[data-stx-md-big-uid="{uid}"] p,'
+        f'[data-stx-md-big-uid="{uid}"] li {{ {big_css} }}'
+        f"</style>"
+    )
+    marker_html = (
+        f'{inline_css}'
+        f'<span class="stx-marker {uid}" '
+        f'data-stx-kind="md-big" data-stx-uid="{uid}" '
+        f'style="display:none"></span>'
+    )
+    with st.container():
+        st.html(marker_html)
+        st.markdown(body, unsafe_allow_html=True)
     record_if_active(body)
 
 

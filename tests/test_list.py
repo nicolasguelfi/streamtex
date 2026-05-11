@@ -524,7 +524,7 @@ class TestListAlign:
     """Tests for the align parameter of st_list."""
 
     def test_st_list_default_align_none(self, mock_streamlit):
-        """Test that align defaults to None — list uses width: 100%."""
+        """Test that align defaults to None — no data-stx-list-width attribute."""
         with patch("streamtex.list.st_block") as mock_st_block, \
              patch("streamtex.list.st.html") as mock_html, \
              patch("streamtex.list.is_export_active", return_value=False):
@@ -535,12 +535,12 @@ class TestListAlign:
             with st_list() as controller:
                 pass
 
-            css_call = mock_html.call_args_list[0][0][0]
-            assert "width: 100%" in css_call
-            assert "fit-content" not in css_call
+            marker = mock_html.call_args_list[0][0][0]
+            assert "data-stx-list-width" not in marker
+            # The default width (100%) lives in the global stylesheet.
 
     def test_st_list_align_center(self, mock_streamlit):
-        """Test that align='center' uses fit-content + margin-inline: auto."""
+        """Test that align='center' forwards data-stx-list-width=fit-content."""
         with patch("streamtex.list.st_block") as mock_st_block, \
              patch("streamtex.list.st.html") as mock_html, \
              patch("streamtex.list.is_export_active", return_value=False):
@@ -551,10 +551,10 @@ class TestListAlign:
             with st_list(align="center") as controller:
                 pass
 
-            css_call = mock_html.call_args_list[0][0][0]
-            assert "width: fit-content" in css_call
-            assert "margin-inline: auto" in css_call
-            assert "width: 100%" not in css_call
+            marker = mock_html.call_args_list[0][0][0]
+            assert 'data-stx-list-width="fit-content"' in marker
+            # The global stylesheet rule converts that into
+            # `width: fit-content; margin-inline: auto`.
 
     def test_st_list_align_does_not_affect_controller(self, mock_streamlit):
         """Test that align parameter does not change the ListController."""

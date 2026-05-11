@@ -3,7 +3,6 @@ from contextlib import contextmanager
 import streamlit as st
 
 from .export import export_pop_wrapper, export_push_wrapper, is_export_active
-from .marker_runtime import is_marker_runtime_enabled
 from .styles import StxStyles, Style
 from .utils import generate_key
 
@@ -11,85 +10,55 @@ from .utils import generate_key
 def _build_block_payload(block_id: str, style: Style, section_css: str) -> str:
     """Return the `<style>+<span>` payload that scopes ``st_block`` to its container.
 
-    Two code paths share the same call site:
-
-    * **Legacy** (default until Phase 4): emits a ``:has()``-based stylesheet
-      that targets the parent ``stVerticalBlock`` div and a hidden marker span.
-    * **Marker runtime** (``STX_USE_MARKER_RUNTIME=1``): emits a sentinel span
-      with ``data-stx-kind="block"``; the global stylesheet + observer
-      installed by :mod:`streamtex.marker_runtime` translate that into a class
-      on the parent.  When the user supplies a non-empty style, an extra
-      per-instance ``<style>`` keyed by attribute selector ``[data-stx-uid]``
-      carries it (Option B in the fix plan — preserves cascade semantics).
+    Emits a sentinel ``<span class="stx-marker" data-stx-kind="block" …>``
+    that the global :mod:`streamtex.marker_runtime` MutationObserver
+    translates into a ``.stx-block`` class on the parent
+    ``[data-testid="stVerticalBlock"]``.  When the user supplies a
+    non-empty style, an extra per-instance ``<style>`` keyed by the
+    attribute selector ``[data-stx-block-uid="…"]`` carries it
+    (preserves the cascade semantics of the historical ``:has()`` rule).
     """
-    if is_marker_runtime_enabled():
-        combined = f"{style!s}{section_css}".strip()
-        if combined:
-            inline_css = (
-                f'<style>'
-                f'[data-stx-block-uid="{block_id}"]'
-                f'{{{style!s}{section_css}}}'
-                f'</style>'
-            )
-        else:
-            inline_css = ''
-        return (
-            f'{inline_css}'
-            f'<span class="stx-marker {block_id}" '
-            f'data-stx-kind="block" data-stx-uid="{block_id}" '
-            f'style="display:none;"></span>'
+    combined = f"{style!s}{section_css}".strip()
+    if combined:
+        inline_css = (
+            f'<style>'
+            f'[data-stx-block-uid="{block_id}"]'
+            f'{{{style!s}{section_css}}}'
+            f'</style>'
         )
-
-    # Legacy :has() path.
+    else:
+        inline_css = ''
     return (
-        f'<style>'
-        f'div:has(> .element-container > .stHtml > span.{block_id})'
-        f'{{ {style!s}{section_css} }}'
-        f' .element-container:has(.stHtml > span.{block_id})'
-        f'{{ width: auto; }}'
-        f'</style>'
-        f'<span class="{block_id}" style="display:none;"></span>'
+        f'{inline_css}'
+        f'<span class="stx-marker {block_id}" '
+        f'data-stx-kind="block" data-stx-uid="{block_id}" '
+        f'style="display:none;"></span>'
     )
 
 
 def _build_span_payload(block_id: str, style: Style, section_css: str) -> str:
     """Return the `<style>+<span>` payload that scopes ``st_span`` to its container.
 
-    Mirrors :func:`_build_block_payload` but for the horizontal flex layout
-    of ``st_span``.  The flex-row container styles (display, flex-direction,
-    white-space) are *per-instance* in the legacy path; in the marker path
-    they live in the global stylesheet under ``.stx-span`` and only the
-    user-supplied style is per-instance.
+    Mirrors :func:`_build_block_payload` but with ``data-stx-kind="span"``.
+    The flex-row container styles (display:flex, flex-direction:row,
+    white-space:pre) live in the global stylesheet under ``.stx-span``;
+    only the user-supplied ``style`` is per-instance.
     """
-    if is_marker_runtime_enabled():
-        combined = f"{style!s}{section_css}".strip()
-        if combined:
-            inline_css = (
-                f'<style>'
-                f'[data-stx-span-uid="{block_id}"]'
-                f'{{{style!s}{section_css}}}'
-                f'</style>'
-            )
-        else:
-            inline_css = ''
-        return (
-            f'{inline_css}'
-            f'<span class="stx-marker {block_id}" '
-            f'data-stx-kind="span" data-stx-uid="{block_id}" '
-            f'style="display:none;"></span>'
+    combined = f"{style!s}{section_css}".strip()
+    if combined:
+        inline_css = (
+            f'<style>'
+            f'[data-stx-span-uid="{block_id}"]'
+            f'{{{style!s}{section_css}}}'
+            f'</style>'
         )
-
-    # Legacy :has() path.
+    else:
+        inline_css = ''
     return (
-        f'<style>'
-        f'div:has(> .element-container > .stHtml > span.{block_id}) > *'
-        f'{{ width: auto; }}'
-        f' div:has(> .element-container > .stHtml > span.{block_id})'
-        f'{{ display: flex; flex-direction: row; white-space: pre; {style!s}{section_css} }}'
-        f' .element-container:has(.stHtml > span.{block_id})'
-        f'{{ width: auto; }}'
-        f'</style>'
-        f'<span class="{block_id}" style="display:none;"></span>'
+        f'{inline_css}'
+        f'<span class="stx-marker {block_id}" '
+        f'data-stx-kind="span" data-stx-uid="{block_id}" '
+        f'style="display:none;"></span>'
     )
 
 
@@ -169,6 +138,3 @@ def st_span(style: Style = StxStyles.none):
 
     if is_export_active():
         export_pop_wrapper("</div>")
-
-
-

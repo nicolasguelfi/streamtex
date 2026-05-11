@@ -42,3 +42,58 @@
   width: auto;
 }
 
+/* ============================================================================
+ * Phase 2 (0.6.13) — st_list / st_list-item
+ * Replaces the legacy per-instance :has() selectors in streamtex/list.py.
+ *
+ * Bullet content is per-item (list.py emits a tiny `<style>` keyed by the
+ * `[data-stx-list-item-uid="…"]` attribute selector) because `content:
+ * counter(streamtex-counter, decimal) '.'` cannot be reliably carried by a
+ * CSS custom property.  Every other rule is here.
+ * ========================================================================== */
+
+/* List root (counter-reset, gap, default width). */
+[data-testid="stVerticalBlock"].stx-list {
+  counter-reset: streamtex-counter;
+  gap: 0.2rem;
+  width: 100%;
+}
+/* Centered list root (align="center"): width override via observer-set var. */
+[data-testid="stVerticalBlock"].stx-list[data-stx-list-width="fit-content"] {
+  width: fit-content;
+  margin-inline: auto;
+}
+
+/* List item: flex row holding [bullet ::before] + [content wrapper]. */
+[data-testid="stVerticalBlock"].stx-list-item {
+  display: flex;
+  flex-direction: row;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+[data-testid="stVerticalBlock"].stx-list-item.stx-list-item--ordered {
+  counter-increment: streamtex-counter;
+}
+/* Bullet positioning (the `content` value itself is per-item — see list.py). */
+[data-testid="stVerticalBlock"].stx-list-item::before {
+  flex-shrink: 0;
+  text-align: right;
+  min-width: 1.2rem;
+  color: inherit;
+  font-weight: inherit;
+  align-self: baseline;
+}
+/* Hide the list-item's own marker cell (`display:none` like the legacy rule). */
+[data-testid="stVerticalBlock"].stx-list-item > .element-container.stx-marker-cell {
+  display: none;
+}
+/* Inner content wrapper: the st.container() yielded inside each item. */
+[data-testid="stVerticalBlock"].stx-list-item > [data-testid="stVerticalBlock"] {
+  flex-grow: 1;
+  width: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-width: 0;
+}
+

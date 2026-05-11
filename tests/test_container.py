@@ -755,8 +755,10 @@ class TestStBlockMarkerPath:
         with st_block(style):
             pass
         joined = "".join(c[0][0] for c in mock_streamlit["html"].call_args_list)
-        # Per-instance stylesheet must use [data-stx-uid="…"], not :has().
-        assert '[data-stx-uid="block-' in joined
+        # Per-instance stylesheet uses kind-prefixed UID attribute, not :has().
+        # The kind prefix lets multiple marker kinds coexist on the same
+        # parent (e.g. a list-item that wraps st_block).
+        assert '[data-stx-block-uid="block-' in joined
         assert "color: red" in joined
         assert ":has(" not in joined
 
@@ -798,7 +800,7 @@ class TestStSpanMarkerPath:
         with st_span(style):
             pass
         joined = "".join(c[0][0] for c in mock_streamlit["html"].call_args_list)
-        assert '[data-stx-uid="span-' in joined
+        assert '[data-stx-span-uid="span-' in joined
         assert "color: blue" in joined
         assert ":has(" not in joined
 

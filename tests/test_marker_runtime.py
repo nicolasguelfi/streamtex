@@ -120,6 +120,14 @@ class TestStaticAssets:
         for kind in ("block", "span", "grid", "list", "list-item", "zoom", "md-big"):
             assert f"'{kind}'" in js, f"missing kind {kind!r} in observer"
 
+    def test_js_observer_uses_kind_prefixed_uid_attribute(self):
+        """Observer must set `data-stx-{kind}-uid` on the parent, not a flat
+        `data-stx-uid`, so multiple marker kinds (e.g. list-item wrapping
+        st_block) can coexist without uid collision."""
+        js = _JS_PATH.read_text(encoding="utf-8")
+        # Look for the kind-prefix concatenation pattern.
+        assert "'data-stx-' + kind + '-uid'" in js
+
     def test_css_hides_marker_cells(self):
         css = _CSS_PATH.read_text(encoding="utf-8")
         assert ".stx-marker-cell" in css

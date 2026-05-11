@@ -59,9 +59,14 @@
       parent.style.setProperty(cssVar, a.value);
     }
 
-    // Tag for the inspector / export tooling.
+    // Tag for the inspector / export tooling + per-instance CSS targeting.
+    // Use a *kind-prefixed* attribute on the parent so multiple marker kinds
+    // (e.g. a list-item that wraps a st_block) can coexist without one's uid
+    // overwriting another's.
     var uid = markerSpan.getAttribute('data-stx-uid');
-    if (uid) parent.setAttribute('data-stx-uid', uid);
+    if (uid) {
+      parent.setAttribute('data-stx-' + kind + '-uid', uid);
+    }
 
     // Boolean modifiers (presence-only attributes like data-stx-ordered).
     if (markerSpan.hasAttribute('data-stx-ordered')) {

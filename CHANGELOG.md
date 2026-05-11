@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.13] — 2026-05-11
+
+### Added
+- **`st_list` / `ListController.item` marker-runtime path** (Phase 2 of the `:has()` removal plan). When `STX_USE_MARKER_RUNTIME=1` is set, `streamtex/list.py` emits sentinel markers (`data-stx-kind="list"`, `data-stx-kind="list-item"`) instead of `:has()`-scoped stylesheets. Bullet `content` (including ordered counters like `counter(streamtex-counter, decimal) '.'`) is carried by a tiny per-item stylesheet keyed by `[data-stx-list-item-uid="…"]` — necessary because CSS `var()` cannot reliably carry a `counter()` function call across all browsers.
+- `.stx-list` and `.stx-list-item` rules in `streamtex/static/css/stx_global.css`. Layout, gap, baseline alignment, marker-cell hide, and inner content wrapper now live in the global stylesheet.
+- New test classes `TestStListMarkerPath`, `TestListItemMarkerPath` in `tests/test_list.py` (8 new tests).
+
+### Changed
+- **Observer kind-prefixed UID attribute**: `streamtex/static/js/stx_marker_observer.js` now sets `data-stx-{kind}-uid` (e.g. `data-stx-block-uid`, `data-stx-list-item-uid`) on the parent `stVerticalBlock` rather than a single `data-stx-uid`. This is required because a `ListController.item` wraps a `st_block` — both markers point at the same parent and a flat attribute would let one overwrite the other.
+- `streamtex/container.py` marker path: per-instance stylesheets now use `[data-stx-block-uid="…"]` / `[data-stx-span-uid="…"]` instead of `[data-stx-uid="…"]`.
+- `tests/test_container.py`, `tests/test_marker_runtime.py` updated for the kind-prefixed attribute.
+
+### Notes
+- Legacy `:has()` path remains the default (flag off). Every legacy test in `tests/test_list.py`, `tests/test_container.py` continues to pass byte-identically.
+- See `documentation/maintenance/freeze-has/fix-plan.md` for the multi-phase plan.
+
 ## [0.6.12] — 2026-05-11
 
 ### Added

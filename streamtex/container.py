@@ -27,7 +27,7 @@ def _build_block_payload(block_id: str, style: Style, section_css: str) -> str:
         if combined:
             inline_css = (
                 f'<style>'
-                f'[data-testid="stVerticalBlock"][data-stx-uid="{block_id}"]'
+                f'[data-stx-block-uid="{block_id}"]'
                 f'{{{style!s}{section_css}}}'
                 f'</style>'
             )
@@ -66,7 +66,7 @@ def _build_span_payload(block_id: str, style: Style, section_css: str) -> str:
         if combined:
             inline_css = (
                 f'<style>'
-                f'[data-testid="stVerticalBlock"][data-stx-uid="{block_id}"]'
+                f'[data-stx-span-uid="{block_id}"]'
                 f'{{{style!s}{section_css}}}'
                 f'</style>'
             )

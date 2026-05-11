@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.14] — 2026-05-11
+
+### Added
+- **`st_grid` marker-runtime path** (Phase 3 of the `:has()` removal plan). When `STX_USE_MARKER_RUNTIME=1` is set, `streamtex/grid.py` emits a sentinel `data-stx-kind="grid"` marker plus `data-stx-grid-template` / `data-stx-grid-gap` attributes that the observer forwards as CSS custom properties. Optional `grid_style` and `breakpoint` overrides become tiny per-instance stylesheets keyed by `[data-stx-grid-uid="…"]` (the `@container` query stays per-instance because CSS `var()` is not reliable inside query conditions across browsers).
+- **`st_zoom` marker-runtime path**: `streamtex/zoom.py` emits a `data-stx-kind="zoom"` marker with `data-stx-zoom-factor` consumed by the global `.stx-zoom` rule via CSS custom property.
+- **`_render_md_body` marker-runtime path**: `streamtex/block_helpers.py` emits a `data-stx-kind="md-big"` marker with a tiny per-instance stylesheet for the `StxStyles.big` font-size override (preserves the legacy `<p>`/`<li>` cascade override 1:1).
+- `.stx-grid`, `.stx-zoom`, `.stx-md-big` rules in `streamtex/static/css/stx_global.css`. The grid's "hide non-cell element-container" behavior is collapsed into a single `.stx-grid > .element-container { display: none !important; }` rule (replacing the legacy three-way `:has(style|script|span)` union).
+- New test classes `TestStGridMarkerPath` (7 tests), `TestStZoomMarkerPath` (3 tests) in `tests/test_grid.py` / `tests/test_zoom.py`.
+
+### Notes
+- Legacy `:has()` path remains the default (flag off). All existing tests for legacy emit continue to pass byte-identically.
+- This release completes the migration of every StreamTeX construct using `:has()` for scoping. Phase 4 (0.6.15) flips the flag default to ON; Phase 5 (0.6.16) deletes the legacy code paths.
+- See `documentation/maintenance/freeze-has/fix-plan.md`.
+
 ## [0.6.13] — 2026-05-11
 
 ### Added

@@ -1,5 +1,6 @@
 """Unit tests for streamtex.grid — GridController and st_grid context manager."""
 
+import os
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -690,3 +691,73 @@ class TestGridControllerIntendedCols:
         """Test GridController without intended_cols falls back to space-count."""
         controller = GridController("1fr 1fr 1fr")
         assert controller.cols == 3
+
+
+# ===========================================================================
+# Phase 3 — marker-runtime path (STX_USE_MARKER_RUNTIME=1)
+# ===========================================================================
+
+
+@pytest.fixture
+def _marker_runtime_on():
+    prev = os.environ.get("STX_USE_MARKER_RUNTIME")
+    os.environ["STX_USE_MARKER_RUNTIME"] = "1"
+    yield
+    if prev is None:
+        os.environ.pop("STX_USE_MARKER_RUNTIME", None)
+    else:
+        os.environ["STX_USE_MARKER_RUNTIME"] = prev
+
+
+class TestStGridMarkerPath:
+    def test_emits_grid_marker(self, mock_streamlit, _marker_runtime_on):
+        with st_grid(2):
+            pass
+        joined = "".join(c[0][0] for c in mock_streamlit["html"].call_args_list)
+        assert 'data-stx-kind="grid"' in joined
+        assert 'data-stx-uid="css-grid-' in joined
+
+    def test_template_carried_by_data_attr(self, mock_streamlit, _marker_runtime_on):
+        with st_grid(3):
+            pass
+        joined = "".join(c[0][0] for c in mock_streamlit["html"].call_args_list)
+        assert 'data-stx-grid-template="1fr 1fr 1fr"' in joined
+
+    def test_no_has_selector_emitted(self, mock_streamlit, _marker_runtime_on):
+        with st_grid(2):
+            pass
+        joined = "".join(c[0][0] for c in mock_streamlit["html"].call_args_list)
+        assert ":has(" not in joined
+
+    def test_gap_carried_by_data_attr(self, mock_streamlit, _marker_runtime_on):
+        with st_grid(2, gap="1rem"):
+            pass
+        joined = "".join(c[0][0] for c in mock_streamlit["html"].call_args_list)
+        assert 'data-stx-grid-gap="1rem"' in joined
+
+    def test_breakpoint_emits_per_instance_container_query(self, mock_streamlit, _marker_runtime_on):
+        """`@container` queries cannot consume var() reliably across browsers
+        so breakpoints stay per-instance — but still keyed by attribute
+        selector, not :has()."""
+        with st_grid(2, breakpoint="600px"):
+            pass
+        joined = "".join(c[0][0] for c in mock_streamlit["html"].call_args_list)
+        assert "@container" in joined
+        assert "max-width: 600px" in joined
+        assert '[data-stx-grid-uid="css-grid-' in joined
+        assert ":has(" not in joined
+
+    def test_grid_style_emits_per_instance_stylesheet(self, mock_streamlit, _marker_runtime_on):
+        with st_grid(2, grid_style=Style("background: yellow;", "bg_yellow")):
+            pass
+        joined = "".join(c[0][0] for c in mock_streamlit["html"].call_args_list)
+        assert '[data-stx-grid-uid="css-grid-' in joined
+        assert "background: yellow" in joined
+        assert ":has(" not in joined
+
+    def test_responsive_template(self, mock_streamlit, _marker_runtime_on):
+        with st_grid(3, responsive=True):
+            pass
+        joined = "".join(c[0][0] for c in mock_streamlit["html"].call_args_list)
+        assert "repeat(auto-fit" in joined
+        assert ":has(" not in joined

@@ -97,3 +97,57 @@
   min-width: 0;
 }
 
+/* ============================================================================
+ * Phase 3 (0.6.14) — st_grid / st_zoom / _render_md_body
+ * Replaces the legacy per-instance :has() selectors in streamtex/grid.py,
+ * streamtex/zoom.py and streamtex/block_helpers.py.
+ *
+ * Per-instance overrides:
+ *   - grid_style (Style argument) → tiny per-instance <style> (Option B),
+ *     emitted by grid.py
+ *   - breakpoint (@container query) → tiny per-instance <style>,
+ *     emitted by grid.py — `@container` query conditions cannot consume
+ *     CSS var() reliably across browsers, so this stays per-instance
+ *   - StxStyles.big for _render_md_body → tiny per-instance <style>,
+ *     emitted by block_helpers.py
+ * ========================================================================== */
+
+/* st_grid: turn the parent stVerticalBlock into a CSS grid container.
+ * Column template and gap are forwarded by the observer as CSS custom
+ * properties (data-stx-grid-template, data-stx-grid-gap). */
+[data-testid="stVerticalBlock"].stx-grid {
+  display: grid;
+  grid-template-columns: var(--stx-grid-template, 1fr);
+  gap: var(--stx-grid-gap, 0);
+  align-items: stretch;
+}
+/* Hide every direct .element-container child (script tags, marker cells,
+ * inline styles) so only the actual cells (stVerticalBlocks) take grid slots.
+ * Mirrors the three legacy `:has(style|script|span.{uid})` rules in one go. */
+[data-testid="stVerticalBlock"].stx-grid > .element-container {
+  display: none !important;
+}
+/* Cells: stVerticalBlocks that are direct children of the grid. */
+[data-testid="stVerticalBlock"].stx-grid > [data-testid="stVerticalBlock"] {
+  width: auto !important;
+  min-width: 0;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+/* st_zoom: zoom factor forwarded as `--stx-zoom-factor`. */
+[data-testid="stVerticalBlock"].stx-zoom {
+  zoom: var(--stx-zoom-factor, 1);
+}
+[data-testid="stVerticalBlock"].stx-zoom > .element-container {
+  width: auto;
+}
+
+/* _render_md_body: layout class only — the actual font-size override (from
+ * `StxStyles.big`) is per-instance because it may vary per project and we
+ * preserve the legacy cascade semantics by emitting it via attribute selector
+ * inside block_helpers.py.  This class is a hook for future theming. */
+[data-testid="stVerticalBlock"].stx-md-big {
+  /* intentionally empty; per-instance rule is emitted by block_helpers.py */
+}
+

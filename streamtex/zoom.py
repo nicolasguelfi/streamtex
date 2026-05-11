@@ -3,6 +3,7 @@ from contextlib import contextmanager
 import streamlit as st
 
 from .export import export_pop_wrapper, export_push_wrapper, is_export_active
+from .marker_runtime import is_marker_runtime_enabled
 from .utils import generate_key
 
 _PAGE_WIDTH_KEY = "_stx_page_width"
@@ -167,15 +168,26 @@ def st_zoom(factor: int = 100):
     zoom_id = generate_key("zoom")
     zoom_value = factor / 100
 
-    css_and_marker = (
-        f'<style>'
-        f'div:has(> .element-container > .stHtml > span.{zoom_id})'
-        f'{{ zoom: {zoom_value}; }}'
-        f' .element-container:has(.stHtml > span.{zoom_id})'
-        f'{{ width: auto; }}'
-        f'</style>'
-        f'<span class="{zoom_id}" style="display:none;"></span>'
-    )
+    if is_marker_runtime_enabled():
+        # Marker path: the zoom factor is forwarded by the observer as
+        # `--stx-zoom-factor` and consumed by the global `.stx-zoom` rule.
+        css_and_marker = (
+            f'<span class="stx-marker {zoom_id}" '
+            f'data-stx-kind="zoom" data-stx-uid="{zoom_id}" '
+            f'data-stx-zoom-factor="{zoom_value}" '
+            f'style="display:none;"></span>'
+        )
+    else:
+        # Legacy :has() path.
+        css_and_marker = (
+            f'<style>'
+            f'div:has(> .element-container > .stHtml > span.{zoom_id})'
+            f'{{ zoom: {zoom_value}; }}'
+            f' .element-container:has(.stHtml > span.{zoom_id})'
+            f'{{ width: auto; }}'
+            f'</style>'
+            f'<span class="{zoom_id}" style="display:none;"></span>'
+        )
 
     if is_export_active():
         export_push_wrapper(

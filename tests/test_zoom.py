@@ -1,12 +1,16 @@
 """Unit tests for streamtex.zoom — page width and CSS zoom."""
 
+import os
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 from streamtex.zoom import (
     _PAGE_WIDTH_KEY,
     _ZOOM_KEY,
     add_zoom_options,
     inject_zoom_logic,
+    st_zoom,
 )
 
 # ---------------------------------------------------------------------------
@@ -123,3 +127,44 @@ class TestAddZoomOptions:
         mock_st.session_state = {_PAGE_WIDTH_KEY: 75, _ZOOM_KEY: 125}
         add_zoom_options(container=MagicMock())
         mock_inject.assert_called_once_with(75, 125)
+
+
+# ===========================================================================
+# Phase 3 — st_zoom marker-runtime path (STX_USE_MARKER_RUNTIME=1)
+# ===========================================================================
+
+
+@pytest.fixture
+def _marker_runtime_on():
+    prev = os.environ.get("STX_USE_MARKER_RUNTIME")
+    os.environ["STX_USE_MARKER_RUNTIME"] = "1"
+    yield
+    if prev is None:
+        os.environ.pop("STX_USE_MARKER_RUNTIME", None)
+    else:
+        os.environ["STX_USE_MARKER_RUNTIME"] = prev
+
+
+class TestStZoomMarkerPath:
+    @patch("streamtex.zoom.st")
+    def test_emits_zoom_marker(self, mock_st, _marker_runtime_on):
+        with st_zoom(75):
+            pass
+        joined = "".join(c[0][0] for c in mock_st.html.call_args_list)
+        assert 'data-stx-kind="zoom"' in joined
+        assert 'data-stx-uid="zoom-' in joined
+
+    @patch("streamtex.zoom.st")
+    def test_factor_carried_by_data_attr(self, mock_st, _marker_runtime_on):
+        with st_zoom(150):
+            pass
+        joined = "".join(c[0][0] for c in mock_st.html.call_args_list)
+        assert 'data-stx-zoom-factor="1.5"' in joined
+
+    @patch("streamtex.zoom.st")
+    def test_no_has_selector_emitted(self, mock_st, _marker_runtime_on):
+        with st_zoom(50):
+            pass
+        joined = "".join(c[0][0] for c in mock_st.html.call_args_list)
+        assert ":has(" not in joined
+        assert "<style>" not in joined

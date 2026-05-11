@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.12] — 2026-05-11
+
+### Added
+- **`st_block` / `st_span` marker-runtime path** (Phase 1 of the `:has()` removal plan). When `STX_USE_MARKER_RUNTIME=1` is set, `streamtex/container.py` emits a `<span class="stx-marker" data-stx-kind="block|span" data-stx-uid="…">` sentinel instead of a `:has()`-scoped stylesheet. Custom user `style=` is carried by a per-instance `[data-stx-uid="…"]` attribute-selector stylesheet (Option B — preserves cascade semantics 1:1).
+- `.stx-span` rules in `streamtex/static/css/stx_global.css` (display:flex / flex-direction:row / white-space:pre / `>* {width:auto}`).
+- New test classes `TestStBlockMarkerPath`, `TestStSpanMarkerPath`, `TestExportUnaffectedByMarkerPath` in `tests/test_container.py` covering the marker emit pattern, the absence of `:has()` in the new path, and the byte-identical export wrappers across both paths.
+
+### Notes
+- Legacy `:has()` path remains the default (flag off). Existing tests for the legacy emit pattern continue to pass unchanged.
+- The same per-instance `<style>` count drops to 0 for blocks/spans when the new path is on and no `style=` is passed; rises to 1 when a user style is supplied.
+- See `documentation/maintenance/freeze-has/fix-plan.md` for the multi-phase plan.
+
 ## [0.6.11] — 2026-05-11
 
 ### Added

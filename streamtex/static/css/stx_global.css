@@ -15,3 +15,30 @@
 [data-testid="stVerticalBlock"] > .element-container.stx-marker-cell {
   display: none !important;
 }
+
+/* ============================================================================
+ * Phase 1 (0.6.12) — st_block / st_span
+ * Replaces the legacy per-instance :has() selectors in streamtex/container.py.
+ *
+ * Per-instance user style (`style=` argument + section horizontal CSS) is
+ * injected separately by container.py as a tiny per-call <style> using the
+ * `[data-testid="stVerticalBlock"][data-stx-uid="…"]` attribute selector
+ * (Option B in the fix plan — preserves cascade semantics).
+ * ========================================================================== */
+
+/* st_block: rely on Streamlit's default flex-column layout — no extra rules
+ * are needed beyond the marker-cell hide above.  The class is still set on
+ * the parent stVerticalBlock so per-instance attribute-selector stylesheets
+ * (carrying user-supplied `style=`) can target it.
+ */
+
+/* st_span: horizontal flex layout that mirrors the legacy `:has()` rule. */
+[data-testid="stVerticalBlock"].stx-span {
+  display: flex;
+  flex-direction: row;
+  white-space: pre;
+}
+[data-testid="stVerticalBlock"].stx-span > * {
+  width: auto;
+}
+

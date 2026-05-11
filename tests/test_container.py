@@ -1,6 +1,9 @@
 """Tests for streamtex.container — st_block and st_span context managers."""
 
+import os
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 from streamtex.container import st_block, st_span
 from streamtex.export import ExportConfig, reset_export_buffer
@@ -691,3 +694,150 @@ class TestContainerCssStructure:
         close_braces = css_content.count("}")
 
         assert open_braces == close_braces
+
+
+# ===========================================================================
+# Phase 1 — marker-runtime path (STX_USE_MARKER_RUNTIME=1)
+# ===========================================================================
+#
+# These tests cover the new emit pattern that replaces the per-instance
+# :has() CSS scoping with a sentinel <span class="stx-marker"
+# data-stx-kind="…" data-stx-uid="…"> processed by the global observer
+# installed by streamtex.marker_runtime.
+
+
+@pytest.fixture
+def _marker_runtime_on():
+    """Enable the marker runtime for the duration of one test."""
+    prev = os.environ.get("STX_USE_MARKER_RUNTIME")
+    os.environ["STX_USE_MARKER_RUNTIME"] = "1"
+    yield
+    if prev is None:
+        os.environ.pop("STX_USE_MARKER_RUNTIME", None)
+    else:
+        os.environ["STX_USE_MARKER_RUNTIME"] = prev
+
+
+class TestStBlockMarkerPath:
+    """st_block under STX_USE_MARKER_RUNTIME=1 emits a marker span, no :has()."""
+
+    def setup_method(self):
+        reset_export_buffer(None)
+
+    def teardown_method(self):
+        reset_export_buffer(None)
+
+    def test_emits_stx_marker_span(self, mock_streamlit, _marker_runtime_on):
+        with st_block():
+            pass
+        html_calls = [c[0][0] for c in mock_streamlit["html"].call_args_list]
+        joined = "".join(html_calls)
+        assert 'class="stx-marker' in joined
+        assert 'data-stx-kind="block"' in joined
+        assert 'data-stx-uid="block-' in joined
+
+    def test_no_has_selector_emitted(self, mock_streamlit, _marker_runtime_on):
+        with st_block():
+            pass
+        html_calls = [c[0][0] for c in mock_streamlit["html"].call_args_list]
+        for html in html_calls:
+            assert ":has(" not in html, f":has() still present in {html!r}"
+
+    def test_no_inline_style_when_default_style(self, mock_streamlit, _marker_runtime_on):
+        with st_block():
+            pass
+        joined = "".join(c[0][0] for c in mock_streamlit["html"].call_args_list)
+        # With StxStyles.none and no section CSS, no per-instance <style> tag.
+        assert "<style>" not in joined
+
+    def test_inline_style_uses_attribute_selector(self, mock_streamlit, _marker_runtime_on):
+        style = Style("color: red;", "red_text")
+        with st_block(style):
+            pass
+        joined = "".join(c[0][0] for c in mock_streamlit["html"].call_args_list)
+        # Per-instance stylesheet must use [data-stx-uid="…"], not :has().
+        assert '[data-stx-uid="block-' in joined
+        assert "color: red" in joined
+        assert ":has(" not in joined
+
+    def test_marker_span_carries_block_id_class(self, mock_streamlit, _marker_runtime_on):
+        """Backward-compat: the marker span still carries the block-N class
+        so any downstream tooling that grepped that string keeps working."""
+        with st_block():
+            pass
+        joined = "".join(c[0][0] for c in mock_streamlit["html"].call_args_list)
+        import re
+        assert re.search(r'class="stx-marker block-\d+"', joined)
+
+
+class TestStSpanMarkerPath:
+    """st_span under STX_USE_MARKER_RUNTIME=1 emits a marker span, no :has()."""
+
+    def setup_method(self):
+        reset_export_buffer(None)
+
+    def teardown_method(self):
+        reset_export_buffer(None)
+
+    def test_emits_stx_marker_span(self, mock_streamlit, _marker_runtime_on):
+        with st_span():
+            pass
+        joined = "".join(c[0][0] for c in mock_streamlit["html"].call_args_list)
+        assert 'class="stx-marker' in joined
+        assert 'data-stx-kind="span"' in joined
+        assert 'data-stx-uid="span-' in joined
+
+    def test_no_has_selector_emitted(self, mock_streamlit, _marker_runtime_on):
+        with st_span():
+            pass
+        joined = "".join(c[0][0] for c in mock_streamlit["html"].call_args_list)
+        assert ":has(" not in joined
+
+    def test_inline_style_via_attribute_selector(self, mock_streamlit, _marker_runtime_on):
+        style = Style("color: blue;", "blue_text")
+        with st_span(style):
+            pass
+        joined = "".join(c[0][0] for c in mock_streamlit["html"].call_args_list)
+        assert '[data-stx-uid="span-' in joined
+        assert "color: blue" in joined
+        assert ":has(" not in joined
+
+
+class TestExportUnaffectedByMarkerPath:
+    """Export wrappers must be byte-identical between legacy and marker paths."""
+
+    def setup_method(self):
+        reset_export_buffer(None)
+
+    def teardown_method(self):
+        reset_export_buffer(None)
+
+    def test_block_export_wrapper_unchanged(self, mock_streamlit, _marker_runtime_on):
+        reset_export_buffer(ExportConfig(enabled=True))
+        try:
+            with patch("streamtex.container.export_push_wrapper") as mock_push:
+                with st_block(Style("color: red;", "red")):
+                    pass
+                assert mock_push.called
+                pushed = mock_push.call_args[0][0]
+                assert '<div class="stx-block"' in pushed
+                assert "color: red" in pushed
+                # MUST NOT introduce stx-marker into the export wrapper.
+                assert "stx-marker" not in pushed
+        finally:
+            reset_export_buffer(None)
+
+    def test_span_export_wrapper_unchanged(self, mock_streamlit, _marker_runtime_on):
+        reset_export_buffer(ExportConfig(enabled=True))
+        try:
+            with patch("streamtex.container.export_push_wrapper") as mock_push:
+                with st_span(Style("color: blue;", "blue")):
+                    pass
+                assert mock_push.called
+                pushed = mock_push.call_args[0][0]
+                assert "display:flex" in pushed
+                assert "flex-direction:row" in pushed
+                assert "color: blue" in pushed
+                assert "stx-marker" not in pushed
+        finally:
+            reset_export_buffer(None)

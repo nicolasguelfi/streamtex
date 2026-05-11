@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "streamtex"
-version = "0.6.10"
+version = "0.6.11"
 description = "AI-powered content framework for Streamlit — create presentations, courses, and web-books with Claude or Cursor, no coding required."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -94,6 +94,8 @@ include = ["streamtex*"]
 
 [tool.setuptools.package-data]
 "streamtex.static" = ["*.css", "*.png"]
+"streamtex.static.css" = ["*.css"]
+"streamtex.static.js" = ["*.js"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.11] — 2026-05-11
+
+### Added
+- **Marker runtime scaffold** (Phase 0 of the `:has()` removal plan): new internal module `streamtex/marker_runtime.py` plus two shipped assets `streamtex/static/css/stx_global.css` and `streamtex/static/js/stx_marker_observer.js`. When the env var `STX_USE_MARKER_RUNTIME=1` is set, `st_book` injects a global stylesheet and a `MutationObserver` that will replace the per-instance `:has()` CSS scoping pattern in later phases. Default behavior is unchanged (flag off → legacy `:has()` path).
+- Internal escape hatch `STX_USE_LEGACY_HAS=1` reserved for Phase 4 — currently a no-op since the legacy path is the default.
+- Package data now includes `streamtex/static/css/*.css` and `streamtex/static/js/*.js`.
+- New test module `tests/test_marker_runtime.py` covering the env-flag gating, idempotency within a session, and the presence of the static assets.
+
+### Notes
+- No user-facing API change; no rendering behavior change with the flag off.
+- See `documentation/maintenance/freeze-has/fix-plan.md` for the multi-phase plan replacing the `:has()` selector storm that causes a 1.5–3.5 s freeze on Chrome at cold load.
+
 ## [0.6.10] — 2026-04-15
 
 ### Added

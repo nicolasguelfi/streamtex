@@ -1,0 +1,17 @@
+/* StreamTeX global stylesheet — marker-class scoping (replaces legacy :has()).
+ *
+ * This file ships rules for every StreamTeX construct that previously used the
+ * per-instance `:has(> .element-container .stHtml span.{uid})` pattern.
+ *
+ * Rules are appended phase by phase as each Python module is migrated:
+ *   - Phase 1 (0.6.12): .stx-block, .stx-span         (container.py)
+ *   - Phase 2 (0.6.13): .stx-list, .stx-list-item     (list.py)
+ *   - Phase 3 (0.6.14): .stx-grid, .stx-zoom, .stx-md-big
+ *
+ * Phase 0 (0.6.11): file is intentionally minimal — only universal helpers.
+ */
+
+/* Hide marker cells (the .element-container that hosts the sentinel span). */
+[data-testid="stVerticalBlock"] > .element-container.stx-marker-cell {
+  display: none !important;
+}

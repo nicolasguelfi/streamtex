@@ -30,6 +30,7 @@ from .export import (
 )
 from .loading import inject_loading_overlay, remove_loading_overlay, update_loading_progress
 from .marker import MarkerConfig, inject_marker_navigation, marker_count, marker_entries, reset_marker_registry
+from .marker_runtime import inject_marker_runtime
 from .pdf_export import PdfConfig
 from .presentation import get_presentation_config, st_presentation_footer
 from .presentation_profile import (
@@ -603,6 +604,10 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
     _show_loading = loading and not _warmup_mode
     if _show_loading:
         inject_loading_overlay()
+    # --- Marker runtime (env-gated; no-op unless STX_USE_MARKER_RUNTIME=1) ---
+    # Injects the global stylesheet + MutationObserver that replace the legacy
+    # per-instance :has() scoping pattern.  Idempotent within a session.
+    inject_marker_runtime()
     # --- Chrome recommendation banner (JS-injected, no block flow impact) ---
     if chrome_banner:
         st_chrome_banner()

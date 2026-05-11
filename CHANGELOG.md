@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.15] — 2026-05-12
+
+### Changed
+- **Marker runtime is now the default** (Phase 4 of the `:has()` removal plan). `is_marker_runtime_enabled()` returns `True` unless `STX_USE_LEGACY_HAS=1` is set or `STX_USE_MARKER_RUNTIME=0` is set explicitly. Every StreamTeX construct that used to emit `:has()`-scoped stylesheets (st_block, st_span, st_list, ListController.item, st_grid, st_zoom, _render_md_body) now emits sentinel marker spans + a global stylesheet + a `MutationObserver` by default.
+- Tests that assert the legacy `:has()` emit pattern now use an autouse `_force_legacy_by_default` fixture (in `tests/test_container.py`, `tests/test_list.py`, `tests/test_grid.py`, `tests/test_zoom.py`, `tests/test_section_zoom.py`) to opt back into legacy. The `_marker_runtime_on` fixture used by marker-path tests now also unsets `STX_USE_LEGACY_HAS` so it overrides the autouse default.
+
+### Notes
+- **Escape hatch**: `export STX_USE_LEGACY_HAS=1` reverts to the legacy `:has()` path for users hitting an unforeseen regression. Removed in 0.6.16.
+- **Expected impact**: Chrome cold-load freeze (~3-4 s) eliminated. The `<style>` element count on a typical manual drops from ~1 054 to < 50; the `:has()` selector count drops from ~958 to 0 (legacy off).
+- See `documentation/maintenance/freeze-has/fix-plan.md`.
+
 ## [0.6.14] — 2026-05-11
 
 ### Added

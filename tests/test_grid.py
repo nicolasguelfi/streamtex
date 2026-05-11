@@ -8,6 +8,26 @@ import pytest
 from streamtex.grid import GridController, responsive_cols, st_grid
 from streamtex.styles import StxStyles, Style, StyleGrid
 
+
+# Module-level autouse fixture: legacy :has() path is the default for tests
+# in this file (matches their historical assertions).  Marker-path tests
+# opt in via `_marker_runtime_on` below.
+@pytest.fixture(autouse=True)
+def _force_legacy_by_default():
+    prev_legacy = os.environ.get("STX_USE_LEGACY_HAS")
+    prev_marker = os.environ.get("STX_USE_MARKER_RUNTIME")
+    os.environ["STX_USE_LEGACY_HAS"] = "1"
+    os.environ.pop("STX_USE_MARKER_RUNTIME", None)
+    yield
+    if prev_legacy is None:
+        os.environ.pop("STX_USE_LEGACY_HAS", None)
+    else:
+        os.environ["STX_USE_LEGACY_HAS"] = prev_legacy
+    if prev_marker is None:
+        os.environ.pop("STX_USE_MARKER_RUNTIME", None)
+    else:
+        os.environ["STX_USE_MARKER_RUNTIME"] = prev_marker
+
 # ===========================================================================
 # TestGridController — Style resolution and cell counter
 # ===========================================================================
@@ -700,13 +720,19 @@ class TestGridControllerIntendedCols:
 
 @pytest.fixture
 def _marker_runtime_on():
-    prev = os.environ.get("STX_USE_MARKER_RUNTIME")
+    prev_legacy = os.environ.get("STX_USE_LEGACY_HAS")
+    prev_marker = os.environ.get("STX_USE_MARKER_RUNTIME")
+    os.environ.pop("STX_USE_LEGACY_HAS", None)
     os.environ["STX_USE_MARKER_RUNTIME"] = "1"
     yield
-    if prev is None:
+    if prev_legacy is None:
+        os.environ.pop("STX_USE_LEGACY_HAS", None)
+    else:
+        os.environ["STX_USE_LEGACY_HAS"] = prev_legacy
+    if prev_marker is None:
         os.environ.pop("STX_USE_MARKER_RUNTIME", None)
     else:
-        os.environ["STX_USE_MARKER_RUNTIME"] = prev
+        os.environ["STX_USE_MARKER_RUNTIME"] = prev_marker
 
 
 class TestStGridMarkerPath:

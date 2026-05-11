@@ -9,6 +9,31 @@ from streamtex.container import st_block, st_span
 from streamtex.export import ExportConfig, reset_export_buffer
 from streamtex.styles import Style
 
+# ---------------------------------------------------------------------------
+# Module-level autouse: default to the LEGACY :has() path so the historical
+# tests below (which assert the :has() emit pattern) remain valid even after
+# the Phase 4 default flip (0.6.15) made the marker runtime the default.
+# Tests that explicitly target the marker path use the `_marker_runtime_on`
+# fixture below, which overrides this default for their duration.
+# All of this disappears in Phase 5 (0.6.16) when the legacy path is deleted.
+# ---------------------------------------------------------------------------
+
+@pytest.fixture(autouse=True)
+def _force_legacy_by_default():
+    prev_legacy = os.environ.get("STX_USE_LEGACY_HAS")
+    prev_marker = os.environ.get("STX_USE_MARKER_RUNTIME")
+    os.environ["STX_USE_LEGACY_HAS"] = "1"
+    os.environ.pop("STX_USE_MARKER_RUNTIME", None)
+    yield
+    if prev_legacy is None:
+        os.environ.pop("STX_USE_LEGACY_HAS", None)
+    else:
+        os.environ["STX_USE_LEGACY_HAS"] = prev_legacy
+    if prev_marker is None:
+        os.environ.pop("STX_USE_MARKER_RUNTIME", None)
+    else:
+        os.environ["STX_USE_MARKER_RUNTIME"] = prev_marker
+
 
 class TestStBlockBasic:
     """Tests for st_block without export."""
@@ -708,14 +733,24 @@ class TestContainerCssStructure:
 
 @pytest.fixture
 def _marker_runtime_on():
-    """Enable the marker runtime for the duration of one test."""
-    prev = os.environ.get("STX_USE_MARKER_RUNTIME")
+    """Enable the marker runtime for the duration of one test.
+
+    Overrides the module-level `_force_legacy_by_default` autouse fixture
+    by unsetting STX_USE_LEGACY_HAS *and* setting STX_USE_MARKER_RUNTIME=1.
+    """
+    prev_legacy = os.environ.get("STX_USE_LEGACY_HAS")
+    prev_marker = os.environ.get("STX_USE_MARKER_RUNTIME")
+    os.environ.pop("STX_USE_LEGACY_HAS", None)
     os.environ["STX_USE_MARKER_RUNTIME"] = "1"
     yield
-    if prev is None:
+    if prev_legacy is None:
+        os.environ.pop("STX_USE_LEGACY_HAS", None)
+    else:
+        os.environ["STX_USE_LEGACY_HAS"] = prev_legacy
+    if prev_marker is None:
         os.environ.pop("STX_USE_MARKER_RUNTIME", None)
     else:
-        os.environ["STX_USE_MARKER_RUNTIME"] = prev
+        os.environ["STX_USE_MARKER_RUNTIME"] = prev_marker
 
 
 class TestStBlockMarkerPath:

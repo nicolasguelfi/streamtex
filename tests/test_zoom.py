@@ -136,13 +136,19 @@ class TestAddZoomOptions:
 
 @pytest.fixture
 def _marker_runtime_on():
-    prev = os.environ.get("STX_USE_MARKER_RUNTIME")
+    prev_legacy = os.environ.get("STX_USE_LEGACY_HAS")
+    prev_marker = os.environ.get("STX_USE_MARKER_RUNTIME")
+    os.environ.pop("STX_USE_LEGACY_HAS", None)
     os.environ["STX_USE_MARKER_RUNTIME"] = "1"
     yield
-    if prev is None:
+    if prev_legacy is None:
+        os.environ.pop("STX_USE_LEGACY_HAS", None)
+    else:
+        os.environ["STX_USE_LEGACY_HAS"] = prev_legacy
+    if prev_marker is None:
         os.environ.pop("STX_USE_MARKER_RUNTIME", None)
     else:
-        os.environ["STX_USE_MARKER_RUNTIME"] = prev
+        os.environ["STX_USE_MARKER_RUNTIME"] = prev_marker
 
 
 class TestStZoomMarkerPath:

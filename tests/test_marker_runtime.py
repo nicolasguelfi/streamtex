@@ -39,18 +39,26 @@ def _reset_marker_session():
 # ---------------------------------------------------------------------------
 
 class TestIsMarkerRuntimeEnabled:
-    def test_disabled_by_default(self):
+    def test_enabled_by_default(self):
+        """Phase 4 (0.6.15) flipped the default to ON."""
         with patch.dict(os.environ, {}, clear=False):
             os.environ.pop("STX_USE_MARKER_RUNTIME", None)
             os.environ.pop("STX_USE_LEGACY_HAS", None)
-            assert is_marker_runtime_enabled() is False
+            assert is_marker_runtime_enabled() is True
 
     def test_enabled_by_flag(self):
         with patch.dict(os.environ, {"STX_USE_MARKER_RUNTIME": "1"}, clear=False):
             os.environ.pop("STX_USE_LEGACY_HAS", None)
             assert is_marker_runtime_enabled() is True
 
+    def test_explicit_zero_disables(self):
+        """STX_USE_MARKER_RUNTIME=0 is the explicit opt-out (Phase 4 only)."""
+        with patch.dict(os.environ, {"STX_USE_MARKER_RUNTIME": "0"}, clear=False):
+            os.environ.pop("STX_USE_LEGACY_HAS", None)
+            assert is_marker_runtime_enabled() is False
+
     def test_legacy_override_wins(self):
+        """STX_USE_LEGACY_HAS=1 is the escape hatch — wins over MARKER=1."""
         with patch.dict(os.environ, {
             "STX_USE_MARKER_RUNTIME": "1",
             "STX_USE_LEGACY_HAS": "1",
@@ -64,7 +72,8 @@ class TestIsMarkerRuntimeEnabled:
 
 class TestInjectMarkerRuntime:
     def test_noop_when_disabled(self):
-        with patch.dict(os.environ, {}, clear=False):
+        """With the Phase 4 default flip, disabling requires STX_USE_LEGACY_HAS=1."""
+        with patch.dict(os.environ, {"STX_USE_LEGACY_HAS": "1"}, clear=False):
             os.environ.pop("STX_USE_MARKER_RUNTIME", None)
             with patch("streamtex.marker_runtime.st.html") as mock_html:
                 inject_marker_runtime()

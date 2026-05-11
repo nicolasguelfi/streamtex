@@ -1,5 +1,6 @@
 """Unit tests for per-block / per-section zoom feature."""
 
+import os
 from unittest.mock import patch
 
 import pytest
@@ -22,6 +23,26 @@ from streamtex.spacing import (
 )
 
 # ── Fixtures ──────────────────────────────────────────────────────────────
+
+
+# Force the legacy :has() path for the st_zoom CSS tests in this file
+# (they assert the literal `zoom: 0.75` etc. that the legacy path emits).
+# Phase 5 (0.6.16) deletes this fixture along with the legacy path.
+@pytest.fixture(autouse=True)
+def _force_legacy_by_default():
+    prev_legacy = os.environ.get("STX_USE_LEGACY_HAS")
+    prev_marker = os.environ.get("STX_USE_MARKER_RUNTIME")
+    os.environ["STX_USE_LEGACY_HAS"] = "1"
+    os.environ.pop("STX_USE_MARKER_RUNTIME", None)
+    yield
+    if prev_legacy is None:
+        os.environ.pop("STX_USE_LEGACY_HAS", None)
+    else:
+        os.environ["STX_USE_LEGACY_HAS"] = prev_legacy
+    if prev_marker is None:
+        os.environ.pop("STX_USE_MARKER_RUNTIME", None)
+    else:
+        os.environ["STX_USE_MARKER_RUNTIME"] = prev_marker
 
 
 @pytest.fixture(autouse=True)

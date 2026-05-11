@@ -10,6 +10,26 @@ from streamtex.list import ListController, _current_list_level, st_list
 from streamtex.styles import ListStyle, StxStyles, Style
 
 
+# Module-level autouse fixture: keep the legacy :has() path as the test
+# default so historical assertions remain valid after Phase 4's default
+# flip.  Marker-path tests opt in via `_marker_runtime_on` below.
+@pytest.fixture(autouse=True)
+def _force_legacy_by_default():
+    prev_legacy = os.environ.get("STX_USE_LEGACY_HAS")
+    prev_marker = os.environ.get("STX_USE_MARKER_RUNTIME")
+    os.environ["STX_USE_LEGACY_HAS"] = "1"
+    os.environ.pop("STX_USE_MARKER_RUNTIME", None)
+    yield
+    if prev_legacy is None:
+        os.environ.pop("STX_USE_LEGACY_HAS", None)
+    else:
+        os.environ["STX_USE_LEGACY_HAS"] = prev_legacy
+    if prev_marker is None:
+        os.environ.pop("STX_USE_MARKER_RUNTIME", None)
+    else:
+        os.environ["STX_USE_MARKER_RUNTIME"] = prev_marker
+
+
 class TestListController:
     """Tests for ListController class."""
 
@@ -776,13 +796,19 @@ class TestAltLiStyles:
 
 @pytest.fixture
 def _marker_runtime_on():
-    prev = os.environ.get("STX_USE_MARKER_RUNTIME")
+    prev_legacy = os.environ.get("STX_USE_LEGACY_HAS")
+    prev_marker = os.environ.get("STX_USE_MARKER_RUNTIME")
+    os.environ.pop("STX_USE_LEGACY_HAS", None)
     os.environ["STX_USE_MARKER_RUNTIME"] = "1"
     yield
-    if prev is None:
+    if prev_legacy is None:
+        os.environ.pop("STX_USE_LEGACY_HAS", None)
+    else:
+        os.environ["STX_USE_LEGACY_HAS"] = prev_legacy
+    if prev_marker is None:
         os.environ.pop("STX_USE_MARKER_RUNTIME", None)
     else:
-        os.environ["STX_USE_MARKER_RUNTIME"] = prev
+        os.environ["STX_USE_MARKER_RUNTIME"] = prev_marker
 
 
 def _collect_html(mock_streamlit):

@@ -39,20 +39,19 @@ _JS_PATH = _STATIC_DIR / "js" / "stx_marker_observer.js"
 def is_marker_runtime_enabled() -> bool:
     """Return ``True`` when the marker runtime should be used.
 
-    Resolution order (Phase 0 → Phase 4 transitional):
+    Resolution order (Phase 4 default-on; Phase 5 deletes this function):
 
-    1. If ``STX_USE_LEGACY_HAS=1`` is set, return ``False`` (escape hatch).
-    2. If ``STX_USE_MARKER_RUNTIME=1`` is set, return ``True``.
-    3. Otherwise return ``False`` (legacy ``:has()`` path is the default
-       during Phases 0-3).
-
-    Once Phase 4 (release 0.6.15) flips the default, this function will
-    return ``True`` unless ``STX_USE_LEGACY_HAS=1`` is set.  Phase 5
-    (release 0.6.16) deletes this function entirely.
+    1. If ``STX_USE_LEGACY_HAS=1`` is set, return ``False`` (escape hatch
+       for users who want to temporarily fall back to the legacy
+       ``:has()`` emit pattern — kept for one patch release, removed in
+       0.6.16).
+    2. If ``STX_USE_MARKER_RUNTIME=0`` is set, return ``False`` (explicit
+       opt-out — also removed in 0.6.16).
+    3. Otherwise return ``True`` — the marker runtime is now the default.
     """
     if os.environ.get(_LEGACY_ENV, "0") == "1":
         return False
-    return os.environ.get(_FLAG_ENV, "0") == "1"
+    return os.environ.get(_FLAG_ENV, "1") != "0"
 
 
 def _read_asset(path: Path) -> str:

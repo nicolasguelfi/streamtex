@@ -7,6 +7,61 @@ from .styles import StxStyles, Style
 from .utils import generate_key
 
 
+def _build_block_payload(block_id: str, style: Style, section_css: str) -> str:
+    """Return the `<style>+<span>` payload that scopes ``st_block`` to its container.
+
+    Emits a sentinel ``<span class="stx-marker" data-stx-kind="block" …>``
+    that the global :mod:`streamtex.marker_runtime` MutationObserver
+    translates into a ``.stx-block`` class on the parent
+    ``[data-testid="stVerticalBlock"]``.  When the user supplies a
+    non-empty style, an extra per-instance ``<style>`` keyed by the
+    attribute selector ``[data-stx-block-uid="…"]`` carries it
+    (preserves the cascade semantics of the historical ``:has()`` rule).
+    """
+    combined = f"{style!s}{section_css}".strip()
+    if combined:
+        inline_css = (
+            f'<style>'
+            f'[data-stx-block-uid="{block_id}"]'
+            f'{{{style!s}{section_css}}}'
+            f'</style>'
+        )
+    else:
+        inline_css = ''
+    return (
+        f'{inline_css}'
+        f'<span class="stx-marker {block_id}" '
+        f'data-stx-kind="block" data-stx-uid="{block_id}" '
+        f'style="display:none;"></span>'
+    )
+
+
+def _build_span_payload(block_id: str, style: Style, section_css: str) -> str:
+    """Return the `<style>+<span>` payload that scopes ``st_span`` to its container.
+
+    Mirrors :func:`_build_block_payload` but with ``data-stx-kind="span"``.
+    The flex-row container styles (display:flex, flex-direction:row,
+    white-space:pre) live in the global stylesheet under ``.stx-span``;
+    only the user-supplied ``style`` is per-instance.
+    """
+    combined = f"{style!s}{section_css}".strip()
+    if combined:
+        inline_css = (
+            f'<style>'
+            f'[data-stx-span-uid="{block_id}"]'
+            f'{{{style!s}{section_css}}}'
+            f'</style>'
+        )
+    else:
+        inline_css = ''
+    return (
+        f'{inline_css}'
+        f'<span class="stx-marker {block_id}" '
+        f'data-stx-kind="span" data-stx-uid="{block_id}" '
+        f'style="display:none;"></span>'
+    )
+
+
 @contextmanager
 def st_block(style: Style = StxStyles.none, _export_wrapper: bool = True):
     """A Context Manager that wraps content within a styled container."""
@@ -25,15 +80,7 @@ def st_block(style: Style = StxStyles.none, _export_wrapper: bool = True):
             _section_css += f" margin-right: {_sh.right};"
 
     # 3. Build CSS + marker span (fused into a single st.html call)
-    css_and_marker = (
-        f'<style>'
-        f'div:has(> .element-container > .stHtml > span.{block_id})'
-        f'{{ {str(style)}{_section_css} }}'
-        f' .element-container:has(.stHtml > span.{block_id})'
-        f'{{ width: auto; }}'
-        f'</style>'
-        f'<span class="{block_id}" style="display:none;"></span>'
-    )
+    css_and_marker = _build_block_payload(block_id, style, _section_css)
 
     # 4. Export wrapper (no-op when export is inactive)
     # Prepend flex-direction:column to mirror Streamlit's stVerticalBlock
@@ -76,17 +123,7 @@ def st_span(style: Style = StxStyles.none):
             _section_css += f" margin-right: {_sh.right};"
 
     # 3. Build CSS + marker span (fused into a single st.html call)
-    css_and_marker = (
-        f'<style>'
-        f'div:has(> .element-container > .stHtml > span.{block_id}) > *'
-        f'{{ width: auto; }}'
-        f' div:has(> .element-container > .stHtml > span.{block_id})'
-        f'{{ display: flex; flex-direction: row; white-space: pre; {str(style)}{_section_css} }}'
-        f' .element-container:has(.stHtml > span.{block_id})'
-        f'{{ width: auto; }}'
-        f'</style>'
-        f'<span class="{block_id}" style="display:none;"></span>'
-    )
+    css_and_marker = _build_span_payload(block_id, style, _section_css)
 
     # 4. Export wrapper (no-op when export is inactive)
     _export_style = f'display:flex;flex-direction:row;white-space:pre;{style}{_section_css}'
@@ -101,6 +138,3 @@ def st_span(style: Style = StxStyles.none):
 
     if is_export_active():
         export_pop_wrapper("</div>")
-
-
-

@@ -5,11 +5,11 @@ from unittest.mock import patch
 from streamtex.browser import _CHROME_BANNER_JS, st_chrome_banner
 
 
-def test_chrome_banner_calls_components_html():
-    """st_chrome_banner() should inject JS via components.html with height=0."""
-    with patch("streamtex.browser._components.html") as mock_html:
+def test_chrome_banner_calls_st_iframe():
+    """st_chrome_banner() should inject JS via st.iframe with height=1."""
+    with patch("streamtex.browser.st.iframe") as mock_iframe:
         st_chrome_banner()
-        mock_html.assert_called_once_with(_CHROME_BANNER_JS, height=0)
+        mock_iframe.assert_called_once_with(_CHROME_BANNER_JS, height=1)
 
 
 def test_chrome_banner_js_contains_detection():

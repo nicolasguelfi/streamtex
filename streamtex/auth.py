@@ -19,7 +19,6 @@ In local dev, the gate is off by default.  Set ``STX_GATE=1`` (without
 import os
 
 import streamlit as st
-import streamlit.components.v1 as components
 from dotenv import load_dotenv
 
 from .container import st_block
@@ -261,7 +260,7 @@ def _password_gate() -> None:
     st_space("v", _GAP_CIRCLES)
 
     # --- Keyboard listener ---
-    components.html(_KEYBOARD_JS, height=0)
+    st.iframe(_KEYBOARD_JS, height=1)
 
     # --- 6×6 grid (centered) ---
     clicked = None

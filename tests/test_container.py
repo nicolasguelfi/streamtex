@@ -40,17 +40,14 @@ class TestStBlockBasic:
         assert "color: red;" in css_content
 
     def test_st_block_uses_default_style(self, mock_streamlit):
-        """st_block should use StxStyles.none by default."""
+        """st_block with StxStyles.none should still emit the marker span."""
         with st_block():
             pass
 
         # Verify st.html was called
         assert mock_streamlit["html"].call_count >= 1
-        css_call = mock_streamlit["html"].call_args_list[0]
-        css_content = css_call[0][0]
-
-        # Should contain style tags
-        assert "<style>" in css_content
+        joined = "".join(c[0][0] for c in mock_streamlit["html"].call_args_list)
+        assert 'class="stx-marker' in joined
 
     def test_st_block_generates_unique_block_id(self, mock_streamlit):
         """st_block should generate a unique ID for each block."""
@@ -109,41 +106,21 @@ class TestStBlockBasic:
             mock_container.assert_called()
 
     def test_st_block_inserts_marker_span(self, mock_streamlit):
-        """st_block should insert a marker span element."""
+        """st_block should insert a stx-marker span element."""
         with st_block():
             pass
 
-        # Find the marker span call
-        marker_found = False
-        for call_args in mock_streamlit["html"].call_args_list:
-            html_content = call_args[0][0]
-            if '<span class="block-' in html_content and 'style="display:none;"' in html_content:
-                marker_found = True
-                break
+        joined = "".join(c[0][0] for c in mock_streamlit["html"].call_args_list)
+        assert 'class="stx-marker block-' in joined
+        assert 'data-stx-kind="block"' in joined
+        assert 'style="display:none;"' in joined
 
-        assert marker_found, "Marker span not found in st.html calls"
-
-    def test_st_block_uses_has_selector(self, mock_streamlit):
-        """st_block CSS should use :has() selector."""
+    def test_st_block_does_not_use_has_selector(self, mock_streamlit):
+        """st_block must not emit any :has() selector (the legacy pattern)."""
         with st_block():
             pass
-
-        css_call = mock_streamlit["html"].call_args_list[0]
-        css_content = css_call[0][0]
-
-        # Should use :has() selector
-        assert ":has(" in css_content
-
-    def test_st_block_width_auto(self, mock_streamlit):
-        """st_block CSS should set width: auto."""
-        with st_block():
-            pass
-
-        css_call = mock_streamlit["html"].call_args_list[0]
-        css_content = css_call[0][0]
-
-        # Should set width: auto
-        assert "width: auto" in css_content
+        joined = "".join(c[0][0] for c in mock_streamlit["html"].call_args_list)
+        assert ":has(" not in joined
 
 
 class TestStSpanBasic:
@@ -179,50 +156,14 @@ class TestStSpanBasic:
         assert "color: blue;" in css_content
 
     def test_st_span_uses_default_style(self, mock_streamlit):
-        """st_span should use StxStyles.none by default."""
+        """st_span with default style should still emit the stx-marker span."""
         with st_span():
             pass
 
-        # Verify st.html was called
         assert mock_streamlit["html"].call_count >= 1
-        css_call = mock_streamlit["html"].call_args_list[0]
-        css_content = css_call[0][0]
-
-        # Should contain style tags
-        assert "<style>" in css_content
-
-    def test_st_span_sets_display_flex(self, mock_streamlit):
-        """st_span CSS should set display: flex."""
-        with st_span():
-            pass
-
-        css_call = mock_streamlit["html"].call_args_list[0]
-        css_content = css_call[0][0]
-
-        # Should set display: flex
-        assert "display: flex" in css_content
-
-    def test_st_span_sets_flex_direction_row(self, mock_streamlit):
-        """st_span CSS should set flex-direction: row."""
-        with st_span():
-            pass
-
-        css_call = mock_streamlit["html"].call_args_list[0]
-        css_content = css_call[0][0]
-
-        # Should set flex-direction: row
-        assert "flex-direction: row" in css_content
-
-    def test_st_span_preserves_whitespace(self, mock_streamlit):
-        """st_span CSS should set white-space: pre."""
-        with st_span():
-            pass
-
-        css_call = mock_streamlit["html"].call_args_list[0]
-        css_content = css_call[0][0]
-
-        # Should set white-space: pre
-        assert "white-space: pre" in css_content
+        joined = "".join(c[0][0] for c in mock_streamlit["html"].call_args_list)
+        assert 'class="stx-marker' in joined
+        assert 'data-stx-kind="span"' in joined
 
     def test_st_span_generates_unique_span_id(self, mock_streamlit):
         """st_span should generate a unique ID for each span."""
@@ -241,31 +182,14 @@ class TestStSpanBasic:
         # Should have at least one span ID
         assert len(span_ids) > 0
 
-    def test_st_span_width_auto(self, mock_streamlit):
-        """st_span CSS should set width: auto for elements."""
-        with st_span():
-            pass
-
-        css_call = mock_streamlit["html"].call_args_list[0]
-        css_content = css_call[0][0]
-
-        # Should set width: auto
-        assert "width: auto" in css_content
-
     def test_st_span_inserts_marker_span(self, mock_streamlit):
-        """st_span should insert a marker span element."""
+        """st_span should insert a stx-marker span element with kind=span."""
         with st_span():
             pass
-
-        # Find the marker span call
-        marker_found = False
-        for call_args in mock_streamlit["html"].call_args_list:
-            html_content = call_args[0][0]
-            if '<span class="span-' in html_content and 'style="display:none;"' in html_content:
-                marker_found = True
-                break
-
-        assert marker_found, "Marker span not found in st.html calls"
+        joined = "".join(c[0][0] for c in mock_streamlit["html"].call_args_list)
+        assert 'class="stx-marker span-' in joined
+        assert 'data-stx-kind="span"' in joined
+        assert 'style="display:none;"' in joined
 
 
 class TestStBlockExport:
@@ -614,80 +538,156 @@ class TestStSpanEdgeCases:
 
 
 class TestContainerCssStructure:
-    """Tests for CSS structure and selectors."""
+    """Tests for the CSS payload structure (well-formed when emitted)."""
 
     def setup_method(self):
-        """Reset export buffer before each test."""
         reset_export_buffer(None)
 
     def teardown_method(self):
-        """Clean up after each test."""
         reset_export_buffer(None)
 
-    def test_st_block_css_has_element_container_selector(self, mock_streamlit):
-        """st_block CSS should have .element-container selector."""
+    def test_st_block_css_well_formed_when_styled(self, mock_streamlit):
+        """When a per-instance style is emitted, the <style> tag is balanced."""
+        with st_block(Style("color: red;", "red")):
+            pass
+        joined = "".join(c[0][0] for c in mock_streamlit["html"].call_args_list)
+        assert joined.count("<style>") == joined.count("</style>")
+        assert joined.count("{") == joined.count("}")
+
+    def test_st_span_css_well_formed_when_styled(self, mock_streamlit):
+        with st_span(Style("color: blue;", "blue")):
+            pass
+        joined = "".join(c[0][0] for c in mock_streamlit["html"].call_args_list)
+        assert joined.count("<style>") == joined.count("</style>")
+        assert joined.count("{") == joined.count("}")
+
+
+# ===========================================================================
+# Marker emit pattern — the only path since 0.6.16 (legacy :has() removed).
+# ===========================================================================
+
+
+class TestStBlockMarkerPath:
+    """st_block emits a stx-marker span; no :has() in the output."""
+
+    def setup_method(self):
+        reset_export_buffer(None)
+
+    def teardown_method(self):
+        reset_export_buffer(None)
+
+    def test_emits_stx_marker_span(self, mock_streamlit):
         with st_block():
             pass
+        joined = "".join(c[0][0] for c in mock_streamlit["html"].call_args_list)
+        assert 'class="stx-marker' in joined
+        assert 'data-stx-kind="block"' in joined
+        assert 'data-stx-uid="block-' in joined
 
-        css_call = mock_streamlit["html"].call_args_list[0]
-        css_content = css_call[0][0]
-
-        assert ".element-container" in css_content
-
-    def test_st_block_css_has_stHtml_selector(self, mock_streamlit):
-        """st_block CSS should have .stHtml selector."""
+    def test_no_has_selector_emitted(self, mock_streamlit):
         with st_block():
             pass
+        for c in mock_streamlit["html"].call_args_list:
+            html = c[0][0]
+            assert ":has(" not in html, f":has() still present in {html!r}"
 
-        css_call = mock_streamlit["html"].call_args_list[0]
-        css_content = css_call[0][0]
-
-        assert ".stHtml" in css_content
-
-    def test_st_span_css_has_element_container_selector(self, mock_streamlit):
-        """st_span CSS should have .element-container selector."""
-        with st_span():
-            pass
-
-        css_call = mock_streamlit["html"].call_args_list[0]
-        css_content = css_call[0][0]
-
-        assert ".element-container" in css_content
-
-    def test_st_span_css_has_stHtml_selector(self, mock_streamlit):
-        """st_span CSS should have .stHtml selector."""
-        with st_span():
-            pass
-
-        css_call = mock_streamlit["html"].call_args_list[0]
-        css_content = css_call[0][0]
-
-        assert ".stHtml" in css_content
-
-    def test_st_block_css_well_formed(self, mock_streamlit):
-        """st_block CSS should be well-formed."""
+    def test_no_inline_style_when_default_style(self, mock_streamlit):
         with st_block():
             pass
+        joined = "".join(c[0][0] for c in mock_streamlit["html"].call_args_list)
+        # With StxStyles.none and no section CSS, no per-instance <style> tag.
+        assert "<style>" not in joined
 
-        css_call = mock_streamlit["html"].call_args_list[0]
-        css_content = css_call[0][0]
+    def test_inline_style_uses_attribute_selector(self, mock_streamlit):
+        style = Style("color: red;", "red_text")
+        with st_block(style):
+            pass
+        joined = "".join(c[0][0] for c in mock_streamlit["html"].call_args_list)
+        # Per-instance stylesheet uses kind-prefixed UID attribute, not :has().
+        # The kind prefix lets multiple marker kinds coexist on the same
+        # parent (e.g. a list-item that wraps st_block).
+        assert '[data-stx-block-uid="block-' in joined
+        assert "color: red" in joined
+        assert ":has(" not in joined
 
-        # Count opening and closing braces
-        open_braces = css_content.count("{")
-        close_braces = css_content.count("}")
+    def test_marker_span_carries_block_id_class(self, mock_streamlit):
+        """Backward-compat: the marker span still carries the block-N class
+        so any downstream tooling that grepped that string keeps working."""
+        with st_block():
+            pass
+        joined = "".join(c[0][0] for c in mock_streamlit["html"].call_args_list)
+        import re
+        assert re.search(r'class="stx-marker block-\d+"', joined)
 
-        assert open_braces == close_braces
 
-    def test_st_span_css_well_formed(self, mock_streamlit):
-        """st_span CSS should be well-formed."""
+class TestStSpanMarkerPath:
+    """st_span under STX_USE_MARKER_RUNTIME=1 emits a marker span, no :has()."""
+
+    def setup_method(self):
+        reset_export_buffer(None)
+
+    def teardown_method(self):
+        reset_export_buffer(None)
+
+    def test_emits_stx_marker_span(self, mock_streamlit):
         with st_span():
             pass
+        joined = "".join(c[0][0] for c in mock_streamlit["html"].call_args_list)
+        assert 'class="stx-marker' in joined
+        assert 'data-stx-kind="span"' in joined
+        assert 'data-stx-uid="span-' in joined
 
-        css_call = mock_streamlit["html"].call_args_list[0]
-        css_content = css_call[0][0]
+    def test_no_has_selector_emitted(self, mock_streamlit):
+        with st_span():
+            pass
+        joined = "".join(c[0][0] for c in mock_streamlit["html"].call_args_list)
+        assert ":has(" not in joined
 
-        # Count opening and closing braces
-        open_braces = css_content.count("{")
-        close_braces = css_content.count("}")
+    def test_inline_style_via_attribute_selector(self, mock_streamlit):
+        style = Style("color: blue;", "blue_text")
+        with st_span(style):
+            pass
+        joined = "".join(c[0][0] for c in mock_streamlit["html"].call_args_list)
+        assert '[data-stx-span-uid="span-' in joined
+        assert "color: blue" in joined
+        assert ":has(" not in joined
 
-        assert open_braces == close_braces
+
+class TestExportUnaffectedByMarkerPath:
+    """Export wrappers must be byte-identical between legacy and marker paths."""
+
+    def setup_method(self):
+        reset_export_buffer(None)
+
+    def teardown_method(self):
+        reset_export_buffer(None)
+
+    def test_block_export_wrapper_unchanged(self, mock_streamlit):
+        reset_export_buffer(ExportConfig(enabled=True))
+        try:
+            with patch("streamtex.container.export_push_wrapper") as mock_push:
+                with st_block(Style("color: red;", "red")):
+                    pass
+                assert mock_push.called
+                pushed = mock_push.call_args[0][0]
+                assert '<div class="stx-block"' in pushed
+                assert "color: red" in pushed
+                # MUST NOT introduce stx-marker into the export wrapper.
+                assert "stx-marker" not in pushed
+        finally:
+            reset_export_buffer(None)
+
+    def test_span_export_wrapper_unchanged(self, mock_streamlit):
+        reset_export_buffer(ExportConfig(enabled=True))
+        try:
+            with patch("streamtex.container.export_push_wrapper") as mock_push:
+                with st_span(Style("color: blue;", "blue")):
+                    pass
+                assert mock_push.called
+                pushed = mock_push.call_args[0][0]
+                assert "display:flex" in pushed
+                assert "flex-direction:row" in pushed
+                assert "color: blue" in pushed
+                assert "stx-marker" not in pushed
+        finally:
+            reset_export_buffer(None)

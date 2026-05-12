@@ -44,6 +44,7 @@ from .dev_cmd import (
 )
 from .export_cmd import export_html
 from .install_cmd import install as stx_install
+from .patterns_cmd import patterns as patterns_group
 from .project_cmd import new as project_new
 from .project_cmd import validate as project_validate
 from .publish_cmd import check_cmd as publish_check
@@ -172,6 +173,11 @@ def export():
 
 
 export.add_command(export_html)
+
+
+# --- Patterns subgroup -----------------------------------------------------
+
+cli.add_command(patterns_group, name="patterns")
 
 
 # --- Dev subgroup ----------------------------------------------------------

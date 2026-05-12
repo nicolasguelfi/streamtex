@@ -18,7 +18,6 @@ from contextlib import nullcontext
 from html import escape
 
 import streamlit as st
-import streamlit.components.v1 as components
 
 from .container import st_block
 from .export import _render, export_append, is_export_active
@@ -144,10 +143,14 @@ _TIKZ_TEMPLATE = """\
   #viewport {
     width: 100%; height: calc(100% - 32px);
     overflow: hidden; cursor: grab;
-    display: flex; justify-content: start; align-items: start;
+    display: flex; justify-content: center; align-items: center;
   }
   #viewport.dragging { cursor: grabbing; }
-  #viewport svg { transform-origin: 0 0; }
+  #viewport svg {
+    max-width: 100%; max-height: 100%;
+    width: auto; height: auto;
+    transform-origin: center center;
+  }
   #controls {
     height: 32px; display: flex; gap: 4px;
     justify-content: center; align-items: center;
@@ -169,7 +172,7 @@ _TIKZ_TEMPLATE = """\
   <button onclick="zoomOut()" title="Zoom out">&minus;</button>
 </div>
 <script>
-  var _s = 1, _tx = 0, _ty = 0, _fitS = 1, _fitTx = 0, _fitTy = 0;
+  var _s = 1, _tx = 0, _ty = 0;
   var _svg = document.querySelector('#viewport svg');
 
   function _apply() {
@@ -178,45 +181,21 @@ _TIKZ_TEMPLATE = """\
   }
   function zoomIn()    { _s *= 1.2; _apply(); }
   function zoomOut()   { _s /= 1.2; _apply(); }
-  function resetView() { _s = _fitS; _tx = _fitTx; _ty = _fitTy; _apply(); }
-
-  function _autoFit() {
-    if (!_svg) return;
-    var vp = document.getElementById('viewport');
-    var vw = vp.clientWidth, vh = vp.clientHeight;
-    var sw = _svg.getAttribute('width'), sh = _svg.getAttribute('height');
-    if (!sw || !sh) {
-      var bb = _svg.getBBox();
-      sw = bb.width; sh = bb.height;
-    } else {
-      sw = parseFloat(sw); sh = parseFloat(sh);
-    }
-    if (!sw || !sh) return;
-    var scaleX = vw / sw, scaleY = vh / sh;
-    _fitS = Math.min(scaleX, scaleY);
-    _fitTx = (vw - sw * _fitS) / 2;
-    _fitTy = (vh - sh * _fitS) / 2;
-    _s = _fitS; _tx = _fitTx; _ty = _fitTy;
-    _apply();
-  }
+  function resetView() { _s = 1; _tx = 0; _ty = 0; _apply(); }
 
   if (_svg) {
-    _svg.style.transformOrigin = '0 0';
-    _autoFit();
-
     var vp = document.getElementById('viewport');
     var drag = false, sx = 0, sy = 0;
 
     vp.addEventListener('wheel', function(e) {
       e.preventDefault();
-      var r = vp.getBoundingClientRect();
-      var mx = e.clientX - r.left;
-      var my = e.clientY - r.top;
+      var sr = _svg.getBoundingClientRect();
+      var dx = e.clientX - (sr.left + sr.width / 2);
+      var dy = e.clientY - (sr.top + sr.height / 2);
       var f = e.deltaY < 0 ? 1.1 : 0.9;
-      var ns = _s * f;
-      _tx = mx - (mx - _tx) * ns / _s;
-      _ty = my - (my - _ty) * ns / _s;
-      _s = ns;
+      _tx = _tx + dx * (1 - f);
+      _ty = _ty + dy * (1 - f);
+      _s = _s * f;
       _apply();
     }, { passive: false });
 
@@ -319,7 +298,26 @@ def st_tikz(
                     .replace("__BG__", bg)
                     .replace("__SVG__", svg)
                 )
-                components.html(html, height=height, scrolling=True)
+                st.iframe(html, height=height)
+                if is_export_active():
+                    # Embed the SVG as a base64 data URI inside an <img>.
+                    # Inline <svg> renders inconsistently across browsers
+                    # — Firefox uses the SVG's intrinsic width for content
+                    # scaling even when CSS clamps the box width, causing
+                    # the painted content to overflow.  Wrapping in <img>
+                    # forces uniform CSS-driven sizing in every engine.
+                    import base64 as _b64
+                    b64 = _b64.b64encode(svg.encode("utf-8")).decode("ascii")
+                    img_tag = (
+                        f'<img src="data:image/svg+xml;base64,{b64}" '
+                        f'style="max-width:100%;height:auto;'
+                        f'display:block;margin:0 auto" '
+                        f'alt="TikZ diagram">'
+                    )
+                    export_append(
+                        f'<div class="stx-tikz" style="text-align:center">'
+                        f'{img_tag}</div>'
+                    )
             else:
                 if light_bg:
                     css = "background:#fff;padding:8px;text-align:center"

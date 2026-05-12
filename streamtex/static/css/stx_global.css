@@ -1,0 +1,183 @@
+/* StreamTeX global stylesheet — marker-class scoping (replaces legacy :has()).
+ *
+ * This file ships rules for every StreamTeX construct that previously used the
+ * per-instance `:has(> .element-container .stHtml span.{uid})` pattern.
+ *
+ * Rules are appended phase by phase as each Python module is migrated:
+ *   - Phase 1 (0.6.12): .stx-block, .stx-span         (container.py)
+ *   - Phase 2 (0.6.13): .stx-list, .stx-list-item     (list.py)
+ *   - Phase 3 (0.6.14): .stx-grid, .stx-zoom, .stx-md-big
+ *   - Phase 4 (0.6.21): adapted to Streamlit 1.56+ DOM structure changes:
+ *       * `.element-container` → `[data-testid="stElementContainer"]`
+ *       * new `[data-testid="stLayoutWrapper"]` wraps each cell/child
+ *       * Streamlit sets `display:flex; flex-direction:column` on every
+ *         stVerticalBlock — our overrides need `!important` to win the
+ *         cascade reliably.
+ *
+ *   Both old and new selectors are matched in every rule for compat with
+ *   any Streamlit ≥ 1.54.
+ */
+
+/* --- Universal marker-cell hide ----------------------------------------- */
+/* Hide marker cells (the container that hosts the sentinel span).
+ * Streamlit ≤ 1.55: .element-container ; Streamlit ≥ 1.56: stElementContainer. */
+[data-testid="stVerticalBlock"] > .element-container.stx-marker-cell,
+[data-testid="stVerticalBlock"] > [data-testid="stElementContainer"].stx-marker-cell {
+  display: none !important;
+}
+
+/* ============================================================================
+ * Phase 1 (0.6.12) — st_block / st_span
+ * Replaces the legacy per-instance :has() selectors in streamtex/container.py.
+ *
+ * Per-instance user style (`style=` argument + section horizontal CSS) is
+ * injected separately by container.py as a tiny per-call <style> using the
+ * `[data-testid="stVerticalBlock"][data-stx-block-uid="…"]` attribute
+ * selector (Option B — preserves cascade semantics).
+ * ========================================================================== */
+
+/* st_block: rely on Streamlit's default flex-column layout — no extra rules
+ * are needed beyond the marker-cell hide above.  The class is still set on
+ * the parent stVerticalBlock so per-instance attribute-selector stylesheets
+ * (carrying user-supplied `style=`) can target it.
+ */
+
+/* st_span: horizontal flex layout that mirrors the legacy `:has()` rule. */
+[data-testid="stVerticalBlock"].stx-span {
+  display: flex !important;
+  flex-direction: row !important;
+  white-space: pre;
+}
+[data-testid="stVerticalBlock"].stx-span > * {
+  width: auto;
+}
+
+/* ============================================================================
+ * Phase 2 (0.6.13) — st_list / st_list-item
+ * Replaces the legacy per-instance :has() selectors in streamtex/list.py.
+ *
+ * Bullet content is per-item (list.py emits a tiny `<style>` keyed by the
+ * `[data-stx-list-item-uid="…"]` attribute selector) because `content:
+ * counter(streamtex-counter, decimal) '.'` cannot be reliably carried by a
+ * CSS custom property.  Every other rule is here.
+ * ========================================================================== */
+
+/* List root (counter-reset, gap, default width). */
+[data-testid="stVerticalBlock"].stx-list {
+  counter-reset: streamtex-counter;
+  gap: 0.2rem;
+  width: 100%;
+}
+/* Centered list root (align="center"): width override via observer-set var. */
+[data-testid="stVerticalBlock"].stx-list[data-stx-list-width="fit-content"] {
+  width: fit-content;
+  margin-inline: auto;
+}
+
+/* List item: flex row holding [bullet ::before] + [content wrapper]. */
+[data-testid="stVerticalBlock"].stx-list-item {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+[data-testid="stVerticalBlock"].stx-list-item.stx-list-item--ordered {
+  counter-increment: streamtex-counter;
+}
+/* Bullet positioning (the `content` value itself is per-item — see list.py). */
+[data-testid="stVerticalBlock"].stx-list-item::before {
+  flex-shrink: 0;
+  text-align: right;
+  min-width: 1.2rem;
+  color: inherit;
+  font-weight: inherit;
+  align-self: baseline;
+}
+/* Hide the list-item's own marker cell. */
+[data-testid="stVerticalBlock"].stx-list-item > .element-container.stx-marker-cell,
+[data-testid="stVerticalBlock"].stx-list-item > [data-testid="stElementContainer"].stx-marker-cell {
+  display: none !important;
+}
+/* Inner content wrapper: the st.container() yielded inside each item.
+ * Streamlit ≥ 1.56 wraps this in an extra stLayoutWrapper — match both. */
+[data-testid="stVerticalBlock"].stx-list-item > [data-testid="stVerticalBlock"],
+[data-testid="stVerticalBlock"].stx-list-item > [data-testid="stLayoutWrapper"] > [data-testid="stVerticalBlock"],
+[data-testid="stVerticalBlock"].stx-list-item > [data-testid="stLayoutWrapper"] {
+  flex-grow: 1;
+  width: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-width: 0;
+}
+
+/* ============================================================================
+ * Phase 3 (0.6.14) — st_grid / st_zoom / _render_md_body
+ * Replaces the legacy per-instance :has() selectors in streamtex/grid.py,
+ * streamtex/zoom.py and streamtex/block_helpers.py.
+ *
+ * Per-instance overrides:
+ *   - grid_style (Style argument) → tiny per-instance <style> (Option B),
+ *     emitted by grid.py
+ *   - breakpoint (@container query) → tiny per-instance <style>,
+ *     emitted by grid.py — `@container` query conditions cannot consume
+ *     CSS var() reliably across browsers, so this stays per-instance
+ *   - StxStyles.big for _render_md_body → tiny per-instance <style>,
+ *     emitted by block_helpers.py
+ * ========================================================================== */
+
+/* st_grid: turn the parent stVerticalBlock into a CSS grid container.
+ * `!important` overrides Streamlit's default `display:flex; flex-direction:
+ * column;` on every stVerticalBlock (Streamlit ≥ 1.56 applies this with
+ * higher specificity than our class+attribute selector). */
+[data-testid="stVerticalBlock"].stx-grid {
+  display: grid !important;
+  grid-template-columns: var(--stx-grid-template, 1fr) !important;
+  gap: var(--stx-grid-gap, 0) !important;
+  align-items: stretch !important;
+}
+/* Hide every direct marker / inline-style / script container child so only
+ * actual cells take grid slots.  Matches both legacy `.element-container`
+ * and Streamlit 1.56+ `[data-testid="stElementContainer"]`. */
+[data-testid="stVerticalBlock"].stx-grid > .element-container,
+[data-testid="stVerticalBlock"].stx-grid > [data-testid="stElementContainer"] {
+  display: none !important;
+}
+/* Cells.  Streamlit ≤ 1.55: each cell is a direct stVerticalBlock child.
+ * Streamlit ≥ 1.56: each cell is wrapped in a stLayoutWrapper which is the
+ * direct child of the grid.  Match both. */
+[data-testid="stVerticalBlock"].stx-grid > [data-testid="stVerticalBlock"],
+[data-testid="stVerticalBlock"].stx-grid > [data-testid="stLayoutWrapper"] {
+  width: auto !important;
+  min-width: 0;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+/* In the 1.56+ case, the stLayoutWrapper itself becomes the grid cell —
+ * make sure its inner stVerticalBlock fills the wrapper's slot so user
+ * styles (background, padding, etc. emitted via per-instance attribute
+ * selectors on the inner stVerticalBlock) render correctly. */
+[data-testid="stVerticalBlock"].stx-grid > [data-testid="stLayoutWrapper"] {
+  display: block;
+}
+[data-testid="stVerticalBlock"].stx-grid > [data-testid="stLayoutWrapper"] > [data-testid="stVerticalBlock"] {
+  width: 100%;
+  height: 100%;
+}
+
+/* st_zoom: zoom factor forwarded as `--stx-zoom-factor`. */
+[data-testid="stVerticalBlock"].stx-zoom {
+  zoom: var(--stx-zoom-factor, 1);
+}
+[data-testid="stVerticalBlock"].stx-zoom > .element-container,
+[data-testid="stVerticalBlock"].stx-zoom > [data-testid="stElementContainer"] {
+  width: auto;
+}
+
+/* _render_md_body: layout class only — the actual font-size override (from
+ * `StxStyles.big`) is per-instance because it may vary per project and we
+ * preserve the legacy cascade semantics by emitting it via attribute selector
+ * inside block_helpers.py.  This class is a hook for future theming. */
+[data-testid="stVerticalBlock"].stx-md-big {
+  /* intentionally empty; per-instance rule is emitted by block_helpers.py */
+}

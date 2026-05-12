@@ -1,5 +1,6 @@
 """Tests for the list module."""
 
+import os
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -7,6 +8,26 @@ import pytest
 from streamtex.enums import ListTypes
 from streamtex.list import ListController, _current_list_level, st_list
 from streamtex.styles import ListStyle, StxStyles, Style
+
+
+# Module-level autouse fixture: keep the legacy :has() path as the test
+# default so historical assertions remain valid after Phase 4's default
+# flip.  Marker-path tests opt in via `_marker_runtime_on` below.
+@pytest.fixture(autouse=True)
+def _force_legacy_by_default():
+    prev_legacy = os.environ.get("STX_USE_LEGACY_HAS")
+    prev_marker = os.environ.get("STX_USE_MARKER_RUNTIME")
+    os.environ["STX_USE_LEGACY_HAS"] = "1"
+    os.environ.pop("STX_USE_MARKER_RUNTIME", None)
+    yield
+    if prev_legacy is None:
+        os.environ.pop("STX_USE_LEGACY_HAS", None)
+    else:
+        os.environ["STX_USE_LEGACY_HAS"] = prev_legacy
+    if prev_marker is None:
+        os.environ.pop("STX_USE_MARKER_RUNTIME", None)
+    else:
+        os.environ["STX_USE_MARKER_RUNTIME"] = prev_marker
 
 
 class TestListController:
@@ -503,7 +524,7 @@ class TestListAlign:
     """Tests for the align parameter of st_list."""
 
     def test_st_list_default_align_none(self, mock_streamlit):
-        """Test that align defaults to None — list uses width: 100%."""
+        """Test that align defaults to None — no data-stx-list-width attribute."""
         with patch("streamtex.list.st_block") as mock_st_block, \
              patch("streamtex.list.st.html") as mock_html, \
              patch("streamtex.list.is_export_active", return_value=False):
@@ -514,12 +535,12 @@ class TestListAlign:
             with st_list() as controller:
                 pass
 
-            css_call = mock_html.call_args_list[0][0][0]
-            assert "width: 100%" in css_call
-            assert "fit-content" not in css_call
+            marker = mock_html.call_args_list[0][0][0]
+            assert "data-stx-list-width" not in marker
+            # The default width (100%) lives in the global stylesheet.
 
     def test_st_list_align_center(self, mock_streamlit):
-        """Test that align='center' uses fit-content + margin-inline: auto."""
+        """Test that align='center' forwards data-stx-list-width=fit-content."""
         with patch("streamtex.list.st_block") as mock_st_block, \
              patch("streamtex.list.st.html") as mock_html, \
              patch("streamtex.list.is_export_active", return_value=False):
@@ -530,10 +551,10 @@ class TestListAlign:
             with st_list(align="center") as controller:
                 pass
 
-            css_call = mock_html.call_args_list[0][0][0]
-            assert "width: fit-content" in css_call
-            assert "margin-inline: auto" in css_call
-            assert "width: 100%" not in css_call
+            marker = mock_html.call_args_list[0][0][0]
+            assert 'data-stx-list-width="fit-content"' in marker
+            # The global stylesheet rule converts that into
+            # `width: fit-content; margin-inline: auto`.
 
     def test_st_list_align_does_not_affect_controller(self, mock_streamlit):
         """Test that align parameter does not change the ListController."""
@@ -762,3 +783,105 @@ class TestAltLiStyles:
 
             with st_list() as ctrl:
                 assert ctrl.alt_li_styles is None
+
+
+# ===========================================================================
+# Phase 2 — marker-runtime path (STX_USE_MARKER_RUNTIME=1)
+# ===========================================================================
+#
+# Validates that st_list / ListController.item emit sentinel marker spans
+# (`data-stx-kind="list"`, `data-stx-kind="list-item"`) instead of the
+# legacy :has() stylesheets when the marker runtime is enabled.
+
+
+@pytest.fixture
+def _marker_runtime_on():
+    prev_legacy = os.environ.get("STX_USE_LEGACY_HAS")
+    prev_marker = os.environ.get("STX_USE_MARKER_RUNTIME")
+    os.environ.pop("STX_USE_LEGACY_HAS", None)
+    os.environ["STX_USE_MARKER_RUNTIME"] = "1"
+    yield
+    if prev_legacy is None:
+        os.environ.pop("STX_USE_LEGACY_HAS", None)
+    else:
+        os.environ["STX_USE_LEGACY_HAS"] = prev_legacy
+    if prev_marker is None:
+        os.environ.pop("STX_USE_MARKER_RUNTIME", None)
+    else:
+        os.environ["STX_USE_MARKER_RUNTIME"] = prev_marker
+
+
+def _collect_html(mock_streamlit):
+    """Concatenate every st.html() call argument seen by the mock."""
+    return "".join(c[0][0] for c in mock_streamlit["html"].call_args_list)
+
+
+class TestStListMarkerPath:
+    def test_emits_list_marker(self, mock_streamlit, _marker_runtime_on):
+        with st_list() as _:
+            pass
+        joined = _collect_html(mock_streamlit)
+        assert 'data-stx-kind="list"' in joined
+        assert 'data-stx-uid="ul-' in joined
+
+    def test_no_has_selector_in_list_root(self, mock_streamlit, _marker_runtime_on):
+        with st_list():
+            pass
+        joined = _collect_html(mock_streamlit)
+        assert ":has(" not in joined
+
+    def test_align_center_carries_width_data_attr(self, mock_streamlit, _marker_runtime_on):
+        with st_list(align="center"):
+            pass
+        joined = _collect_html(mock_streamlit)
+        assert 'data-stx-list-width="fit-content"' in joined
+
+
+class TestListItemMarkerPath:
+    def test_emits_list_item_marker(self, mock_streamlit, _marker_runtime_on):
+        with st_list() as lst:
+            with lst.item():
+                pass
+        joined = _collect_html(mock_streamlit)
+        assert 'data-stx-kind="list-item"' in joined
+        assert 'data-stx-uid="li-' in joined
+
+    def test_unordered_item_does_not_set_ordered_attr(self, mock_streamlit, _marker_runtime_on):
+        with st_list() as lst:
+            with lst.item():
+                pass
+        joined = _collect_html(mock_streamlit)
+        assert "data-stx-ordered" not in joined
+
+    def test_ordered_item_sets_ordered_attr(self, mock_streamlit, _marker_runtime_on):
+        with st_list(list_type=ListTypes.ordered) as lst:
+            with lst.item():
+                pass
+        joined = _collect_html(mock_streamlit)
+        assert "data-stx-ordered" in joined
+
+    def test_bullet_uses_per_item_attribute_selector(self, mock_streamlit, _marker_runtime_on):
+        """The bullet `content:` value is injected as a per-item stylesheet
+        keyed by [data-stx-list-item-uid=…] — not a :has() selector."""
+        with st_list() as lst:
+            with lst.item():
+                pass
+        joined = _collect_html(mock_streamlit)
+        assert '[data-stx-list-item-uid="li-' in joined
+        assert "content:" in joined
+        assert ":has(" not in joined
+
+    def test_ordered_bullet_contains_counter(self, mock_streamlit, _marker_runtime_on):
+        with st_list(list_type=ListTypes.ordered) as lst:
+            with lst.item():
+                pass
+        joined = _collect_html(mock_streamlit)
+        assert "counter(streamtex-counter" in joined
+
+    def test_unordered_bullet_contains_dot(self, mock_streamlit, _marker_runtime_on):
+        with st_list() as lst:
+            with lst.item():
+                pass
+        joined = _collect_html(mock_streamlit)
+        # Default level-1 unordered bullet is `'•'`.
+        assert "'•'" in joined

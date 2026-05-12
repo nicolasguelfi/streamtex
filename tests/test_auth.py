@@ -68,7 +68,6 @@ def _patch_gate(session=None, clicked_char=None):
         patch("streamtex.auth.st_space"),
         patch("streamtex.auth.st_write"),
         patch("streamtex.auth.st_block", return_value=block),
-        patch("streamtex.auth.components"),
         patch("streamtex.auth._render_circles"),
     ):
         yield mock_st

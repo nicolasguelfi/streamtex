@@ -125,7 +125,7 @@ class TestLiveRendering:
         # height is extracted from the SVG (150px + 20px padding)
         assert mock_render.call_args[1]["height"] == 170
 
-    @patch("streamtex.tikz.components")
+    @patch("streamtex.tikz.st.iframe")
     @patch("streamtex.tikz._render")
     @patch("streamtex.tikz.st")
     @patch("streamtex.tikz._compile_tikz", return_value=FAKE_SVG)
@@ -135,8 +135,8 @@ class TestLiveRendering:
         """Explicit height renders via components.html with JS pan/zoom."""
         st_tikz(SAMPLE_CODE, height=800)
         mock_render.assert_not_called()
-        mock_components.html.assert_called_once()
-        html_arg = mock_components.html.call_args[0][0]
+        mock_components.assert_called_once()
+        html_arg = mock_components.call_args[0][0]
         # JS auto-fit pattern
         assert "Math.min(scaleX, scaleY)" in html_arg
         assert "resetView" in html_arg
@@ -147,7 +147,7 @@ class TestLiveRendering:
         # SVG is injected
         assert "<svg" in html_arg
         # Correct height passed
-        assert mock_components.html.call_args[1]["height"] == 800
+        assert mock_components.call_args[1]["height"] == 800
 
     @patch("streamtex.tikz._render")
     @patch("streamtex.tikz.st")

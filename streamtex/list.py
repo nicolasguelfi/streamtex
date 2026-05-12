@@ -13,6 +13,52 @@ from .utils import generate_key
 
 _current_list_level = ContextVar("list_level", default=0)
 
+
+def _build_list_item_payload(item_id: str, bullet_content: str, is_ordered: bool) -> str:
+    """Return the per-item bullet CSS + sentinel marker span for a list item.
+
+    The bullet ``content:`` value (which may include ``counter(streamtex-counter,
+    decimal) '.'`` for ordered lists) is carried by a tiny per-item
+    stylesheet keyed by ``[data-stx-list-item-uid="…"]`` — CSS ``var()``
+    cannot reliably carry a ``counter()`` function call across browsers.
+    All other rules (flex layout, gap, baseline alignment, marker-cell
+    hide, inner content wrapper) live in the global stylesheet under
+    ``.stx-list-item``.
+    """
+    bullet_css = (
+        f'<style>'
+        f'[data-stx-list-item-uid="{item_id}"]::before'
+        f'{{ content: {bullet_content}; }}'
+        f'</style>'
+    )
+    marker_attrs = (
+        f'class="stx-marker {item_id}" '
+        f'data-stx-kind="list-item" data-stx-uid="{item_id}"'
+    )
+    if is_ordered:
+        marker_attrs += ' data-stx-ordered'
+    return (
+        f'{bullet_css}'
+        f'<span {marker_attrs} style="display:none"></span>'
+    )
+
+
+def _build_list_root_payload(list_id: str, align: str) -> str:
+    """Return the sentinel marker span for a list root container.
+
+    The single styling rule (counter-reset + gap + default width) lives in
+    the global stylesheet under ``.stx-list``.  ``align="center"`` is
+    forwarded as ``data-stx-list-width="fit-content"`` so the global
+    stylesheet can override the default 100% width.
+    """
+    width_attr = ' data-stx-list-width="fit-content"' if align == "center" else ''
+    return (
+        f'<span class="stx-marker {list_id}" '
+        f'data-stx-kind="list" data-stx-uid="{list_id}"'
+        f'{width_attr} style="display:none"></span>'
+    )
+
+
 class ListController:
     def __init__(self, li_style: Style, bullet_content: str, is_ordered: bool,
                  alt_li_styles: list[Style] | None = None):
@@ -39,52 +85,7 @@ class ListController:
         # We generate a unique ID for the Outer Container (the 'LI')
         item_id = generate_key("li")
 
-        # CSS Logic
-        css = f"""
-        <style>
-            /* 1. OUTER CONTAINER (Flex Row) */
-            /* This holds the bullet and the content wrapper side-by-side */
-            div[data-testid="stVerticalBlock"]:has(> .element-container .stHtml span.{item_id}) {{
-                display: flex;
-                flex-direction: row;
-                align-items: baseline; /* Aligns bullet with the first line of text */
-                gap: 0.5rem;
-                {"counter-increment: streamtex-counter;" if self.is_ordered else ""}
-            }}
-
-            /* 2. THE BULLET (::before on Outer) */
-            div[data-testid="stVerticalBlock"]:has(> .element-container .stHtml span.{item_id})::before {{
-                content: {self.bullet_content};
-                flex-shrink: 0;
-                text-align: right;
-                min-width: 1.2rem;
-                color: inherit;
-                font-weight: inherit;
-
-                /* Alignment tweak: prevents bullet from jumping if baseline is weird */
-                align-self: baseline;
-            }}
-
-            /* 3. HIDE THE MARKER CONTAINER */
-            /* We hide the technical div that holds our span.{item_id} so it doesn't take up space in the flex row */
-            div[data-testid="stVerticalBlock"]:has(> .element-container .stHtml span.{item_id}) > .element-container:has(span.{item_id}) {{
-                display: none;
-            }}
-
-            /* 4. INNER CONTENT WRAPPER */
-            /* The 'st.container()' we yield creates a new stVerticalBlock inside our Outer one.
-               We want this wrapper to grow and handle the vertical stacking of its children. */
-            div[data-testid="stVerticalBlock"]:has(> .element-container .stHtml span.{item_id}) > .stVerticalBlock {{
-                flex-grow: 1;
-                width: auto;      /* Let it fill the flex space */
-                display: flex;
-                flex-direction: column; /* Force children to stack vertically */
-                gap: 0;           /* Optional: tighter stacking */
-                min-width: 0;     /* CSS Grid/Flex trick to prevent overflow issues */
-            }}
-        </style>
-        """
-        st.html(css)
+        css_and_marker = _build_list_item_payload(item_id, self.bullet_content, self.is_ordered)
 
         # Structure:
         # [ st_block (Outer) ]
@@ -97,7 +98,10 @@ class ListController:
             export_push_wrapper(f'<li style="{final_style}">')
 
         with st_block(style=final_style, _export_wrapper=False):
-            st.html(f'<span class="{item_id}" style="display:none"></span>')
+            # Per-item bullet stylesheet + sentinel marker span go INSIDE the
+            # block so the observer's `closest('[data-testid="stVerticalBlock"]')`
+            # finds the block's container (same target as the legacy :has() rule).
+            st.html(css_and_marker)
 
             # THIS IS THE FIX:
             # We open a new container to wrap all user content.
@@ -179,18 +183,7 @@ def st_list(
         list_id = generate_key("ul")
         tag = "ol" if is_ordered else "ul"
 
-        width_css = "width: fit-content; margin-inline: auto;" if align == "center" else "width: 100%;"
-
-        css = f"""
-        <style>
-            div[data-testid="stVerticalBlock"]:has(> .element-container .stHtml span.{list_id}) {{
-                counter-reset: streamtex-counter;
-                gap: 0.2rem;
-                {width_css}
-            }}
-        </style>
-        """
-        st.html(css)
+        marker = _build_list_root_payload(list_id, align)
 
         # Export wrapper: semantic <ul>/<ol> (suppresses st_block's own <div>)
         if is_export_active():
@@ -198,7 +191,7 @@ def st_list(
 
         _list_base = Style("text-align: left;", "stx-list-base")
         with st_block(style=_list_base + l_style, _export_wrapper=False):
-            st.html(f'<span class="{list_id}" style="display:none"></span>')
+            st.html(marker)
             yield ListController(li_style=li_style, bullet_content=bullet_content, is_ordered=is_ordered, alt_li_styles=alt_li_styles)
 
         if is_export_active():

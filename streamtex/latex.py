@@ -4,7 +4,7 @@
 
 ``st_latex_doc()`` renders full LaTeX documents or fragments using the
 `LaTeX.js <https://latex.js.org/>`_ programmatic API loaded from CDN inside
-a ``components.html()`` iframe.  Fragments (no ``\\documentclass``) are
+a ``st.iframe()`` iframe.  Fragments (no ``\\documentclass``) are
 automatically wrapped in a minimal ``\\documentclass{article}`` document
 because LaTeX.js requires a full document structure to parse commands
 like ``\\section``, ``\\begin{tabular}``, etc.
@@ -17,7 +17,6 @@ from contextlib import nullcontext
 from html import escape
 
 import streamlit as st
-import streamlit.components.v1 as components
 
 from .container import st_block
 from .export import export_append, is_export_active
@@ -182,7 +181,7 @@ def st_latex_doc(
     )
 
     with st_block(style) if style is not None else nullcontext():
-        components.html(html, height=height, scrolling=True)
+        st.iframe(html, height=height)
 
     # --- Export rendering ---
     if is_export_active():

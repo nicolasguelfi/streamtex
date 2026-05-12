@@ -259,29 +259,32 @@ class TestStHtml:
     def test_alias_is_same_function(self):
         assert _render is st_html
 
-    @patch("streamlit.components.v1.html")
-    def test_iframe_injects_font(self, mock_comp):
+    @patch("streamlit.iframe")
+    def test_iframe_injects_font(self, mock_iframe):
         st_html("<p>chart</p>", height=300)
-        call_args = mock_comp.call_args
+        call_args = mock_iframe.call_args
         html_arg = call_args[0][0]
         assert "font-family:Source Sans Pro,sans-serif" in html_arg
         assert "margin:0" in html_arg
         assert "<p>chart</p>" in html_arg
 
-    @patch("streamlit.components.v1.html")
-    def test_iframe_scrolling(self, mock_comp):
+    @patch("streamlit.iframe")
+    def test_iframe_scrolling_accepted_but_noop(self, mock_iframe):
+        """``scrolling`` is kept in the signature for backwards compat
+        but no longer forwarded — st.iframe has no scrolling parameter."""
         st_html("<p>long</p>", height=400, scrolling=True)
-        call_args = mock_comp.call_args
-        assert call_args[1]["scrolling"] is True
+        call_args = mock_iframe.call_args
+        # The kwarg is NOT forwarded to st.iframe (no error, just no-op).
+        assert "scrolling" not in call_args[1]
 
-    @patch("streamlit.components.v1.html")
-    def test_iframe_no_scrolling_by_default(self, mock_comp):
+    @patch("streamlit.iframe")
+    def test_iframe_default_no_scrolling_kwarg(self, mock_iframe):
         st_html("<p>short</p>", height=200)
-        call_args = mock_comp.call_args
-        assert call_args[1]["scrolling"] is False
+        call_args = mock_iframe.call_args
+        assert "scrolling" not in call_args[1]
 
-    @patch("streamlit.components.v1.html")
-    def test_iframe_buffer_gets_raw_html(self, mock_comp):
+    @patch("streamlit.iframe")
+    def test_iframe_buffer_gets_raw_html(self, mock_iframe):
         """Export buffer receives the original HTML, not the iframe-wrapped version."""
         reset_export_buffer(ExportConfig(enabled=True))
         st_html("<p>chart</p>", height=300)

@@ -54,53 +54,55 @@ class TestLiveRendering:
     """Tests for the live components.html() rendering path."""
 
     @patch("streamtex.plantuml._fetch_svg", return_value=FAKE_SVG)
-    @patch("streamtex.plantuml.components")
+    @patch("streamtex.plantuml.st.iframe")
     def test_renders_via_components_html(self, mock_components, mock_fetch):
         """The diagram is rendered via components.html()."""
         st_plantuml(SAMPLE_CODE)
-        mock_components.html.assert_called_once()
-        html_arg = mock_components.html.call_args[0][0]
+        mock_components.assert_called_once()
+        html_arg = mock_components.call_args[0][0]
         assert "<svg" in html_arg
 
     @patch("streamtex.plantuml._fetch_svg", return_value=FAKE_SVG)
-    @patch("streamtex.plantuml.components")
+    @patch("streamtex.plantuml.st.iframe")
     def test_light_bg_true_sets_white_background(self, mock_components, mock_fetch):
         """When light_bg=True, background is white."""
         st_plantuml(SAMPLE_CODE, light_bg=True)
-        html_arg = mock_components.html.call_args[0][0]
+        html_arg = mock_components.call_args[0][0]
         assert "#fff" in html_arg
 
     @patch("streamtex.plantuml._fetch_svg", return_value=FAKE_SVG)
-    @patch("streamtex.plantuml.components")
+    @patch("streamtex.plantuml.st.iframe")
     def test_light_bg_false_sets_transparent_background(self, mock_components, mock_fetch):
         """When light_bg=False, background is transparent."""
         st_plantuml(SAMPLE_CODE, light_bg=False)
-        html_arg = mock_components.html.call_args[0][0]
+        html_arg = mock_components.call_args[0][0]
         assert "transparent" in html_arg
 
     @patch("streamtex.plantuml._fetch_svg", return_value=FAKE_SVG)
-    @patch("streamtex.plantuml.components")
+    @patch("streamtex.plantuml.st.iframe")
     def test_default_height_500(self, mock_components, mock_fetch):
         """Default height is 500 pixels."""
         st_plantuml(SAMPLE_CODE)
-        assert mock_components.html.call_args[1]["height"] == 500
+        assert mock_components.call_args[1]["height"] == 500
 
     @patch("streamtex.plantuml._fetch_svg", return_value=FAKE_SVG)
-    @patch("streamtex.plantuml.components")
+    @patch("streamtex.plantuml.st.iframe")
     def test_custom_height(self, mock_components, mock_fetch):
         """Height parameter is forwarded to components.html()."""
         st_plantuml(SAMPLE_CODE, height=800)
-        assert mock_components.html.call_args[1]["height"] == 800
+        assert mock_components.call_args[1]["height"] == 800
 
     @patch("streamtex.plantuml._fetch_svg", return_value=FAKE_SVG)
-    @patch("streamtex.plantuml.components")
-    def test_scrolling_enabled(self, mock_components, mock_fetch):
-        """scrolling=True is passed to components.html() for interactivity."""
+    @patch("streamtex.plantuml.st.iframe")
+    def test_no_scrolling_kwarg(self, mock_components, mock_fetch):
+        """st.iframe has no `scrolling` parameter — native iframe
+        scrollbars appear automatically when content overflows the
+        configured height."""
         st_plantuml(SAMPLE_CODE)
-        assert mock_components.html.call_args[1]["scrolling"] is True
+        assert "scrolling" not in mock_components.call_args[1]
 
     @patch("streamtex.plantuml._fetch_svg", return_value=FAKE_SVG)
-    @patch("streamtex.plantuml.components")
+    @patch("streamtex.plantuml.st.iframe")
     def test_style_wraps_in_st_block(self, mock_components, mock_fetch):
         """When style is provided, diagram is wrapped in st_block."""
         from streamtex.styles import Style
@@ -112,11 +114,11 @@ class TestLiveRendering:
             mock_block.assert_called_once_with(my_style)
 
     @patch("streamtex.plantuml._fetch_svg", return_value=FAKE_SVG)
-    @patch("streamtex.plantuml.components")
+    @patch("streamtex.plantuml.st.iframe")
     def test_pan_zoom_js_included(self, mock_components, mock_fetch):
         """The HTML includes pan-zoom JavaScript (wheel, mousedown)."""
         st_plantuml(SAMPLE_CODE)
-        html_arg = mock_components.html.call_args[0][0]
+        html_arg = mock_components.call_args[0][0]
         assert "addEventListener" in html_arg
         assert "wheel" in html_arg
         assert "mousedown" in html_arg
@@ -124,18 +126,18 @@ class TestLiveRendering:
         assert "resetView" in html_arg
 
     @patch("streamtex.plantuml._fetch_svg", return_value=FAKE_SVG)
-    @patch("streamtex.plantuml.components")
+    @patch("streamtex.plantuml.st.iframe")
     def test_full_html_document(self, mock_components, mock_fetch):
         """The HTML is a complete document (DOCTYPE, html, body)."""
         st_plantuml(SAMPLE_CODE)
-        html_arg = mock_components.html.call_args[0][0]
+        html_arg = mock_components.call_args[0][0]
         assert "<!DOCTYPE html>" in html_arg
         assert "<html>" in html_arg
         assert "<body>" in html_arg
 
     @patch("streamtex.plantuml._fetch_svg", side_effect=Exception("network error"))
     @patch("streamtex.plantuml.st")
-    @patch("streamtex.plantuml.components")
+    @patch("streamtex.plantuml.st.iframe")
     def test_fallback_on_network_error(self, mock_components, mock_st, mock_fetch):
         """When fetch fails, a warning + raw code is shown."""
         st_plantuml(SAMPLE_CODE)
@@ -144,15 +146,15 @@ class TestLiveRendering:
         assert mock_st.code.call_args[0][0] == SAMPLE_CODE
 
     @patch("streamtex.plantuml._fetch_svg", return_value=FAKE_SVG)
-    @patch("streamtex.plantuml.components")
+    @patch("streamtex.plantuml.st.iframe")
     def test_svg_injected_in_html(self, mock_components, mock_fetch):
         """The fetched SVG is injected into the HTML template."""
         st_plantuml(SAMPLE_CODE)
-        html_arg = mock_components.html.call_args[0][0]
+        html_arg = mock_components.call_args[0][0]
         assert FAKE_SVG in html_arg
 
     @patch("streamtex.plantuml._fetch_svg", return_value=FAKE_SVG)
-    @patch("streamtex.plantuml.components")
+    @patch("streamtex.plantuml.st.iframe")
     def test_custom_server(self, mock_components, mock_fetch):
         """Custom server URL is forwarded to _fetch_svg."""
         st_plantuml(SAMPLE_CODE, server="http://localhost:8080")
@@ -171,14 +173,14 @@ class TestExportRendering:
         export_mod._buffer = None
 
     @patch("streamtex.plantuml._fetch_svg", return_value=FAKE_SVG)
-    @patch("streamtex.plantuml.components")
+    @patch("streamtex.plantuml.st.iframe")
     def test_noop_when_inactive(self, mock_components, mock_fetch):
         """No export output when export is not active."""
         st_plantuml(SAMPLE_CODE)
         assert generate_export_html() is None
 
     @patch("streamtex.plantuml._fetch_svg", return_value=FAKE_SVG)
-    @patch("streamtex.plantuml.components")
+    @patch("streamtex.plantuml.st.iframe")
     def test_export_svg_when_active(self, mock_components, mock_fetch):
         """When export is active and fetch succeeds, SVG is appended."""
         reset_export_buffer(ExportConfig(enabled=True))
@@ -189,7 +191,7 @@ class TestExportRendering:
 
     @patch("streamtex.plantuml._fetch_svg", side_effect=Exception("network error"))
     @patch("streamtex.plantuml.st")
-    @patch("streamtex.plantuml.components")
+    @patch("streamtex.plantuml.st.iframe")
     def test_export_fallback_on_error(self, mock_components, mock_st, mock_fetch):
         """When fetch fails, raw code is exported as <pre>."""
         reset_export_buffer(ExportConfig(enabled=True))
@@ -201,7 +203,7 @@ class TestExportRendering:
 
     @patch("streamtex.plantuml._fetch_svg", side_effect=Exception("fail"))
     @patch("streamtex.plantuml.st")
-    @patch("streamtex.plantuml.components")
+    @patch("streamtex.plantuml.st.iframe")
     def test_export_escapes_html(self, mock_components, mock_st, mock_fetch):
         """Fallback properly escapes HTML special characters."""
         reset_export_buffer(ExportConfig(enabled=True))
@@ -218,10 +220,10 @@ class TestExportRendering:
 
 class TestFileParameter:
     @patch("streamtex.plantuml._fetch_svg", return_value=FAKE_SVG)
-    @patch("streamtex.plantuml.components")
+    @patch("streamtex.plantuml.st.iframe")
     @patch("streamtex.utils.resolve_content", return_value=SAMPLE_CODE)
     def test_st_plantuml_with_file(self, mock_resolve, mock_components, mock_fetch):
         """file= parameter loads code via resolve_content."""
         st_plantuml(file="diagrams/class.puml")
         mock_resolve.assert_called_once_with("", file="diagrams/class.puml", encoding="utf-8")
-        mock_components.html.assert_called_once()
+        mock_components.assert_called_once()

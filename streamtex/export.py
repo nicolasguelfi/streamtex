@@ -547,7 +547,7 @@ def st_html(html: str, *, height: int = 0, light_bg: bool = False,
     Parameters
     ----------
     height : int
-        When > 0, use ``components.html()`` with an explicit pixel height
+        When > 0, use ``st.iframe()`` with an explicit pixel height
         instead of ``st.html()``.  This is required for content (e.g. SVG
         diagrams, bar charts) that cannot be auto-sized by the Shadow DOM
         iframe.  The iframe automatically gets ``font-family: Source Sans Pro``
@@ -557,7 +557,11 @@ def st_html(html: str, *, height: int = 0, light_bg: bool = False,
         diagram / image content renders on a white background even when the
         OS or browser is in dark mode.
     scrolling : bool
-        When True and *height* > 0, enable scrolling inside the iframe.
+        **Kept for backwards compat; no-op since 0.6.19.**  ``st.iframe``
+        (Streamlit ≥ 1.56) has no explicit ``scrolling`` parameter; the
+        iframe shows native scrollbars when its content overflows the
+        configured *height*.  Pass ``scrolling=True`` or ``scrolling=False``
+        without effect — kept in the signature to avoid breaking callers.
     """
     # Section-level horizontal spacing + zoom: wrap each fragment
     from .spacing import get_section_horizontal, get_section_zoom
@@ -576,10 +580,8 @@ def st_html(html: str, *, height: int = 0, light_bg: bool = False,
 
     live = f"{_LIGHT_SCHEME}{html}" if light_bg else html
     if height > 0:
-        import streamlit.components.v1 as components
-
         live = f"{_IFRAME_BASE}{live}"
-        components.html(live, height=height, scrolling=scrolling)
+        st.iframe(live, height=height)
     else:
         st.html(live)
     if _buffer is not None:

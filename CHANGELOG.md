@@ -5,6 +5,243 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.24] — 2026-05-12
+
+### Fixed
+- **Sidebar settings sliders (zoom / page_width) wiped per-instance
+  backgrounds and borders.**  When the user moved a sliders in the
+  paginated-mode settings panel, Streamlit's reconciliation stripped our
+  `class`, `data-stx-*-uid`, and inline `style` from existing
+  `stVerticalBlock` elements *without adding or removing any children*.
+  The marker observer was watching `childList` only, so it never saw the
+  strip and never re-applied — per-instance CSS rules (which target
+  `[data-stx-block-uid="…"]`) no longer matched anything → cells lost
+  their backgrounds and borders even though the markers themselves were
+  still in the DOM.
+
+  Fix:
+  - MutationObserver now also watches `attributes` (filtered to
+    `class`, `style`, and each `data-stx-*-uid`).  Any mutation
+    schedules a debounced full scan on the next animation frame.
+  - `applyMarker` is now fully idempotent: every write (`classList.add`,
+    `setProperty`, `setAttribute`) is guarded by a read so that
+    re-running on an already-applied marker fires **zero** mutations —
+    this is what stops the attribute-watching observer from looping on
+    itself.
+  - A new helper `setInlineImportant(el, prop, value)` makes the no-op
+    guard for `!important` inline styles a one-liner.
+
+## [0.6.23] — 2026-05-12
+
+### Fixed
+- **Marker cell stayed visible on Streamlit 1.56+.** The observer used
+  `markerSpan.closest('.element-container')` to find the cell containing
+  the sentinel, but Streamlit ≥ 1.56 renamed that class to
+  `stElementContainer` (only the testid is reliable across versions).  The
+  selector now matches both:
+  `[data-testid="stElementContainer"], .element-container`.  Symptom: in a
+  2-column `.stx-grid`, the invisible marker cell took grid slot #1 and
+  shifted every subsequent cell by one (e.g. the FC deck's "Three
+  Frameworks" slide rendered GDPR in the top-right slot instead of
+  top-left).
+- **Marker cell now hidden inline with `!important`** in addition to the
+  CSS class — bulletproof against any future cascade surprise.
+- **Settings change (sidebar width/zoom) wiped grid layout.**  The observer
+  used a one-shot `data-stx-processed` attribute on each marker to avoid
+  reprocessing.  Streamlit's reconciliation can replace the parent
+  `stVerticalBlock` on rerun *while reusing the marker* — leaving the new
+  parent without the `.stx-grid` class or inline layout styles, and the
+  observer silently skipping it.  The observer now drops the one-shot gate
+  and re-validates on every pass; `applyMarker` is fully idempotent thanks
+  to a `parent.classList.contains(cls)` fast-path that only runs the
+  expensive work when the parent state was wiped.
+
+## [0.6.22] — 2026-05-12
+
+### Fixed
+- **Marker observer: inline-style fallback for layout-critical declarations.**
+  Streamlit 1.56+ applies `display: flex; flex-direction: column` on every
+  `[data-testid="stVerticalBlock"]` via an inline style (or a `!important`
+  rule loaded after our stylesheet, depending on the build), which beat the
+  global stylesheet even with `!important`.  The MutationObserver now sets
+  the layout-critical properties **directly on the element** with the
+  `!important` flag via `element.style.setProperty(prop, value, 'important')`.
+  This guarantees correct layout regardless of CSS cascade or stylesheet
+  load order:
+
+  | Marker kind | Inline properties applied                                       |
+  |-------------|-----------------------------------------------------------------|
+  | `grid`      | `display: grid`, `grid-template-columns`, `gap`, `align-items`  |
+  | `span`      | `display: flex`, `flex-direction: row`, `white-space: pre`      |
+  | `list-item` | `display: flex`, `flex-direction: row`, `align-items: baseline` |
+  | `zoom`      | `zoom: <factor>`                                                |
+
+  CSS rules are kept as a safety net for browsers/devtools introspection but
+  no longer load-bearing for these four kinds.
+- Fixes "Three Frameworks — At a Glance" 3-cell grid rendering vertically
+  on the FC presentation deck (verified via `slides/STX_DIAG_GRID/`
+  diagnostic harness).
+
+## [0.6.21] — 2026-05-12
+
+### Fixed
+- **Layout broken on Streamlit ≥ 1.56** — visible regression on the FC presentation deck's "Three Frameworks — At a Glance" slide (and other multi-grid layouts): the 3 boxes collapsed into a vertical stack regardless of the grid template. Root cause traced through the diagnostic project `slides/STX_DIAG_GRID/` to **stale CSS selectors** in `stx_global.css` that targeted the old Streamlit DOM:
+  - `.element-container` (Streamlit ≤ 1.55) is now `[data-testid="stElementContainer"]` (Streamlit ≥ 1.56);
+  - Streamlit ≥ 1.56 wraps every cell/container in an additional `[data-testid="stLayoutWrapper"]` parent;
+  - Streamlit's default `display: flex; flex-direction: column;` on every `stVerticalBlock` overrides our `display: grid` rule unless we use `!important`.
+  - The marker observer was always working correctly (verified empirically: `obs=true`, `handle=true`, all marker `data-stx-processed`, `data-stx-{kind}-uid` set). The chain broke at the CSS-to-DOM mapping.
+
+### Changed
+- `streamtex/static/css/stx_global.css` — Phase-4 update for Streamlit 1.56+ DOM:
+  - Every `.element-container` selector now also matches `[data-testid="stElementContainer"]` (compat with both old and new Streamlit).
+  - Every `> [data-testid="stVerticalBlock"]` cell selector now ALSO matches `> [data-testid="stLayoutWrapper"]` (compat with both wrap structures).
+  - Display overrides (`display: grid` on `.stx-grid`, `display: flex` on `.stx-span` / `.stx-list-item`, `grid-template-columns` / `gap` on `.stx-grid`) gain `!important` to beat Streamlit's inline cascade.
+  - Inner `stLayoutWrapper > stVerticalBlock` is sized to fill its grid slot so per-instance background/padding styles render correctly inside grid cells.
+- **`streamtex/marker_runtime.py:inject_marker_runtime()` migrated from `streamlit.components.v1.html` to `st.components.v2.component(name, js=…, isolate_styles=False)`** — the V2 custom-component API (stable, added in 1.56). With `isolate_styles=False`, the observer JS executes **inline in the host page** (no iframe, no shadow DOM) so it has direct access to `document` without `window.parent` indirection. The component is reconciled by Streamlit across reruns (verified in `slides/STX_DIAG_GRID/`), so the `MutationObserver` stays alive throughout the session.
+- **`components.v1.html` is no longer used anywhere in the streamtex codebase.** The deprecation debt accepted in 0.6.20 is now cleared, ahead of the 2026-06-01 removal deadline.
+- `tests/test_marker_runtime.py` — `test_js_via_components_html` → `test_js_via_v2_component`. Asserts the V2 component is registered with `isolate_styles=False`, the JS payload is wrapped in `export default function`, the wrapped component callable is invoked once. Mock target: `streamtex.marker_runtime.st.components.v2.component`.
+
+### Notes
+- All other 0.6.19 migrations from `components.v1.html` → `st.iframe` (17 other call sites) are preserved as-is. They worked correctly because they don't rely on long-lived `MutationObserver`s; only the marker observer needed the special V2 treatment.
+- Verified via `slides/STX_DIAG_GRID/` (the diagnostic mini-project shipped with this PR) that `v2-component` reaches `OBSERVER OK` status on all 4 test slides including the "Three Frameworks" replica.
+- Public API unchanged. No env var, no signature change. Users on 0.6.20 simply upgrade.
+
+## [0.6.20] — 2026-05-12
+
+### Fixed
+- **Marker observer over-tagging and Chrome freeze** introduced by the 0.6.19 `st.iframe` migration of the observer iframe specifically. Symptoms on the FC presentation deck: at 0.6.19 the "Three Frameworks — At a Glance" slide had 1 grid marker un-processed (visible regression — boxes stacked vertically); at a transient never-shipped variant (disconnect-then-reinstall pattern) the same scene generated **47 `.stx-grid` classes** instead of 3 plus a Chrome cold-load freeze. Root cause not fully understood, but empirically the legacy `streamlit.components.v1.html` works reliably for this specific call site whereas `st.iframe` does not.
+
+### Changed
+- `streamtex/marker_runtime.py:inject_marker_runtime()` — reverted to `streamlit.components.v1.html(..., height=0)` for the observer JS injection only. The CSS goes via `st.html("<style>…</style>")` unchanged. The Python-side `session_state` guard is kept (so the observer iframe is emitted once per session; Streamlit treats `components.v1.html` as a persistent custom component whose iframe survives reruns and keeps the `MutationObserver` alive).
+- `streamtex/static/js/stx_marker_observer.js` — flag-only `hostWin.__stxMarkerObs` idempotency guard restored.
+- `tests/test_marker_runtime.py` — `test_js_via_st_iframe` → `test_js_via_components_html` (asserts the `components.html` call path with `height=0`).
+
+### Notes
+- **All other 0.6.19 migrations are preserved**: 17 of the 18 original `components.v1.html` call sites remain on `st.iframe`. Only the marker observer (1 site, in `marker_runtime.py`) keeps `components.v1.html`. The `cli/cache_cmd.py` monkey-patch still patches both APIs.
+- **Deprecation debt acknowledged**: `streamlit.components.v1.html` is officially deprecated since Streamlit 1.56 with announced removal after 2026-06-01. This release accepts that debt for one specific call site, deferring the root-cause analysis of why `st.iframe` breaks the marker observer specifically (while working fine for 17 other JS-injection call sites in the same release). Investigation continues under `documentation/maintenance/components.v1_issue/`.
+- `streamlit>=1.56.0` floor preserved (still required for the other 17 `st.iframe` call sites).
+
+## [0.6.19] — 2026-05-12
+
+### Changed
+- **All `streamlit.components.v1.html` calls migrated to `st.iframe`** (added in Streamlit 1.56; the official replacement per the runtime warning "`st.components.v1.html` will be removed after 2026-06-01. Please replace with `st.iframe`."). 18 call sites across `marker_runtime.py`, `marker.py`, `bib_preview.py`, `loading.py` (3), `auth.py`, `browser.py`, `book.py` (5), `mermaid.py`, `plantuml.py`, `latex.py`, `tikz.py`, `export.py`; plus the cache-pre-generation monkey-patch in `cli/cache_cmd.py` now patches both `st.iframe` (the new path) and `streamlit.components.v1.html` (legacy user code) so unmigrated callers stay neutralised.
+- **Minimum Streamlit bumped to `>=1.56.0`** in `streamtex/pyproject.toml` — `st.iframe` was added in 1.56. Anyone on 1.54/1.55 must upgrade.
+- `st_html(..., scrolling=…)` — `scrolling` kwarg kept in the signature for backwards compat but is now a **no-op**; `st.iframe` has no `scrolling` parameter and uses native iframe scrollbars when content overflows the configured height. Visual verification on Mermaid / PlantUML / LaTeX / TikZ / export is the responsibility of the integrator.
+- All previously-tested behaviour preserved: marker observer still injected via iframe → reaches `window.parent.document`, idempotency guard on `hostWin.__stxMarkerObs` unchanged, sentinel-class logic unchanged, all 1.9k tests still pass.
+
+### Notes
+- Why not use `st.html(unsafe_allow_javascript=True)` instead — the doc-recommended path? **Verified empirically on Streamlit 1.52 → 1.57 with a 5-probe reproducer** (`documentation/maintenance/components.v1_issue/reproducer/app.py`): `st.html(..., unsafe_allow_javascript=True)` does **not** execute injected JavaScript (neither `<script>` tags nor DOM event handlers `onload`/`onerror`). The proto flag is forwarded by the Python API but the released frontend strips JS regardless. `st.iframe` is the only working JS-execution path as of 2026-05-12.
+- Test mocks across 7 test files (`test_marker.py`, `test_marker_runtime.py`, `test_bib_preview.py`, `test_browser.py`, `test_auth.py`, `test_loading.py`, `test_latex.py`, `test_mermaid.py`, `test_plantuml.py`, `test_tikz.py`, `test_export.py`, `test_export_guard.py`) rewired from `streamtex.MODULE.components.html` / `streamlit.components.v1.html` to `streamtex.MODULE.st.iframe`.
+- The maintenance directory `documentation/maintenance/components.v1_issue/` (gitignored, local-only) contains the reproducer, the migration plan, and the (now-obsolete) upstream-issue draft against `st.html`'s broken `unsafe_allow_javascript` flag.
+
+## [0.6.18] — 2026-05-12
+
+### Fixed
+- **Marker-runtime observer now actually executes (real fix)**: 0.6.17 attempted to keep the observer inline in the host page via `st.html(..., unsafe_allow_javascript=True)`, but verification on Streamlit 1.57.0 (and 1.54+) showed `window.__stxMarkerObs === undefined` and `.stx-grid` count `0`. The `unsafe_allow_javascript` proto field is forwarded by the Python API but the released Streamlit frontend does not honor it in any version checked (1.52 through 1.57) — neither for `<script>` tags nor for DOM event handlers (`onload`, `onerror`). The visible regressions from 0.6.16 (broken grids, missing `st_zoom` containment, ignored custom font sizes, AI-image WYSIWYG zoom dropping to 100%) persisted in 0.6.17.
+- `streamtex/marker_runtime.py:inject_marker_runtime()` now splits injection: CSS through `st.html("<style>…</style>")` (inline, host page) and JS through `streamlit.components.v1.html("<script>…</script>", height=0)` (0-pixel iframe). Same pattern already proven by `streamtex/marker.py` and `streamtex/bib_preview.py`.
+- `streamtex/static/js/stx_marker_observer.js` rewritten to operate on `window.parent.document`: idempotency guard moves to `hostWin.__stxMarkerObs`, `scan()` walks the parent body, the `MutationObserver` is constructed via `hostWin.MutationObserver` and observes `hostDoc.body`. Same-origin Streamlit allows the iframe to reach back into the host DOM.
+- `tests/test_marker_runtime.py`: `test_injects_once_per_session` now patches both `st.html` and `components.html`; new `test_css_via_st_html` and `test_js_via_components_html` lock in the split-call contract (CSS goes through `st.html`, JS goes through `components.html` with `height=0`); `test_js_observer_has_idempotency_guard` asserts `hostWin.__stxMarkerObs`.
+
+### Notes
+- No public API change. No new env var. Users on 0.6.17 (or 0.6.16) just need to upgrade.
+- **Acknowledged deprecation debt**: `streamlit.components.v1.html` is officially deprecated in Streamlit 1.56 (docs name `st.html` as the replacement). However, the replacement does not honor `unsafe_allow_javascript=True` on the frontend — verified on 1.57.0 with a self-contained reproducer for `<script>`, `<svg onload>`, and `<img onerror>`. Until Streamlit fixes the flag on the frontend, `components.v1.html` is the **only** path that actually runs injected JavaScript. See `documentation/maintenance/components.v1_issue/` for the reproducer, the upstream issue draft, and the migration plan.
+- Browser verification: `window.__stxMarkerObs === true`, `document.querySelectorAll('.stx-grid').length > 0`, `document.querySelectorAll('.stx-marker-cell').length > 0`.
+
+## [0.6.17] — 2026-05-12
+
+### Fixed
+- **Marker-runtime observer now actually executes**: critical hotfix on top of 0.6.16. Streamlit ≥ 1.54 silently strips `<script>` tags from `st.html()` payloads by default. Without execution of the observer, every marker-based CSS rule (`.stx-grid`, `.stx-zoom`, `.stx-list-item`, per-instance `[data-stx-block-uid="…"]`, …) silently no-oped, which surfaced as broken grids, missing `st_zoom` containment, ignored custom font sizes, and AI-image WYSIWYG zoom dropping to 100%.
+- `streamtex/marker_runtime.py:inject_marker_runtime()` now calls `st.html(..., unsafe_allow_javascript=True)` so the bundled `static/js/stx_marker_observer.js` runs in the host-page context (no iframe, no `parent.document` indirection). Pattern aligned with Streamlit's deprecation of `st.components.v1.html` in 1.56.
+- `tests/test_marker_runtime.py` gains `test_passes_unsafe_allow_javascript_flag` which would have caught the regression at unit-test time.
+
+### Notes
+- No public API change. No new env var. Users on 0.6.16 simply need to upgrade.
+- The bundled observer is a fixed, version-controlled asset — the `unsafe_allow_javascript=True` flag is bounded to that single trusted payload.
+- **Did not fix the regression in practice** — see 0.6.18 for the working fix.
+
+## [0.6.16] — 2026-05-12
+
+### Removed
+- **Legacy `:has()` scoping pattern** (Phase 5 — final phase of the `:has()` removal plan). Removed from `streamtex/container.py`, `streamtex/list.py`, `streamtex/grid.py`, `streamtex/zoom.py`, `streamtex/block_helpers.py`. The marker-runtime path is now the only path; there is no fallback.
+- Environment variables `STX_USE_MARKER_RUNTIME` and `STX_USE_LEGACY_HAS` are removed. `is_marker_runtime_enabled()` is removed from `streamtex/marker_runtime.py`. Setting either env var has no effect.
+- Progress-emit throttle in `streamtex/loading.py` (introduced in 0.6.11). It was a defensive patch built on an incorrect hypothesis (iframe storm) and is no longer needed once the actual cause — `:has()` selector explosion — is gone.
+- `TestProgressThrottle` test class in `tests/test_loading.py` (4 tests).
+- All `_force_legacy_by_default` and `_marker_runtime_on` test fixtures across `tests/test_container.py`, `tests/test_list.py`, `tests/test_grid.py`, `tests/test_zoom.py`, `tests/test_section_zoom.py` — no longer needed.
+- `TestStBlockMarkerPath` / `TestStSpanMarkerPath` / `TestStGridMarkerPath` / `TestStZoomMarkerPath` / `TestStListMarkerPath` / `TestListItemMarkerPath` classes folded into the regular test classes (the marker pattern is the only behavior).
+
+### Changed
+- `tests/test_export_guard.py`: `container.py` 2, `grid.py` 1 (was 3 with dual paths), `list.py` 2 (was 6), `block_helpers.py` 1 (was 3) — reflecting the now-single emit path.
+- Several legacy-asserting tests in `tests/test_container.py`, `tests/test_list.py`, `tests/test_grid.py`, `tests/test_section_zoom.py` rewritten to assert the marker emit pattern.
+
+### Notes
+- The freeze fix is now permanent. Users on `0.6.15` who set `STX_USE_LEGACY_HAS=1` as a workaround must remove it before upgrading.
+- See `documentation/maintenance/freeze-has/fix-plan.md`.
+
+## [0.6.15] — 2026-05-12
+
+### Changed
+- **Marker runtime is now the default** (Phase 4 of the `:has()` removal plan). `is_marker_runtime_enabled()` returns `True` unless `STX_USE_LEGACY_HAS=1` is set or `STX_USE_MARKER_RUNTIME=0` is set explicitly. Every StreamTeX construct that used to emit `:has()`-scoped stylesheets (st_block, st_span, st_list, ListController.item, st_grid, st_zoom, _render_md_body) now emits sentinel marker spans + a global stylesheet + a `MutationObserver` by default.
+- Tests that assert the legacy `:has()` emit pattern now use an autouse `_force_legacy_by_default` fixture (in `tests/test_container.py`, `tests/test_list.py`, `tests/test_grid.py`, `tests/test_zoom.py`, `tests/test_section_zoom.py`) to opt back into legacy. The `_marker_runtime_on` fixture used by marker-path tests now also unsets `STX_USE_LEGACY_HAS` so it overrides the autouse default.
+
+### Notes
+- **Escape hatch**: `export STX_USE_LEGACY_HAS=1` reverts to the legacy `:has()` path for users hitting an unforeseen regression. Removed in 0.6.16.
+- **Expected impact**: Chrome cold-load freeze (~3-4 s) eliminated. The `<style>` element count on a typical manual drops from ~1 054 to < 50; the `:has()` selector count drops from ~958 to 0 (legacy off).
+- See `documentation/maintenance/freeze-has/fix-plan.md`.
+
+## [0.6.14] — 2026-05-11
+
+### Added
+- **`st_grid` marker-runtime path** (Phase 3 of the `:has()` removal plan). When `STX_USE_MARKER_RUNTIME=1` is set, `streamtex/grid.py` emits a sentinel `data-stx-kind="grid"` marker plus `data-stx-grid-template` / `data-stx-grid-gap` attributes that the observer forwards as CSS custom properties. Optional `grid_style` and `breakpoint` overrides become tiny per-instance stylesheets keyed by `[data-stx-grid-uid="…"]` (the `@container` query stays per-instance because CSS `var()` is not reliable inside query conditions across browsers).
+- **`st_zoom` marker-runtime path**: `streamtex/zoom.py` emits a `data-stx-kind="zoom"` marker with `data-stx-zoom-factor` consumed by the global `.stx-zoom` rule via CSS custom property.
+- **`_render_md_body` marker-runtime path**: `streamtex/block_helpers.py` emits a `data-stx-kind="md-big"` marker with a tiny per-instance stylesheet for the `StxStyles.big` font-size override (preserves the legacy `<p>`/`<li>` cascade override 1:1).
+- `.stx-grid`, `.stx-zoom`, `.stx-md-big` rules in `streamtex/static/css/stx_global.css`. The grid's "hide non-cell element-container" behavior is collapsed into a single `.stx-grid > .element-container { display: none !important; }` rule (replacing the legacy three-way `:has(style|script|span)` union).
+- New test classes `TestStGridMarkerPath` (7 tests), `TestStZoomMarkerPath` (3 tests) in `tests/test_grid.py` / `tests/test_zoom.py`.
+
+### Notes
+- Legacy `:has()` path remains the default (flag off). All existing tests for legacy emit continue to pass byte-identically.
+- This release completes the migration of every StreamTeX construct using `:has()` for scoping. Phase 4 (0.6.15) flips the flag default to ON; Phase 5 (0.6.16) deletes the legacy code paths.
+- See `documentation/maintenance/freeze-has/fix-plan.md`.
+
+## [0.6.13] — 2026-05-11
+
+### Added
+- **`st_list` / `ListController.item` marker-runtime path** (Phase 2 of the `:has()` removal plan). When `STX_USE_MARKER_RUNTIME=1` is set, `streamtex/list.py` emits sentinel markers (`data-stx-kind="list"`, `data-stx-kind="list-item"`) instead of `:has()`-scoped stylesheets. Bullet `content` (including ordered counters like `counter(streamtex-counter, decimal) '.'`) is carried by a tiny per-item stylesheet keyed by `[data-stx-list-item-uid="…"]` — necessary because CSS `var()` cannot reliably carry a `counter()` function call across all browsers.
+- `.stx-list` and `.stx-list-item` rules in `streamtex/static/css/stx_global.css`. Layout, gap, baseline alignment, marker-cell hide, and inner content wrapper now live in the global stylesheet.
+- New test classes `TestStListMarkerPath`, `TestListItemMarkerPath` in `tests/test_list.py` (8 new tests).
+
+### Changed
+- **Observer kind-prefixed UID attribute**: `streamtex/static/js/stx_marker_observer.js` now sets `data-stx-{kind}-uid` (e.g. `data-stx-block-uid`, `data-stx-list-item-uid`) on the parent `stVerticalBlock` rather than a single `data-stx-uid`. This is required because a `ListController.item` wraps a `st_block` — both markers point at the same parent and a flat attribute would let one overwrite the other.
+- `streamtex/container.py` marker path: per-instance stylesheets now use `[data-stx-block-uid="…"]` / `[data-stx-span-uid="…"]` instead of `[data-stx-uid="…"]`.
+- `tests/test_container.py`, `tests/test_marker_runtime.py` updated for the kind-prefixed attribute.
+
+### Notes
+- Legacy `:has()` path remains the default (flag off). Every legacy test in `tests/test_list.py`, `tests/test_container.py` continues to pass byte-identically.
+- See `documentation/maintenance/freeze-has/fix-plan.md` for the multi-phase plan.
+
+## [0.6.12] — 2026-05-11
+
+### Added
+- **`st_block` / `st_span` marker-runtime path** (Phase 1 of the `:has()` removal plan). When `STX_USE_MARKER_RUNTIME=1` is set, `streamtex/container.py` emits a `<span class="stx-marker" data-stx-kind="block|span" data-stx-uid="…">` sentinel instead of a `:has()`-scoped stylesheet. Custom user `style=` is carried by a per-instance `[data-stx-uid="…"]` attribute-selector stylesheet (Option B — preserves cascade semantics 1:1).
+- `.stx-span` rules in `streamtex/static/css/stx_global.css` (display:flex / flex-direction:row / white-space:pre / `>* {width:auto}`).
+- New test classes `TestStBlockMarkerPath`, `TestStSpanMarkerPath`, `TestExportUnaffectedByMarkerPath` in `tests/test_container.py` covering the marker emit pattern, the absence of `:has()` in the new path, and the byte-identical export wrappers across both paths.
+
+### Notes
+- Legacy `:has()` path remains the default (flag off). Existing tests for the legacy emit pattern continue to pass unchanged.
+- The same per-instance `<style>` count drops to 0 for blocks/spans when the new path is on and no `style=` is passed; rises to 1 when a user style is supplied.
+- See `documentation/maintenance/freeze-has/fix-plan.md` for the multi-phase plan.
+
+## [0.6.11] — 2026-05-11
+
+### Added
+- **Marker runtime scaffold** (Phase 0 of the `:has()` removal plan): new internal module `streamtex/marker_runtime.py` plus two shipped assets `streamtex/static/css/stx_global.css` and `streamtex/static/js/stx_marker_observer.js`. When the env var `STX_USE_MARKER_RUNTIME=1` is set, `st_book` injects a global stylesheet and a `MutationObserver` that will replace the per-instance `:has()` CSS scoping pattern in later phases. Default behavior is unchanged (flag off → legacy `:has()` path).
+- Internal escape hatch `STX_USE_LEGACY_HAS=1` reserved for Phase 4 — currently a no-op since the legacy path is the default.
+- Package data now includes `streamtex/static/css/*.css` and `streamtex/static/js/*.js`.
+- New test module `tests/test_marker_runtime.py` covering the env-flag gating, idempotency within a session, and the presence of the static assets.
+
+### Notes
+- No user-facing API change; no rendering behavior change with the flag off.
+- See `documentation/maintenance/freeze-has/fix-plan.md` for the multi-phase plan replacing the `:has()` selector storm that causes a 1.5–3.5 s freeze on Chrome at cold load.
+
 ## [0.6.10] — 2026-04-15
 
 ### Added
@@ -76,6 +313,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - **Default serve mode is `dual`**: `stx deploy hetzner --serve-mode` defaults to `dual`.
 
+## [0.6.2] — 2026-04-01
+
+Intermediate release published to PyPI between 0.6.1 and 0.6.3. Introduced the
+dual-mode deployment scaffold (Nginx static + Streamlit interactive) and PDF
+TOC bookmarks. The polished/end-to-end versions of these features ship in
+0.6.3, which supersedes 0.6.2 for new installs.
+
+### Added
+- **Dual-mode deployment templates**: Nginx + Streamlit Dockerfile/nginx.conf/entrypoint scaffold (`generate_dockerfile`, `generate_nginx_conf`, `generate_entrypoint`).
+- **PDF bookmarks (initial)**: `export_pdf()` outline generation from TOC anchors.
+
 ## [0.6.1] — 2026-04-01
 
 ### Added
@@ -100,16 +348,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **PDF export no longer includes sidebar TOC**: enrichment applied to HTML copy only, raw HTML preserved for PDF.
 - **Keyboard navigation in HTML export**: Arrow keys (all 4) + PageUp/PageDown navigate between markers (previously required Ctrl+Arrow).
-
-## [0.5.23] — 2026-04-01
-
-### Added
-- **Horizontal scaling**: `stx deploy scale TARGET --replicas N` command to scale Coolify services. Creates multiple containers behind the same FQDN — Traefik load-balances automatically.
-- **AppEntry.replicas** and **replica_uuids** fields in `.stx-deploy.json` state schema.
-- **CoolifyClient.scale_app()**, **rebuild_all_replicas()**, **restart_all_replicas()** methods.
-- **Replica-aware status**: `stx deploy status coolify` shows replica count (e.g. `3/3`) per service.
-- **Replica-aware update**: `stx deploy update` rebuilds primary + all replicas.
-- 15 unit tests for scaling logic.
 
 ## [0.5.22] — 2026-03-31
 

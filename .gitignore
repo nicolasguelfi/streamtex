@@ -37,3 +37,4 @@ BIG/
 .claude/*
 !.claude/custom/
 !.claude/.stx-profile
+tests/e2e/_artefacts/

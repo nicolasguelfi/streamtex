@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
-import streamlit.components.v1 as components
+import streamlit as st
 
 from .constants import LINK_ACTIVE_COLOR_DARK, STX_CORAL, STX_HOME_URL
 from .export import _render
@@ -189,8 +189,9 @@ def inject_marker_navigation(
 ) -> None:
     """Inject the floating nav widget and keyboard/scroll JS.
 
-    Uses components.html() to create a real iframe where scripts execute
-    (st.html() strips <script> tags in Streamlit 1.54+).
+    Uses st.iframe() to create a real iframe where scripts execute
+    (st.html() strips <script> tags even with unsafe_allow_javascript=True
+    in Streamlit 1.52–1.57; see documentation/maintenance/components.v1_issue/).
     From the iframe we access parent.document (same pattern as zoom.py).
 
     :param profile_names: List of profile names for the profile popup.
@@ -956,6 +957,7 @@ def inject_marker_navigation(
         .replace('__ACTIVE_PROFILE__', json.dumps(active_profile or "Default"))
         .replace('__PROFILE_MODIFIED__', 'true' if profile_modified else 'false'))
 
-    # components.html() creates a real iframe where scripts execute
-    # (st.html() strips <script> tags in Streamlit 1.54+)
-    components.html(f"<script>{js_body}</script>", height=0)
+    # st.iframe() creates a real iframe where scripts execute
+    # (st.html() strips <script> tags in Streamlit 1.52–1.57 regardless of
+    # unsafe_allow_javascript; see documentation/maintenance/components.v1_issue/).
+    st.iframe(f"<script>{js_body}</script>", height=1)

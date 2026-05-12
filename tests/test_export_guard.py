@@ -16,15 +16,16 @@ from pathlib import Path
 EXPECTED_ST_HTML_COUNTS = {
     "export.py": 1,         # st_html() — the only authorised bridge
     "container.py": 2,      # 2 fused CSS+marker calls (1 per st_block, 1 per st_span)
-    "grid.py": 2,           # 1 CSS + 1 hidden marker
-    "list.py": 4,           # 2 CSS injections + 2 hidden markers
-    "zoom.py": 2,           # 1 CSS injection (inject_zoom_logic) + 1 CSS+marker (st_zoom)
+    "grid.py": 1,           # 1 fused CSS+marker call inside the container
+    "list.py": 2,           # 1 fused per-item bullet+marker + 1 list-root marker
+    "zoom.py": 2,           # 1 CSS injection (inject_zoom_logic) + 1 marker (st_zoom)
     "presentation.py": 1,  # CSS injection (presentation mode)
     "link_preview.py": 2,   # CSS + JS scaffold
     "bib_preview.py": 1,    # CSS only (JS via components.html)
     "book.py": 4,           # 1 load_css + 1 populate_toc (no-search branch) + 1 populate_markers + 1 block horizontal CSS
     "inspector.py": 3,      # 1 global CSS + 1 sidebar width CSS + 1 hidden marker (edit button)
-    "block_helpers.py": 2,  # 1 CSS injection + 1 hidden marker (_render_md_body)
+    "block_helpers.py": 1,  # 1 fused CSS+marker call (_render_md_body)
+    "marker_runtime.py": 1, # 1 fused <style>+<script> injection for the marker runtime
 }
 
 STREAMTEX_DIR = Path(__file__).resolve().parent.parent / "streamtex"

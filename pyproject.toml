@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "streamtex"
-version = "0.6.10"
+version = "0.6.24"
 description = "AI-powered content framework for Streamlit — create presentations, courses, and web-books with Claude or Cursor, no coding required."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -33,7 +33,7 @@ classifiers = [
     "Topic :: Multimedia :: Graphics :: Presentation",
 ]
 dependencies = [
-    "streamlit>=1.54.0",
+    "streamlit>=1.56.0",
     "beautifulsoup4>=4.10.0",
     "requests>=2.28.0",
     "watchdog",
@@ -58,6 +58,11 @@ ai = ["openai>=1.0", "google-genai>=1.0", "fal-client>=0.5", "Pillow>=10.0"]
 ai-openai = ["openai>=1.0", "Pillow>=10.0"]
 ai-google = ["google-genai>=1.0", "Pillow>=10.0"]
 ai-fal = ["fal-client>=0.5", "Pillow>=10.0"]
+gsheet = [
+    "google-api-python-client>=2.100",
+    "google-auth>=2.30",
+    "google-auth-oauthlib>=1.2",
+]
 
 [project.urls]
 Homepage = "https://github.com/nicolasguelfi/streamtex"
@@ -89,13 +94,16 @@ include = ["streamtex*"]
 
 [tool.setuptools.package-data]
 "streamtex.static" = ["*.css", "*.png"]
+"streamtex.static.css" = ["*.css"]
+"streamtex.static.js" = ["*.js"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
-addopts = "-m 'not live'"
+addopts = "-m 'not live and not e2e'"
 markers = [
     "live: tests that call external APIs (OpenAI, Google, fal.ai) — run with: uv run pytest -m live",
+    "e2e: end-to-end browser tests via Playwright (launch streamlit, drive Chromium) — run with: uv run pytest -m e2e",
 ]
 
 [tool.uv]

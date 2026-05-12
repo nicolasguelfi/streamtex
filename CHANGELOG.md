@@ -5,6 +5,70 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.26] — 2026-05-12
+
+### Fixed
+- **Chrome cache-build freeze on decks of ~40+ blocks (regression introduced
+  by the 0.6.21–0.6.24 layout fixes).**  Two root causes addressed.
+
+  1. **`stx_marker_observer.js` — surgical mutation handling.**  The
+     `MutationObserver` callback previously schedules a full
+     `document.querySelectorAll('span.stx-marker')` walk on every batch of
+     mutations, then re-applies every marker.  During the paginated cache
+     build of a 60-block deck this produced ~780 000 mutations and ~1 100
+     full-document scans, saturating Chrome's main thread for tens of
+     seconds (Firefox/Safari coped thanks to lighter MutationObserver +
+     more aggressive rAF batching).  The handler now consumes
+     `MutationRecord.addedNodes` (for new markers) and the specific
+     parent `stVerticalBlock` whose `class` / `style` / `data-stx-*-uid`
+     was reconciled (re-applies that marker only), dedup'd via `Set`.
+     Bootstrap initial pass is unchanged.  The 0.6.21–0.6.24 invariants
+     (attribute-strip recovery, idempotent re-apply) remain exercised by
+     `tests/e2e/test_marker_observer_regression.py`.
+
+  2. **`_build_page_cache` — suppress DOM emit during the hidden render.**
+     The Tier-3 cache rebuild runs all blocks inside `st.empty().container()`
+     that is immediately `.empty()`-cleared once TOC, marker registry,
+     search index, and export buffer have been populated server-side.  The
+     intermediate DOM still travelled over the WebSocket and was reconciled
+     by React (per-instance attribute-selector `<style>` blocks parsed,
+     marker spans inserted) before being discarded, blocking the
+     `remove_loading_overlay()` iframe at the tail of the run.  A new
+     context manager `_suppress_cache_build_dom` monkey-patches the
+     DOM-emitting streamlit primitives (`st.html`, `st.markdown`,
+     `st.write`, `st.text`, `st.code`, `st.caption`, `st.header`,
+     `st.subheader`, `st.title`, `st.divider`) to no-ops for the span of
+     the cache-build loop.  `st.container` and `st.iframe` are preserved
+     — the former because the with-statement structure of streamtex
+     primitives depends on it, the latter because
+     `update_loading_progress()` re-emits a progress iframe between
+     blocks.  Python-side state (TOC entries, marker registry, search
+     index, export buffer) is populated *before* the primitives emit and
+     is therefore unaffected.
+
+  Combined measurement on a 60-block synthetic fixture matching the
+  FC-260507-NG-SLIDES profile (`tests/e2e/test_cache_build_freeze.py`):
+  cold-load cache-build window 60+ s → 0.85 s (≈70 × speed-up); observer
+  mutations 782 499 → 409; full-document marker scans 1 088 → 1 (bootstrap
+  only); long-task total 57 338 ms → 327 ms.
+
+### Added
+- `tests/e2e/test_cache_build_freeze.py` + fixture under
+  `tests/e2e/fixtures/cache_build_freeze_app/`: a Playwright regression
+  guarding the cold-load wall-clock window and the
+  `marker-scan` count on Chromium for a 60-block paginated deck.
+- `tests/test_marker_runtime.py::TestStaticAssets::test_js_observer_coalesces_via_animation_frame`
+  updated to assert the new `pendingBatch` / `pendingScheduled`
+  coalescing tokens (intent unchanged: many mutations must collapse into
+  one animation-frame-debounced handler).
+
+### Notes
+- No public Python API change; no removal.  The behavioural envelope of
+  the 0.6.21–0.6.24 layout fixes is preserved — the existing
+  `test_marker_observer_regression.py` Playwright tests continue to pass
+  unchanged, ensuring attribute-strip recovery and Streamlit-1.56+
+  `display:flex` overrides still survive reconciliation.
+
 ## [0.6.25] — 2026-05-12
 
 ### Changed

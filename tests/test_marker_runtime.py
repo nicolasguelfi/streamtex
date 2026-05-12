@@ -172,12 +172,16 @@ class TestStaticAssets:
         assert "getPropertyPriority" in js
 
     def test_js_observer_coalesces_via_animation_frame(self):
-        """Many mutations during one Streamlit rerun should coalesce into a
-        single full scan — otherwise the observer pegs the CPU.  We use
-        requestAnimationFrame as the debouncer."""
+        """Many mutations during one Streamlit rerun must coalesce into a
+        single batched handler on the next animation frame — otherwise
+        the observer pegs the CPU during the cache-build mutation storm
+        (the freeze reproduced by tests/e2e/test_cache_build_freeze.py).
+        Since 0.6.26 the coalescing is via ``pendingBatch`` /
+        ``pendingScheduled`` rather than the legacy ``pendingScan``."""
         js = _JS_PATH.read_text(encoding="utf-8")
         assert "requestAnimationFrame" in js
-        assert "pendingScan" in js
+        assert "pendingBatch" in js
+        assert "pendingScheduled" in js
 
     def test_css_hides_marker_cells(self):
         css = _CSS_PATH.read_text(encoding="utf-8")

@@ -1,8 +1,7 @@
 """Unit tests for streamtex.marker_runtime.
 
 Validates that:
-  - inject_marker_runtime() emits CSS + JS on every call (Streamlit
-    reconciles the elements across reruns);
+  - inject_marker_runtime() is idempotent within a session;
   - the global stylesheet and JS observer assets ship inside the package
     and contain the expected anchors.
 """
@@ -10,27 +9,41 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
+import pytest
+import streamlit as st
+
 from streamtex import marker_runtime
 from streamtex.marker_runtime import (
     _CSS_PATH,
     _JS_PATH,
+    _SESSION_KEY,
     inject_marker_runtime,
 )
+
+
+@pytest.fixture(autouse=True)
+def _reset_marker_session():
+    """Clear the session_state flag between tests."""
+    if _SESSION_KEY in st.session_state:
+        del st.session_state[_SESSION_KEY]
+    yield
+    if _SESSION_KEY in st.session_state:
+        del st.session_state[_SESSION_KEY]
+
 
 # ---------------------------------------------------------------------------
 # inject_marker_runtime
 # ---------------------------------------------------------------------------
 
 class TestInjectMarkerRuntime:
-    def test_emits_on_every_call(self):
-        """No Python-side guard — each call re-emits.  Streamlit
-        reconciliation handles deduplication at the DOM level."""
+    def test_injects_once_per_session(self):
         with patch("streamtex.marker_runtime.st.html") as mock_html, \
              patch("streamtex.marker_runtime.st.iframe") as mock_iframe:
             inject_marker_runtime()
-            inject_marker_runtime()
-            assert mock_html.call_count == 2
-            assert mock_iframe.call_count == 2
+            inject_marker_runtime()  # second call same session
+            assert mock_html.call_count == 1
+            assert mock_iframe.call_count == 1
+        assert st.session_state.get(_SESSION_KEY) is True
 
     def test_css_via_st_html(self):
         """CSS must go through st.html() — inline in the host page, no iframe."""
@@ -78,17 +91,12 @@ class TestStaticAssets:
     def test_js_file_exists(self):
         assert _JS_PATH.exists(), f"missing {_JS_PATH}"
 
-    def test_js_observer_uses_disconnect_then_reinstall(self):
-        """The observer must tear down its previous instance before
-        installing a fresh one — otherwise stale orphaned observers
-        accumulate (and, worse, the observer may go silent if Streamlit
-        forces a reload of the iframe between reruns)."""
+    def test_js_observer_has_idempotency_guard(self):
+        """Observer must guard against running twice (the same script can be
+        re-emitted on each Streamlit rerun); the guard lives on the
+        parent window because the observer runs in an iframe."""
         js = _JS_PATH.read_text(encoding="utf-8")
-        # Observer handle held on the parent window for disconnect across reruns.
-        assert "__stxMarkerObsHandle" in js
-        assert ".disconnect()" in js, "observer must disconnect the previous handle"
-        # Sentinel flag still set for browser-side diagnostics.
-        assert "hostWin.__stxMarkerObs = true" in js
+        assert "hostWin.__stxMarkerObs" in js, "observer must guard re-installation"
 
     def test_js_observer_uses_correct_parent_selector(self):
         js = _JS_PATH.read_text(encoding="utf-8")

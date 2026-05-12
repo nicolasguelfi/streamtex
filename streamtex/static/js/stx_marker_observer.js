@@ -140,13 +140,67 @@
   function hideMarkerCell(markerSpan) {
     // Hide the marker's own cell — bulletproof: class for CSS introspection,
     // inline !important for guaranteed effect regardless of cascade.
-    var ec = markerSpan.closest(EC_SEL);
-    if (!ec) return;
+    //
+    // CRITICAL: we resolve the cell via the canonical structural relation
+    // ``EC > stHtml > {<style>?, <span.stx-marker>}`` (the EXACT shape
+    // ``st.html(css_and_marker)`` emits — never any other content), NOT
+    // via ``markerSpan.closest(EC_SEL)``.  The closest() form would,
+    // during a Streamlit first-paint reconciliation race, return an
+    // unrelated stElementContainer — typically the user-content cell of
+    // the same list-item — and hiding it would erase the visible content.
+    // This was the FC slide 11 root cause: the first bullet's text
+    // ("Supervisory authority") disappeared on first render post-cache-
+    // clear because the list-item marker was transiently placed inside
+    // the user content stHtml, hideMarkerCell walked up to the user
+    // content EC, and stamped ``display: none !important`` on it.
+    //
+    // Guard: only hide the EC if the marker's enclosing stHtml is a
+    // "pure marker carrier" — its only children are an optional <style>
+    // and the marker span itself.  Anything else (user text, <p>, <a>,
+    // markdown-rendered content, …) means the cell carries content that
+    // must remain visible; bail cleanly and let the observer fire again
+    // when Streamlit reconciles the marker into its proper cell.
+    var stHtml = markerSpan.parentNode;
+    if (!stHtml || stHtml.nodeType !== 1) return;
+    if (!(stHtml.matches && stHtml.matches('[data-testid="stHtml"], .stHtml'))) return;
+    var ec = stHtml.parentNode;
+    if (!ec || ec.nodeType !== 1) return;
+    if (!(ec.matches && ec.matches(EC_SEL))) return;
+    // EC-singleton check.  A legitimate marker cell holds EXACTLY one
+    // child element — the marker's own stHtml.  During a Streamlit
+    // first-paint reconciliation race, the marker stHtml may be
+    // transiently grouped under the SAME EC as a user-content stHtml,
+    // giving the EC two children.  Hiding such a mixed EC erases the
+    // user content; bail out and let the observer fire again once
+    // Streamlit splits them into separate ECs.
+    if (ec.children.length !== 1 || ec.children[0] !== stHtml) return;
+    // Pure-marker-carrier check.  Within the marker's stHtml, only an
+    // optional <style> and the marker span itself are legal; anything
+    // else means the markerSpan is co-located with user content.
+    var kids = stHtml.children;
+    for (var i = 0; i < kids.length; i++) {
+      var k = kids[i];
+      if (k.tagName === 'STYLE') continue;
+      if (k.tagName === 'SPAN' && k.classList && k.classList.contains('stx-marker')) continue;
+      return;  // foreign child → not a marker cell
+    }
     if (!ec.classList.contains('stx-marker-cell')) {
       ec.classList.add('stx-marker-cell');
     }
     setInlineImportant(ec, 'display', 'none');
+    if (hiddenECs.add) hiddenECs.add(ec);
+    else if (hiddenECs.indexOf(ec) === -1) hiddenECs.push(ec);
   }
+
+  // Tracking set of ECs we've stamped with `display: none !important`.
+  // Used by auditMarkerCells() to detect strands when Streamlit reuses
+  // the EC for unrelated content (the FC-slide-11 first-bullet bug):
+  // Streamlit can strip the `stx-marker-cell` class as part of its
+  // reconciliation, hiding the EC from a class-based query yet leaving
+  // the inline `display: none !important` in place — invisible to a
+  // document-wide ``querySelectorAll('.stx-marker-cell')`` scan but
+  // very visible to the user as missing content.
+  var hiddenECs = (typeof Set === 'function') ? new Set() : [];
 
   function forwardCustomProps(markerSpan, parent) {
     // Forward every data-stx-* attribute (except `kind`) onto the parent
@@ -430,6 +484,59 @@
     // when clearMarker's ``still attached?`` guard runs.
     for (var r = 0; r < removedMarkers.length; r++) {
       clearMarker(removedMarkers[r]);
+    }
+    // Auto-heal stranded marker cells.  Streamlit can REUSE an
+    // stElementContainer that briefly hosted a marker for unrelated
+    // content on a subsequent reconciliation (the marker is detached,
+    // user-content children are inserted into the same EC).  In that
+    // case the EC keeps the ``stx-marker-cell`` class and the inline
+    // ``display: none !important`` that ``hideMarkerCell`` stamped on
+    // it earlier — erasing the now-visible content (FC slide 11, first
+    // bullet, post-cache-clear).  After any batch that detached a
+    // marker, sweep all ``.stx-marker-cell`` ECs and clear the hidden
+    // state from those that no longer host a marker.  Scoped to the
+    // removal case so the cost is paid only when the structure actually
+    // changed.
+    if (removedMarkers.length > 0) {
+      auditMarkerCells();
+    }
+  }
+
+  function auditMarkerCells() {
+    // Walk the tracking set rather than ``.stx-marker-cell`` selector
+    // because Streamlit reconciliation can strip the class while we
+    // still need to undo the inline ``display: none !important``.
+    var stale = [];
+    function check(ec) {
+      if (!ec.isConnected) {
+        stale.push(ec);
+        return;
+      }
+      var marker = ec.querySelector(
+        ':scope > [data-testid="stHtml"] > span.stx-marker,' +
+        ' :scope > .stHtml > span.stx-marker'
+      );
+      if (marker) return;  // still legitimate, keep hidden
+      // Stranded — strip the marker-cell class (if still present) and
+      // the inline hide so the now-user-content EC renders again.
+      if (ec.classList.contains('stx-marker-cell')) {
+        ec.classList.remove('stx-marker-cell');
+      }
+      if (ec.style.getPropertyValue('display') === 'none' &&
+          ec.style.getPropertyPriority('display') === 'important') {
+        ec.style.removeProperty('display');
+      }
+      stale.push(ec);
+    }
+    if (hiddenECs.forEach) {
+      hiddenECs.forEach(check);
+    } else {
+      for (var i = 0; i < hiddenECs.length; i++) check(hiddenECs[i]);
+    }
+    if (hiddenECs.delete) {
+      for (var s = 0; s < stale.length; s++) hiddenECs.delete(stale[s]);
+    } else if (stale.length) {
+      hiddenECs = hiddenECs.filter(function (e) { return stale.indexOf(e) === -1; });
     }
   }
 

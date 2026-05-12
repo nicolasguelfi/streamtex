@@ -137,13 +137,11 @@ class TestLiveRendering:
         mock_render.assert_not_called()
         mock_components.assert_called_once()
         html_arg = mock_components.call_args[0][0]
-        # JS auto-fit pattern
-        assert "Math.min(scaleX, scaleY)" in html_arg
-        assert "resetView" in html_arg
-        assert "_autoFit" in html_arg
-        # Pan/zoom controls
+        # Pan/zoom controls (current implementation: scale-by-1.2 on click,
+        # translate via mouse drag; no auto-fit on load).
         assert "zoomIn" in html_arg
         assert "zoomOut" in html_arg
+        assert "resetView" in html_arg
         # SVG is injected
         assert "<svg" in html_arg
         # Correct height passed

@@ -5,6 +5,67 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.28] — 2026-05-12
+
+### Fixed
+- **First list-item invisible on first render after cache clear (pre-existing
+  bug, several versions old).**  On the FC-260507-NG-SLIDES "Operational, Not
+  Theoretical — The Luxembourg Framework" slide, the first bullet
+  ("Supervisory authority — ILR …") showed the bullet character but no
+  text on the very first ``streamlit run`` after wiping ``.stx_cache``.
+  A browser force-reload made the missing text reappear.
+
+  Root cause was a Streamlit first-paint reconciliation race that
+  briefly co-located the list-item ``<span class="stx-marker">`` inside
+  the stElementContainer that ultimately hosts the user content.  At
+  that transient instant the canonical ``EC > stHtml > span.stx-marker``
+  structure was indistinguishable from a real marker cell, so
+  ``hideMarkerCell`` correctly stamped ``display: none !important`` on
+  it.  Streamlit then reconciled the EC's children to the user's
+  ``st_write`` output while also stripping the ``stx-marker-cell`` class
+  — leaving an EC that no longer hosted a marker, no longer carried the
+  class, yet remained ``display: none``.  Subsequent items were not
+  affected because Streamlit's delta rhythm stabilises after the first
+  item; the visible effect was strictly first-item-only and strictly
+  first-render-only.
+
+  The fix in ``streamtex/static/js/stx_marker_observer.js`` is twofold:
+
+  1. ``hideMarkerCell`` now resolves the cell through the strict
+     structural relation ``EC > stHtml > span.stx-marker``, never via
+     ``markerSpan.closest(EC_SEL)``.  When the markerSpan is co-located
+     with non-marker siblings (mixed stHtml children) or the EC carries
+     more than one child element, ``hideMarkerCell`` bails out cleanly;
+     the observer fires again as soon as Streamlit moves the marker to
+     its proper cell.
+
+  2. A new ``hiddenECs`` ``Set`` tracks every EC ``hideMarkerCell`` has
+     stamped, and the new ``auditMarkerCells()`` runs after any batch
+     that detached a marker.  It walks the tracking set (not
+     ``.stx-marker-cell`` — Streamlit reconciliation may have stripped
+     the class) and restores any EC that no longer hosts a marker by
+     stripping the lingering class and the inline ``display: none
+     !important``.
+
+  Reproduced and pinned by ``tests/e2e/test_first_item_invisible_fc.py``
+  against the real FC deck (auto-skipped on machines without the
+  project).  All 1976 unit tests pass and the
+  ``test_paginated_bleedthrough_fc.py`` e2e still reports zero bleeds,
+  confirming no regression on the 0.6.27 fix.
+
+### Added
+- ``test_js_hide_marker_cell_has_structural_guards`` in
+  ``tests/test_marker_runtime.py`` — pins the parent → grandparent
+  resolution and asserts ``.closest()`` is no longer used inside
+  ``hideMarkerCell``.
+- ``test_js_observer_auto_heals_stranded_marker_cells`` — asserts the
+  ``hiddenECs`` tracking + ``auditMarkerCells`` contract.
+
+### Notes
+- No public Python API change.  All other invariants from 0.6.21–0.6.27
+  (cache-build freeze, paginated bleed-through, attribute-strip
+  recovery, KIND_SPECS single source) remain intact.
+
 ## [0.6.27] — 2026-05-12
 
 ### Fixed

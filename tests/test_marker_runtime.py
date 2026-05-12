@@ -231,6 +231,78 @@ class TestStaticAssets:
         # can strip them symmetrically.
         assert "spec.booleanModifiers" in js
 
+    def test_js_hide_marker_cell_has_structural_guards(self):
+        """``hideMarkerCell`` must resolve the cell via the canonical
+        ``EC > stHtml > span.stx-marker`` structure, not via ``closest()``.
+        During a Streamlit first-paint race the markerSpan can transiently
+        be co-located with user content; ``closest(EC_SEL)`` would then
+        return the user-content cell and ``display:none`` would erase the
+        visible text (FC slide 11, "Supervisory authority" bullet).  The
+        guards pin the structural relationship so a future refactor that
+        switches back to ``closest()`` fails this test immediately.
+        """
+        js = _JS_PATH.read_text(encoding="utf-8")
+        # Resolves the cell via parent → grandparent, not closest().
+        assert "var stHtml = markerSpan.parentNode" in js
+        assert "var ec = stHtml.parentNode" in js
+        # EC must hold exactly one child (the marker's stHtml).
+        assert "ec.children.length !== 1" in js
+        # The stHtml's children must be only <style> + <span.stx-marker>.
+        assert "k.tagName === 'STYLE'" in js
+        assert "stx-marker" in js
+        # closest(EC_SEL) must not be USED to resolve the cell — strip
+        # comments first so the explanatory docstring (which references
+        # closest() to motivate the switch) doesn't trigger a false hit.
+        import re
+        m = re.search(r"function hideMarkerCell\([^)]*\)\s*\{", js)
+        assert m, "hideMarkerCell not found"
+        start = m.end()
+        depth = 1
+        i = start
+        while i < len(js) and depth > 0:
+            c = js[i]
+            if c == "{":
+                depth += 1
+            elif c == "}":
+                depth -= 1
+            i += 1
+        body = js[start:i-1]
+        # Strip /* … */ and // … line comments before scanning for usage.
+        code = re.sub(r"/\*[\s\S]*?\*/", "", body)
+        code = re.sub(r"//[^\n]*", "", code)
+        assert ".closest(" not in code, (
+            "hideMarkerCell calls .closest() in its code — that's the form "
+            "the structural guards replace.  closest() returns an unrelated "
+            "EC during Streamlit reconciliation and erases user content."
+        )
+
+    def test_js_observer_auto_heals_stranded_marker_cells(self):
+        """When Streamlit reuses an EC that briefly hosted a marker for
+        unrelated user content, the inline ``display: none !important``
+        and (initially) the ``stx-marker-cell`` class persist on the EC.
+        Streamlit reconciliation then strips the class as part of its
+        normal pass — leaving an EC that is INVISIBLE via class-based
+        queries but still hidden in the layout.  This is the FC-slide-11
+        first-bullet root cause.
+
+        The observer must track every EC it hides in a ``hiddenECs`` set
+        and audit it after any batch that detached a marker, restoring
+        ECs that no longer host a marker by stripping the class (if
+        still present) AND the inline ``display: none !important``.
+        """
+        js = _JS_PATH.read_text(encoding="utf-8")
+        # Tracking set populated by hideMarkerCell.
+        assert "var hiddenECs" in js
+        # Audit function exists and is invoked from handleBatch.
+        assert "function auditMarkerCells(" in js
+        assert "auditMarkerCells()" in js
+        # The audit MUST handle the class-stripped case — it strips inline
+        # display:none even if stx-marker-cell is no longer there.
+        assert "ec.style.removeProperty('display')" in js
+        # The audit is gated by removedMarkers.length > 0 so the cost is
+        # paid only when the marker structure actually changed.
+        assert "removedMarkers.length > 0" in js
+
     def test_js_apply_marker_writes_no_inline_style_outside_spec(self):
         """applyMarker MUST NOT write inline styles to ``parent`` with a
         literal property name — those writes bypass KIND_SPECS and

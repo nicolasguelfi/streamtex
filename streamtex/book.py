@@ -516,7 +516,7 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
             banner: BannerConfig = None,
             bib_sources=None, bib_config=None,
             inspector=None,
-            chrome_banner: bool = True,
+            chrome_banner: bool = False,
             page_width: int = 90,
             zoom: int = 100,
             presentation_profiles: list[PresentationProfile] | None = None,

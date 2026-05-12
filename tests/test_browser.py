@@ -39,3 +39,18 @@ def test_chrome_banner_js_detects_ios():
 def test_chrome_banner_js_detects_crios():
     """The detection should recognize Chrome on iOS (CriOS user-agent token)."""
     assert "CriOS\\/" in _CHROME_BANNER_JS
+
+
+def test_st_book_chrome_banner_default_is_false():
+    """Since 0.6.25 the Chrome banner is OFF by default — the marker-runtime
+    migration eliminated the Chrome-specific advantage that motivated it.
+    The function remains exported so users can opt back in explicitly."""
+    import inspect
+
+    from streamtex.book import st_book
+
+    sig = inspect.signature(st_book)
+    default = sig.parameters["chrome_banner"].default
+    assert default is False, (
+        f"chrome_banner default should be False since 0.6.25, got {default!r}"
+    )

@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.25] — 2026-05-12
+
+### Changed
+- **Chrome recommendation banner: off by default in `st_book`.**  The
+  banner was introduced when streamtex relied on CSS `:has()` selectors,
+  which caused a 3–4 s freeze on Chrome cold load and were unsupported in
+  Firefox until v121 (2023-12).  The marker-runtime migration (0.6.11 →
+  0.6.16) eliminated both issues: `:has()` is no longer used, and the new
+  MutationObserver-based path is universally supported.  At this point
+  Chrome no longer offers a meaningful advantage for streamtex content,
+  so `st_book(chrome_banner=False)` is now the default.  The
+  `st_chrome_banner()` helper remains exported for users who want to opt
+  back in explicitly.  See `streamtex/browser.py` docstring for the full
+  rationale.
+
 ## [0.6.24] — 2026-05-12
 
 ### Fixed

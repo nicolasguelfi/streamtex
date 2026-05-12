@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.22] — 2026-05-12
+
+### Fixed
+- **Marker observer: inline-style fallback for layout-critical declarations.**
+  Streamlit 1.56+ applies `display: flex; flex-direction: column` on every
+  `[data-testid="stVerticalBlock"]` via an inline style (or a `!important`
+  rule loaded after our stylesheet, depending on the build), which beat the
+  global stylesheet even with `!important`.  The MutationObserver now sets
+  the layout-critical properties **directly on the element** with the
+  `!important` flag via `element.style.setProperty(prop, value, 'important')`.
+  This guarantees correct layout regardless of CSS cascade or stylesheet
+  load order:
+
+  | Marker kind | Inline properties applied                                       |
+  |-------------|-----------------------------------------------------------------|
+  | `grid`      | `display: grid`, `grid-template-columns`, `gap`, `align-items`  |
+  | `span`      | `display: flex`, `flex-direction: row`, `white-space: pre`      |
+  | `list-item` | `display: flex`, `flex-direction: row`, `align-items: baseline` |
+  | `zoom`      | `zoom: <factor>`                                                |
+
+  CSS rules are kept as a safety net for browsers/devtools introspection but
+  no longer load-bearing for these four kinds.
+- Fixes "Three Frameworks — At a Glance" 3-cell grid rendering vertically
+  on the FC presentation deck (verified via `slides/STX_DIAG_GRID/`
+  diagnostic harness).
+
 ## [0.6.21] — 2026-05-12
 
 ### Fixed

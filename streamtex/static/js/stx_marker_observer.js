@@ -84,6 +84,32 @@
       parent.style.setProperty(cssVar, a.value);
     }
 
+    // Kind-specific INLINE style overrides — set directly on the element with
+    // !important so they beat Streamlit's own inline `display: flex` (which is
+    // applied on every stVerticalBlock since 1.56+ and beats our external
+    // !important rule on some Streamlit builds).  This makes the layout
+    // independent of the CSS cascade.
+    if (kind === 'grid') {
+      var tpl = markerSpan.getAttribute('data-stx-grid-template') || '1fr';
+      var g   = markerSpan.getAttribute('data-stx-grid-gap') || '0';
+      parent.style.setProperty('display', 'grid', 'important');
+      parent.style.setProperty('grid-template-columns', tpl, 'important');
+      parent.style.setProperty('gap', g, 'important');
+      parent.style.setProperty('align-items', 'stretch', 'important');
+    } else if (kind === 'span') {
+      parent.style.setProperty('display', 'flex', 'important');
+      parent.style.setProperty('flex-direction', 'row', 'important');
+      parent.style.setProperty('white-space', 'pre', 'important');
+    } else if (kind === 'list-item') {
+      parent.style.setProperty('display', 'flex', 'important');
+      parent.style.setProperty('flex-direction', 'row', 'important');
+      parent.style.setProperty('align-items', 'baseline', 'important');
+      parent.style.setProperty('gap', '0.5rem', 'important');
+    } else if (kind === 'zoom') {
+      var z = markerSpan.getAttribute('data-stx-zoom-factor') || '1';
+      parent.style.setProperty('zoom', z, 'important');
+    }
+
     // Tag for the inspector / export tooling + per-instance CSS targeting.
     // Use a *kind-prefixed* attribute on the parent so multiple marker kinds
     // (e.g. a list-item that wraps a st_block) can coexist without one's uid

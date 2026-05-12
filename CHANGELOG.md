@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.20] — 2026-05-12
+
+### Fixed
+- **Marker observer regression** introduced by 0.6.18/0.6.19: on paginated navigation, some grid (`.stx-grid`) / zoom (`.stx-zoom`) / list-item (`.stx-list-item`) classes were not applied to their parent `stVerticalBlock`, breaking layouts (e.g. on the FC presentation deck the "Three Frameworks — At a Glance" slide rendered 3 boxes stacked vertically instead of 2+1). Root cause: `inject_marker_runtime()` short-circuited on subsequent reruns via a `session_state` guard, which let Streamlit's reconciliation remove the `st.iframe` element from the DOM and silently kill the `MutationObserver`; the JS-side flag `__stxMarkerObs=true` then prevented re-installation on any later script execution.
+
+### Changed
+- `streamtex/marker_runtime.py:inject_marker_runtime()` — Python-side `session_state` guard **removed**. `st.html(<style>)` and `st.iframe(<script>)` are now emitted on every rerun; Streamlit reconciles them to the same DOM nodes (same call site → same elements). Aligned with the pattern already used by `streamtex/marker.py` and `streamtex/bib_preview.py`.
+- `streamtex/static/js/stx_marker_observer.js` — flag-only idempotency guard replaced by a **disconnect-then-reinstall** pattern on `hostWin.__stxMarkerObsHandle`. Each script execution disconnects the previous observer (if it survived) before installing a fresh one. The `hostWin.__stxMarkerObs = true` sentinel is preserved for browser-side diagnostics. Markers already carry `data-stx-processed='1'`, so re-scanning across reruns skips work that was already done.
+- `tests/test_marker_runtime.py` — `test_injects_once_per_session` → `test_emits_on_every_call` (now asserts that two consecutive calls emit twice). `test_js_observer_has_idempotency_guard` → `test_js_observer_uses_disconnect_then_reinstall` (asserts the new pattern). Stale `_reset_marker_session` fixture removed.
+
+### Notes
+- All other 0.6.19 migrations (17 other call sites, monkey-patch, `streamlit>=1.56.0` floor) preserved unchanged.
+- Diagnostic that pinned the root cause: on the broken slide, `document.querySelectorAll('.stx-grid').length` returned 2 while 3 grid sentinels existed (`span.stx-marker[data-stx-kind="grid"]`), one with `:not([data-stx-processed])` — proving the observer was alive but unable to catch new markers on slide change because its `MutationObserver` had been silently destroyed.
+- Visual verification on the FC deck: the "Three Frameworks" slide now lays out GDPR+NIS2 side-by-side with AI Act centered below, as in the pre-regression v2 image.
+
 ## [0.6.19] — 2026-05-12
 
 ### Changed

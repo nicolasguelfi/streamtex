@@ -42,8 +42,6 @@ import streamlit as st
 
 logger = logging.getLogger(__name__)
 
-_SESSION_KEY = "__stx_marker_runtime_injected__"
-
 _STATIC_DIR = Path(__file__).resolve().parent / "static"
 _CSS_PATH = _STATIC_DIR / "css" / "stx_global.css"
 _JS_PATH = _STATIC_DIR / "js" / "stx_marker_observer.js"
@@ -59,21 +57,31 @@ def _read_asset(path: Path) -> str:
 
 
 def inject_marker_runtime() -> None:
-    """Inject the global stylesheet + observer script, once per session.
+    """Inject the global stylesheet + observer script.
 
-    Idempotent across reruns: the Streamlit ``session_state`` flag prevents
-    re-emission within a session, and the JavaScript itself is guarded by
-    ``window.parent.__stxMarkerObs``.
+    Called once per rerun (no Python-side ``session_state`` guard).
+    Streamlit reconciles the emitted ``st.html`` and ``st.iframe`` elements
+    to the same DOM nodes across reruns (same call site, same payload),
+    so the CSS ``<style>`` tag is updated in place and the observer
+    ``<iframe>`` is preserved.  The JavaScript itself is idempotent at the
+    DOM level via a disconnect-then-reinstall pattern on
+    ``window.parent.__stxMarkerObsHandle`` — if the previous observer was
+    garbage-collected for any reason (e.g. Streamlit forced a reload of
+    the iframe), the script re-installs cleanly.
 
-    Two separate Streamlit calls (see the module docstring for why):
+    The previous implementation gated injection at the Python side via
+    ``session_state``, but that caused the iframe to be reconciled-out
+    of the DOM on reruns where ``inject_marker_runtime()`` short-circuited,
+    silently destroying the observer.  See
+    ``documentation/maintenance/components.v1_issue/`` for the
+    investigation that led to this pattern.
+
+    Two separate Streamlit calls:
 
     * ``st.html("<style>…</style>")`` — inline CSS in the host page.
     * ``st.iframe("<script>…</script>", height=1)`` — JS in a 1-pixel
       iframe that reaches back to ``window.parent.document``.
     """
-    if st.session_state.get(_SESSION_KEY):
-        return
-
     css = _read_asset(_CSS_PATH)
     js = _read_asset(_JS_PATH)
     if not css and not js:
@@ -83,11 +91,4 @@ def inject_marker_runtime() -> None:
         st.html(f"<style>{css}</style>")
     if js:
         st.iframe(f"<script>{js}</script>", height=1)
-    st.session_state[_SESSION_KEY] = True
     logger.debug("marker_runtime: injected (css=%d bytes, js=%d bytes)", len(css), len(js))
-
-
-def _reset_for_tests() -> None:
-    """Clear the session flag — test helper, not part of the public API."""
-    if _SESSION_KEY in st.session_state:
-        del st.session_state[_SESSION_KEY]

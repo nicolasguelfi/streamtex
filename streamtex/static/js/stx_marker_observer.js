@@ -35,8 +35,17 @@
   var hostDoc = hostWin.document;
   if (!hostDoc || !hostDoc.body) return;
 
-  if (hostWin.__stxMarkerObs) return;       // idempotent across reruns
-  hostWin.__stxMarkerObs = true;
+  // Disconnect-then-reinstall: the previous observer (if any) is
+  // explicitly torn down before installing a fresh one.  Streamlit may
+  // reconcile this iframe across reruns; if it forces a reload, the
+  // previous JS context is gone but the parent window's
+  // `__stxMarkerObsHandle` still points at the now-orphaned observer.
+  // Disconnecting it is a safe no-op when the observer was already GCed.
+  if (hostWin.__stxMarkerObsHandle
+      && typeof hostWin.__stxMarkerObsHandle.disconnect === 'function') {
+    try { hostWin.__stxMarkerObsHandle.disconnect(); } catch (e) { /* GCed */ }
+  }
+  hostWin.__stxMarkerObs = true;       // sentinel for browser-side diagnostics
 
   var PARENT_SEL = '[data-testid="stVerticalBlock"]';
   var KIND_TO_CLASS = {

@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.21] — 2026-05-12
+
+### Fixed
+- **Layout broken on Streamlit ≥ 1.56** — visible regression on the FC presentation deck's "Three Frameworks — At a Glance" slide (and other multi-grid layouts): the 3 boxes collapsed into a vertical stack regardless of the grid template. Root cause traced through the diagnostic project `slides/STX_DIAG_GRID/` to **stale CSS selectors** in `stx_global.css` that targeted the old Streamlit DOM:
+  - `.element-container` (Streamlit ≤ 1.55) is now `[data-testid="stElementContainer"]` (Streamlit ≥ 1.56);
+  - Streamlit ≥ 1.56 wraps every cell/container in an additional `[data-testid="stLayoutWrapper"]` parent;
+  - Streamlit's default `display: flex; flex-direction: column;` on every `stVerticalBlock` overrides our `display: grid` rule unless we use `!important`.
+  - The marker observer was always working correctly (verified empirically: `obs=true`, `handle=true`, all marker `data-stx-processed`, `data-stx-{kind}-uid` set). The chain broke at the CSS-to-DOM mapping.
+
+### Changed
+- `streamtex/static/css/stx_global.css` — Phase-4 update for Streamlit 1.56+ DOM:
+  - Every `.element-container` selector now also matches `[data-testid="stElementContainer"]` (compat with both old and new Streamlit).
+  - Every `> [data-testid="stVerticalBlock"]` cell selector now ALSO matches `> [data-testid="stLayoutWrapper"]` (compat with both wrap structures).
+  - Display overrides (`display: grid` on `.stx-grid`, `display: flex` on `.stx-span` / `.stx-list-item`, `grid-template-columns` / `gap` on `.stx-grid`) gain `!important` to beat Streamlit's inline cascade.
+  - Inner `stLayoutWrapper > stVerticalBlock` is sized to fill its grid slot so per-instance background/padding styles render correctly inside grid cells.
+- **`streamtex/marker_runtime.py:inject_marker_runtime()` migrated from `streamlit.components.v1.html` to `st.components.v2.component(name, js=…, isolate_styles=False)`** — the V2 custom-component API (stable, added in 1.56). With `isolate_styles=False`, the observer JS executes **inline in the host page** (no iframe, no shadow DOM) so it has direct access to `document` without `window.parent` indirection. The component is reconciled by Streamlit across reruns (verified in `slides/STX_DIAG_GRID/`), so the `MutationObserver` stays alive throughout the session.
+- **`components.v1.html` is no longer used anywhere in the streamtex codebase.** The deprecation debt accepted in 0.6.20 is now cleared, ahead of the 2026-06-01 removal deadline.
+- `tests/test_marker_runtime.py` — `test_js_via_components_html` → `test_js_via_v2_component`. Asserts the V2 component is registered with `isolate_styles=False`, the JS payload is wrapped in `export default function`, the wrapped component callable is invoked once. Mock target: `streamtex.marker_runtime.st.components.v2.component`.
+
+### Notes
+- All other 0.6.19 migrations from `components.v1.html` → `st.iframe` (17 other call sites) are preserved as-is. They worked correctly because they don't rely on long-lived `MutationObserver`s; only the marker observer needed the special V2 treatment.
+- Verified via `slides/STX_DIAG_GRID/` (the diagnostic mini-project shipped with this PR) that `v2-component` reaches `OBSERVER OK` status on all 4 test slides including the "Three Frameworks" replica.
+- Public API unchanged. No env var, no signature change. Users on 0.6.20 simply upgrade.
+
 ## [0.6.20] — 2026-05-12
 
 ### Fixed

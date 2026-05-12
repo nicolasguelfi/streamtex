@@ -17,48 +17,33 @@ Injection strategy
 ------------------
 The CSS goes through ``st.html`` (renders inline in the host page, no iframe).
 
-The JavaScript goes through ``streamlit.components.v1.html(..., height=0)``
-(0-pixel iframe).  This API is **officially deprecated in Streamlit 1.56**
-with removal announced for after 2026-06-01, with ``st.iframe`` named as the
-replacement.  **HOWEVER**, switching this specific call site to ``st.iframe``
-(0.6.19 + 0.6.20 attempts) produced two distinct failure modes on the FC
-presentation deck:
+The JavaScript goes through ``st.components.v2.component(..., isolate_styles=False)``
+— Streamlit's V2 custom-component API (stable, no deprecation marker, added
+in 1.56).  With ``isolate_styles=False`` the JS executes **inline in the host
+page** (no iframe, no shadow DOM), giving the observer direct access to
+``document`` without ``window.parent`` indirection.
 
-* 0.6.19 (``st.iframe`` + Python-side ``session_state`` guard): some grid
-  markers on paginated navigation never received their ``.stx-grid`` class,
-  because Streamlit's reconciliation removes the ``st.iframe`` element from
-  the DOM on subsequent reruns when ``inject_marker_runtime()`` short-circuits,
-  silently destroying the ``MutationObserver``.
-* 0.6.20 (``st.iframe`` + no guard + disconnect-then-reinstall): catastrophic
-  over-tagging — 47 ``.stx-grid`` classes applied (vs. the expected 3 for
-  the visible slide) plus a Chrome freeze.  Root cause not fully understood
-  as of 2026-05-12.
+History (why not the alternatives):
 
-``components.v1.html`` (used here) was empirically verified to work on
-0.6.18 in the same conditions: stable observer across reruns, correct count
-of class applications, no freeze.  Streamlit treats it as a "custom
-component" whose iframe is persistent across reruns, which keeps the
-``MutationObserver`` alive.  ``st.iframe`` is a regular Streamlit element
-and is reconciled differently.
+* ``streamlit.components.v1.html`` — the API streamtex used up to 0.6.18.
+  Works, but **deprecated in Streamlit 1.56** with announced removal after
+  2026-06-01.
+* ``st.iframe`` — Streamlit's runtime warning points at this as the v1
+  replacement.  Functionally identical to v1.html for one-shot JS injection
+  but **breaks long-lived MutationObservers**: Streamlit's reconciliation
+  removes/recreates the iframe on subsequent reruns, destroying the
+  observer (verified empirically on the FC presentation deck; see
+  ``documentation/maintenance/components.v1_issue/``).
+* ``st.html(..., unsafe_allow_javascript=True)`` — documented as a JS
+  execution path since 1.52 but the released frontend (1.52 → 1.57) strips
+  ``<script>`` tags and DOM event handlers regardless of the flag (DOMPurify
+  sanitisation not bypassed by the Python-side proto flag).
+* ``st.components.v2.component(js=…, isolate_styles=False)`` — what we use
+  now.  Verified to install the observer cleanly, process all markers on
+  paginated navigation, and survive reruns without reconciliation issues.
 
-The legacy alternative ``st.html("<script>…</script>",
-unsafe_allow_javascript=True)`` does not execute JavaScript at all: verified
-empirically on Streamlit 1.52 → 1.57, the proto field is forwarded by the
-Python API but the frontend strips ``<script>`` tags and DOM event handlers
-regardless.  See ``documentation/maintenance/components.v1_issue/`` for
-the reproducer (``reproducer/app.py`` probes A–E).
-
-**TODO before 2026-06-01**: find an ``st.iframe``-based (or other
-non-deprecated) injection strategy that preserves the observer across
-paginated navigation without over-tagging.  Investigation lives in
-``documentation/maintenance/components.v1_issue/``.
-
-The observer is therefore written to reach back into
-``window.parent.document`` so it operates on the host DOM despite living
-in an iframe.  Same pattern as :mod:`streamtex.marker` and
-:mod:`streamtex.bib_preview` (note: those two modules use ``st.iframe`` and
-work because they don't rely on a long-lived ``MutationObserver`` — they
-re-emit their JS on every rerun).
+The observer JS file (``static/js/stx_marker_observer.js``) is wrapped in a
+V2 default export so the IIFE inside runs when the component mounts.
 """
 from __future__ import annotations
 
@@ -66,7 +51,6 @@ import logging
 from pathlib import Path
 
 import streamlit as st
-import streamlit.components.v1 as components
 
 logger = logging.getLogger(__name__)
 
@@ -75,6 +59,8 @@ _SESSION_KEY = "__stx_marker_runtime_injected__"
 _STATIC_DIR = Path(__file__).resolve().parent / "static"
 _CSS_PATH = _STATIC_DIR / "css" / "stx_global.css"
 _JS_PATH = _STATIC_DIR / "js" / "stx_marker_observer.js"
+
+_COMPONENT_NAME = "stx_marker_observer"
 
 
 def _read_asset(path: Path) -> str:
@@ -86,20 +72,33 @@ def _read_asset(path: Path) -> str:
         return ""
 
 
+def _wrap_observer_for_v2(js_body: str) -> str:
+    """Wrap the streamtex observer IIFE inside a V2 default-export function.
+
+    The shipped observer is an auto-installing IIFE (``(function(){…})();``).
+    V2 expects a module-style ``export default function(ctx) { … }`` that
+    Streamlit calls on mount.  We simply place the IIFE inside the function
+    body so it runs when the component mounts.  ``ctx`` is unused — the
+    observer reaches the host DOM directly because ``isolate_styles=False``
+    mounts it inline (not in a shadow root).
+    """
+    return f"export default function(_ctx) {{\n{js_body}\n}}\n"
+
+
 def inject_marker_runtime() -> None:
     """Inject the global stylesheet + observer script, once per session.
 
     Idempotent across reruns: the Streamlit ``session_state`` flag prevents
-    re-emission within a session, and the JavaScript itself is guarded by
-    ``window.parent.__stxMarkerObs``.
+    re-emission within a session, and the JavaScript itself is guarded at
+    the DOM level via ``window.__stxMarkerObsHandle`` (disconnect-then-
+    reinstall on every script execution — see the observer JS).
 
-    Two separate Streamlit calls (see the module docstring for why
-    ``components.v1.html`` is used despite being deprecated):
+    Two separate Streamlit calls:
 
     * ``st.html("<style>…</style>")`` — inline CSS in the host page.
-    * ``components.v1.html("<script>…</script>", height=0)`` — JS in a
-      0-pixel iframe (a "custom component") that Streamlit treats as
-      persistent across reruns, keeping the MutationObserver alive.
+    * ``st.components.v2.component(name, js=…, isolate_styles=False)`` —
+      observer JS executed inline in the host page (no iframe, no shadow
+      DOM).  The component is rendered as an invisible empty element.
     """
     if st.session_state.get(_SESSION_KEY):
         return
@@ -112,7 +111,12 @@ def inject_marker_runtime() -> None:
     if css:
         st.html(f"<style>{css}</style>")
     if js:
-        components.html(f"<script>{js}</script>", height=0)
+        component = st.components.v2.component(
+            _COMPONENT_NAME,
+            js=_wrap_observer_for_v2(js),
+            isolate_styles=False,
+        )
+        component()
     st.session_state[_SESSION_KEY] = True
     logger.debug("marker_runtime: injected (css=%d bytes, js=%d bytes)", len(css), len(js))
 

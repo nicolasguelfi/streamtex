@@ -7,7 +7,7 @@ Validates that:
 """
 from __future__ import annotations
 
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 import streamlit as st
@@ -37,52 +37,53 @@ def _reset_marker_session():
 
 class TestInjectMarkerRuntime:
     def test_injects_once_per_session(self):
+        mock_v2 = MagicMock()
         with patch("streamtex.marker_runtime.st.html") as mock_html, \
-             patch("streamtex.marker_runtime.components.html") as mock_components:
+             patch("streamtex.marker_runtime.st.components.v2.component",
+                   return_value=mock_v2) as mock_v2_factory:
             inject_marker_runtime()
             inject_marker_runtime()  # second call same session
             assert mock_html.call_count == 1
-            assert mock_components.call_count == 1
+            assert mock_v2_factory.call_count == 1
+            assert mock_v2.call_count == 1
         assert st.session_state.get(_SESSION_KEY) is True
 
     def test_css_via_st_html(self):
         """CSS must go through st.html() — inline in the host page, no iframe."""
         with patch("streamtex.marker_runtime.st.html") as mock_html, \
-             patch("streamtex.marker_runtime.components.html"):
+             patch("streamtex.marker_runtime.st.components.v2.component"):
             inject_marker_runtime()
         assert mock_html.call_count == 1
         css_payload = mock_html.call_args[0][0]
         assert "<style>" in css_payload
         assert "stx-marker-cell" in css_payload  # universal marker-cell rule
-        assert "<script>" not in css_payload      # no JS in this call
+        assert "<script>" not in css_payload     # no JS in this call
 
-    def test_js_via_components_html(self):
-        """JS observer must go through components.v1.html — deprecated
-        in Streamlit 1.56 (removal after 2026-06-01) with st.iframe as
-        the official replacement, BUT switching this specific call site
-        to st.iframe broke the marker observer empirically (0.6.19/0.6.20
-        attempts — see documentation/maintenance/components.v1_issue/).
-        Streamlit treats components.v1.html as a "custom component" with
-        a persistent iframe across reruns, which keeps the
-        MutationObserver alive — whereas st.iframe is a regular element
-        that gets reconciled-out, silently destroying the observer.
-        st.html(unsafe_allow_javascript=True) is documented as a
-        JS-execution path but the released frontend (1.52 → 1.57) strips
-        <script> tags regardless of the flag.
+    def test_js_via_v2_component(self):
+        """JS observer must go through st.components.v2.component with
+        isolate_styles=False (inline DOM, no iframe).  This is the
+        long-term replacement for streamlit.components.v1.html (removed
+        2026-06-01).  See documentation/maintenance/components.v1_issue/
+        for the investigation that ruled out st.iframe and
+        st.html(unsafe_allow_javascript=True).
         """
+        mock_v2 = MagicMock()
         with patch("streamtex.marker_runtime.st.html"), \
-             patch("streamtex.marker_runtime.components.html") as mock_components:
+             patch("streamtex.marker_runtime.st.components.v2.component",
+                   return_value=mock_v2) as mock_v2_factory:
             inject_marker_runtime()
-        assert mock_components.call_count == 1
-        args, kwargs = mock_components.call_args
-        js_payload = args[0]
-        assert "<script>" in js_payload
-        # The observer reaches back to the host page via window.parent.
-        assert "window.parent" in js_payload or "parent.document" in js_payload
-        # Observer idempotency guard targets the parent window.
+        mock_v2_factory.assert_called_once()
+        # First positional arg is the component name.
+        args, kwargs = mock_v2_factory.call_args
+        assert args[0] == "stx_marker_observer"
+        # Inline (no shadow DOM, no iframe).
+        assert kwargs.get("isolate_styles") is False
+        # JS payload is wrapped in a V2 default export and contains the observer.
+        js_payload = kwargs.get("js", "")
+        assert "export default function" in js_payload
         assert "__stxMarkerObs" in js_payload
-        # 0-pixel iframe (components.v1.html accepts height=0).
-        assert kwargs.get("height") == 0
+        # The wrapped component is then invoked once to mount it.
+        mock_v2.assert_called_once()
 
 
 # ---------------------------------------------------------------------------

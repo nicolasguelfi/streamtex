@@ -7,12 +7,22 @@
  *   - Phase 1 (0.6.12): .stx-block, .stx-span         (container.py)
  *   - Phase 2 (0.6.13): .stx-list, .stx-list-item     (list.py)
  *   - Phase 3 (0.6.14): .stx-grid, .stx-zoom, .stx-md-big
+ *   - Phase 4 (0.6.21): adapted to Streamlit 1.56+ DOM structure changes:
+ *       * `.element-container` → `[data-testid="stElementContainer"]`
+ *       * new `[data-testid="stLayoutWrapper"]` wraps each cell/child
+ *       * Streamlit sets `display:flex; flex-direction:column` on every
+ *         stVerticalBlock — our overrides need `!important` to win the
+ *         cascade reliably.
  *
- * Phase 0 (0.6.11): file is intentionally minimal — only universal helpers.
+ *   Both old and new selectors are matched in every rule for compat with
+ *   any Streamlit ≥ 1.54.
  */
 
-/* Hide marker cells (the .element-container that hosts the sentinel span). */
-[data-testid="stVerticalBlock"] > .element-container.stx-marker-cell {
+/* --- Universal marker-cell hide ----------------------------------------- */
+/* Hide marker cells (the container that hosts the sentinel span).
+ * Streamlit ≤ 1.55: .element-container ; Streamlit ≥ 1.56: stElementContainer. */
+[data-testid="stVerticalBlock"] > .element-container.stx-marker-cell,
+[data-testid="stVerticalBlock"] > [data-testid="stElementContainer"].stx-marker-cell {
   display: none !important;
 }
 
@@ -22,8 +32,8 @@
  *
  * Per-instance user style (`style=` argument + section horizontal CSS) is
  * injected separately by container.py as a tiny per-call <style> using the
- * `[data-testid="stVerticalBlock"][data-stx-uid="…"]` attribute selector
- * (Option B in the fix plan — preserves cascade semantics).
+ * `[data-testid="stVerticalBlock"][data-stx-block-uid="…"]` attribute
+ * selector (Option B — preserves cascade semantics).
  * ========================================================================== */
 
 /* st_block: rely on Streamlit's default flex-column layout — no extra rules
@@ -34,8 +44,8 @@
 
 /* st_span: horizontal flex layout that mirrors the legacy `:has()` rule. */
 [data-testid="stVerticalBlock"].stx-span {
-  display: flex;
-  flex-direction: row;
+  display: flex !important;
+  flex-direction: row !important;
   white-space: pre;
 }
 [data-testid="stVerticalBlock"].stx-span > * {
@@ -66,8 +76,8 @@
 
 /* List item: flex row holding [bullet ::before] + [content wrapper]. */
 [data-testid="stVerticalBlock"].stx-list-item {
-  display: flex;
-  flex-direction: row;
+  display: flex !important;
+  flex-direction: row !important;
   align-items: baseline;
   gap: 0.5rem;
 }
@@ -83,12 +93,16 @@
   font-weight: inherit;
   align-self: baseline;
 }
-/* Hide the list-item's own marker cell (`display:none` like the legacy rule). */
-[data-testid="stVerticalBlock"].stx-list-item > .element-container.stx-marker-cell {
-  display: none;
+/* Hide the list-item's own marker cell. */
+[data-testid="stVerticalBlock"].stx-list-item > .element-container.stx-marker-cell,
+[data-testid="stVerticalBlock"].stx-list-item > [data-testid="stElementContainer"].stx-marker-cell {
+  display: none !important;
 }
-/* Inner content wrapper: the st.container() yielded inside each item. */
-[data-testid="stVerticalBlock"].stx-list-item > [data-testid="stVerticalBlock"] {
+/* Inner content wrapper: the st.container() yielded inside each item.
+ * Streamlit ≥ 1.56 wraps this in an extra stLayoutWrapper — match both. */
+[data-testid="stVerticalBlock"].stx-list-item > [data-testid="stVerticalBlock"],
+[data-testid="stVerticalBlock"].stx-list-item > [data-testid="stLayoutWrapper"] > [data-testid="stVerticalBlock"],
+[data-testid="stVerticalBlock"].stx-list-item > [data-testid="stLayoutWrapper"] {
   flex-grow: 1;
   width: auto;
   display: flex;
@@ -113,33 +127,50 @@
  * ========================================================================== */
 
 /* st_grid: turn the parent stVerticalBlock into a CSS grid container.
- * Column template and gap are forwarded by the observer as CSS custom
- * properties (data-stx-grid-template, data-stx-grid-gap). */
+ * `!important` overrides Streamlit's default `display:flex; flex-direction:
+ * column;` on every stVerticalBlock (Streamlit ≥ 1.56 applies this with
+ * higher specificity than our class+attribute selector). */
 [data-testid="stVerticalBlock"].stx-grid {
-  display: grid;
-  grid-template-columns: var(--stx-grid-template, 1fr);
-  gap: var(--stx-grid-gap, 0);
-  align-items: stretch;
+  display: grid !important;
+  grid-template-columns: var(--stx-grid-template, 1fr) !important;
+  gap: var(--stx-grid-gap, 0) !important;
+  align-items: stretch !important;
 }
-/* Hide every direct .element-container child (script tags, marker cells,
- * inline styles) so only the actual cells (stVerticalBlocks) take grid slots.
- * Mirrors the three legacy `:has(style|script|span.{uid})` rules in one go. */
-[data-testid="stVerticalBlock"].stx-grid > .element-container {
+/* Hide every direct marker / inline-style / script container child so only
+ * actual cells take grid slots.  Matches both legacy `.element-container`
+ * and Streamlit 1.56+ `[data-testid="stElementContainer"]`. */
+[data-testid="stVerticalBlock"].stx-grid > .element-container,
+[data-testid="stVerticalBlock"].stx-grid > [data-testid="stElementContainer"] {
   display: none !important;
 }
-/* Cells: stVerticalBlocks that are direct children of the grid. */
-[data-testid="stVerticalBlock"].stx-grid > [data-testid="stVerticalBlock"] {
+/* Cells.  Streamlit ≤ 1.55: each cell is a direct stVerticalBlock child.
+ * Streamlit ≥ 1.56: each cell is wrapped in a stLayoutWrapper which is the
+ * direct child of the grid.  Match both. */
+[data-testid="stVerticalBlock"].stx-grid > [data-testid="stVerticalBlock"],
+[data-testid="stVerticalBlock"].stx-grid > [data-testid="stLayoutWrapper"] {
   width: auto !important;
   min-width: 0;
   overflow-wrap: break-word;
   word-break: break-word;
+}
+/* In the 1.56+ case, the stLayoutWrapper itself becomes the grid cell —
+ * make sure its inner stVerticalBlock fills the wrapper's slot so user
+ * styles (background, padding, etc. emitted via per-instance attribute
+ * selectors on the inner stVerticalBlock) render correctly. */
+[data-testid="stVerticalBlock"].stx-grid > [data-testid="stLayoutWrapper"] {
+  display: block;
+}
+[data-testid="stVerticalBlock"].stx-grid > [data-testid="stLayoutWrapper"] > [data-testid="stVerticalBlock"] {
+  width: 100%;
+  height: 100%;
 }
 
 /* st_zoom: zoom factor forwarded as `--stx-zoom-factor`. */
 [data-testid="stVerticalBlock"].stx-zoom {
   zoom: var(--stx-zoom-factor, 1);
 }
-[data-testid="stVerticalBlock"].stx-zoom > .element-container {
+[data-testid="stVerticalBlock"].stx-zoom > .element-container,
+[data-testid="stVerticalBlock"].stx-zoom > [data-testid="stElementContainer"] {
   width: auto;
 }
 
@@ -150,4 +181,3 @@
 [data-testid="stVerticalBlock"].stx-md-big {
   /* intentionally empty; per-instance rule is emitted by block_helpers.py */
 }
-

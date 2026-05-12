@@ -160,13 +160,11 @@
     hideMarkerCell(markerSpan);
   }
 
-  function scan(root) {
-    // Walk every marker on every pass — applyMarker is idempotent and uses
-    // a fast-path when the parent already has the kind class.  We cannot
-    // skip "previously processed" markers via a one-shot attribute because
-    // Streamlit reconciliation may replace the parent stVerticalBlock on
-    // rerun (settings change, paginated navigation) while reusing the
-    // marker, which would otherwise leave the new parent un-classed.
+  function scanAll(root) {
+    // Full-document marker walk.  Used only for the initial bootstrap
+    // pass (covers everything already in the DOM at script start) — the
+    // per-mutation hot path uses surgical processing instead, see
+    // handleBatch() below.
     var scope = (root && root.querySelectorAll) ? root : hostDoc;
     var markers = scope.querySelectorAll('span.stx-marker');
     for (var i = 0; i < markers.length; i++) {
@@ -175,20 +173,97 @@
   }
 
   // Initial pass (covers everything already in the parent DOM at script start).
-  scan(hostDoc);
+  scanAll(hostDoc);
 
-  // Coalesce many mutations into one full scan on the next animation frame.
-  // applyMarker is fully idempotent (no-op when state already matches), so
-  // re-running it after every Streamlit reconciliation is safe and cheap.
-  var pendingScan = false;
-  function scheduleScan() {
-    if (pendingScan) return;
-    pendingScan = true;
+  // Surgical mutation handling — each batch of MutationRecords is
+  // processed by acting only on what changed:
+  //
+  //   - childList.addedNodes: extract any span.stx-marker (the node itself
+  //     or descendants of an added subtree) and apply it.
+  //   - attributes on a stVerticalBlock parent: Streamlit reconciliation
+  //     may have stripped our class/uid/style.  Find the marker inside
+  //     that parent and re-apply.
+  //
+  // We dedupe targets via Sets so a single batch with many mutations on
+  // the same parent triggers at most one applyMarker per parent.  This
+  // is what bounds the per-batch cost to O(unique_targets) instead of
+  // the previous O(all_markers × batches) full-document scans.
+  //
+  // applyMarker is fully idempotent (no-op when state already matches),
+  // so re-running it on a parent that is already in the correct state
+  // does not trigger a feedback loop through the observer.
+  var pendingBatch = [];
+  var pendingScheduled = false;
+
+  function handleBatch(batch) {
+    var addedMarkers = (typeof Set === 'function') ? new Set() : null;
+    var dirtyParents = (typeof Set === 'function') ? new Set() : null;
+    // Fallback for engines without Set: dedupe via Array.indexOf.
+    var addedArr = addedMarkers ? null : [];
+    var dirtyArr = dirtyParents ? null : [];
+
+    function pushMarker(m) {
+      if (addedMarkers) { addedMarkers.add(m); return; }
+      if (addedArr.indexOf(m) === -1) addedArr.push(m);
+    }
+    function pushParent(p) {
+      if (dirtyParents) { dirtyParents.add(p); return; }
+      if (dirtyArr.indexOf(p) === -1) dirtyArr.push(p);
+    }
+
+    for (var i = 0; i < batch.length; i++) {
+      var rec = batch[i];
+      if (rec.type === 'childList') {
+        var added = rec.addedNodes;
+        for (var j = 0; j < added.length; j++) {
+          var n = added[j];
+          if (n.nodeType !== 1) continue;
+          if (n.matches && n.matches('span.stx-marker')) {
+            pushMarker(n);
+          }
+          if (n.querySelectorAll) {
+            var sub = n.querySelectorAll('span.stx-marker');
+            for (var k = 0; k < sub.length; k++) pushMarker(sub[k]);
+          }
+        }
+      } else if (rec.type === 'attributes') {
+        var t = rec.target;
+        if (t && t.nodeType === 1 && t.matches && t.matches(PARENT_SEL)) {
+          pushParent(t);
+        }
+      }
+    }
+
+    function processMarker(marker) {
+      applyMarker(marker);
+    }
+    function processParent(parent) {
+      // The marker for this parent lives inside one of its
+      // element-container children.  ``:scope`` keeps the lookup tight
+      // and short-circuits as soon as we find it.
+      var marker = parent.querySelector(':scope span.stx-marker');
+      if (marker) applyMarker(marker);
+    }
+
+    if (addedMarkers) {
+      addedMarkers.forEach(processMarker);
+      dirtyParents.forEach(processParent);
+    } else {
+      for (var i = 0; i < addedArr.length; i++) processMarker(addedArr[i]);
+      for (var i = 0; i < dirtyArr.length; i++) processParent(dirtyArr[i]);
+    }
+  }
+
+  function scheduleHandle() {
+    if (pendingScheduled || pendingBatch.length === 0) return;
+    pendingScheduled = true;
     var raf = hostWin.requestAnimationFrame || window.requestAnimationFrame ||
               function (cb) { return setTimeout(cb, 16); };
     raf(function () {
-      pendingScan = false;
-      scan(hostDoc);
+      var batch = pendingBatch;
+      pendingBatch = [];
+      pendingScheduled = false;
+      handleBatch(batch);
     });
   }
 
@@ -205,12 +280,12 @@
   //                   childList-only observer.  We filter to only the
   //                   attributes that, if changed, would invalidate our
   //                   layout: `class`, `style`, and each `data-stx-*-uid`.
-  //
-  // The handler simply schedules a debounced full scan; applyMarker's
-  // no-op guards prevent any feedback loop from our own writes.
   var ObserverCtor = hostWin.MutationObserver || window.MutationObserver;
-  var obs = new ObserverCtor(function () {
-    scheduleScan();
+  var obs = new ObserverCtor(function (mutations) {
+    for (var i = 0; i < mutations.length; i++) {
+      pendingBatch.push(mutations[i]);
+    }
+    scheduleHandle();
   });
   obs.observe(hostDoc.body, {
     childList: true,

@@ -1331,6 +1331,68 @@ def _isolate_widget_keys():
 _STX_FULL_EXPORT_HTML_KEY = "_stx_full_export_html"
 
 
+# Streamlit primitives whose DOM emission is suppressed during the
+# cache-build loop.  See ``_suppress_cache_build_dom`` below — the
+# attributes listed here are the ones streamtex blocks invoke that
+# would otherwise stream thousands of deltas per cold cache build.
+#
+# Excluded on purpose:
+#   * ``container`` — the hidden cache-build wrapper itself relies on
+#     ``with hidden.container():`` to nest deltas; the per-block
+#     ``with st.container():`` calls inside streamtex primitives need
+#     to keep their context-manager protocol.
+#   * ``iframe`` — ``update_loading_progress()`` re-emits a progress
+#     iframe after every block.  Keeping ``st.iframe`` live is the only
+#     way the loading overlay percentage actually updates during the
+#     cache build.
+#   * ``columns``, ``tabs``, ``empty``, ``expander`` — rarely used in
+#     streamtex primitives; preserving them keeps user ``build()``
+#     functions that mix in raw Streamlit widgets behaving like before.
+_CACHE_BUILD_DOM_PATCH_ATTRS = (
+    "html", "markdown", "write", "text", "code", "caption",
+    "header", "subheader", "title", "divider",
+)
+
+
+@contextlib.contextmanager
+def _suppress_cache_build_dom():
+    """Monkey-patch streamlit DOM-emitting primitives to no-ops.
+
+    During the Tier-3 ``_build_page_cache`` rebuild, streamtex renders
+    every block inside a hidden ``st.empty().container()`` that is
+    immediately wiped by ``hidden.empty()`` once the cache is captured.
+    The browser, however, still receives every intermediate delta over
+    the WebSocket and pays for the React reconciliation, the
+    MutationObserver bookkeeping, and (on big decks) the CSS parse of
+    hundreds of per-instance attribute-selector ``<style>`` blocks
+    before the wipe can take effect.  On Chrome with the FC-260507 deck
+    (~40 styled blocks) this is what produced the multi-tens-of-seconds
+    "Loading… 73 % module 30/41" freeze that motivated this branch.
+
+    The cache build itself does **not** need any of that DOM: TOC
+    entries, marker entries, the search index and the export buffer are
+    all populated by the Python-side state machinery *before* the
+    streamlit primitive ever emits.  By suppressing the emits for the
+    span of the cache-build loop, we cut the WebSocket payload to a
+    couple of progress-iframe + skeleton-container deltas per block and
+    keep the browser idle until the visible page renders.
+
+    Restored unconditionally on exit so that the post-cache page render
+    (which IS visible) goes through the unpatched streamlit primitives.
+    """
+    saved = {}
+    noop = lambda *a, **kw: None  # noqa: E731 — concise sentinel
+    for attr in _CACHE_BUILD_DOM_PATCH_ATTRS:
+        if hasattr(st, attr):
+            saved[attr] = getattr(st, attr)
+            setattr(st, attr, noop)
+    try:
+        yield
+    finally:
+        for attr, val in saved.items():
+            setattr(st, attr, val)
+
+
 def _build_page_cache(module_list, toc_config, marker_config, separator,
                       cache_hash, *args, export_config: ExportConfig | None = None,
                       progress_callback=None,
@@ -1367,7 +1429,12 @@ def _build_page_cache(module_list, toc_config, marker_config, separator,
         _block_sp = resolve_block_spacing()
 
         hidden = hidden_container if hidden_container is not None else st.empty()
-        with hidden.container(), _isolate_widget_keys():
+        # _suppress_cache_build_dom: see its docstring.  When export_config
+        # is provided we still want the streamtex export buffer to be
+        # populated, but that buffer is appended-to by ``st_html`` (the
+        # streamtex wrapper) *before* the patched ``streamlit.html``
+        # call returns, so the buffer is preserved regardless.
+        with hidden.container(), _isolate_widget_keys(), _suppress_cache_build_dom():
             for i, module in enumerate(module_list):
                 toc_before = len(toc_entries()) if toc_config else 0
                 markers_before = len(marker_entries()) if marker_config else 0

@@ -37,37 +37,45 @@ def _reset_marker_session():
 
 class TestInjectMarkerRuntime:
     def test_injects_once_per_session(self):
-        with patch("streamtex.marker_runtime.st.html") as mock_html:
+        with patch("streamtex.marker_runtime.st.html") as mock_html, \
+             patch("streamtex.marker_runtime.components.html") as mock_components:
             inject_marker_runtime()
             inject_marker_runtime()  # second call same session
             assert mock_html.call_count == 1
+            assert mock_components.call_count == 1
         assert st.session_state.get(_SESSION_KEY) is True
 
-    def test_emits_style_and_script_tags(self):
-        with patch("streamtex.marker_runtime.st.html") as mock_html:
+    def test_css_via_st_html(self):
+        """CSS must go through st.html() — inline in the host page, no iframe."""
+        with patch("streamtex.marker_runtime.st.html") as mock_html, \
+             patch("streamtex.marker_runtime.components.html"):
             inject_marker_runtime()
         assert mock_html.call_count == 1
-        args, kwargs = mock_html.call_args
-        html_payload = args[0]
-        assert "<style>" in html_payload
-        assert "<script>" in html_payload
-        # Observer asset signature.
-        assert "__stxMarkerObs" in html_payload
-        # Universal marker-cell rule lives in the global stylesheet.
-        assert "stx-marker-cell" in html_payload
+        css_payload = mock_html.call_args[0][0]
+        assert "<style>" in css_payload
+        assert "stx-marker-cell" in css_payload  # universal marker-cell rule
+        assert "<script>" not in css_payload      # no JS in this call
 
-    def test_passes_unsafe_allow_javascript_flag(self):
-        """Streamlit ≥ 1.54 strips <script> tags from st.html() unless
-        unsafe_allow_javascript=True is explicitly set.  Without this flag
-        the observer never runs and every marker-based rule silently
-        no-ops (broken grids, no zoom, ignored font sizes, etc.)."""
-        with patch("streamtex.marker_runtime.st.html") as mock_html:
+    def test_js_via_components_html(self):
+        """JS observer must go through components.v1.html() — Streamlit
+        (verified 1.44 through 1.57) strips <script> tags from st.html()
+        even when unsafe_allow_javascript=True is set on the Python side
+        (the proto field is forwarded but the frontend does not honor it
+        in any released version as of 2026-05-12).
+        """
+        with patch("streamtex.marker_runtime.st.html"), \
+             patch("streamtex.marker_runtime.components.html") as mock_components:
             inject_marker_runtime()
-        _, kwargs = mock_html.call_args
-        assert kwargs.get("unsafe_allow_javascript") is True, (
-            "inject_marker_runtime() must pass unsafe_allow_javascript=True "
-            "to st.html() so the MutationObserver actually executes."
-        )
+        assert mock_components.call_count == 1
+        args, kwargs = mock_components.call_args
+        js_payload = args[0]
+        assert "<script>" in js_payload
+        # The observer reaches back to the host page via window.parent.
+        assert "window.parent" in js_payload or "parent.document" in js_payload
+        # Observer idempotency guard targets the parent window.
+        assert "__stxMarkerObs" in js_payload
+        # Iframe must have zero height so it does not steal layout space.
+        assert kwargs.get("height") == 0
 
 
 # ---------------------------------------------------------------------------
@@ -82,8 +90,11 @@ class TestStaticAssets:
         assert _JS_PATH.exists(), f"missing {_JS_PATH}"
 
     def test_js_observer_has_idempotency_guard(self):
+        """Observer must guard against running twice (the same script can be
+        re-emitted on each Streamlit rerun); the guard lives on the
+        parent window because the observer runs in an iframe."""
         js = _JS_PATH.read_text(encoding="utf-8")
-        assert "window.__stxMarkerObs" in js, "observer must guard re-installation"
+        assert "hostWin.__stxMarkerObs" in js, "observer must guard re-installation"
 
     def test_js_observer_uses_correct_parent_selector(self):
         js = _JS_PATH.read_text(encoding="utf-8")

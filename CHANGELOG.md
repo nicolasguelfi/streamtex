@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.18] — 2026-05-12
+
+### Fixed
+- **Marker-runtime observer now actually executes (real fix)**: 0.6.17 attempted to keep the observer inline in the host page via `st.html(..., unsafe_allow_javascript=True)`, but verification on Streamlit 1.57.0 (and 1.54+) showed `window.__stxMarkerObs === undefined` and `.stx-grid` count `0` — the `unsafe_allow_javascript` proto field is forwarded by the Python API but the released Streamlit frontend does not honor it in any version checked (1.44 through 1.57). The visible regressions from 0.6.16 (broken grids, missing `st_zoom` containment, ignored custom font sizes, AI-image WYSIWYG zoom dropping to 100%) persisted in 0.6.17.
+- `streamtex/marker_runtime.py:inject_marker_runtime()` now splits injection: CSS through `st.html("<style>…</style>")` (inline, host page) and JS through `streamlit.components.v1.html("<script>…</script>", height=0)` (0-pixel iframe). Same pattern already proven by `streamtex/marker.py` and `streamtex/bib_preview.py`.
+- `streamtex/static/js/stx_marker_observer.js` rewritten to operate on `window.parent.document`: idempotency guard moves to `hostWin.__stxMarkerObs`, `scan()` walks the parent body, the `MutationObserver` is constructed via `hostWin.MutationObserver` and observes `hostDoc.body`. Same-origin Streamlit allows the iframe to reach back into the host DOM.
+- `tests/test_marker_runtime.py`: `test_injects_once_per_session` now patches both `st.html` and `components.html`; new `test_css_via_st_html` and `test_js_via_components_html` lock in the split-call contract (CSS goes through `st.html`, JS goes through `components.html` with `height=0`); `test_js_observer_has_idempotency_guard` asserts `hostWin.__stxMarkerObs`.
+
+### Notes
+- No public API change. No new env var. Users on 0.6.17 (or 0.6.16) just need to upgrade.
+- `components.v1.html` is deprecated in Streamlit 1.56 but is the only path that reliably executes injected `<script>` tags as of 2026-05-12; the deprecation will be revisited if and when a released Streamlit honors `unsafe_allow_javascript` on the frontend.
+- Browser verification: `window.__stxMarkerObs === true`, `document.querySelectorAll('.stx-grid').length > 0`, `document.querySelectorAll('.stx-marker-cell').length > 0`.
+
 ## [0.6.17] — 2026-05-12
 
 ### Fixed
@@ -15,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Notes
 - No public API change. No new env var. Users on 0.6.16 simply need to upgrade.
 - The bundled observer is a fixed, version-controlled asset — the `unsafe_allow_javascript=True` flag is bounded to that single trusted payload.
+- **Did not fix the regression in practice** — see 0.6.18 for the working fix.
 
 ## [0.6.16] — 2026-05-12
 

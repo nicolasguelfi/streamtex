@@ -12,6 +12,20 @@ This module owns:
 
 ``st_book`` calls :func:`inject_marker_runtime` once per session, which
 injects both assets into the parent Streamlit document.
+
+Injection strategy
+------------------
+The CSS goes through ``st.html`` (renders inline in the host page, no iframe).
+
+The JavaScript goes through ``streamlit.components.v1.html(..., height=0)``
+(0-pixel iframe).  Empirically, Streamlit 1.54.0 silently strips ``<script>``
+tags from ``st.html()`` payloads **even when** ``unsafe_allow_javascript=True``
+is set (the parameter exists in the Python API but the frontend in 1.54 does
+not honor it yet).  ``components.v1.html`` is deprecated in 1.56 but is the
+only reliable way to execute injected JavaScript in 1.54+.  The observer is
+written to reach back into ``window.parent.document`` so it operates on the
+host DOM despite living in an iframe.  Same pattern as
+:mod:`streamtex.marker` and :mod:`streamtex.bib_preview`.
 """
 from __future__ import annotations
 
@@ -19,6 +33,7 @@ import logging
 from pathlib import Path
 
 import streamlit as st
+import streamlit.components.v1 as components
 
 logger = logging.getLogger(__name__)
 
@@ -43,17 +58,13 @@ def inject_marker_runtime() -> None:
 
     Idempotent across reruns: the Streamlit ``session_state`` flag prevents
     re-emission within a session, and the JavaScript itself is guarded by
-    ``window.__stxMarkerObs``.
+    ``window.parent.__stxMarkerObs``.
 
-    The script is emitted with ``unsafe_allow_javascript=True`` — required
-    because Streamlit ≥ 1.54 silently strips ``<script>`` tags from
-    ``st.html()`` payloads by default.  The marker-runtime observer is our
-    own bundled, version-controlled asset (``static/js/stx_marker_observer.js``),
-    not user input, so the security implication is intentional and bounded.
-    Without this flag the observer never runs and every marker-based rule
-    (``.stx-grid``, ``.stx-zoom``, ``.stx-list-item`` …) silently no-ops,
-    visible to the user as broken grids, missing zoom, ignored font sizes,
-    etc.  See ``documentation/maintenance/freeze-has/fix-plan.md`` §0.6.17.
+    Two separate Streamlit calls (see the module docstring for why):
+
+    * ``st.html("<style>…</style>")`` — inline CSS in the host page.
+    * ``components.v1.html("<script>…</script>", height=0)`` — JS in a
+      0-pixel iframe that reaches back to ``window.parent.document``.
     """
     if st.session_state.get(_SESSION_KEY):
         return
@@ -63,12 +74,10 @@ def inject_marker_runtime() -> None:
     if not css and not js:
         return
 
-    fragments: list[str] = []
     if css:
-        fragments.append(f"<style>{css}</style>")
+        st.html(f"<style>{css}</style>")
     if js:
-        fragments.append(f"<script>{js}</script>")
-    st.html("".join(fragments), unsafe_allow_javascript=True)
+        components.html(f"<script>{js}</script>", height=0)
     st.session_state[_SESSION_KEY] = True
     logger.debug("marker_runtime: injected (css=%d bytes, js=%d bytes)", len(css), len(js))
 

@@ -1,8 +1,13 @@
 /* StreamTeX marker observer — replaces per-instance :has() selectors.
  *
- * When a sentinel <span class="stx-marker" data-stx-kind="..." data-stx-uid="..."
- *   data-stx-*="..." style="display:none"></span>
- * appears anywhere in the Streamlit page, this observer:
+ * This script is injected via `streamlit.components.v1.html(..., height=0)`,
+ * which means it runs inside a 0-pixel iframe.  All DOM operations must
+ * therefore target the *parent* document (the actual Streamlit app page) via
+ * `window.parent.document` — the iframe's own document is empty.
+ *
+ * When a sentinel <span class="stx-marker" data-stx-kind="..."
+ *   data-stx-uid="..." data-stx-*="..." style="display:none"></span>
+ * appears anywhere in the parent Streamlit page, this observer:
  *   1. Walks up to the nearest [data-testid="stVerticalBlock"] ancestor.
  *   2. Adds a class (e.g. `stx-block`, `stx-grid`, `stx-list-item`) on that
  *      ancestor based on `data-stx-kind`.
@@ -11,6 +16,9 @@
  *      parameter values without per-instance CSS injection.
  *   4. Tags the marker's .element-container with class `stx-marker-cell`
  *      so the global stylesheet can hide it.
+ *   5. Sets a kind-prefixed UID attribute (`data-stx-{kind}-uid`) on the
+ *      ancestor so per-instance stylesheets (`[data-stx-block-uid="…"]`,
+ *      `[data-stx-list-item-uid="…"]`, …) can target it.
  *
  * This entire system is the marker-runtime replacement for the legacy
  * `div[data-testid="stVerticalBlock"]:has(> .element-container .stHtml span.{uid})`
@@ -18,8 +26,17 @@
  */
 (function () {
   'use strict';
-  if (window.__stxMarkerObs) return;       // idempotent across reruns
-  window.__stxMarkerObs = true;
+
+  // We live inside a Streamlit components iframe.  Reach back to the parent
+  // window/document for all real DOM operations.  Same pattern as
+  // streamtex/marker.py and streamtex/bib_preview.py.
+  var hostWin = window.parent;
+  if (!hostWin) return;
+  var hostDoc = hostWin.document;
+  if (!hostDoc || !hostDoc.body) return;
+
+  if (hostWin.__stxMarkerObs) return;       // idempotent across reruns
+  hostWin.__stxMarkerObs = true;
 
   var PARENT_SEL = '[data-testid="stVerticalBlock"]';
   var KIND_TO_CLASS = {
@@ -79,7 +96,7 @@
   }
 
   function scan(root) {
-    var scope = (root && root.querySelectorAll) ? root : document;
+    var scope = (root && root.querySelectorAll) ? root : hostDoc;
     var markers = scope.querySelectorAll('span.stx-marker:not([data-stx-processed])');
     for (var i = 0; i < markers.length; i++) {
       applyMarker(markers[i]);
@@ -87,10 +104,14 @@
     }
   }
 
-  // Initial pass (covers everything already in the DOM at script start).
-  scan(document);
+  // Initial pass (covers everything already in the parent DOM at script start).
+  scan(hostDoc);
 
-  var obs = new MutationObserver(function (muts) {
+  // MutationObserver lives in the iframe scope but observes the parent doc.
+  // Same-origin Streamlit allows this; the observer instance survives as
+  // long as window.parent.__stxMarkerObsHandle holds a reference.
+  var ObserverCtor = hostWin.MutationObserver || window.MutationObserver;
+  var obs = new ObserverCtor(function (muts) {
     for (var i = 0; i < muts.length; i++) {
       var m = muts[i];
       for (var j = 0; j < m.addedNodes.length; j++) {
@@ -104,7 +125,8 @@
       }
     }
   });
-  obs.observe(document.body, { childList: true, subtree: true });
+  obs.observe(hostDoc.body, { childList: true, subtree: true });
 
-  window.__stxMarkerObsHandle = obs;
+  // Keep a reference on the parent window so we can introspect from devtools.
+  hostWin.__stxMarkerObsHandle = obs;
 })();

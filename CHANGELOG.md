@@ -5,6 +5,87 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.27] — 2026-05-12
+
+### Fixed
+- **Paginated marker bleed-through: stale inline-styles from a previous
+  slide survived navigation and skewed the next slide's layout.**  When
+  Streamlit paginated navigation unmounted a slide, the marker
+  ``<span class="stx-marker">`` was removed from the DOM but the parent
+  ``[data-testid="stVerticalBlock"]`` that ``applyMarker`` had decorated
+  retained its ``stx-{kind}`` class, ``data-stx-{kind}-uid`` attribute,
+  CSS custom properties and inline ``grid-template-columns`` / ``zoom``
+  / ``display:flex`` / etc.  If React reused that DOM element for a
+  different construct on the next slide, the new slide inherited the
+  previous slide's layout — visible on FC-260507-NG-SLIDES as a "mix-up
+  between zoom and cells" when the user navigated forward then back
+  (screenshots provided by the user).
+
+  The fix introduces ``clearMarker`` in
+  ``streamtex/static/js/stx_marker_observer.js`` — the inverse of
+  ``applyMarker``.  ``handleBatch`` now consumes ``MutationRecord.
+  removedNodes`` in addition to ``addedNodes``, and on every removed
+  marker span ``clearMarker`` strips the class, the uid attribute, every
+  CSS custom property forwarded from the marker's ``data-stx-*`` attrs,
+  and the inline layout properties (``grid-template-columns``, ``zoom``,
+  etc.) listed in ``INLINE_PROPS_BY_KIND``.  A "marker with same uid is
+  still attached?" guard makes the operation idempotent under React
+  move-style reconciliation (remove + re-add in one batch leaves state
+  untouched).
+
+  Reproduced and pinned by ``tests/e2e/test_paginated_bleedthrough.py``
+  (synthetic 3-slide fixture, fast) and
+  ``tests/e2e/test_paginated_bleedthrough_fc.py`` (real-world deck —
+  auto-skipped on machines that don't have the FC project at the fixed
+  Dropbox path).  Pre-fix the FC test reported bleed on 8 of 9 slides;
+  post-fix it reports zero.
+
+### Changed
+- **Marker observer refactored around a ``KIND_SPECS`` single source of
+  truth.**  Previously, per-kind behavior was scattered in three places
+  inside ``stx_marker_observer.js``: ``KIND_TO_CLASS`` (class to add),
+  ``INLINE_PROPS_BY_KIND`` (props to strip), and inline ``if (kind ===
+  '…') { setInlineImportant(parent, '…', …) }`` branches in
+  ``applyMarker`` (props to write).  Three lists to keep synchronised
+  meant three drift opportunities — exactly the kind of fragility that
+  introduced the bleed-through bug above.
+
+  The refactor lifts all three into a single per-kind ``KIND_SPECS``
+  table declaring ``{ cls, inlineStyles(span), booleanModifiers }``.
+  ``applyMarker`` writes from the spec; ``clearMarker`` reads the SAME
+  spec to discover which property KEYS to strip.  Adding a new kind, or
+  a new inline property on an existing kind, only requires editing the
+  spec entry — both code paths pick it up automatically, so drift is
+  impossible by construction.
+
+  Two contract tests pin the design:
+  - ``test_js_observer_uses_kind_specs_single_source_of_truth`` — the
+    spec table exists, has every known kind, and both ``spec.cls`` /
+    ``spec.inlineStyles`` / ``spec.booleanModifiers`` appear in the
+    consumer code.
+  - ``test_js_apply_marker_writes_no_inline_style_outside_spec`` —
+    scans for ``setInlineImportant(parent, '<literal>', …)`` calls and
+    asserts there are zero.  A future refactor that bypasses the spec
+    fails this check immediately rather than introducing a silent
+    bleed-through regression.
+
+  No public Python API change; no runtime behavior change (the
+  ``test_paginated_bleedthrough_fc.py`` e2e still reports 0/9 bleeds).
+
+### Added
+- ``test_js_observer_clears_marker_state_on_removal`` in
+  ``tests/test_marker_runtime.py`` — asserts ``clearMarker`` is wired
+  into the batch handler and reverses every state change.
+- ``test_js_observer_uses_kind_specs_single_source_of_truth`` and
+  ``test_js_apply_marker_writes_no_inline_style_outside_spec`` — the
+  two contract tests described above.
+
+### Notes
+- No public Python API change.  The 0.6.26 surgical mutation handling
+  is preserved, the 0.6.21–0.6.24 attribute-strip-recovery invariants
+  remain exercised by ``test_marker_observer_regression.py``, and the
+  cache-build freeze regression test still passes.
+
 ## [0.6.26] — 2026-05-12
 
 ### Fixed

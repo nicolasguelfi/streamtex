@@ -44,19 +44,30 @@ class TestInjectMarkerRuntime:
         assert st.session_state.get(_SESSION_KEY) is True
 
     def test_emits_style_and_script_tags(self):
-        captured = {}
-
-        def _capture(html: str) -> None:
-            captured["html"] = html
-
-        with patch("streamtex.marker_runtime.st.html", side_effect=_capture):
+        with patch("streamtex.marker_runtime.st.html") as mock_html:
             inject_marker_runtime()
-        assert "<style>" in captured["html"]
-        assert "<script>" in captured["html"]
+        assert mock_html.call_count == 1
+        args, kwargs = mock_html.call_args
+        html_payload = args[0]
+        assert "<style>" in html_payload
+        assert "<script>" in html_payload
         # Observer asset signature.
-        assert "__stxMarkerObs" in captured["html"]
+        assert "__stxMarkerObs" in html_payload
         # Universal marker-cell rule lives in the global stylesheet.
-        assert "stx-marker-cell" in captured["html"]
+        assert "stx-marker-cell" in html_payload
+
+    def test_passes_unsafe_allow_javascript_flag(self):
+        """Streamlit ≥ 1.54 strips <script> tags from st.html() unless
+        unsafe_allow_javascript=True is explicitly set.  Without this flag
+        the observer never runs and every marker-based rule silently
+        no-ops (broken grids, no zoom, ignored font sizes, etc.)."""
+        with patch("streamtex.marker_runtime.st.html") as mock_html:
+            inject_marker_runtime()
+        _, kwargs = mock_html.call_args
+        assert kwargs.get("unsafe_allow_javascript") is True, (
+            "inject_marker_runtime() must pass unsafe_allow_javascript=True "
+            "to st.html() so the MutationObserver actually executes."
+        )
 
 
 # ---------------------------------------------------------------------------

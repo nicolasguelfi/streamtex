@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.17] — 2026-05-12
+
+### Fixed
+- **Marker-runtime observer now actually executes**: critical hotfix on top of 0.6.16. Streamlit ≥ 1.54 silently strips `<script>` tags from `st.html()` payloads by default. Without execution of the observer, every marker-based CSS rule (`.stx-grid`, `.stx-zoom`, `.stx-list-item`, per-instance `[data-stx-block-uid="…"]`, …) silently no-oped, which surfaced as broken grids, missing `st_zoom` containment, ignored custom font sizes, and AI-image WYSIWYG zoom dropping to 100%.
+- `streamtex/marker_runtime.py:inject_marker_runtime()` now calls `st.html(..., unsafe_allow_javascript=True)` so the bundled `static/js/stx_marker_observer.js` runs in the host-page context (no iframe, no `parent.document` indirection). Pattern aligned with Streamlit's deprecation of `st.components.v1.html` in 1.56.
+- `tests/test_marker_runtime.py` gains `test_passes_unsafe_allow_javascript_flag` which would have caught the regression at unit-test time.
+
+### Notes
+- No public API change. No new env var. Users on 0.6.16 simply need to upgrade.
+- The bundled observer is a fixed, version-controlled asset — the `unsafe_allow_javascript=True` flag is bounded to that single trusted payload.
+
 ## [0.6.16] — 2026-05-12
 
 ### Removed

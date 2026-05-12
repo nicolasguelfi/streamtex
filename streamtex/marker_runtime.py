@@ -44,6 +44,16 @@ def inject_marker_runtime() -> None:
     Idempotent across reruns: the Streamlit ``session_state`` flag prevents
     re-emission within a session, and the JavaScript itself is guarded by
     ``window.__stxMarkerObs``.
+
+    The script is emitted with ``unsafe_allow_javascript=True`` — required
+    because Streamlit ≥ 1.54 silently strips ``<script>`` tags from
+    ``st.html()`` payloads by default.  The marker-runtime observer is our
+    own bundled, version-controlled asset (``static/js/stx_marker_observer.js``),
+    not user input, so the security implication is intentional and bounded.
+    Without this flag the observer never runs and every marker-based rule
+    (``.stx-grid``, ``.stx-zoom``, ``.stx-list-item`` …) silently no-ops,
+    visible to the user as broken grids, missing zoom, ignored font sizes,
+    etc.  See ``documentation/maintenance/freeze-has/fix-plan.md`` §0.6.17.
     """
     if st.session_state.get(_SESSION_KEY):
         return
@@ -58,7 +68,7 @@ def inject_marker_runtime() -> None:
         fragments.append(f"<style>{css}</style>")
     if js:
         fragments.append(f"<script>{js}</script>")
-    st.html("".join(fragments))
+    st.html("".join(fragments), unsafe_allow_javascript=True)
     st.session_state[_SESSION_KEY] = True
     logger.debug("marker_runtime: injected (css=%d bytes, js=%d bytes)", len(css), len(js))
 

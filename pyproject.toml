@@ -100,9 +100,10 @@ include = ["streamtex*"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
-addopts = "-m 'not live'"
+addopts = "-m 'not live and not e2e'"
 markers = [
     "live: tests that call external APIs (OpenAI, Google, fal.ai) — run with: uv run pytest -m live",
+    "e2e: end-to-end browser tests via Playwright (launch streamlit, drive Chromium) — run with: uv run pytest -m e2e",
 ]
 
 [tool.uv]

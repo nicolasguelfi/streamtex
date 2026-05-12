@@ -183,6 +183,31 @@ class TestStaticAssets:
         assert "pendingBatch" in js
         assert "pendingScheduled" in js
 
+    def test_js_observer_clears_marker_state_on_removal(self):
+        """When a marker span is detached from the DOM (e.g. Streamlit
+        unmounts a slide during paginated navigation), the parent
+        ``stVerticalBlock`` it was attached to may be reused by React
+        for some other construct.  applyMarker only adds class / uid /
+        inline styles — without a matching removal path, those persist
+        and bleed into the next slide.  Reproduced empirically by
+        tests/e2e/test_paginated_bleedthrough_fc.py before the fix.
+
+        The fix introduces ``clearMarker`` which the batch handler runs
+        on every removed marker, after additions, to leave the parent
+        in the same shape it had before applyMarker ever touched it.
+        """
+        js = _JS_PATH.read_text(encoding="utf-8")
+        assert "function clearMarker(" in js
+        # clearMarker must reverse every state change applyMarker writes
+        # — guard each removal site so a future refactor doesn't silently
+        # leave one of them out.
+        assert "parent.classList.remove(cls)" in js
+        assert "parent.removeAttribute(uidAttr)" in js
+        assert "parent.style.removeProperty(props[j])" in js
+        # And it must be wired into the mutation pipeline through
+        # ``rec.removedNodes`` from childList records.
+        assert "rec.removedNodes" in js
+
     def test_css_hides_marker_cells(self):
         css = _CSS_PATH.read_text(encoding="utf-8")
         assert ".stx-marker-cell" in css

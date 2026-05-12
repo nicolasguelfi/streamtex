@@ -5,6 +5,52 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.27] — 2026-05-12
+
+### Fixed
+- **Paginated marker bleed-through: stale inline-styles from a previous
+  slide survived navigation and skewed the next slide's layout.**  When
+  Streamlit paginated navigation unmounted a slide, the marker
+  ``<span class="stx-marker">`` was removed from the DOM but the parent
+  ``[data-testid="stVerticalBlock"]`` that ``applyMarker`` had decorated
+  retained its ``stx-{kind}`` class, ``data-stx-{kind}-uid`` attribute,
+  CSS custom properties and inline ``grid-template-columns`` / ``zoom``
+  / ``display:flex`` / etc.  If React reused that DOM element for a
+  different construct on the next slide, the new slide inherited the
+  previous slide's layout — visible on FC-260507-NG-SLIDES as a "mix-up
+  between zoom and cells" when the user navigated forward then back
+  (screenshots provided by the user).
+
+  The fix introduces ``clearMarker`` in
+  ``streamtex/static/js/stx_marker_observer.js`` — the inverse of
+  ``applyMarker``.  ``handleBatch`` now consumes ``MutationRecord.
+  removedNodes`` in addition to ``addedNodes``, and on every removed
+  marker span ``clearMarker`` strips the class, the uid attribute, every
+  CSS custom property forwarded from the marker's ``data-stx-*`` attrs,
+  and the inline layout properties (``grid-template-columns``, ``zoom``,
+  etc.) listed in ``INLINE_PROPS_BY_KIND``.  A "marker with same uid is
+  still attached?" guard makes the operation idempotent under React
+  move-style reconciliation (remove + re-add in one batch leaves state
+  untouched).
+
+  Reproduced and pinned by ``tests/e2e/test_paginated_bleedthrough.py``
+  (synthetic 3-slide fixture, fast) and
+  ``tests/e2e/test_paginated_bleedthrough_fc.py`` (real-world deck —
+  auto-skipped on machines that don't have the FC project at the fixed
+  Dropbox path).  Pre-fix the FC test reported bleed on 8 of 9 slides;
+  post-fix it reports zero.
+
+### Added
+- ``test_js_observer_clears_marker_state_on_removal`` in
+  ``tests/test_marker_runtime.py`` — asserts ``clearMarker`` is wired
+  into the batch handler and reverses every state change.
+
+### Notes
+- No public Python API change.  The 0.6.26 surgical mutation handling
+  is preserved, the 0.6.21–0.6.24 attribute-strip-recovery invariants
+  remain exercised by ``test_marker_observer_regression.py``, and the
+  cache-build freeze regression test still passes.
+
 ## [0.6.26] — 2026-05-12
 
 ### Fixed

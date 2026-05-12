@@ -61,6 +61,26 @@
     'md-big':      'stx-md-big'
   };
 
+  // For each kind, the list of *inline* CSS properties applyMarker writes
+  // via setInlineImportant.  clearMarker removes exactly these props (and
+  // only these) when the corresponding marker is detached from the DOM,
+  // so we never accidentally strip a user's own inline style on a reused
+  // stVerticalBlock.  Kinds not listed here (block / list / md-big) only
+  // carry a class on the parent and need no inline-style cleanup.
+  var INLINE_PROPS_BY_KIND = {
+    'grid':       ['display', 'grid-template-columns', 'gap', 'align-items'],
+    'span':       ['display', 'flex-direction', 'white-space'],
+    'list-item':  ['display', 'flex-direction', 'align-items', 'gap'],
+    'zoom':       ['zoom']
+  };
+
+  function cssEscapeUid(uid) {
+    if (hostWin.CSS && hostWin.CSS.escape) return hostWin.CSS.escape(uid);
+    // Defensive fallback — streamtex generate_key() produces safe ids
+    // (kind-digits) so the regex covers everything we ever pass.
+    return String(uid).replace(/[^A-Za-z0-9_-]/g, '\\$&');
+  }
+
   // Idempotent inline-style setter: only writes if the existing
   // (value, priority) tuple does not already match — this avoids triggering
   // MutationObserver fires for no-op writes, which is what stops the
@@ -160,6 +180,61 @@
     hideMarkerCell(markerSpan);
   }
 
+  // When a marker span is detached from the DOM (e.g. Streamlit unmounts
+  // the slide it belonged to during paginated navigation), the parent
+  // stVerticalBlock — if React preserved it for some other reason — keeps
+  // the class, the kind-prefixed uid attribute, the CSS custom properties
+  // and the inline layout styles applyMarker wrote on it.  When a new
+  // slide is then rendered that REUSES the same DOM node for a different
+  // construct, those stale styles bleed through.  clearMarker reverses
+  // applyMarker for a single removed marker, guarded by a "is there
+  // really no marker left on that parent?" check so a marker that was
+  // moved (removed + re-added in the same batch) is left alone.
+  function clearMarker(removedSpan) {
+    if (!removedSpan || !removedSpan.getAttribute) return;
+    var kind = removedSpan.getAttribute('data-stx-kind');
+    var uid  = removedSpan.getAttribute('data-stx-uid');
+    if (!kind || !uid) return;
+    var cls = KIND_TO_CLASS[kind];
+    if (!cls) return;
+    var uidAttr = 'data-stx-' + kind + '-uid';
+    var sel = '[' + uidAttr + '="' + cssEscapeUid(uid) + '"]';
+    var parent = hostDoc.querySelector(sel);
+    if (!parent) return;
+    // If a marker with the same uid is still attached anywhere inside the
+    // parent, the "removal" was actually a re-render — leave the parent
+    // state untouched and let the freshly-added marker re-apply.
+    var still = parent.querySelector(
+      'span.stx-marker[data-stx-uid="' + cssEscapeUid(uid) + '"]'
+    );
+    if (still) return;
+    // Strip the class.
+    if (parent.classList.contains(cls)) parent.classList.remove(cls);
+    // Strip the list-item boolean modifier if present (we only set it
+    // for list-item kind but stripping unconditionally is cheap and safe).
+    if (parent.classList.contains('stx-list-item--ordered')) {
+      parent.classList.remove('stx-list-item--ordered');
+    }
+    // Strip the kind-prefixed uid attribute.
+    if (parent.hasAttribute(uidAttr)) parent.removeAttribute(uidAttr);
+    // Strip every CSS custom property we forwarded from data-stx-* attrs.
+    var attrs = removedSpan.attributes;
+    if (attrs) {
+      for (var i = 0; i < attrs.length; i++) {
+        var a = attrs[i];
+        if (a.name === 'data-stx-kind' || a.name === 'data-stx-uid') continue;
+        if (a.name.indexOf('data-stx-') !== 0) continue;
+        var cssVar = '--' + a.name.slice('data-'.length);
+        parent.style.removeProperty(cssVar);
+      }
+    }
+    // Strip the inline layout properties applyMarker set.
+    var props = INLINE_PROPS_BY_KIND[kind] || [];
+    for (var j = 0; j < props.length; j++) {
+      parent.style.removeProperty(props[j]);
+    }
+  }
+
   function scanAll(root) {
     // Full-document marker walk.  Used only for the initial bootstrap
     // pass (covers everything already in the DOM at script start) — the
@@ -198,7 +273,12 @@
   function handleBatch(batch) {
     var addedMarkers = (typeof Set === 'function') ? new Set() : null;
     var dirtyParents = (typeof Set === 'function') ? new Set() : null;
-    // Fallback for engines without Set: dedupe via Array.indexOf.
+    // removedMarkers must be an *Array* (preserve insertion order) so
+    // clearMarker sees the same span twice only when it really was
+    // removed twice — using a Set keyed by node identity would still
+    // be correct, but order matters for the "moved" / re-added test
+    // below.
+    var removedMarkers = [];
     var addedArr = addedMarkers ? null : [];
     var dirtyArr = dirtyParents ? null : [];
 
@@ -226,6 +306,25 @@
             for (var k = 0; k < sub.length; k++) pushMarker(sub[k]);
           }
         }
+        var removed = rec.removedNodes;
+        for (var rj = 0; rj < removed.length; rj++) {
+          var rn = removed[rj];
+          if (!rn || rn.nodeType !== 1) continue;
+          // Caveat: ``rn.matches`` exists even on detached subtrees but
+          // ``rn.querySelectorAll`` only finds elements that were part
+          // of the removed subtree at the time of detachment.  Both
+          // suffice for clearMarker because it reads the data attributes
+          // directly on the removed span.
+          if (rn.matches && rn.matches('span.stx-marker')) {
+            removedMarkers.push(rn);
+          }
+          if (rn.querySelectorAll) {
+            var rsub = rn.querySelectorAll('span.stx-marker');
+            for (var rk = 0; rk < rsub.length; rk++) {
+              removedMarkers.push(rsub[rk]);
+            }
+          }
+        }
       } else if (rec.type === 'attributes') {
         var t = rec.target;
         if (t && t.nodeType === 1 && t.matches && t.matches(PARENT_SEL)) {
@@ -251,6 +350,12 @@
     } else {
       for (var i = 0; i < addedArr.length; i++) processMarker(addedArr[i]);
       for (var i = 0; i < dirtyArr.length; i++) processParent(dirtyArr[i]);
+    }
+    // Process removals AFTER additions so a "moved" marker (removed
+    // then re-added in the same batch) has its new instance in the DOM
+    // when clearMarker's ``still attached?`` guard runs.
+    for (var r = 0; r < removedMarkers.length; r++) {
+      clearMarker(removedMarkers[r]);
     }
   }
 

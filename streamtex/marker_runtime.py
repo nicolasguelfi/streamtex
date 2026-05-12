@@ -18,14 +18,28 @@ Injection strategy
 The CSS goes through ``st.html`` (renders inline in the host page, no iframe).
 
 The JavaScript goes through ``streamlit.components.v1.html(..., height=0)``
-(0-pixel iframe).  Empirically, Streamlit 1.54.0 silently strips ``<script>``
-tags from ``st.html()`` payloads **even when** ``unsafe_allow_javascript=True``
-is set (the parameter exists in the Python API but the frontend in 1.54 does
-not honor it yet).  ``components.v1.html`` is deprecated in 1.56 but is the
-only reliable way to execute injected JavaScript in 1.54+.  The observer is
-written to reach back into ``window.parent.document`` so it operates on the
-host DOM despite living in an iframe.  Same pattern as
-:mod:`streamtex.marker` and :mod:`streamtex.bib_preview`.
+(0-pixel iframe).  ``components.v1.html`` is **officially deprecated in
+Streamlit 1.56** (with ``st.html`` named as the replacement), but the
+recommended replacement does not actually execute injected JavaScript:
+
+* ``st.html("<script>…</script>", unsafe_allow_javascript=True)`` — script
+  stripped by DOMPurify, ``window.*`` flags never set.
+* ``st.html('<svg onload=…/>', unsafe_allow_javascript=True)`` — handler
+  not fired.
+* ``st.html('<img onerror=…>', unsafe_allow_javascript=True)`` — handler
+  not fired.
+
+Verified on Streamlit 1.57.0 (2026-05-12); also affects 1.54 through 1.57.
+The ``unsafe_allow_javascript`` Python parameter exists since 1.52 and is
+forwarded on the proto, but the frontend does not honor it in any released
+version.  See ``documentation/maintenance/components.v1_issue/`` for the
+reproducer and the migration plan when (or if) the flag is honored upstream.
+
+The observer is therefore written to reach back into
+``window.parent.document`` so it operates on the host DOM despite living
+in an iframe.  Same pattern as :mod:`streamtex.marker` and
+:mod:`streamtex.bib_preview` (both pre-existing uses of
+``components.v1.html`` in the codebase).
 """
 from __future__ import annotations
 
@@ -60,7 +74,8 @@ def inject_marker_runtime() -> None:
     re-emission within a session, and the JavaScript itself is guarded by
     ``window.parent.__stxMarkerObs``.
 
-    Two separate Streamlit calls (see the module docstring for why):
+    Two separate Streamlit calls (see the module docstring for why
+    ``components.v1.html`` is used despite being deprecated):
 
     * ``st.html("<style>…</style>")`` — inline CSS in the host page.
     * ``components.v1.html("<script>…</script>", height=0)`` — JS in a

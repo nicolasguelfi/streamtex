@@ -1,32 +1,29 @@
-/* StreamTeX marker observer — replaces per-instance :has() selectors.
+/* StreamTeX marker observer — single-source-of-truth per-kind specs.
  *
- * This script is injected via `streamlit.components.v1.html(..., height=0)`,
- * which means it runs inside a 0-pixel iframe.  All DOM operations must
- * therefore target the *parent* document (the actual Streamlit app page)
- * via `window.parent.document` — the iframe's own document is empty.
- *
- * Why components.v1.html instead of st.iframe (deprecated → removed
- * 2026-06-01):  st.iframe is a regular Streamlit element that Streamlit's
- * reconciliation can remove/recreate across reruns, destroying the
- * MutationObserver.  components.v1.html is treated as a custom component
- * whose iframe persists across reruns.  See
- * documentation/maintenance/components.v1_issue/ for the investigation
- * (0.6.19/0.6.20 failed attempts at switching this specific call site).
+ * Injected as a Streamlit components.v2 component with
+ * isolate_styles=False, so the script runs INLINE in the host page (no
+ * iframe).  In that mode `window.parent === window`, but we keep the
+ * `hostWin/hostDoc` indirection for compatibility with the legacy
+ * components.v1.html deployment (which ran the script inside a
+ * 0-pixel iframe and reached the host page via `window.parent`).
  *
  * When a sentinel <span class="stx-marker" data-stx-kind="..."
  *   data-stx-uid="..." data-stx-*="..." style="display:none"></span>
- * appears anywhere in the parent Streamlit page, this observer:
- *   1. Walks up to the nearest [data-testid="stVerticalBlock"] ancestor.
- *   2. Adds a class (e.g. `stx-block`, `stx-grid`, `stx-list-item`) on that
- *      ancestor based on `data-stx-kind`.
- *   3. Copies every other `data-stx-*` attribute onto the ancestor as a CSS
- *      custom property (`--stx-foo-bar`), so the global stylesheet can read
- *      parameter values without per-instance CSS injection.
- *   4. Tags the marker's .element-container with class `stx-marker-cell`
- *      so the global stylesheet can hide it.
- *   5. Sets a kind-prefixed UID attribute (`data-stx-{kind}-uid`) on the
- *      ancestor so per-instance stylesheets (`[data-stx-block-uid="…"]`,
- *      `[data-stx-list-item-uid="…"]`, …) can target it.
+ * appears anywhere in the parent Streamlit page, this observer applies
+ * the spec for that kind to the nearest [data-testid="stVerticalBlock"]
+ * ancestor.  Each spec declares:
+ *
+ *     cls               : the class to add (always present)
+ *     inlineStyles(span): map of inline CSS props to set with !important
+ *     booleanModifiers  : { dataAttrName: modifierClass } — class added
+ *                         when the marker has the attribute
+ *
+ * applyMarker WRITES from the spec.  clearMarker READS the SAME spec to
+ * undo every write when the marker is detached.  Adding a new kind, or
+ * a new inline property on an existing kind, only requires editing
+ * KIND_SPECS — both code paths consume it identically, so drift between
+ * them is impossible by construction.  This invariant is what guarantees
+ * the 0.6.27 paginated bleed-through fix can't silently regress.
  *
  * This entire system is the marker-runtime replacement for the legacy
  * `div[data-testid="stVerticalBlock"]:has(> .element-container .stHtml span.{uid})`
@@ -35,10 +32,11 @@
 (function () {
   'use strict';
 
-  // We live inside a Streamlit components iframe.  Reach back to the parent
-  // window/document for all real DOM operations.  Same pattern as
-  // streamtex/marker.py and streamtex/bib_preview.py.
-  var hostWin = window.parent;
+  // Host DOM access.  Under components.v2 + isolate_styles=False the script
+  // is inline so `window.parent === window`; under the legacy v1 iframe
+  // `window.parent` is the host page.  Both forms resolve to the same
+  // hostWin/hostDoc here.
+  var hostWin = window.parent || window;
   if (!hostWin) return;
   var hostDoc = hostWin.document;
   if (!hostDoc || !hostDoc.body) return;
@@ -51,27 +49,75 @@
   // `stElementContainer` and exposes it via `data-testid="stElementContainer"`.
   // Match both so we can find the marker's own cell across versions.
   var EC_SEL = '[data-testid="stElementContainer"], .element-container';
-  var KIND_TO_CLASS = {
-    'block':       'stx-block',
-    'span':        'stx-span',
-    'grid':        'stx-grid',
-    'list':        'stx-list',
-    'list-item':   'stx-list-item',
-    'zoom':        'stx-zoom',
-    'md-big':      'stx-md-big'
-  };
 
-  // For each kind, the list of *inline* CSS properties applyMarker writes
-  // via setInlineImportant.  clearMarker removes exactly these props (and
-  // only these) when the corresponding marker is detached from the DOM,
-  // so we never accidentally strip a user's own inline style on a reused
-  // stVerticalBlock.  Kinds not listed here (block / list / md-big) only
-  // carry a class on the parent and need no inline-style cleanup.
-  var INLINE_PROPS_BY_KIND = {
-    'grid':       ['display', 'grid-template-columns', 'gap', 'align-items'],
-    'span':       ['display', 'flex-direction', 'white-space'],
-    'list-item':  ['display', 'flex-direction', 'align-items', 'gap'],
-    'zoom':       ['zoom']
+  // -------------------------------------------------------------------------
+  // KIND_SPECS — single source of truth for per-kind marker behavior.
+  //
+  // Both applyMarker (DOM additions) and clearMarker (DOM removals) consume
+  // entries from this table.  Because the additive and retractive code paths
+  // share the same declarations, an inline property written by applyMarker
+  // cannot silently slip past clearMarker — the cause of the paginated
+  // bleed-through bug fixed in 0.6.27.
+  //
+  // Schema:
+  //   cls               (string, required)
+  //       Class added to the marker's stVerticalBlock ancestor.
+  //   inlineStyles      (function(span) -> { prop: value }, optional)
+  //       CSS properties applyMarker sets on the ancestor with !important.
+  //       clearMarker calls the same function on the detached span and
+  //       uses only the returned KEYS to strip — the values may be
+  //       degenerate when attributes are no longer readable, but the keys
+  //       are always the same set.
+  //   booleanModifiers  ({ attrName: modifierClass }, optional)
+  //       For every attrName present on the marker span, applyMarker adds
+  //       modifierClass to the ancestor.  clearMarker removes every listed
+  //       modifierClass unconditionally (applyMarker only adds, so an
+  //       unconditional symmetric removal is correct).
+  //
+  // Adding a new kind: append one entry below.  No other change required.
+  var KIND_SPECS = {
+    'block':     { cls: 'stx-block' },
+    'span':      {
+      cls: 'stx-span',
+      inlineStyles: function () {
+        return {
+          'display': 'flex',
+          'flex-direction': 'row',
+          'white-space': 'pre'
+        };
+      }
+    },
+    'grid':      {
+      cls: 'stx-grid',
+      inlineStyles: function (span) {
+        return {
+          'display': 'grid',
+          'grid-template-columns': span.getAttribute('data-stx-grid-template') || '1fr',
+          'gap': span.getAttribute('data-stx-grid-gap') || '0',
+          'align-items': 'stretch'
+        };
+      }
+    },
+    'list':      { cls: 'stx-list' },
+    'list-item': {
+      cls: 'stx-list-item',
+      inlineStyles: function () {
+        return {
+          'display': 'flex',
+          'flex-direction': 'row',
+          'align-items': 'baseline',
+          'gap': '0.5rem'
+        };
+      },
+      booleanModifiers: { 'data-stx-ordered': 'stx-list-item--ordered' }
+    },
+    'zoom':      {
+      cls: 'stx-zoom',
+      inlineStyles: function (span) {
+        return { 'zoom': span.getAttribute('data-stx-zoom-factor') || '1' };
+      }
+    },
+    'md-big':    { cls: 'stx-md-big' }
   };
 
   function cssEscapeUid(uid) {
@@ -102,26 +148,11 @@
     setInlineImportant(ec, 'display', 'none');
   }
 
-  function applyMarker(markerSpan) {
-    // Fully idempotent: every write is guarded by a read so re-running
-    // applyMarker on an already-applied marker fires no mutations.  This is
-    // essential because the MutationObserver watches attribute changes
-    // (Streamlit's reconciliation strips our class/uid/style on rerun),
-    // and a non-idempotent applyMarker would loop on itself indefinitely.
-    var kind = markerSpan.getAttribute('data-stx-kind');
-    var cls = KIND_TO_CLASS[kind];
-    if (!cls) return;
-
-    var parent = markerSpan.closest(PARENT_SEL);
-    if (!parent) return;
-
-    // 1. Kind class.
-    if (!parent.classList.contains(cls)) {
-      parent.classList.add(cls);
-    }
-
-    // 2. Forward data-stx-* attributes (except `kind`) as CSS custom
-    //    properties.  Naming: `data-stx-foo-bar="x"` → `--stx-foo-bar: x;`.
+  function forwardCustomProps(markerSpan, parent) {
+    // Forward every data-stx-* attribute (except `kind`) onto the parent
+    // as a CSS custom property: `data-stx-foo-bar="x"` -> `--stx-foo-bar: x;`.
+    // Per-instance stylesheets can then read the values without per-instance
+    // CSS injection.
     var attrs = markerSpan.attributes;
     for (var i = 0; i < attrs.length; i++) {
       var a = attrs[i];
@@ -132,34 +163,42 @@
         parent.style.setProperty(cssVar, a.value);
       }
     }
+  }
 
-    // 3. Kind-specific INLINE style overrides — set directly on the element
-    //    with !important so they beat Streamlit's own inline `display: flex`
-    //    (applied on every stVerticalBlock since 1.56).  This makes the
-    //    layout independent of the CSS cascade.
-    if (kind === 'grid') {
-      var tpl = markerSpan.getAttribute('data-stx-grid-template') || '1fr';
-      var g   = markerSpan.getAttribute('data-stx-grid-gap') || '0';
-      setInlineImportant(parent, 'display', 'grid');
-      setInlineImportant(parent, 'grid-template-columns', tpl);
-      setInlineImportant(parent, 'gap', g);
-      setInlineImportant(parent, 'align-items', 'stretch');
-    } else if (kind === 'span') {
-      setInlineImportant(parent, 'display', 'flex');
-      setInlineImportant(parent, 'flex-direction', 'row');
-      setInlineImportant(parent, 'white-space', 'pre');
-    } else if (kind === 'list-item') {
-      setInlineImportant(parent, 'display', 'flex');
-      setInlineImportant(parent, 'flex-direction', 'row');
-      setInlineImportant(parent, 'align-items', 'baseline');
-      setInlineImportant(parent, 'gap', '0.5rem');
-    } else if (kind === 'zoom') {
-      var z = markerSpan.getAttribute('data-stx-zoom-factor') || '1';
-      setInlineImportant(parent, 'zoom', z);
+  function applyMarker(markerSpan) {
+    // Fully idempotent: every write is guarded by a read so re-running
+    // applyMarker on an already-applied marker fires no mutations.  This is
+    // essential because the MutationObserver watches attribute changes
+    // (Streamlit's reconciliation strips our class/uid/style on rerun),
+    // and a non-idempotent applyMarker would loop on itself indefinitely.
+    var kind = markerSpan.getAttribute('data-stx-kind');
+    var spec = KIND_SPECS[kind];
+    if (!spec) return;
+
+    var parent = markerSpan.closest(PARENT_SEL);
+    if (!parent) return;
+
+    // 1. Kind class.
+    if (!parent.classList.contains(spec.cls)) {
+      parent.classList.add(spec.cls);
     }
 
-    // 4. Per-instance kind-prefixed uid attribute (the per-instance
-    //    stylesheet selectors target `[data-stx-{kind}-uid="…"]`).
+    // 2. Forward data-stx-* attrs as CSS custom properties on the parent.
+    forwardCustomProps(markerSpan, parent);
+
+    // 3. Kind-specific inline styles — declared once in KIND_SPECS so the
+    //    write site here and the strip site in clearMarker stay in lockstep.
+    if (spec.inlineStyles) {
+      var styles = spec.inlineStyles(markerSpan);
+      for (var p in styles) {
+        if (Object.prototype.hasOwnProperty.call(styles, p)) {
+          setInlineImportant(parent, p, styles[p]);
+        }
+      }
+    }
+
+    // 4. Per-instance kind-prefixed uid attribute (per-instance stylesheet
+    //    selectors target `[data-stx-{kind}-uid="…"]`).
     var uid = markerSpan.getAttribute('data-stx-uid');
     if (uid) {
       var uidAttr = 'data-stx-' + kind + '-uid';
@@ -168,10 +207,17 @@
       }
     }
 
-    // 5. Boolean modifiers (presence-only attributes like data-stx-ordered).
-    if (markerSpan.hasAttribute('data-stx-ordered')) {
-      if (!parent.classList.contains('stx-list-item--ordered')) {
-        parent.classList.add('stx-list-item--ordered');
+    // 5. Boolean modifiers (presence-only data attribute -> modifier class),
+    //    also declared in KIND_SPECS so clearMarker can find them.
+    if (spec.booleanModifiers) {
+      for (var attrName in spec.booleanModifiers) {
+        if (!Object.prototype.hasOwnProperty.call(spec.booleanModifiers, attrName)) continue;
+        var modCls = spec.booleanModifiers[attrName];
+        if (markerSpan.hasAttribute(attrName)) {
+          if (!parent.classList.contains(modCls)) {
+            parent.classList.add(modCls);
+          }
+        }
       }
     }
 
@@ -186,17 +232,20 @@
   // the class, the kind-prefixed uid attribute, the CSS custom properties
   // and the inline layout styles applyMarker wrote on it.  When a new
   // slide is then rendered that REUSES the same DOM node for a different
-  // construct, those stale styles bleed through.  clearMarker reverses
-  // applyMarker for a single removed marker, guarded by a "is there
-  // really no marker left on that parent?" check so a marker that was
-  // moved (removed + re-added in the same batch) is left alone.
+  // construct, those stale styles bleed through.
+  //
+  // clearMarker reverses applyMarker by reading the SAME KIND_SPECS entry
+  // applyMarker consumed — so the two stay in lockstep by construction.
+  // A "marker with same uid still attached?" guard makes the operation
+  // safe under React move-style reconciliation (a detach + re-attach in
+  // the same batch leaves the parent state untouched).
   function clearMarker(removedSpan) {
     if (!removedSpan || !removedSpan.getAttribute) return;
     var kind = removedSpan.getAttribute('data-stx-kind');
     var uid  = removedSpan.getAttribute('data-stx-uid');
     if (!kind || !uid) return;
-    var cls = KIND_TO_CLASS[kind];
-    if (!cls) return;
+    var spec = KIND_SPECS[kind];
+    if (!spec) return;
     var uidAttr = 'data-stx-' + kind + '-uid';
     var sel = '[' + uidAttr + '="' + cssEscapeUid(uid) + '"]';
     var parent = hostDoc.querySelector(sel);
@@ -208,16 +257,29 @@
       'span.stx-marker[data-stx-uid="' + cssEscapeUid(uid) + '"]'
     );
     if (still) return;
-    // Strip the class.
-    if (parent.classList.contains(cls)) parent.classList.remove(cls);
-    // Strip the list-item boolean modifier if present (we only set it
-    // for list-item kind but stripping unconditionally is cheap and safe).
-    if (parent.classList.contains('stx-list-item--ordered')) {
-      parent.classList.remove('stx-list-item--ordered');
+
+    // 1. Strip the kind class.
+    if (parent.classList.contains(spec.cls)) {
+      parent.classList.remove(spec.cls);
     }
-    // Strip the kind-prefixed uid attribute.
+
+    // 2. Strip every boolean-modifier class declared for this kind.
+    //    applyMarker only adds modifiers (never removes), so unconditional
+    //    removal here is the symmetric undo.
+    if (spec.booleanModifiers) {
+      for (var modAttr in spec.booleanModifiers) {
+        if (!Object.prototype.hasOwnProperty.call(spec.booleanModifiers, modAttr)) continue;
+        var modCls = spec.booleanModifiers[modAttr];
+        if (parent.classList.contains(modCls)) {
+          parent.classList.remove(modCls);
+        }
+      }
+    }
+
+    // 3. Strip the kind-prefixed uid attribute.
     if (parent.hasAttribute(uidAttr)) parent.removeAttribute(uidAttr);
-    // Strip every CSS custom property we forwarded from data-stx-* attrs.
+
+    // 4. Strip every CSS custom property we forwarded from data-stx-* attrs.
     var attrs = removedSpan.attributes;
     if (attrs) {
       for (var i = 0; i < attrs.length; i++) {
@@ -228,10 +290,19 @@
         parent.style.removeProperty(cssVar);
       }
     }
-    // Strip the inline layout properties applyMarker set.
-    var props = INLINE_PROPS_BY_KIND[kind] || [];
-    for (var j = 0; j < props.length; j++) {
-      parent.style.removeProperty(props[j]);
+
+    // 5. Strip the inline layout properties.  We discover the property
+    //    KEYS by calling the SAME spec.inlineStyles applyMarker called;
+    //    the returned values are unused here — only the keys matter.
+    //    Driving both code paths from the one function is what makes
+    //    drift impossible.
+    if (spec.inlineStyles) {
+      var styles = spec.inlineStyles(removedSpan);
+      for (var p in styles) {
+        if (Object.prototype.hasOwnProperty.call(styles, p)) {
+          parent.style.removeProperty(p);
+        }
+      }
     }
   }
 
@@ -253,16 +324,21 @@
   // Surgical mutation handling — each batch of MutationRecords is
   // processed by acting only on what changed:
   //
-  //   - childList.addedNodes: extract any span.stx-marker (the node itself
-  //     or descendants of an added subtree) and apply it.
+  //   - childList.addedNodes:   any span.stx-marker (the node itself or a
+  //                             descendant of an added subtree) is applied.
+  //   - childList.removedNodes: any detached span.stx-marker is run through
+  //                             clearMarker (AFTER additions so a re-added
+  //                             marker's "still attached?" guard sees the
+  //                             new instance).
   //   - attributes on a stVerticalBlock parent: Streamlit reconciliation
-  //     may have stripped our class/uid/style.  Find the marker inside
-  //     that parent and re-apply.
+  //                             may have stripped our class/uid/style.
+  //                             Find the marker inside that parent and
+  //                             re-apply.
   //
   // We dedupe targets via Sets so a single batch with many mutations on
   // the same parent triggers at most one applyMarker per parent.  This
-  // is what bounds the per-batch cost to O(unique_targets) instead of
-  // the previous O(all_markers × batches) full-document scans.
+  // bounds the per-batch cost to O(unique_targets) instead of the
+  // previous O(all_markers × batches) full-document scans.
   //
   // applyMarker is fully idempotent (no-op when state already matches),
   // so re-running it on a parent that is already in the correct state
@@ -273,11 +349,9 @@
   function handleBatch(batch) {
     var addedMarkers = (typeof Set === 'function') ? new Set() : null;
     var dirtyParents = (typeof Set === 'function') ? new Set() : null;
-    // removedMarkers must be an *Array* (preserve insertion order) so
-    // clearMarker sees the same span twice only when it really was
-    // removed twice — using a Set keyed by node identity would still
-    // be correct, but order matters for the "moved" / re-added test
-    // below.
+    // removedMarkers must be an *Array* (preserve insertion order) so a
+    // moved marker that is removed then re-added in the same batch keeps
+    // the natural ordering for the "still attached?" check.
     var removedMarkers = [];
     var addedArr = addedMarkers ? null : [];
     var dirtyArr = dirtyParents ? null : [];
@@ -348,8 +422,8 @@
       addedMarkers.forEach(processMarker);
       dirtyParents.forEach(processParent);
     } else {
-      for (var i = 0; i < addedArr.length; i++) processMarker(addedArr[i]);
-      for (var i = 0; i < dirtyArr.length; i++) processParent(dirtyArr[i]);
+      for (var ai = 0; ai < addedArr.length; ai++) processMarker(addedArr[ai]);
+      for (var pi = 0; pi < dirtyArr.length; pi++) processParent(dirtyArr[pi]);
     }
     // Process removals AFTER additions so a "moved" marker (removed
     // then re-added in the same batch) has its new instance in the DOM
@@ -404,6 +478,7 @@
     ]
   });
 
-  // Keep a reference on the parent window so we can introspect from devtools.
+  // Keep references on the parent window for devtools introspection.
   hostWin.__stxMarkerObsHandle = obs;
+  hostWin.__stxMarkerSpecs = KIND_SPECS;
 })();

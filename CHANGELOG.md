@@ -40,10 +40,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Dropbox path).  Pre-fix the FC test reported bleed on 8 of 9 slides;
   post-fix it reports zero.
 
+### Changed
+- **Marker observer refactored around a ``KIND_SPECS`` single source of
+  truth.**  Previously, per-kind behavior was scattered in three places
+  inside ``stx_marker_observer.js``: ``KIND_TO_CLASS`` (class to add),
+  ``INLINE_PROPS_BY_KIND`` (props to strip), and inline ``if (kind ===
+  '…') { setInlineImportant(parent, '…', …) }`` branches in
+  ``applyMarker`` (props to write).  Three lists to keep synchronised
+  meant three drift opportunities — exactly the kind of fragility that
+  introduced the bleed-through bug above.
+
+  The refactor lifts all three into a single per-kind ``KIND_SPECS``
+  table declaring ``{ cls, inlineStyles(span), booleanModifiers }``.
+  ``applyMarker`` writes from the spec; ``clearMarker`` reads the SAME
+  spec to discover which property KEYS to strip.  Adding a new kind, or
+  a new inline property on an existing kind, only requires editing the
+  spec entry — both code paths pick it up automatically, so drift is
+  impossible by construction.
+
+  Two contract tests pin the design:
+  - ``test_js_observer_uses_kind_specs_single_source_of_truth`` — the
+    spec table exists, has every known kind, and both ``spec.cls`` /
+    ``spec.inlineStyles`` / ``spec.booleanModifiers`` appear in the
+    consumer code.
+  - ``test_js_apply_marker_writes_no_inline_style_outside_spec`` —
+    scans for ``setInlineImportant(parent, '<literal>', …)`` calls and
+    asserts there are zero.  A future refactor that bypasses the spec
+    fails this check immediately rather than introducing a silent
+    bleed-through regression.
+
+  No public Python API change; no runtime behavior change (the
+  ``test_paginated_bleedthrough_fc.py`` e2e still reports 0/9 bleeds).
+
 ### Added
 - ``test_js_observer_clears_marker_state_on_removal`` in
   ``tests/test_marker_runtime.py`` — asserts ``clearMarker`` is wired
   into the batch handler and reverses every state change.
+- ``test_js_observer_uses_kind_specs_single_source_of_truth`` and
+  ``test_js_apply_marker_writes_no_inline_style_outside_spec`` — the
+  two contract tests described above.
 
 ### Notes
 - No public Python API change.  The 0.6.26 surgical mutation handling

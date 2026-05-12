@@ -7,6 +7,7 @@ Validates that:
 """
 from __future__ import annotations
 
+import re
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -200,13 +201,62 @@ class TestStaticAssets:
         assert "function clearMarker(" in js
         # clearMarker must reverse every state change applyMarker writes
         # — guard each removal site so a future refactor doesn't silently
-        # leave one of them out.
-        assert "parent.classList.remove(cls)" in js
+        # leave one of them out.  Since the KIND_SPECS refactor the class
+        # comes from ``spec.cls`` and the inline-style key is iterated
+        # from ``spec.inlineStyles`` (var ``p``).
+        assert "parent.classList.remove(spec.cls)" in js
         assert "parent.removeAttribute(uidAttr)" in js
-        assert "parent.style.removeProperty(props[j])" in js
+        assert "parent.style.removeProperty(p)" in js
         # And it must be wired into the mutation pipeline through
         # ``rec.removedNodes`` from childList records.
         assert "rec.removedNodes" in js
+
+    def test_js_observer_uses_kind_specs_single_source_of_truth(self):
+        """All per-kind marker behavior must live in a single KIND_SPECS
+        table that BOTH applyMarker and clearMarker consume — that's how
+        we make it structurally impossible for an inline property written
+        by applyMarker to be missed by clearMarker (the cause of the
+        paginated bleed-through bug fixed in 0.6.27).
+        """
+        js = _JS_PATH.read_text(encoding="utf-8")
+        # The spec table itself.
+        assert "var KIND_SPECS" in js
+        # Every kind handled by the observer must have an entry.
+        for kind in ("block", "span", "grid", "list", "list-item", "zoom", "md-big"):
+            assert f"'{kind}':" in js, f"missing kind {kind!r} in KIND_SPECS"
+        # Both code paths read from the same spec entry.
+        assert "spec.inlineStyles" in js
+        assert "spec.cls" in js
+        # Boolean modifiers are also part of the spec so clearMarker
+        # can strip them symmetrically.
+        assert "spec.booleanModifiers" in js
+
+    def test_js_apply_marker_writes_no_inline_style_outside_spec(self):
+        """applyMarker MUST NOT write inline styles to ``parent`` with a
+        literal property name — those writes bypass KIND_SPECS and
+        would silently desync clearMarker.  The legitimate code path is
+        ``setInlineImportant(parent, p, styles[p])`` where ``p`` is
+        iterated from spec.inlineStyles.  A literal property name (a
+        string immediately after ``parent,``) is the forbidden pattern;
+        this guard is what stops the 0.6.27 bleed-through fix from
+        regressing on a future refactor.
+
+        ``hideMarkerCell`` writes inline ``display: none`` on the
+        marker's element-container (``ec``), not on the marker's parent
+        stVerticalBlock — that's allowed and outside this contract.
+        """
+        js = _JS_PATH.read_text(encoding="utf-8")
+        bypasses = re.findall(
+            r"setInlineImportant\s*\(\s*parent\s*,\s*['\"]",
+            js,
+        )
+        assert not bypasses, (
+            f"Found {len(bypasses)} inline-style write(s) to `parent` "
+            "with a literal property name — those bypass the "
+            "KIND_SPECS-driven loop.  All per-kind inline styles MUST "
+            "be declared in KIND_SPECS[kind].inlineStyles so clearMarker "
+            "can strip them on detach."
+        )
 
     def test_css_hides_marker_cells(self):
         css = _CSS_PATH.read_text(encoding="utf-8")

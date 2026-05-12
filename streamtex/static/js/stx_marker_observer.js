@@ -1,9 +1,17 @@
 /* StreamTeX marker observer — replaces per-instance :has() selectors.
  *
- * This script is injected via `st.iframe(..., height=1)`, which means it
- * runs inside a 1-pixel iframe.  All DOM operations must therefore target
- * the *parent* document (the actual Streamlit app page) via
- * `window.parent.document` — the iframe's own document is empty.
+ * This script is injected via `streamlit.components.v1.html(..., height=0)`,
+ * which means it runs inside a 0-pixel iframe.  All DOM operations must
+ * therefore target the *parent* document (the actual Streamlit app page)
+ * via `window.parent.document` — the iframe's own document is empty.
+ *
+ * Why components.v1.html instead of st.iframe (deprecated → removed
+ * 2026-06-01):  st.iframe is a regular Streamlit element that Streamlit's
+ * reconciliation can remove/recreate across reruns, destroying the
+ * MutationObserver.  components.v1.html is treated as a custom component
+ * whose iframe persists across reruns.  See
+ * documentation/maintenance/components.v1_issue/ for the investigation
+ * (0.6.19/0.6.20 failed attempts at switching this specific call site).
  *
  * When a sentinel <span class="stx-marker" data-stx-kind="..."
  *   data-stx-uid="..." data-stx-*="..." style="display:none"></span>

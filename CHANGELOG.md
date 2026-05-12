@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.20] — 2026-05-12
+
+### Fixed
+- **Marker observer over-tagging and Chrome freeze** introduced by the 0.6.19 `st.iframe` migration of the observer iframe specifically. Symptoms on the FC presentation deck: at 0.6.19 the "Three Frameworks — At a Glance" slide had 1 grid marker un-processed (visible regression — boxes stacked vertically); at a transient never-shipped variant (disconnect-then-reinstall pattern) the same scene generated **47 `.stx-grid` classes** instead of 3 plus a Chrome cold-load freeze. Root cause not fully understood, but empirically the legacy `streamlit.components.v1.html` works reliably for this specific call site whereas `st.iframe` does not.
+
+### Changed
+- `streamtex/marker_runtime.py:inject_marker_runtime()` — reverted to `streamlit.components.v1.html(..., height=0)` for the observer JS injection only. The CSS goes via `st.html("<style>…</style>")` unchanged. The Python-side `session_state` guard is kept (so the observer iframe is emitted once per session; Streamlit treats `components.v1.html` as a persistent custom component whose iframe survives reruns and keeps the `MutationObserver` alive).
+- `streamtex/static/js/stx_marker_observer.js` — flag-only `hostWin.__stxMarkerObs` idempotency guard restored.
+- `tests/test_marker_runtime.py` — `test_js_via_st_iframe` → `test_js_via_components_html` (asserts the `components.html` call path with `height=0`).
+
+### Notes
+- **All other 0.6.19 migrations are preserved**: 17 of the 18 original `components.v1.html` call sites remain on `st.iframe`. Only the marker observer (1 site, in `marker_runtime.py`) keeps `components.v1.html`. The `cli/cache_cmd.py` monkey-patch still patches both APIs.
+- **Deprecation debt acknowledged**: `streamlit.components.v1.html` is officially deprecated since Streamlit 1.56 with announced removal after 2026-06-01. This release accepts that debt for one specific call site, deferring the root-cause analysis of why `st.iframe` breaks the marker observer specifically (while working fine for 17 other JS-injection call sites in the same release). Investigation continues under `documentation/maintenance/components.v1_issue/`.
+- `streamlit>=1.56.0` floor preserved (still required for the other 17 `st.iframe` call sites).
+
 ## [0.6.19] — 2026-05-12
 
 ### Changed

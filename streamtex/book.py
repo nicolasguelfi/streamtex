@@ -8,7 +8,6 @@ import os
 import time
 
 import streamlit as st
-import streamlit.components.v1 as components
 from streamlit.delta_generator import DeltaGenerator as Delta
 from streamlit.runtime.scriptrunner_utils.script_run_context import get_script_run_ctx
 
@@ -746,7 +745,7 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
                     st.session_state["_stx_profile_pending"] = _name
                 st.button(f"stx_prof_{_p.name}", key=f"_stx_pbtn_{_p.name}",
                           on_click=_switch_profile)
-        components.html("""<script>
+        st.iframe("""<script>
         (function(){
             var HIDE = 'position:absolute;left:-9999px;height:0;overflow:hidden;pointer-events:auto;';
             function hideProfileButtons() {
@@ -768,7 +767,7 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
                 obs.observe(sidebar, { childList: true, subtree: true });
             }
         })();
-        </script>""", height=0)
+        </script>""", height=1)
 
     if st.session_state[_STX_VIEW_MODE_KEY] == "Paginated":
         _paginated_book(module_list, toc_config, marker_config, separator,
@@ -1072,7 +1071,7 @@ def populate_toc(toc_sidebar: Delta, toc_block: Delta = None, toc_content_style:
     # Inject search JS into the dedicated placeholder (above tabs)
     if search_js_placeholder is not None and block_index is not None:
         with search_js_placeholder.container():
-            components.html(generate_search_script(block_index), height=0)
+            st.iframe(generate_search_script(block_index), height=1)
 
     if toc_block is not None:
         with toc_block.container():
@@ -1603,7 +1602,7 @@ def _build_paginated_sidebar(cache, current_page, total, toc_config, marker_conf
         if show_search and not st.session_state.get(_STX_REFRESH_SEARCH_KEY):
             search_index = cache.get("search_index")
             if search_index:
-                components.html(generate_search_script(search_index), height=0)
+                st.iframe(generate_search_script(search_index), height=1)
 
 
 def _inject_paginated_nav_js(current_page, total, marker_config,
@@ -1999,7 +1998,7 @@ def _inject_paginated_nav_js(current_page, total, marker_config,
                .replace("__LAST_NAMED_PAGE__", str(_lnp))
                .replace("__PAGE_FIRST_MARKER__", pmi_first)
                .replace("__PAGE_LAST_MARKER__", pmi_last))
-    components.html(js_body, height=0)
+    st.iframe(js_body, height=1)
 
 
 def _paginated_book(module_list, toc_config, marker_config, separator,
@@ -2200,8 +2199,8 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
         # Re-inject search JS with updated index (deferred from sidebar)
         if cache.get("search_index"):
             with st.sidebar:
-                components.html(
-                    generate_search_script(cache["search_index"]), height=0)
+                st.iframe(
+                    generate_search_script(cache["search_index"]), height=1)
 
     # Banner — bottom (next section or loop-back to first)
     if current_page < total - 1:

@@ -1,7 +1,7 @@
-"""Mermaid diagram rendering — live via components.html + HTML export as SVG.
+"""Mermaid diagram rendering — live via st.iframe + HTML export as SVG.
 
 Live rendering uses the Mermaid JS library loaded via CDN inside a
-``components.html()`` iframe.  This gives full control over the iframe
+``st.iframe()`` iframe.  This gives full control over the iframe
 background and theme, ensuring diagrams are readable in any OS/browser
 dark-mode configuration.
 
@@ -18,14 +18,14 @@ background with the Mermaid "default" (light) theme.
 from contextlib import nullcontext
 from html import escape
 
-import streamlit.components.v1 as components
+import streamlit as st
 
 from .container import st_block
 from .export import export_append, is_export_active
 from .styles import Style
 
 # ---------------------------------------------------------------------------
-# HTML template rendered inside components.html().
+# HTML template rendered inside st.iframe().
 #
 # Mermaid JS is loaded client-side from CDN — no Python dependency needed
 # for live rendering.  Placeholders use __UPPER__ markers to avoid clashes
@@ -214,7 +214,7 @@ def st_mermaid(
     )
 
     with st_block(style) if style is not None else nullcontext():
-        components.html(html, height=height, scrolling=True)
+        st.iframe(html, height=height)
 
     # --- Export rendering ---
     if is_export_active():

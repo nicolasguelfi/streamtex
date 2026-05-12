@@ -61,7 +61,7 @@ def record_if_active(html: str) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Client-side search — HTML input (st.markdown) + JS (components.html)
+# Client-side search — HTML input (st.markdown) + JS (st.iframe)
 # ---------------------------------------------------------------------------
 
 def generate_search_input_html(placeholder: str = "Search...") -> str:
@@ -76,7 +76,7 @@ def generate_search_input_html(placeholder: str = "Search...") -> str:
 
 
 def generate_search_script(block_index: dict[int, str]) -> str:
-    """Return <script> HTML for components.html() — runs in iframe, targets parent DOM.
+    """Return <script> HTML for st.iframe() — runs in iframe, targets parent DOM.
 
     Uses setInterval retry loop (up to 60s) for reliable DOM-ready detection.
     Streamlit's rehype-raw plugin is lazily loaded, so data-stx-* attributes

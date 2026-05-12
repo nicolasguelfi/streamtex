@@ -1,7 +1,7 @@
 """PlantUML diagram rendering — server-side SVG via HTTP + HTML export.
 
 Live rendering fetches SVG from a PlantUML server (public by default,
-configurable) and displays it inside a ``components.html()`` iframe with
+configurable) and displays it inside a ``st.iframe()`` iframe with
 interactive pan (click + drag) and zoom (mouse wheel) controls — same UX
 as the Mermaid renderer.
 
@@ -18,7 +18,6 @@ from contextlib import nullcontext
 from html import escape
 
 import streamlit as st
-import streamlit.components.v1 as components
 
 from .container import st_block
 from .export import export_append, is_export_active
@@ -242,7 +241,7 @@ def st_plantuml(
                 .replace("__BG__", bg)
                 .replace("__SVG__", svg)
             )
-            components.html(html, height=height, scrolling=True)
+            st.iframe(html, height=height)
         except Exception:
             st.warning(
                 "PlantUML server unreachable — showing raw source. "

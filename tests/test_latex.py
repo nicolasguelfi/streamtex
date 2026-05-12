@@ -102,49 +102,52 @@ class TestStLatexExport:
 class TestStLatexDocLive:
     """Tests for the live components.html() rendering path."""
 
-    @patch("streamtex.latex.components")
+    @patch("streamtex.latex.st.iframe")
     def test_renders_via_components_html(self, mock_components):
         """The document is rendered via components.html() using programmatic API."""
         st_latex_doc(SAMPLE_FRAGMENT)
-        mock_components.html.assert_called_once()
-        html_arg = mock_components.html.call_args[0][0]
+        mock_components.assert_called_once()
+        html_arg = mock_components.call_args[0][0]
         assert "latex.mjs" in html_arg
         assert "HtmlGenerator" in html_arg
         assert "section" in html_arg
 
-    @patch("streamtex.latex.components")
+    @patch("streamtex.latex.st.iframe")
     def test_light_bg_true_sets_white(self, mock_components):
         """When light_bg=True, background is white."""
         st_latex_doc(SAMPLE_FRAGMENT, light_bg=True)
-        html_arg = mock_components.html.call_args[0][0]
+        html_arg = mock_components.call_args[0][0]
         assert "#fff" in html_arg
 
-    @patch("streamtex.latex.components")
+    @patch("streamtex.latex.st.iframe")
     def test_light_bg_false_sets_transparent(self, mock_components):
         """When light_bg=False, background is transparent."""
         st_latex_doc(SAMPLE_FRAGMENT, light_bg=False)
-        html_arg = mock_components.html.call_args[0][0]
+        html_arg = mock_components.call_args[0][0]
         assert "transparent" in html_arg
 
-    @patch("streamtex.latex.components")
+    @patch("streamtex.latex.st.iframe")
     def test_default_height_600(self, mock_components):
         """Default height is 600 pixels."""
         st_latex_doc(SAMPLE_FRAGMENT)
-        assert mock_components.html.call_args[1]["height"] == 600
+        assert mock_components.call_args[1]["height"] == 600
 
-    @patch("streamtex.latex.components")
+    @patch("streamtex.latex.st.iframe")
     def test_custom_height(self, mock_components):
         """Height parameter is forwarded to components.html()."""
         st_latex_doc(SAMPLE_FRAGMENT, height=400)
-        assert mock_components.html.call_args[1]["height"] == 400
+        assert mock_components.call_args[1]["height"] == 400
 
-    @patch("streamtex.latex.components")
-    def test_scrolling_enabled(self, mock_components):
-        """scrolling=True is passed to components.html()."""
+    @patch("streamtex.latex.st.iframe")
+    def test_no_scrolling_kwarg(self, mock_components):
+        """st.iframe has no `scrolling` parameter — the kwarg is dropped
+        compared to the legacy components.v1.html call.  Native iframe
+        scrollbars appear automatically when content overflows the
+        configured height."""
         st_latex_doc(SAMPLE_FRAGMENT)
-        assert mock_components.html.call_args[1]["scrolling"] is True
+        assert "scrolling" not in mock_components.call_args[1]
 
-    @patch("streamtex.latex.components")
+    @patch("streamtex.latex.st.iframe")
     def test_style_wraps_in_st_block(self, mock_components):
         """When style is provided, iframe is wrapped in st_block."""
         from streamtex.styles import Style
@@ -156,73 +159,73 @@ class TestStLatexDocLive:
             st_latex_doc(SAMPLE_FRAGMENT, style=my_style)
             mock_block.assert_called_once_with(my_style)
 
-    @patch("streamtex.latex.components")
+    @patch("streamtex.latex.st.iframe")
     def test_escapes_script_tags_in_code(self, mock_components):
         """</script> in LaTeX code cannot break out of the script tag."""
         malicious = r"\section{<script>alert(1)</script>}"
         st_latex_doc(malicious)
-        html_arg = mock_components.html.call_args[0][0]
+        html_arg = mock_components.call_args[0][0]
         # Only one real </script> closing tag (the template's own)
         assert html_arg.count("</script>") == 1
         # The malicious </script> is escaped as <\/script> inside the JS string
         assert "<\\/script>" in html_arg
 
-    @patch("streamtex.latex.components")
+    @patch("streamtex.latex.st.iframe")
     def test_fragment_wrapped_in_document(self, mock_components):
         """A fragment (no documentclass) is wrapped in a minimal article document."""
         st_latex_doc(SAMPLE_FRAGMENT)
-        html_arg = mock_components.html.call_args[0][0]
+        html_arg = mock_components.call_args[0][0]
         assert "latex.mjs" in html_arg
         # Fragment content should be present inside the JS string
         assert "section" in html_arg
         # The wrapper should be added for LaTeX.js to parse correctly
         assert "documentclass" in html_arg
 
-    @patch("streamtex.latex.components")
+    @patch("streamtex.latex.st.iframe")
     def test_full_doc_passed_as_is(self, mock_components):
         """A full document is passed as-is to LaTeX.js (not stripped)."""
         st_latex_doc(SAMPLE_FULL_DOC)
-        html_arg = mock_components.html.call_args[0][0]
+        html_arg = mock_components.call_args[0][0]
         # The body content should be present
         assert "Hello from a full document" in html_arg
         # The documentclass should be preserved for LaTeX.js
         assert "documentclass" in html_arg
 
-    @patch("streamtex.latex.components")
+    @patch("streamtex.latex.st.iframe")
     def test_hyphenate_true(self, mock_components):
         """Default hyphenation is enabled."""
         st_latex_doc(SAMPLE_FRAGMENT)
-        html_arg = mock_components.html.call_args[0][0]
+        html_arg = mock_components.call_args[0][0]
         assert "hyphenate: true" in html_arg
 
-    @patch("streamtex.latex.components")
+    @patch("streamtex.latex.st.iframe")
     def test_hyphenate_false(self, mock_components):
         """Hyphenation can be disabled."""
         st_latex_doc(SAMPLE_FRAGMENT, hyphenate=False)
-        html_arg = mock_components.html.call_args[0][0]
+        html_arg = mock_components.call_args[0][0]
         assert "hyphenate: false" in html_arg
 
-    @patch("streamtex.latex.components")
+    @patch("streamtex.latex.st.iframe")
     def test_complete_html_document(self, mock_components):
         """The HTML is a complete document (DOCTYPE, html, body)."""
         st_latex_doc(SAMPLE_FRAGMENT)
-        html_arg = mock_components.html.call_args[0][0]
+        html_arg = mock_components.call_args[0][0]
         assert "<!DOCTYPE html>" in html_arg
         assert "<html>" in html_arg
         assert "<body>" in html_arg
 
-    @patch("streamtex.latex.components")
+    @patch("streamtex.latex.st.iframe")
     def test_cdn_url_present(self, mock_components):
         """LaTeX.js CDN URL is injected in the HTML."""
         st_latex_doc(SAMPLE_FRAGMENT)
-        html_arg = mock_components.html.call_args[0][0]
+        html_arg = mock_components.call_args[0][0]
         assert "cdn.jsdelivr.net/npm/latex.js" in html_arg
 
-    @patch("streamtex.latex.components")
+    @patch("streamtex.latex.st.iframe")
     def test_empty_code_is_noop(self, mock_components):
         """Empty code does not call components.html()."""
         st_latex_doc("")
-        mock_components.html.assert_not_called()
+        mock_components.assert_not_called()
 
 
 class TestStLatexDocExport:
@@ -234,13 +237,13 @@ class TestStLatexDocExport:
     def teardown_method(self):
         export_mod._buffer = None
 
-    @patch("streamtex.latex.components")
+    @patch("streamtex.latex.st.iframe")
     def test_noop_when_inactive(self, mock_components):
         """No export output when export is not active."""
         st_latex_doc(SAMPLE_FRAGMENT)
         assert generate_export_html() is None
 
-    @patch("streamtex.latex.components")
+    @patch("streamtex.latex.st.iframe")
     def test_export_latex_js_embedded(self, mock_components):
         """Export includes latex-js web component with source."""
         reset_export_buffer(ExportConfig(enabled=True))
@@ -250,7 +253,7 @@ class TestStLatexDocExport:
         assert "latex-js" in html
         assert "section" in html
 
-    @patch("streamtex.latex.components")
+    @patch("streamtex.latex.st.iframe")
     def test_export_escapes_html(self, mock_components):
         """Export properly escapes HTML special characters."""
         reset_export_buffer(ExportConfig(enabled=True))
@@ -264,7 +267,7 @@ class TestStLatexDocExport:
 class TestStLatexDocFile:
     """Tests for the file= parameter."""
 
-    @patch("streamtex.latex.components")
+    @patch("streamtex.latex.st.iframe")
     @patch("streamtex.utils.resolve_content", return_value=SAMPLE_FRAGMENT)
     def test_file_loads_via_resolve_content(self, mock_resolve, mock_components):
         """file= parameter loads code via resolve_content."""
@@ -272,5 +275,5 @@ class TestStLatexDocFile:
         mock_resolve.assert_called_once_with(
             "", file="docs/intro.tex", encoding="utf-8"
         )
-        html_arg = mock_components.html.call_args[0][0]
+        html_arg = mock_components.call_args[0][0]
         assert "section" in html_arg

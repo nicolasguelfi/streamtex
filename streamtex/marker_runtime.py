@@ -17,29 +17,21 @@ Injection strategy
 ------------------
 The CSS goes through ``st.html`` (renders inline in the host page, no iframe).
 
-The JavaScript goes through ``streamlit.components.v1.html(..., height=0)``
-(0-pixel iframe).  ``components.v1.html`` is **officially deprecated in
-Streamlit 1.56** (with ``st.html`` named as the replacement), but the
-recommended replacement does not actually execute injected JavaScript:
+The JavaScript goes through ``st.iframe(..., height=1)`` (1-pixel iframe,
+added in Streamlit 1.56 — the officially announced replacement for the
+removed-after-2026-06-01 ``streamlit.components.v1.html`` API).
 
-* ``st.html("<script>…</script>", unsafe_allow_javascript=True)`` — script
-  stripped by DOMPurify, ``window.*`` flags never set.
-* ``st.html('<svg onload=…/>', unsafe_allow_javascript=True)`` — handler
-  not fired.
-* ``st.html('<img onerror=…>', unsafe_allow_javascript=True)`` — handler
-  not fired.
-
-Verified on Streamlit 1.57.0 (2026-05-12); also affects 1.54 through 1.57.
-The ``unsafe_allow_javascript`` Python parameter exists since 1.52 and is
-forwarded on the proto, but the frontend does not honor it in any released
-version.  See ``documentation/maintenance/components.v1_issue/`` for the
-reproducer and the migration plan when (or if) the flag is honored upstream.
+The legacy alternative, ``st.html("<script>…</script>",
+unsafe_allow_javascript=True)``, does not execute JavaScript: verified
+empirically on Streamlit 1.52 → 1.57, the proto field is forwarded by the
+Python API but the frontend strips ``<script>`` tags and DOM event handlers
+regardless.  See ``documentation/maintenance/components.v1_issue/`` for
+the reproducer (``reproducer/app.py`` probes A–E).
 
 The observer is therefore written to reach back into
 ``window.parent.document`` so it operates on the host DOM despite living
 in an iframe.  Same pattern as :mod:`streamtex.marker` and
-:mod:`streamtex.bib_preview` (both pre-existing uses of
-``components.v1.html`` in the codebase).
+:mod:`streamtex.bib_preview`.
 """
 from __future__ import annotations
 
@@ -47,7 +39,6 @@ import logging
 from pathlib import Path
 
 import streamlit as st
-import streamlit.components.v1 as components
 
 logger = logging.getLogger(__name__)
 
@@ -74,12 +65,11 @@ def inject_marker_runtime() -> None:
     re-emission within a session, and the JavaScript itself is guarded by
     ``window.parent.__stxMarkerObs``.
 
-    Two separate Streamlit calls (see the module docstring for why
-    ``components.v1.html`` is used despite being deprecated):
+    Two separate Streamlit calls (see the module docstring for why):
 
     * ``st.html("<style>…</style>")`` — inline CSS in the host page.
-    * ``components.v1.html("<script>…</script>", height=0)`` — JS in a
-      0-pixel iframe that reaches back to ``window.parent.document``.
+    * ``st.iframe("<script>…</script>", height=1)`` — JS in a 1-pixel
+      iframe that reaches back to ``window.parent.document``.
     """
     if st.session_state.get(_SESSION_KEY):
         return
@@ -92,7 +82,7 @@ def inject_marker_runtime() -> None:
     if css:
         st.html(f"<style>{css}</style>")
     if js:
-        components.html(f"<script>{js}</script>", height=0)
+        st.iframe(f"<script>{js}</script>", height=1)
     st.session_state[_SESSION_KEY] = True
     logger.debug("marker_runtime: injected (css=%d bytes, js=%d bytes)", len(css), len(js))
 

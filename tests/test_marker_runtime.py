@@ -38,17 +38,17 @@ def _reset_marker_session():
 class TestInjectMarkerRuntime:
     def test_injects_once_per_session(self):
         with patch("streamtex.marker_runtime.st.html") as mock_html, \
-             patch("streamtex.marker_runtime.components.html") as mock_components:
+             patch("streamtex.marker_runtime.st.iframe") as mock_iframe:
             inject_marker_runtime()
             inject_marker_runtime()  # second call same session
             assert mock_html.call_count == 1
-            assert mock_components.call_count == 1
+            assert mock_iframe.call_count == 1
         assert st.session_state.get(_SESSION_KEY) is True
 
     def test_css_via_st_html(self):
         """CSS must go through st.html() — inline in the host page, no iframe."""
         with patch("streamtex.marker_runtime.st.html") as mock_html, \
-             patch("streamtex.marker_runtime.components.html"):
+             patch("streamtex.marker_runtime.st.iframe"):
             inject_marker_runtime()
         assert mock_html.call_count == 1
         css_payload = mock_html.call_args[0][0]
@@ -56,26 +56,28 @@ class TestInjectMarkerRuntime:
         assert "stx-marker-cell" in css_payload  # universal marker-cell rule
         assert "<script>" not in css_payload      # no JS in this call
 
-    def test_js_via_components_html(self):
-        """JS observer must go through components.v1.html() — Streamlit
-        (verified 1.44 through 1.57) strips <script> tags from st.html()
-        even when unsafe_allow_javascript=True is set on the Python side
-        (the proto field is forwarded but the frontend does not honor it
-        in any released version as of 2026-05-12).
+    def test_js_via_st_iframe(self):
+        """JS observer must go through st.iframe() — the
+        components.v1.html replacement announced for removal after
+        2026-06-01.  st.html(unsafe_allow_javascript=True) is documented
+        as a JS-execution path but the released frontend (verified 1.52
+        through 1.57) strips <script> tags and DOM event handlers
+        regardless of the flag.  Only st.iframe (and the deprecated
+        components.v1.html it replaces) actually execute injected JS.
         """
         with patch("streamtex.marker_runtime.st.html"), \
-             patch("streamtex.marker_runtime.components.html") as mock_components:
+             patch("streamtex.marker_runtime.st.iframe") as mock_iframe:
             inject_marker_runtime()
-        assert mock_components.call_count == 1
-        args, kwargs = mock_components.call_args
+        assert mock_iframe.call_count == 1
+        args, kwargs = mock_iframe.call_args
         js_payload = args[0]
         assert "<script>" in js_payload
         # The observer reaches back to the host page via window.parent.
         assert "window.parent" in js_payload or "parent.document" in js_payload
         # Observer idempotency guard targets the parent window.
         assert "__stxMarkerObs" in js_payload
-        # Iframe must have zero height so it does not steal layout space.
-        assert kwargs.get("height") == 0
+        # 1-pixel iframe (st.iframe rejects height=0 — minimum positive int).
+        assert kwargs.get("height") == 1
 
 
 # ---------------------------------------------------------------------------

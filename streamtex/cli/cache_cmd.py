@@ -200,13 +200,24 @@ def _headless_streamlit():
     _saved["tabs"] = st.tabs
     st.tabs = _mock_tabs
 
-    # components.html — no-op.
+    # st.iframe — no-op (since 0.6.19; replaces the legacy
+    # streamlit.components.v1.html monkey-patch).  Both are patched so that
+    # user code that hasn't migrated yet stays neutralised during cache
+    # pre-generation, and so that streamtex internals which switched to
+    # st.iframe are also neutralised.
+    _iframe_saved = None
+    try:
+        _iframe_saved = st.iframe
+        st.iframe = lambda *a, **kw: None
+    except AttributeError:
+        pass
+
     _components_saved = None
     try:
         import streamlit.components.v1 as components
         _components_saved = components.html
         components.html = lambda *a, **kw: None
-    except ImportError:
+    except (ImportError, AttributeError):
         pass
 
     try:
@@ -214,6 +225,8 @@ def _headless_streamlit():
     finally:
         for attr, val in _saved.items():
             setattr(st, attr, val)
+        if _iframe_saved is not None:
+            st.iframe = _iframe_saved
         if _components_saved is not None:
             import streamlit.components.v1 as components
             components.html = _components_saved

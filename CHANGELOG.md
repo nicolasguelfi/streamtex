@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.19] — 2026-05-12
+
+### Changed
+- **All `streamlit.components.v1.html` calls migrated to `st.iframe`** (added in Streamlit 1.56; the official replacement per the runtime warning "`st.components.v1.html` will be removed after 2026-06-01. Please replace with `st.iframe`."). 18 call sites across `marker_runtime.py`, `marker.py`, `bib_preview.py`, `loading.py` (3), `auth.py`, `browser.py`, `book.py` (5), `mermaid.py`, `plantuml.py`, `latex.py`, `tikz.py`, `export.py`; plus the cache-pre-generation monkey-patch in `cli/cache_cmd.py` now patches both `st.iframe` (the new path) and `streamlit.components.v1.html` (legacy user code) so unmigrated callers stay neutralised.
+- **Minimum Streamlit bumped to `>=1.56.0`** in `streamtex/pyproject.toml` — `st.iframe` was added in 1.56. Anyone on 1.54/1.55 must upgrade.
+- `st_html(..., scrolling=…)` — `scrolling` kwarg kept in the signature for backwards compat but is now a **no-op**; `st.iframe` has no `scrolling` parameter and uses native iframe scrollbars when content overflows the configured height. Visual verification on Mermaid / PlantUML / LaTeX / TikZ / export is the responsibility of the integrator.
+- All previously-tested behaviour preserved: marker observer still injected via iframe → reaches `window.parent.document`, idempotency guard on `hostWin.__stxMarkerObs` unchanged, sentinel-class logic unchanged, all 1.9k tests still pass.
+
+### Notes
+- Why not use `st.html(unsafe_allow_javascript=True)` instead — the doc-recommended path? **Verified empirically on Streamlit 1.52 → 1.57 with a 5-probe reproducer** (`documentation/maintenance/components.v1_issue/reproducer/app.py`): `st.html(..., unsafe_allow_javascript=True)` does **not** execute injected JavaScript (neither `<script>` tags nor DOM event handlers `onload`/`onerror`). The proto flag is forwarded by the Python API but the released frontend strips JS regardless. `st.iframe` is the only working JS-execution path as of 2026-05-12.
+- Test mocks across 7 test files (`test_marker.py`, `test_marker_runtime.py`, `test_bib_preview.py`, `test_browser.py`, `test_auth.py`, `test_loading.py`, `test_latex.py`, `test_mermaid.py`, `test_plantuml.py`, `test_tikz.py`, `test_export.py`, `test_export_guard.py`) rewired from `streamtex.MODULE.components.html` / `streamlit.components.v1.html` to `streamtex.MODULE.st.iframe`.
+- The maintenance directory `documentation/maintenance/components.v1_issue/` (gitignored, local-only) contains the reproducer, the migration plan, and the (now-obsolete) upstream-issue draft against `st.html`'s broken `unsafe_allow_javascript` flag.
+
 ## [0.6.18] — 2026-05-12
 
 ### Fixed

@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import logging
 
-import streamlit.components.v1 as components
+import streamlit as st
 
 logger = logging.getLogger(__name__)
 
@@ -149,7 +149,7 @@ _REMOVE_JS = """\
 def inject_loading_overlay() -> None:
     """Create the full-screen loading overlay on the parent document."""
     js = _INJECT_JS.replace("__CSS__", _OVERLAY_CSS.replace("`", "\\`"))
-    components.html(js, height=0)
+    st.iframe(js, height=1)
 
 
 def update_loading_progress(current: int, total: int, module_name: str = "") -> None:
@@ -172,9 +172,9 @@ def update_loading_progress(current: int, total: int, module_name: str = "") -> 
           .replace("__CURRENT__", str(current))
           .replace("__TOTAL__", str(total))
           .replace("__MODULE__", safe_name))
-    components.html(js, height=0)
+    st.iframe(js, height=1)
 
 
 def remove_loading_overlay() -> None:
     """Fade out and remove the loading overlay."""
-    components.html(_REMOVE_JS, height=0)
+    st.iframe(_REMOVE_JS, height=1)

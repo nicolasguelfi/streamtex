@@ -18,7 +18,6 @@ from contextlib import nullcontext
 from html import escape
 
 import streamlit as st
-import streamlit.components.v1 as components
 
 from .container import st_block
 from .export import _render, export_append, is_export_active
@@ -299,7 +298,7 @@ def st_tikz(
                     .replace("__BG__", bg)
                     .replace("__SVG__", svg)
                 )
-                components.html(html, height=height, scrolling=True)
+                st.iframe(html, height=height)
                 if is_export_active():
                     # Embed the SVG as a base64 data URI inside an <img>.
                     # Inline <svg> renders inconsistently across browsers

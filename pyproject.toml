@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "streamtex"
-version = "0.6.18"
+version = "0.6.19"
 description = "AI-powered content framework for Streamlit — create presentations, courses, and web-books with Claude or Cursor, no coding required."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -33,7 +33,7 @@ classifiers = [
     "Topic :: Multimedia :: Graphics :: Presentation",
 ]
 dependencies = [
-    "streamlit>=1.54.0",
+    "streamlit>=1.56.0",
     "beautifulsoup4>=4.10.0",
     "requests>=2.28.0",
     "watchdog",

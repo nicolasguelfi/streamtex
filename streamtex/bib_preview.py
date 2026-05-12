@@ -1,14 +1,15 @@
 """Bibliography hover preview scaffold — JS/CSS injection for citation cards.
 
-Uses components.html() for JS injection (st.html() strips <script> tags in
-Streamlit 1.54+).  Same parent.document access pattern as marker.py / zoom.py.
+Uses st.iframe() for JS injection (st.html() strips <script> tags even
+with unsafe_allow_javascript=True in Streamlit 1.52–1.57; see
+documentation/maintenance/components.v1_issue/).  Same parent.document
+access pattern as marker.py / zoom.py.
 
 The card is interactive: it stays visible when the mouse enters it, allowing
 clicks on the Copy and Open buttons.
 """
 
 import streamlit as st
-import streamlit.components.v1 as components
 
 
 def inject_bib_preview_scaffold():
@@ -147,7 +148,7 @@ def inject_bib_preview_scaffold():
     ICON_CHECK = '<svg viewBox="0 0 16 16"><path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z"/></svg>'
     ICON_OPEN = '<svg viewBox="0 0 16 16"><path d="M3.75 2h3.5a.75.75 0 010 1.5h-3.5a.25.25 0 00-.25.25v8.5c0 .138.112.25.25.25h8.5a.25.25 0 00.25-.25v-3.5a.75.75 0 011.5 0v3.5A1.75 1.75 0 0112.25 14h-8.5A1.75 1.75 0 012 12.25v-8.5C2 2.784 2.784 2 3.75 2zm6.5 0h3a.75.75 0 01.75.75v3a.75.75 0 01-1.5 0V4.06l-4.47 4.47a.75.75 0 01-1.06-1.06L11.44 3H10.25a.75.75 0 010-1.5h.01z"/></svg>'
 
-    # JS via components.html() — runs in iframe, accesses parent DOM
+    # JS via st.iframe() — runs in iframe, accesses parent DOM
     js = f"""
     <script>
     (function() {{
@@ -378,5 +379,5 @@ def inject_bib_preview_scaffold():
     </script>
     """
 
-    # components.html() creates a real iframe where scripts execute
-    components.html(js, height=0)
+    # st.iframe() creates a real iframe where scripts execute
+    st.iframe(js, height=1)

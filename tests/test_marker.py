@@ -269,7 +269,7 @@ class TestMarkerDraggableCollapsible:
 
     # --- JavaScript placeholder replacement ---
 
-    @patch("streamlit.components.v1.html")
+    @patch("streamtex.marker.st.iframe")
     def test_draggable_placeholder_true(self, mock_html):
         """__DRAGGABLE__ placeholder should be replaced with 'true' when draggable=True."""
         reset_marker_registry(MarkerConfig(draggable=True))
@@ -279,7 +279,7 @@ class TestMarkerDraggableCollapsible:
         js_output = mock_html.call_args[0][0]
         assert "var draggable = true;" in js_output
 
-    @patch("streamlit.components.v1.html")
+    @patch("streamtex.marker.st.iframe")
     def test_draggable_placeholder_false(self, mock_html):
         """__DRAGGABLE__ placeholder should be replaced with 'false' when draggable=False."""
         reset_marker_registry(MarkerConfig(draggable=False))
@@ -289,7 +289,7 @@ class TestMarkerDraggableCollapsible:
         js_output = mock_html.call_args[0][0]
         assert "var draggable = false;" in js_output
 
-    @patch("streamlit.components.v1.html")
+    @patch("streamtex.marker.st.iframe")
     def test_collapsible_placeholder_true(self, mock_html):
         """__COLLAPSIBLE__ placeholder should be replaced with 'true' when collapsible=True."""
         reset_marker_registry(MarkerConfig(collapsible=True))
@@ -299,7 +299,7 @@ class TestMarkerDraggableCollapsible:
         js_output = mock_html.call_args[0][0]
         assert "var collapsible = true;" in js_output
 
-    @patch("streamlit.components.v1.html")
+    @patch("streamtex.marker.st.iframe")
     def test_collapsible_placeholder_false(self, mock_html):
         """__COLLAPSIBLE__ placeholder should be replaced with 'false' when collapsible=False."""
         reset_marker_registry(MarkerConfig(collapsible=False))
@@ -311,7 +311,7 @@ class TestMarkerDraggableCollapsible:
 
     # --- JavaScript behavior code presence ---
 
-    @patch("streamlit.components.v1.html")
+    @patch("streamtex.marker.st.iframe")
     def test_draggable_true_contains_drag_code(self, mock_html):
         """When draggable=True, JS output should contain drag-related event handling."""
         reset_marker_registry(MarkerConfig(draggable=True))
@@ -325,7 +325,7 @@ class TestMarkerDraggableCollapsible:
         assert "mouseup" in js_output
         assert "stx-marker-pos" in js_output
 
-    @patch("streamlit.components.v1.html")
+    @patch("streamtex.marker.st.iframe")
     def test_collapsible_true_contains_collapse_code(self, mock_html):
         """When collapsible=True, JS output should contain collapse-related code."""
         reset_marker_registry(MarkerConfig(collapsible=True))
@@ -337,7 +337,7 @@ class TestMarkerDraggableCollapsible:
         assert "stx-marker-collapsed" in js_output
         assert "applyCollapsed" in js_output
 
-    @patch("streamlit.components.v1.html")
+    @patch("streamtex.marker.st.iframe")
     def test_no_leftover_placeholders(self, mock_html):
         """Ensure __DRAGGABLE__ and __COLLAPSIBLE__ placeholders are fully replaced."""
         reset_marker_registry(MarkerConfig(draggable=True, collapsible=True))

@@ -1,8 +1,8 @@
 /* StreamTeX marker observer — replaces per-instance :has() selectors.
  *
- * This script is injected via `streamlit.components.v1.html(..., height=0)`,
- * which means it runs inside a 0-pixel iframe.  All DOM operations must
- * therefore target the *parent* document (the actual Streamlit app page) via
+ * This script is injected via `st.iframe(..., height=1)`, which means it
+ * runs inside a 1-pixel iframe.  All DOM operations must therefore target
+ * the *parent* document (the actual Streamlit app page) via
  * `window.parent.document` — the iframe's own document is empty.
  *
  * When a sentinel <span class="stx-marker" data-stx-kind="..."

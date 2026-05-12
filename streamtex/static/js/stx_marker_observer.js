@@ -47,6 +47,10 @@
   hostWin.__stxMarkerObs = true;
 
   var PARENT_SEL = '[data-testid="stVerticalBlock"]';
+  // Streamlit ≤ 1.55 used class `.element-container`; ≥ 1.56 renamed it to
+  // `stElementContainer` and exposes it via `data-testid="stElementContainer"`.
+  // Match both so we can find the marker's own cell across versions.
+  var EC_SEL = '[data-testid="stElementContainer"], .element-container';
   var KIND_TO_CLASS = {
     'block':       'stx-block',
     'span':        'stx-span',
@@ -57,6 +61,15 @@
     'md-big':      'stx-md-big'
   };
 
+  function hideMarkerCell(markerSpan) {
+    // Hide the marker's own cell — bulletproof: class for CSS introspection,
+    // inline !important for guaranteed effect regardless of cascade.
+    var ec = markerSpan.closest(EC_SEL);
+    if (!ec) return;
+    ec.classList.add('stx-marker-cell');
+    ec.style.setProperty('display', 'none', 'important');
+  }
+
   function applyMarker(markerSpan) {
     var kind = markerSpan.getAttribute('data-stx-kind');
     var cls = KIND_TO_CLASS[kind];
@@ -64,10 +77,13 @@
 
     var parent = markerSpan.closest(PARENT_SEL);
     if (!parent) return;
+
+    // Idempotent fast-path: if the current parent already carries the kind
+    // class, the heavy lifting was done on a previous pass.  Just make sure
+    // the marker cell stays hidden (Streamlit reconciliation can re-render
+    // the .stElementContainer subtree on rerun while keeping the marker).
     if (parent.classList.contains(cls)) {
-      // Already processed for this kind — still hide the marker cell.
-      var ecPrev = markerSpan.closest('.element-container');
-      if (ecPrev) ecPrev.classList.add('stx-marker-cell');
+      hideMarkerCell(markerSpan);
       return;
     }
 
@@ -125,16 +141,20 @@
     }
 
     // Hide the marker's own element-container so it doesn't take a grid/flex slot.
-    var ec = markerSpan.closest('.element-container');
-    if (ec) ec.classList.add('stx-marker-cell');
+    hideMarkerCell(markerSpan);
   }
 
   function scan(root) {
+    // Walk every marker on every pass — applyMarker is idempotent and uses
+    // a fast-path when the parent already has the kind class.  We cannot
+    // skip "previously processed" markers via a one-shot attribute because
+    // Streamlit reconciliation may replace the parent stVerticalBlock on
+    // rerun (settings change, paginated navigation) while reusing the
+    // marker, which would otherwise leave the new parent un-classed.
     var scope = (root && root.querySelectorAll) ? root : hostDoc;
-    var markers = scope.querySelectorAll('span.stx-marker:not([data-stx-processed])');
+    var markers = scope.querySelectorAll('span.stx-marker');
     for (var i = 0; i < markers.length; i++) {
       applyMarker(markers[i]);
-      markers[i].setAttribute('data-stx-processed', '1');
     }
   }
 
@@ -151,9 +171,8 @@
       for (var j = 0; j < m.addedNodes.length; j++) {
         var node = m.addedNodes[j];
         if (node.nodeType !== 1) continue;
-        if (node.matches && node.matches('span.stx-marker:not([data-stx-processed])')) {
+        if (node.matches && node.matches('span.stx-marker')) {
           applyMarker(node);
-          node.setAttribute('data-stx-processed', '1');
         }
         if (node.querySelectorAll) scan(node);
       }

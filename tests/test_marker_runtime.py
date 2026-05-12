@@ -120,6 +120,31 @@ class TestStaticAssets:
         js = _JS_PATH.read_text(encoding="utf-8")
         assert "'data-stx-' + kind + '-uid'" in js
 
+    def test_js_observer_finds_element_container_both_naming(self):
+        """Observer must find the marker's own cell on Streamlit ≤ 1.55
+        (class `.element-container`) AND ≥ 1.56 (testid `stElementContainer`).
+        Without this, marker cells stay visible and grab a grid slot — the
+        exact bug seen on the FC presentation deck after the 1.56 upgrade."""
+        js = _JS_PATH.read_text(encoding="utf-8")
+        assert '[data-testid="stElementContainer"]' in js
+        assert ".element-container" in js
+
+    def test_js_observer_hides_marker_cell_inline(self):
+        """Marker cell must be hidden via inline `display: none !important`
+        (in addition to the class), so it stays hidden regardless of CSS
+        cascade or stylesheet load order."""
+        js = _JS_PATH.read_text(encoding="utf-8")
+        assert "'display', 'none', 'important'" in js
+
+    def test_js_observer_has_no_one_shot_processed_gate(self):
+        """The observer must NOT use a one-shot `data-stx-processed` gate —
+        Streamlit reconciliation can replace the parent stVerticalBlock on
+        rerun (settings change, paginated navigation) while reusing the
+        marker, so applyMarker must run again to re-apply the class +
+        inline styles on the new parent."""
+        js = _JS_PATH.read_text(encoding="utf-8")
+        assert "data-stx-processed" not in js
+
     def test_css_hides_marker_cells(self):
         css = _CSS_PATH.read_text(encoding="utf-8")
         assert ".stx-marker-cell" in css

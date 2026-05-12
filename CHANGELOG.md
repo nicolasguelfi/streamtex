@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.23] — 2026-05-12
+
+### Fixed
+- **Marker cell stayed visible on Streamlit 1.56+.** The observer used
+  `markerSpan.closest('.element-container')` to find the cell containing
+  the sentinel, but Streamlit ≥ 1.56 renamed that class to
+  `stElementContainer` (only the testid is reliable across versions).  The
+  selector now matches both:
+  `[data-testid="stElementContainer"], .element-container`.  Symptom: in a
+  2-column `.stx-grid`, the invisible marker cell took grid slot #1 and
+  shifted every subsequent cell by one (e.g. the FC deck's "Three
+  Frameworks" slide rendered GDPR in the top-right slot instead of
+  top-left).
+- **Marker cell now hidden inline with `!important`** in addition to the
+  CSS class — bulletproof against any future cascade surprise.
+- **Settings change (sidebar width/zoom) wiped grid layout.**  The observer
+  used a one-shot `data-stx-processed` attribute on each marker to avoid
+  reprocessing.  Streamlit's reconciliation can replace the parent
+  `stVerticalBlock` on rerun *while reusing the marker* — leaving the new
+  parent without the `.stx-grid` class or inline layout styles, and the
+  observer silently skipping it.  The observer now drops the one-shot gate
+  and re-validates on every pass; `applyMarker` is fully idempotent thanks
+  to a `parent.classList.contains(cls)` fast-path that only runs the
+  expensive work when the parent state was wiped.
+
 ## [0.6.22] — 2026-05-12
 
 ### Fixed

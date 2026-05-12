@@ -132,9 +132,10 @@ class TestStaticAssets:
     def test_js_observer_hides_marker_cell_inline(self):
         """Marker cell must be hidden via inline `display: none !important`
         (in addition to the class), so it stays hidden regardless of CSS
-        cascade or stylesheet load order."""
+        cascade or stylesheet load order.  The write goes through the
+        idempotent `setInlineImportant` helper."""
         js = _JS_PATH.read_text(encoding="utf-8")
-        assert "'display', 'none', 'important'" in js
+        assert "setInlineImportant(ec, 'display', 'none')" in js
 
     def test_js_observer_has_no_one_shot_processed_gate(self):
         """The observer must NOT use a one-shot `data-stx-processed` gate —
@@ -144,6 +145,39 @@ class TestStaticAssets:
         inline styles on the new parent."""
         js = _JS_PATH.read_text(encoding="utf-8")
         assert "data-stx-processed" not in js
+
+    def test_js_observer_watches_attribute_mutations(self):
+        """The observer must watch attribute changes (not just childList) on
+        the body subtree.  Streamlit's reconciliation can strip our class,
+        uid, and inline style attributes on rerun without adding/removing
+        any children — a childList-only observer misses that entirely and
+        the user sees the layout collapse (sidebar slider regression)."""
+        js = _JS_PATH.read_text(encoding="utf-8")
+        assert "attributes: true" in js
+        assert "attributeFilter" in js
+        # Filter must include the three families we care about.
+        assert "'class'" in js
+        assert "'style'" in js
+        assert "'data-stx-block-uid'" in js
+        assert "'data-stx-grid-uid'" in js
+
+    def test_js_observer_uses_idempotent_inline_style_setter(self):
+        """The attribute-watching observer would loop on itself if applyMarker
+        re-wrote inline styles that were already set.  A `setInlineImportant`
+        helper must skip the write when (value, priority) already match."""
+        js = _JS_PATH.read_text(encoding="utf-8")
+        assert "setInlineImportant" in js
+        # The helper must read getPropertyPriority to detect the !important
+        # case correctly (otherwise the write looks needed even when it isn't).
+        assert "getPropertyPriority" in js
+
+    def test_js_observer_coalesces_via_animation_frame(self):
+        """Many mutations during one Streamlit rerun should coalesce into a
+        single full scan — otherwise the observer pegs the CPU.  We use
+        requestAnimationFrame as the debouncer."""
+        js = _JS_PATH.read_text(encoding="utf-8")
+        assert "requestAnimationFrame" in js
+        assert "pendingScan" in js
 
     def test_css_hides_marker_cells(self):
         css = _CSS_PATH.read_text(encoding="utf-8")

@@ -61,16 +61,33 @@
     'md-big':      'stx-md-big'
   };
 
+  // Idempotent inline-style setter: only writes if the existing
+  // (value, priority) tuple does not already match — this avoids triggering
+  // MutationObserver fires for no-op writes, which is what stops the
+  // attribute-watching observer below from looping on itself.
+  function setInlineImportant(el, prop, value) {
+    if (el.style.getPropertyValue(prop) === value &&
+        el.style.getPropertyPriority(prop) === 'important') return;
+    el.style.setProperty(prop, value, 'important');
+  }
+
   function hideMarkerCell(markerSpan) {
     // Hide the marker's own cell — bulletproof: class for CSS introspection,
     // inline !important for guaranteed effect regardless of cascade.
     var ec = markerSpan.closest(EC_SEL);
     if (!ec) return;
-    ec.classList.add('stx-marker-cell');
-    ec.style.setProperty('display', 'none', 'important');
+    if (!ec.classList.contains('stx-marker-cell')) {
+      ec.classList.add('stx-marker-cell');
+    }
+    setInlineImportant(ec, 'display', 'none');
   }
 
   function applyMarker(markerSpan) {
+    // Fully idempotent: every write is guarded by a read so re-running
+    // applyMarker on an already-applied marker fires no mutations.  This is
+    // essential because the MutationObserver watches attribute changes
+    // (Streamlit's reconciliation strips our class/uid/style on rerun),
+    // and a non-idempotent applyMarker would loop on itself indefinitely.
     var kind = markerSpan.getAttribute('data-stx-kind');
     var cls = KIND_TO_CLASS[kind];
     if (!cls) return;
@@ -78,69 +95,68 @@
     var parent = markerSpan.closest(PARENT_SEL);
     if (!parent) return;
 
-    // Idempotent fast-path: if the current parent already carries the kind
-    // class, the heavy lifting was done on a previous pass.  Just make sure
-    // the marker cell stays hidden (Streamlit reconciliation can re-render
-    // the .stElementContainer subtree on rerun while keeping the marker).
-    if (parent.classList.contains(cls)) {
-      hideMarkerCell(markerSpan);
-      return;
+    // 1. Kind class.
+    if (!parent.classList.contains(cls)) {
+      parent.classList.add(cls);
     }
 
-    parent.classList.add(cls);
-
-    // Forward data-stx-* attributes (except `kind`) as CSS custom properties.
-    // Naming: `data-stx-foo-bar="x"` → `--stx-foo-bar: x;`
+    // 2. Forward data-stx-* attributes (except `kind`) as CSS custom
+    //    properties.  Naming: `data-stx-foo-bar="x"` → `--stx-foo-bar: x;`.
     var attrs = markerSpan.attributes;
     for (var i = 0; i < attrs.length; i++) {
       var a = attrs[i];
       if (a.name === 'data-stx-kind') continue;
       if (a.name.indexOf('data-stx-') !== 0) continue;
       var cssVar = '--' + a.name.slice('data-'.length);
-      parent.style.setProperty(cssVar, a.value);
+      if (parent.style.getPropertyValue(cssVar) !== a.value) {
+        parent.style.setProperty(cssVar, a.value);
+      }
     }
 
-    // Kind-specific INLINE style overrides — set directly on the element with
-    // !important so they beat Streamlit's own inline `display: flex` (which is
-    // applied on every stVerticalBlock since 1.56+ and beats our external
-    // !important rule on some Streamlit builds).  This makes the layout
-    // independent of the CSS cascade.
+    // 3. Kind-specific INLINE style overrides — set directly on the element
+    //    with !important so they beat Streamlit's own inline `display: flex`
+    //    (applied on every stVerticalBlock since 1.56).  This makes the
+    //    layout independent of the CSS cascade.
     if (kind === 'grid') {
       var tpl = markerSpan.getAttribute('data-stx-grid-template') || '1fr';
       var g   = markerSpan.getAttribute('data-stx-grid-gap') || '0';
-      parent.style.setProperty('display', 'grid', 'important');
-      parent.style.setProperty('grid-template-columns', tpl, 'important');
-      parent.style.setProperty('gap', g, 'important');
-      parent.style.setProperty('align-items', 'stretch', 'important');
+      setInlineImportant(parent, 'display', 'grid');
+      setInlineImportant(parent, 'grid-template-columns', tpl);
+      setInlineImportant(parent, 'gap', g);
+      setInlineImportant(parent, 'align-items', 'stretch');
     } else if (kind === 'span') {
-      parent.style.setProperty('display', 'flex', 'important');
-      parent.style.setProperty('flex-direction', 'row', 'important');
-      parent.style.setProperty('white-space', 'pre', 'important');
+      setInlineImportant(parent, 'display', 'flex');
+      setInlineImportant(parent, 'flex-direction', 'row');
+      setInlineImportant(parent, 'white-space', 'pre');
     } else if (kind === 'list-item') {
-      parent.style.setProperty('display', 'flex', 'important');
-      parent.style.setProperty('flex-direction', 'row', 'important');
-      parent.style.setProperty('align-items', 'baseline', 'important');
-      parent.style.setProperty('gap', '0.5rem', 'important');
+      setInlineImportant(parent, 'display', 'flex');
+      setInlineImportant(parent, 'flex-direction', 'row');
+      setInlineImportant(parent, 'align-items', 'baseline');
+      setInlineImportant(parent, 'gap', '0.5rem');
     } else if (kind === 'zoom') {
       var z = markerSpan.getAttribute('data-stx-zoom-factor') || '1';
-      parent.style.setProperty('zoom', z, 'important');
+      setInlineImportant(parent, 'zoom', z);
     }
 
-    // Tag for the inspector / export tooling + per-instance CSS targeting.
-    // Use a *kind-prefixed* attribute on the parent so multiple marker kinds
-    // (e.g. a list-item that wraps a st_block) can coexist without one's uid
-    // overwriting another's.
+    // 4. Per-instance kind-prefixed uid attribute (the per-instance
+    //    stylesheet selectors target `[data-stx-{kind}-uid="…"]`).
     var uid = markerSpan.getAttribute('data-stx-uid');
     if (uid) {
-      parent.setAttribute('data-stx-' + kind + '-uid', uid);
+      var uidAttr = 'data-stx-' + kind + '-uid';
+      if (parent.getAttribute(uidAttr) !== uid) {
+        parent.setAttribute(uidAttr, uid);
+      }
     }
 
-    // Boolean modifiers (presence-only attributes like data-stx-ordered).
+    // 5. Boolean modifiers (presence-only attributes like data-stx-ordered).
     if (markerSpan.hasAttribute('data-stx-ordered')) {
-      parent.classList.add('stx-list-item--ordered');
+      if (!parent.classList.contains('stx-list-item--ordered')) {
+        parent.classList.add('stx-list-item--ordered');
+      }
     }
 
-    // Hide the marker's own element-container so it doesn't take a grid/flex slot.
+    // 6. Hide the marker's own element-container so it doesn't take a
+    //    grid/flex slot.
     hideMarkerCell(markerSpan);
   }
 
@@ -161,24 +177,52 @@
   // Initial pass (covers everything already in the parent DOM at script start).
   scan(hostDoc);
 
+  // Coalesce many mutations into one full scan on the next animation frame.
+  // applyMarker is fully idempotent (no-op when state already matches), so
+  // re-running it after every Streamlit reconciliation is safe and cheap.
+  var pendingScan = false;
+  function scheduleScan() {
+    if (pendingScan) return;
+    pendingScan = true;
+    var raf = hostWin.requestAnimationFrame || window.requestAnimationFrame ||
+              function (cb) { return setTimeout(cb, 16); };
+    raf(function () {
+      pendingScan = false;
+      scan(hostDoc);
+    });
+  }
+
   // MutationObserver lives in the iframe scope but observes the parent doc.
   // Same-origin Streamlit allows this; the observer instance survives as
   // long as window.parent.__stxMarkerObsHandle holds a reference.
+  //
+  // We watch THREE kinds of changes:
+  //   - childList   : new markers, new stVerticalBlocks added on rerun.
+  //   - attributes  : Streamlit reconciliation can strip our class / uid /
+  //                   inline style from existing parents WITHOUT touching
+  //                   their child list — this is what made the "settings
+  //                   slider wipes backgrounds" bug invisible to a
+  //                   childList-only observer.  We filter to only the
+  //                   attributes that, if changed, would invalidate our
+  //                   layout: `class`, `style`, and each `data-stx-*-uid`.
+  //
+  // The handler simply schedules a debounced full scan; applyMarker's
+  // no-op guards prevent any feedback loop from our own writes.
   var ObserverCtor = hostWin.MutationObserver || window.MutationObserver;
-  var obs = new ObserverCtor(function (muts) {
-    for (var i = 0; i < muts.length; i++) {
-      var m = muts[i];
-      for (var j = 0; j < m.addedNodes.length; j++) {
-        var node = m.addedNodes[j];
-        if (node.nodeType !== 1) continue;
-        if (node.matches && node.matches('span.stx-marker')) {
-          applyMarker(node);
-        }
-        if (node.querySelectorAll) scan(node);
-      }
-    }
+  var obs = new ObserverCtor(function () {
+    scheduleScan();
   });
-  obs.observe(hostDoc.body, { childList: true, subtree: true });
+  obs.observe(hostDoc.body, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: [
+      'class', 'style',
+      'data-stx-block-uid', 'data-stx-grid-uid', 'data-stx-list-uid',
+      'data-stx-list-item-uid', 'data-stx-zoom-uid', 'data-stx-span-uid',
+      'data-stx-md-big-uid'
+    ]
+  });
 
   // Keep a reference on the parent window so we can introspect from devtools.
   hostWin.__stxMarkerObsHandle = obs;

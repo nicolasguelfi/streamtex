@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.24] — 2026-05-12
+
+### Fixed
+- **Sidebar settings sliders (zoom / page_width) wiped per-instance
+  backgrounds and borders.**  When the user moved a sliders in the
+  paginated-mode settings panel, Streamlit's reconciliation stripped our
+  `class`, `data-stx-*-uid`, and inline `style` from existing
+  `stVerticalBlock` elements *without adding or removing any children*.
+  The marker observer was watching `childList` only, so it never saw the
+  strip and never re-applied — per-instance CSS rules (which target
+  `[data-stx-block-uid="…"]`) no longer matched anything → cells lost
+  their backgrounds and borders even though the markers themselves were
+  still in the DOM.
+
+  Fix:
+  - MutationObserver now also watches `attributes` (filtered to
+    `class`, `style`, and each `data-stx-*-uid`).  Any mutation
+    schedules a debounced full scan on the next animation frame.
+  - `applyMarker` is now fully idempotent: every write (`classList.add`,
+    `setProperty`, `setAttribute`) is guarded by a read so that
+    re-running on an already-applied marker fires **zero** mutations —
+    this is what stops the attribute-watching observer from looping on
+    itself.
+  - A new helper `setInlineImportant(el, prop, value)` makes the no-op
+    guard for `!important` inline styles a one-liner.
+
 ## [0.6.23] — 2026-05-12
 
 ### Fixed

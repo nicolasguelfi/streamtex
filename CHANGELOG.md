@@ -7,6 +7,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.37] — 2026-05-13
+
+### Fixed
+- **Active TOC/Markers indicator was unstable across navigation modes.**
+  After 0.6.36 made the scroll-spy follow paginated navigation, three
+  remaining failure modes surfaced in real use:
+  1. After a PageDown / floating-arrow / marker click, the
+     `.stx-nav-active` class sometimes stayed on the **previous**
+     entry's DOM node for 200-500 ms. Streamlit reconciliation
+     reuses the outer `<div data-stx-block>` node but flips its
+     inner `<a href>` between a content anchor and the page-nav
+     `#stx-goto-N` anchor depending on which page is current —
+     so the class persists on a node whose anchor *value* has just
+     shifted, while the previous *content-anchor* no longer maps to
+     any DOM entry.
+  2. The recompute debounce (250 ms after last mutation, 750 ms
+     hard cap) could be postponed indefinitely if Streamlit emitted
+     a trailing stream of mutations after a rerun (lazy components,
+     async images). The user's "highlight never reappears after a
+     double-PageDown" bug.
+  3. `findClosestAnchor` ranked the hidden `#stx-goto-N` navigation
+     buttons alongside real content markers. Those buttons sit at
+     a degenerate document-flow position (absolute, `left:-9999px`,
+     `top:auto`), so their `getBoundingClientRect().top` polluted
+     the closest-anchor pick on certain pages.
+  
+  Three coordinated fixes in `stx_scroll_spy.js`:
+  - `findClosestAnchor` now skips any anchor starting with
+    `stx-goto-` — only real content anchors compete.
+  - `setActive` is the **sole writer** of `.stx-nav-active` (add +
+    remove). On every recompute we call `setActive(findClosestAnchor())`
+    unconditionally — never gated on
+    `anchor !== currentActiveAnchor`. `setActive(null)` clears every
+    active class (with a strict null guard so empty entries stay
+    inactive).
+  - The previous debounce-with-cap was replaced by a **throttle**:
+    `scheduleRecompute` fires at most once every 100 ms and
+    **always** fires within 100 ms of any pending signal. So even
+    if Streamlit emits mutations continuously for several seconds,
+    the active entry converges within 100 ms of the DOM
+    stabilising. Validated on the FC deck at 1920×1080: single
+    PageDown settles in 150 ms (was 500 ms), double PageDown in
+    100 ms (was 500 ms + risk of never), 5-rapid-PageDown burst in
+    100 ms after the last keypress.
+  
+  Test contract updated:
+  `test_scroll_spy_recomputes_on_content_change` replaces the
+  former `test_scroll_spy_reapplies_class_on_reconciliation` — the
+  observer no longer watches `class` attribute mutations because
+  the single-source-of-truth `setActive` path handles both add and
+  remove on every recompute.
+
 ## [0.6.36] — 2026-05-13
 
 ### Fixed

@@ -378,13 +378,26 @@ class TestScrollSpyJs:
         # click-triggered active state.
         assert "CLICK_SUPPRESS_MS" in _SCROLL_SPY_JS
 
-    def test_scroll_spy_reapplies_class_on_reconciliation(self):
-        """Streamlit reconciliation can strip our ``stx-nav-active``
-        class on rerun — the script must re-apply via MutationObserver
-        on class-attribute changes."""
+    def test_scroll_spy_recomputes_on_content_change(self):
+        """Streamlit reconciliation can swap a TOC entry's inner ``<a
+        href>`` while keeping the outer ``<div data-stx-block>`` (so
+        the ``stx-nav-active`` class persists on a node that no longer
+        matches the previously-active anchor).  The scroll-spy reacts
+        to ``childList`` mutations in the body subtree by scheduling
+        a recompute through ``findClosestAnchor`` + ``setActive``,
+        which is the single source of truth for which entry is
+        active.  See 0.6.36 history: an earlier ``attributeFilter:
+        ['class']`` design tried to re-apply the class on every
+        reconciliation, but it kept the class on stale nodes whose
+        href had silently mutated."""
         assert "MutationObserver" in _SCROLL_SPY_JS
-        assert "attributeFilter" in _SCROLL_SPY_JS
-        assert "'class'" in _SCROLL_SPY_JS
+        # Recompute is driven by childList mutations (content rebuilt)
+        # not by class-attribute flips.
+        assert "childList" in _SCROLL_SPY_JS
+        # Single fire path through `setActive` (which handles both add
+        # and remove), called via the debounced `scheduleRecompute`.
+        assert "scheduleRecompute" in _SCROLL_SPY_JS
+        assert "fireRecompute" in _SCROLL_SPY_JS
 
     def test_scroll_spy_wired_into_export(self):
         toc = [{"level": 1, "title": "Hello", "_reg_label": "Hello",

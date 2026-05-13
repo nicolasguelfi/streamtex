@@ -186,10 +186,17 @@
 /* st_zoom: zoom factor forwarded as `--stx-zoom-factor`. */
 [data-testid="stVerticalBlock"].stx-zoom {
   zoom: var(--stx-zoom-factor, 1);
+  /* `align-items: stretch` makes children fill the zoom container's
+   * cross-axis (matches the .stx-grid pattern above).  Without this,
+   * Streamlit's default `align-items` on stVerticalBlock can resolve to
+   * non-stretch and the `width: auto` rule below collapses to shrink-to-fit
+   * — visible as a centred-via-`text-align` title rendered left-aligned
+   * on wide viewports because the title block is narrower than its parent. */
+  align-items: stretch !important;
 }
 [data-testid="stVerticalBlock"].stx-zoom > .element-container,
 [data-testid="stVerticalBlock"].stx-zoom > [data-testid="stElementContainer"] {
-  width: auto;
+  width: 100%;
 }
 
 /* _render_md_body: layout class only — the actual font-size override (from

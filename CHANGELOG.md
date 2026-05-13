@@ -33,6 +33,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     self-installed `window.__stxMarkerObsHandle` survives reconciliation
     of the component host, so single-shot registration remains
     sufficient.
+- **Centered titles wrapped in `st_zoom` rendered left-aligned on wide
+  viewports.** Pre-existing CSS rule
+  `.stx-zoom > [data-testid="stElementContainer"] { width: auto; }` was
+  intended to delegate cross-axis sizing to the flex parent (the
+  `.stx-grid` rule uses the same pattern). But `.stx-zoom` was missing
+  the matching `align-items: stretch`, so when Streamlit's default
+  `align-items` on `stVerticalBlock` resolved to a non-stretch value the
+  rule collapsed to *shrink-to-fit* and the element ended up narrower
+  than its parent. Combined with `text-align: center` on the surrounding
+  block, the title then appeared inside a narrower frame anchored at the
+  left of its parent — visually centered when the text wrapped to two
+  lines, visually left-aligned when the viewport was wide enough to keep
+  the text on one line. The previous `inject_marker_runtime` bug
+  (CSS-stripped-on-rerun) hid this regression because the rule itself
+  disappeared along with the rest of the global stylesheet on every
+  rerun; now that the stylesheet survives, the asymmetry between
+  `.stx-grid` and `.stx-zoom` is no longer masked. We add the same
+  `align-items: stretch !important` to `.stx-zoom` that `.stx-grid`
+  already had, and change `width: auto` to `width: 100%` so the
+  intent — "child fills the zoom container" — is explicit regardless of
+  flex defaults.
 
 ### Changed
 - **CE lifecycle refonte (cross-repo, see `streamtex-claude` branch `feat/ce-lifecycle-incremental`)**.

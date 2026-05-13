@@ -115,18 +115,65 @@
     return bestAbove || bestBelow;
   }
 
-  // Click handler — instantaneous active update, plus a short
-  // suppression window so the subsequent smooth-scroll doesn't undo it.
+  // Post-navigation safety net: ANY click anywhere in the host body
+  // or any arrow / page key on the host window may trigger a
+  // Streamlit-driven page change (floating-arrow widget, banner
+  // click, keyboard navigation).  In paginated mode this dispatches
+  // a hidden Streamlit button click and reruns the script — during
+  // the rerun, MutationObserver fires repeatedly, but the cadence
+  // of `childList` events can settle (in some browsers / network
+  // conditions) WITHOUT a final mutation after the page becomes
+  // stable.  When that happens the last `fireRecompute()` call ran
+  // against a half-rendered DOM and returned `null`, leaving the
+  // highlight in whatever state it was at the start of the rerun.
+  //
+  // Schedule explicit recomputes at +500/+1500/+3000 ms after any
+  // potential navigation trigger.  Each is just another
+  // `scheduleRecompute` call — throttled and idempotent — so the
+  // total cost is at most three extra `fireRecompute` invocations
+  // per interaction, each of which is a no-op when state is
+  // already correct.
+  function scheduleNavSafetyNet() {
+    setTimeout(scheduleRecompute, 500);
+    setTimeout(scheduleRecompute, 1500);
+    setTimeout(scheduleRecompute, 3000);
+  }
+
+  // Click handler — instantaneous active update for anchor clicks,
+  // plus a short suppression window so the subsequent smooth-scroll
+  // doesn't undo it.  Also: every click fires the nav safety net,
+  // because we cannot tell from inside scroll-spy whether the click
+  // hit a Streamlit nav button.
   hostDoc.body.addEventListener('click', function (e) {
-    if (!e.target || !e.target.closest) return;
-    var a = e.target.closest('a[href^="#"]');
-    if (!a) return;
-    var entry = a.closest(ENTRY_SEL);
-    if (!entry) return;
-    var anchor = decodeURIComponent(a.getAttribute('href').slice(1));
-    if (!anchor) return;
-    setActive(anchor);
-    suppressUntil = Date.now() + CLICK_SUPPRESS_MS;
+    if (e.target && e.target.closest) {
+      var a = e.target.closest('a[href^="#"]');
+      if (a) {
+        var entry = a.closest(ENTRY_SEL);
+        if (entry) {
+          var anchor = decodeURIComponent(a.getAttribute('href').slice(1));
+          if (anchor) {
+            setActive(anchor);
+            suppressUntil = Date.now() + CLICK_SUPPRESS_MS;
+          }
+        }
+      }
+    }
+    scheduleNavSafetyNet();
+  }, true);
+
+  // Keyboard handler — navigation keys (Page/Arrow/Home/End) can
+  // trigger paginated reruns via marker.py's keydown handler.  We
+  // listen on the host window (and the iframe-attached document
+  // via Streamlit's reattachment scanIframes pattern is unnecessary
+  // here — keydown bubbles to window).
+  hostWin.addEventListener('keydown', function (e) {
+    var k = e.key || '';
+    if (k === 'PageDown' || k === 'PageUp' ||
+        k === 'ArrowRight' || k === 'ArrowLeft' ||
+        k === 'ArrowDown' || k === 'ArrowUp' ||
+        k === 'Home' || k === 'End' || k === 'Space' || k === ' ') {
+      scheduleNavSafetyNet();
+    }
   }, true);
 
   // Single fire path for recomputing the active entry.

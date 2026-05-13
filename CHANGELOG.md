@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.40] — 2026-05-13
+
+### Fixed
+- **Highlight still missing after two-click navigation, where 0.6.39
+  was insufficient.** User reported that even with the no-clear-on-
+  null fix, two consecutive floating-arrow clicks (or arrow-key
+  presses) still left the highlight permanently missing.
+
+  Deeper root cause: in paginated mode, the floating-arrow widget
+  in `marker.py` calls `_stxMarkerGoToPage` → `navigateToPage` in
+  `book.py`, which has a `if (navigating) return` re-entry guard.
+  Click #2 is silently dropped while click #1's Streamlit rerun is
+  in-flight, but `marker.py` has already advanced its internal
+  `currentIdx`. The MutationObserver in `stx_scroll_spy.js` fires
+  during the rerun, but the cadence of `childList` events can
+  settle (in some browsers / network conditions) WITHOUT a final
+  mutation after the page becomes stable — so the last
+  `fireRecompute()` call runs against a half-rendered DOM, returns
+  `null`, and 0.6.39 correctly does not clear, but no later
+  mutation re-triggers a fire against the now-stable DOM either.
+
+  Fix: post-navigation safety net. Every click on the host body
+  and every Page/Arrow/Home/End/Space keydown on the host window
+  schedules three additional `scheduleRecompute` calls at
+  +500/+1500/+3000 ms. Each is throttled and idempotent — if the
+  state is already correct (the normal case), the extra fires are
+  no-ops. If the MutationObserver cadence settled prematurely,
+  these guarantee a recompute against the stable post-rerun DOM.
+
+  Cost: at most three extra `setTimeout` + `setActive` invocations
+  per interaction. No new dependencies, no behaviour change for
+  scroll-only interactions.
+
 ## [0.6.39] — 2026-05-13
 
 ### Fixed

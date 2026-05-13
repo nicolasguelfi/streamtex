@@ -96,9 +96,16 @@ _SIDEBAR_CSS = """
  * aligned with the live app instead of switching to a hardcoded palette based
  * on the reader's OS ``prefers-color-scheme`` preference.
  */
+/* Layout variable for the sidebar width.  The default 280px is also the
+ * "reset" target for the double-click on the resize handle (see
+ * _SIDEBAR_RESIZE_JS).  At runtime the JS reads any persisted width
+ * from localStorage and updates this variable. */
+:root { --stx-sidebar-width: 280px; }
+
 .stx-export-sidebar {
   position: fixed; top: 0; left: 0; bottom: 0;
-  width: 280px; overflow-y: auto; overflow-x: hidden;
+  width: var(--stx-sidebar-width, 280px);
+  overflow-y: auto; overflow-x: hidden;
   background: var(--stx-export-sidebar-bg, #f8f9fa);
   color: var(--stx-export-sidebar-fg, #333);
   border-right: 1px solid var(--stx-export-sidebar-border, #e0e0e0);
@@ -106,6 +113,29 @@ _SIDEBAR_CSS = """
   font-family: Arial, Helvetica, sans-serif; font-size: 14px;
   scrollbar-width: thin;
 }
+
+/* Drag-resize handle (P1 + P4: drag + double-click to reset). */
+.stx-sidebar-resize-handle {
+  position: absolute; top: 0; right: 0; bottom: 0;
+  width: 6px; cursor: ew-resize;
+  background: transparent;
+  transition: background 0.15s;
+  /* Make it click-through-safe when the user is not actively grabbing it. */
+  touch-action: none;
+}
+.stx-sidebar-resize-handle:hover,
+.stx-sidebar-resize-handle:focus-visible,
+body.stx-sidebar-resizing .stx-sidebar-resize-handle {
+  background: var(--stx-export-link, #1155cc);
+  opacity: 0.5;
+}
+.stx-sidebar-resize-handle:focus { outline: none; }
+
+/* While dragging, prevent text selection and freeze the margin/width
+ * transition so the resize tracks the pointer with no lag. */
+body.stx-sidebar-resizing { user-select: none; cursor: ew-resize; }
+body.stx-sidebar-resizing .stx-export-sidebar,
+body.stx-sidebar-resizing .streamtex-page { transition: none !important; }
 .stx-sidebar-header {
   display: flex; align-items: center; gap: 8px;
   margin-bottom: 12px; padding-bottom: 8px;
@@ -144,20 +174,38 @@ _SIDEBAR_CSS = """
 }
 /* TOC entries are rendered as hyperlinks — same look as the live Streamlit
  * sidebar (linkColor + underlined), driven by the project's theme via the
- * --stx-export-link variable. */
+ * --stx-export-link variable.  No bold weight on any TOC item (per user
+ * request): the active entry is marked by a subtle left-border indicator
+ * rather than a font-weight change, so the typography stays uniform. */
+.stx-toc-entry {
+  position: relative;
+}
 .stx-toc-entry a {
   color: var(--stx-export-link, #1155cc);
   text-decoration: underline;
+  font-weight: normal;
 }
 .stx-toc-entry a:hover { text-decoration: underline; }
-.stx-toc-entry.stx-toc-active a { font-weight: 700; }
-.stx-toc-l1 { font-weight: 600; }
+.stx-toc-entry.stx-toc-active::before {
+  content: '';
+  position: absolute;
+  left: -8px; top: 4px; bottom: 4px;
+  width: 3px;
+  background: var(--stx-export-link, #1155cc);
+  border-radius: 2px;
+}
 .stx-toc-l2 { padding-left: 16px; }
 .stx-toc-l3 { padding-left: 32px; font-size: 13px; }
 .stx-toc-l4 { padding-left: 48px; font-size: 12px; }
 
-/* Main content offset — transitions with sidebar */
-.streamtex-page { margin-left: 280px; transition: margin-left 0.25s; }
+/* Main content offset — transitions with sidebar.  The margin tracks
+ * the same --stx-sidebar-width variable that the sidebar's own width
+ * uses, so resizing or toggling stays in lockstep with a single CSS
+ * write. */
+.streamtex-page {
+  margin-left: var(--stx-sidebar-width, 280px);
+  transition: margin-left 0.25s;
+}
 
 /* External toggle — only visible when sidebar is hidden */
 .stx-sidebar-toggle {
@@ -241,6 +289,15 @@ def _build_sidebar_html(toc: list[dict], has_search: bool = False,
             f'{_ver_text}</div>'
         )
     parts.append('<div style="height:40px;"></div>')  # bottom spacer
+    # Drag-resize handle on the right edge.  Double-click resets to 280px.
+    # tabindex=0 + role="separator" makes it keyboard-focusable; the JS
+    # listens for ArrowLeft/ArrowRight (Shift = bigger step) when focused.
+    parts.append(
+        '<div class="stx-sidebar-resize-handle" '
+        'role="separator" aria-orientation="vertical" '
+        'aria-label="Resize sidebar (double-click to reset)" '
+        'tabindex="0"></div>'
+    )
     parts.append('</nav>')
     # Hamburger toggle for mobile
     parts.append(
@@ -482,6 +539,83 @@ _SEARCH_JS = """
 # Sidebar toggle JS
 # ---------------------------------------------------------------------------
 
+_SIDEBAR_RESIZE_JS = """
+(function() {
+  var sidebar = document.getElementById('stx-sidebar');
+  if (!sidebar) return;
+  var handle = sidebar.querySelector('.stx-sidebar-resize-handle');
+  if (!handle) return;
+  var root = document.documentElement;
+  var body = document.body;
+  var MIN = 180;
+  var MAX_FRAC = 0.5;
+  var DEFAULT = 280;
+  var STORAGE_KEY = 'stx-sidebar-width';
+
+  function maxAllowed() {
+    return Math.max(MIN, Math.floor(window.innerWidth * MAX_FRAC));
+  }
+  function clamp(px) {
+    return Math.max(MIN, Math.min(px, maxAllowed()));
+  }
+  function setWidth(px, persist) {
+    root.style.setProperty('--stx-sidebar-width', px + 'px');
+    if (persist) {
+      try { localStorage.setItem(STORAGE_KEY, String(px)); } catch (e) {}
+    }
+  }
+  function currentWidth() {
+    var v = parseInt(getComputedStyle(root).getPropertyValue('--stx-sidebar-width'), 10);
+    return isNaN(v) ? DEFAULT : v;
+  }
+
+  // Restore persisted width on load (desktop only).
+  try {
+    var saved = parseInt(localStorage.getItem(STORAGE_KEY), 10);
+    if (saved && window.innerWidth > 768) setWidth(clamp(saved), false);
+  } catch (e) {}
+
+  // --- Drag-to-resize ---------------------------------------------------
+  var dragging = false;
+  handle.addEventListener('pointerdown', function(e) {
+    if (window.innerWidth <= 768) return;  // disabled on mobile
+    dragging = true;
+    body.classList.add('stx-sidebar-resizing');
+    try { handle.setPointerCapture(e.pointerId); } catch (err) {}
+    e.preventDefault();
+  });
+  handle.addEventListener('pointermove', function(e) {
+    if (!dragging) return;
+    setWidth(clamp(e.clientX), false);
+  });
+  function endDrag(e) {
+    if (!dragging) return;
+    dragging = false;
+    body.classList.remove('stx-sidebar-resizing');
+    try { handle.releasePointerCapture(e.pointerId); } catch (err) {}
+    // Persist the final width once, not on every pointermove.
+    try { localStorage.setItem(STORAGE_KEY, String(currentWidth())); } catch (err) {}
+  }
+  handle.addEventListener('pointerup', endDrag);
+  handle.addEventListener('pointercancel', endDrag);
+
+  // --- Double-click resets to the default (P4) -------------------------
+  handle.addEventListener('dblclick', function() {
+    setWidth(DEFAULT, true);
+  });
+
+  // --- Keyboard accessibility ------------------------------------------
+  handle.addEventListener('keydown', function(e) {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    var step = e.shiftKey ? 50 : 10;
+    var delta = e.key === 'ArrowRight' ? step : -step;
+    setWidth(clamp(currentWidth() + delta), true);
+    e.preventDefault();
+  });
+})();
+"""
+
+
 _SIDEBAR_TOGGLE_JS = """
 (function() {
   var extBtn = document.getElementById('stx-sidebar-toggle');
@@ -628,6 +762,8 @@ def enrich_export_html(
         extra_css += _build_theme_vars_css()
         extra_css += _SIDEBAR_CSS
         extra_js_parts.append(_SIDEBAR_TOGGLE_JS)
+        # Resize handle JS — runs only when the sidebar is present.
+        extra_js_parts.append(_SIDEBAR_RESIZE_JS)
 
     if has_markers:
         extra_css += _MARKER_NAV_CSS

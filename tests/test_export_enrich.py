@@ -21,6 +21,8 @@ from unittest.mock import patch
 from streamtex.export import _get_theme_color
 from streamtex.export_enrich import (
     _SIDEBAR_CSS,
+    _SIDEBAR_RESIZE_JS,
+    _build_sidebar_html,
     _build_theme_vars_css,
     enrich_export_html,
 )
@@ -164,6 +166,113 @@ class TestSidebarCssVars:
         assert "#1a1a2e" not in _SIDEBAR_CSS
         assert "#42D0F3" not in _SIDEBAR_CSS
         assert "#2a2a3e" not in _SIDEBAR_CSS
+
+    def test_sidebar_width_uses_css_variable(self):
+        """The sidebar width MUST come from --stx-sidebar-width so the
+        resize JS can update it; the previous hardcoded 280px would
+        ignore any localStorage value the JS persists."""
+        assert "var(--stx-sidebar-width" in _SIDEBAR_CSS
+
+    def test_main_content_margin_uses_same_variable(self):
+        """The main content's margin-left must read the SAME variable so
+        sidebar resize and content reflow stay in lockstep with a
+        single CSS write."""
+        import re as _re
+        # There are several .streamtex-page rules (main + override during
+        # drag).  At least one must read the variable for margin-left.
+        blocks = _re.findall(r"\.streamtex-page\s*\{[^}]*\}", _SIDEBAR_CSS, _re.DOTALL)
+        assert blocks, "No .streamtex-page rule found"
+        with_var = [b for b in blocks if "var(--stx-sidebar-width" in b]
+        assert with_var, (
+            ".streamtex-page must set margin-left via var(--stx-sidebar-width). "
+            f"Found blocks: {blocks!r}"
+        )
+
+    def test_no_bold_on_toc_entries(self):
+        """Per user request: no font-weight bolding on TOC items at any
+        level.  The active entry is marked by a left-border ::before
+        pseudo-element instead of a font-weight change.
+
+        Scope: only the .stx-toc-* selectors.  The .stx-sidebar-logo
+        header text legitimately keeps font-weight: 700 (it is a brand
+        element, not a TOC entry).
+        """
+        import re as _re
+        # No level-class rule sets font-weight to anything bold.
+        for selector in (r"\.stx-toc-l1", r"\.stx-toc-l2",
+                         r"\.stx-toc-l3", r"\.stx-toc-l4"):
+            m = _re.search(rf"{selector}[^{{]*\{{[^}}]*\}}", _SIDEBAR_CSS, _re.DOTALL)
+            if m is not None:
+                body = m.group(0)
+                assert "font-weight" not in body or "normal" in body, (
+                    f"{selector!r} block must not bold TOC items.  Got: {body!r}"
+                )
+        # Active marker must NOT use font-weight at all on .stx-toc-active
+        # (it now uses a ::before pseudo-element).
+        m = _re.search(r"\.stx-toc-entry\.stx-toc-active a\s*\{[^}]*\}",
+                       _SIDEBAR_CSS, _re.DOTALL)
+        if m is not None:
+            assert "font-weight" not in m.group(0), (
+                "Active TOC entry must not be bolded; use ::before indicator instead."
+            )
+        # And the new ::before indicator is in place.
+        assert ".stx-toc-active::before" in _SIDEBAR_CSS
+
+
+# ---------------------------------------------------------------------------
+# Sidebar drag-resize handle (P1 + P4 reset on double-click)
+# ---------------------------------------------------------------------------
+
+class TestSidebarResizeHandle:
+    def test_handle_emitted_in_sidebar_html(self):
+        toc = [{"level": 1, "title": "Hello", "_reg_label": "Hello",
+                "key_anchor": "h1"}]
+        html = _build_sidebar_html(toc)
+        assert "stx-sidebar-resize-handle" in html
+        # Accessible: keyboard-focusable + role=separator.
+        assert 'role="separator"' in html
+        assert 'tabindex="0"' in html
+
+    def test_resize_js_uses_pointer_events_and_storage(self):
+        """The handler MUST use pointer events (works with mouse + touch
+        + pen) and persist the chosen width across reloads."""
+        assert "pointerdown" in _SIDEBAR_RESIZE_JS
+        assert "pointermove" in _SIDEBAR_RESIZE_JS
+        assert "pointerup" in _SIDEBAR_RESIZE_JS
+        assert "setPointerCapture" in _SIDEBAR_RESIZE_JS
+        assert "localStorage" in _SIDEBAR_RESIZE_JS
+        assert "--stx-sidebar-width" in _SIDEBAR_RESIZE_JS
+
+    def test_resize_js_clamps_to_min_max(self):
+        """A negative drag or one past the viewport must not collapse
+        the sidebar to 0 or push it past sane bounds."""
+        assert "MIN" in _SIDEBAR_RESIZE_JS
+        assert "MAX_FRAC" in _SIDEBAR_RESIZE_JS
+        assert "function clamp" in _SIDEBAR_RESIZE_JS
+
+    def test_resize_js_dblclick_resets_to_default(self):
+        """Double-click on the handle resets to the 280px default (P4)."""
+        assert "dblclick" in _SIDEBAR_RESIZE_JS
+
+    def test_resize_js_keyboard_accessibility(self):
+        """ArrowLeft / ArrowRight on the focused handle adjust the
+        width; Shift increases the step."""
+        assert "ArrowLeft" in _SIDEBAR_RESIZE_JS
+        assert "ArrowRight" in _SIDEBAR_RESIZE_JS
+        assert "shiftKey" in _SIDEBAR_RESIZE_JS
+
+    def test_resize_js_wired_into_enrich(self):
+        """The resize JS must reach the output when a TOC is present."""
+        toc = [{"level": 1, "title": "Hello", "_reg_label": "Hello",
+                "key_anchor": "h1"}]
+        raw = ("<!DOCTYPE html><html><head><title>T</title><style></style>"
+               "</head><body><div class=\"streamtex-page\">x</div>"
+               "</body></html>")
+        with patch("streamtex.export.st.get_option") as mock_opt:
+            mock_opt.return_value = None
+            out = enrich_export_html(raw, toc=toc)
+        assert "stx-sidebar-resize-handle" in out
+        assert "pointerdown" in out
 
 
 # ---------------------------------------------------------------------------

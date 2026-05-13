@@ -5,6 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.31] — 2026-05-13
+
+### Added
+- **Resizable sidebar in the static HTML export.**  A drag handle on
+  the sidebar's right edge lets the reader pick any width between
+  180px and 50% of the viewport.  The main content's ``margin-left``
+  shares the same ``--stx-sidebar-width`` CSS variable, so the content
+  area reflows in real time with the same "respiration" effect the
+  open/close toggle already produces.  Double-clicking the handle
+  resets to the 280px default.  The chosen width is persisted in
+  ``localStorage`` and restored on subsequent page loads.
+
+  Accessibility: the handle is keyboard-focusable
+  (``role="separator"`` + ``tabindex="0"``) and reacts to
+  ``ArrowLeft`` / ``ArrowRight`` (Shift = ×5 step).  Touch + pen
+  inputs work via pointer events.  Mobile (≤768px viewport) keeps the
+  existing slide-in toggle behaviour and disables resize.
+
+  Implementation: new ``_SIDEBAR_RESIZE_JS`` block wired in
+  ``enrich_export_html`` alongside ``_SIDEBAR_TOGGLE_JS``; both share
+  the same ``--stx-sidebar-width`` variable so toggling and resizing
+  stay in lockstep.
+
+### Changed
+- **TOC entries are no longer bolded.**  Previously the L1 level had
+  ``font-weight: 600`` and the active entry had ``font-weight: 700``.
+  Per user request the entries now render at the default weight; the
+  active entry is marked by a subtle left-border (``::before``
+  pseudo-element in ``var(--stx-export-link)``) instead of a heavier
+  font weight, so the typography stays uniform.
+
 ## [0.6.30] — 2026-05-13
 
 ### Fixed

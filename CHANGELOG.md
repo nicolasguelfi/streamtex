@@ -7,6 +7,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.36] — 2026-05-13
+
+### Fixed
+- **TOC/Markers sidebar: multiple entries appeared highlighted instead of
+  the single active one.** When paginated decks displayed several markers
+  or TOC entries pointing to the same Streamlit page, all of them
+  received an inline `color:var(--stx-link-active-color)` style — every
+  entry on the current page looked identically "highlighted". On top of
+  that, the cross-context scroll-spy's 3 px `::before` accent bar (the
+  signal for the *single* active entry) was being clipped away in live
+  context by the same `overflow:hidden` quirk that 0.6.33 had already
+  fixed on the export side. Net visible result: clicking marker N
+  highlighted markers N through N+k (k = number of other markers on the
+  same page), with no way to identify the truly active one.
+  
+  Three coordinated fixes, on `fix/single-active-toc-marker-entry`:
+  - `book.py` (live, paginated and search-enabled paths for TOC + Markers):
+    drop the `style="color:var(--stx-link-active-color)"` from current-page
+    anchors. The cross-context scroll-spy is now the **single source of
+    truth** for which entry is active.
+  - `book.py` (same four paths): wrap the entry content in an inner
+    `<span style="display:block; overflow:hidden; text-overflow:ellipsis;
+    white-space:nowrap;">` so the outer `[data-stx-block]` no longer
+    clips its `::before` bar (mirrors the 0.6.33 export fix).
+  - `stx_global.css`: add the brighter active-link colour for live —
+    `[data-stx-block].stx-nav-active a { color: color-mix(…65%, white) }`
+    — that the export side already had since 0.6.34. The `!important`
+    keeps it winning over any Streamlit per-page coloring that might
+    reappear in future releases.
+
+- **Scroll-spy didn't follow Streamlit paginated navigation.** The
+  cross-context scroll-spy listened for `scroll` events to recompute the
+  closest anchor. But Streamlit's paginated mode (PageDown / banner /
+  TOC page-link click) tears down the main content and rebuilds it —
+  there is no `scroll` event. The previously-active entry stayed
+  highlighted forever, even after the user moved to a different slide.
+  
+  Fix in `stx_scroll_spy.js`: also recompute on `hashchange` (Streamlit
+  updates the URL to `#stx-goto-N` on page change), and let the existing
+  MutationObserver trigger a debounced recompute whenever the main DOM
+  is rebuilt (`childList` mutations). Validated end-to-end on the real
+  FC deck at 1920×1080: 10 consecutive PageDowns each correctly move
+  the active entry to the new slide's marker (Bloc 2 → "2. Problem
+  statement", Bloc 3 → "3 A Historic Moment", …).
+
 ## [0.6.35] — 2026-05-13
 
 ### Fixed

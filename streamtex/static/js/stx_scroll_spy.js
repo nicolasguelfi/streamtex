@@ -119,7 +119,7 @@
 
   // Scroll handler — debounced.
   var scrollTimer = null;
-  function onScroll() {
+  function recomputeActive() {
     if (Date.now() < suppressUntil) return;
     if (scrollTimer) clearTimeout(scrollTimer);
     scrollTimer = setTimeout(function () {
@@ -127,28 +127,71 @@
       if (anchor && anchor !== currentActiveAnchor) setActive(anchor);
     }, 80);
   }
-  hostWin.addEventListener('scroll', onScroll, { passive: true });
+  hostWin.addEventListener('scroll', recomputeActive, { passive: true });
+
+  // Streamlit's paginated navigation (PageDown / PageUp / banner / TOC
+  // page-link click) doesn't produce a `scroll` event — it tears down
+  // the main-area DOM and rebuilds it.  We piggy-back on `hashchange`
+  // (Streamlit updates the URL hash to ``#stx-goto-N`` on page change)
+  // and on the MutationObserver below to refire ``recomputeActive``
+  // whenever the document content changes substantially.
+  hostWin.addEventListener('hashchange', function () {
+    // Reset the previous active so the recompute can pick a fresh
+    // entry — without this, the MutationObserver would re-apply the
+    // stale class first.
+    currentActiveAnchor = null;
+    setTimeout(recomputeActive, 150);
+  });
 
   // Initial pass — fire once after the DOM settles.
   if (hostDoc.readyState === 'complete' || hostDoc.readyState === 'interactive') {
-    setTimeout(onScroll, 50);
+    setTimeout(recomputeActive, 50);
   } else {
-    hostWin.addEventListener('load', function () { setTimeout(onScroll, 50); });
+    hostWin.addEventListener('load', function () { setTimeout(recomputeActive, 50); });
   }
 
-  // MutationObserver — re-apply the active class if Streamlit's
-  // reconciliation strips it on a rerun (live context).  Scoped to
-  // class-attribute mutations so the cost is bounded.
+  // MutationObserver — two jobs:
+  //   1. Re-apply the active class if Streamlit's reconciliation strips
+  //      it on a rerun (live context, no page change).
+  //   2. Detect that the main content area was rebuilt (Streamlit
+  //      pagination) and re-run ``findClosestAnchor`` so the active
+  //      entry follows the new content.  We debounce job 2 separately
+  //      from the scroll handler so a burst of mutations on rerun
+  //      doesn't trigger a flood of recomputes.
   var Observer = hostWin.MutationObserver || window.MutationObserver;
+  var recomputeTimer = null;
   if (Observer) {
-    var obs = new Observer(function () {
-      if (!currentActiveAnchor) return;
-      var entries = getEntries();
-      for (var i = 0; i < entries.length; i++) {
-        if (anchorOf(entries[i]) === currentActiveAnchor &&
-            !entries[i].classList.contains(ACTIVE_CLS)) {
-          entries[i].classList.add(ACTIVE_CLS);
+    var obs = new Observer(function (mutations) {
+      // Job 1: re-apply class if stripped.
+      if (currentActiveAnchor) {
+        var entries = getEntries();
+        for (var i = 0; i < entries.length; i++) {
+          if (anchorOf(entries[i]) === currentActiveAnchor &&
+              !entries[i].classList.contains(ACTIVE_CLS)) {
+            entries[i].classList.add(ACTIVE_CLS);
+          }
         }
+      }
+      // Job 2: heuristic — if any of the mutations added or removed
+      // nodes inside the main content area (not just an attribute
+      // flip), schedule a recompute.  The main area is where the
+      // anchors targeted by the TOC live; new content means the
+      // closest-anchor calculation needs to redo.
+      var contentChanged = false;
+      for (var j = 0; j < mutations.length; j++) {
+        var m = mutations[j];
+        if (m.type === 'childList' &&
+            (m.addedNodes.length > 0 || m.removedNodes.length > 0)) {
+          contentChanged = true;
+          break;
+        }
+      }
+      if (contentChanged) {
+        if (recomputeTimer) clearTimeout(recomputeTimer);
+        recomputeTimer = setTimeout(function () {
+          var anchor = findClosestAnchor();
+          if (anchor && anchor !== currentActiveAnchor) setActive(anchor);
+        }, 250);
       }
     });
     obs.observe(hostDoc.body, {

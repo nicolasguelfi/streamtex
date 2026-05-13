@@ -5,6 +5,45 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.32] — 2026-05-13
+
+### Added
+- **Cross-context scroll-spy for TOC / Markers navigation.**  A new
+  unified JavaScript module (``streamtex/static/js/stx_scroll_spy.js``)
+  drives the cyan active-entry indicator across all three contexts the
+  reader can encounter:
+
+  1. Live Streamlit + sidebar tab "TOC"
+  2. Live Streamlit + sidebar tab "Markers"
+  3. Static HTML export sidebar
+
+  All three contexts already share the ``[data-stx-block]`` attribute on
+  each navigation entry, which makes a single data-driven module
+  possible.  Behaviour:
+
+  - Clicking any entry (any depth, not just L1) marks it active
+    immediately and suppresses the scroll handler for 400 ms so the
+    smooth-scroll animation doesn't bounce the active state away.
+  - On scroll, the entry whose anchor target is closest to (but at or
+    above) ~120 px from the viewport top wins.  At the very top of the
+    document the first anchor below the line wins.
+
+  Robustness: ``window.__stxScrollSpy`` guard prevents double-mount on
+  Streamlit reruns, and a ``MutationObserver`` re-applies the active
+  class if Streamlit's reconciliation strips it.
+
+### Changed
+- **Renamed CSS class ``.stx-toc-active`` → ``.stx-nav-active``.**  The
+  active-entry indicator is no longer TOC-specific — it covers TOC,
+  Markers, and export in one rule.  The selector lives in
+  ``streamtex/static/css/stx_global.css`` (so live mode gets it via the
+  marker-observer injection) and is mirrored in the export sidebar CSS
+  for static exports.
+- ``_MARKER_NAV_JS.updateUI()`` no longer touches the sidebar's active
+  class — scroll-spy now owns this responsibility across all contexts,
+  removing the previous coupling between the marker-navigation runtime
+  and the sidebar's visual state.
+
 ## [0.6.31] — 2026-05-13
 
 ### Added

@@ -20,6 +20,7 @@ from unittest.mock import patch
 
 from streamtex.export import _get_theme_color
 from streamtex.export_enrich import (
+    _SCROLL_SPY_JS,
     _SIDEBAR_CSS,
     _SIDEBAR_RESIZE_JS,
     _build_sidebar_html,
@@ -207,16 +208,18 @@ class TestSidebarCssVars:
                 assert "font-weight" not in body or "normal" in body, (
                     f"{selector!r} block must not bold TOC items.  Got: {body!r}"
                 )
-        # Active marker must NOT use font-weight at all on .stx-toc-active
-        # (it now uses a ::before pseudo-element).
-        m = _re.search(r"\.stx-toc-entry\.stx-toc-active a\s*\{[^}]*\}",
+        # Active marker must NOT use font-weight at all on .stx-nav-active
+        # (it now uses a ::before pseudo-element).  Class was renamed from
+        # the legacy `.stx-toc-active` to `.stx-nav-active` in 0.6.32 so the
+        # same cross-context selector drives live (TOC + Markers) and export.
+        m = _re.search(r"\.stx-toc-entry\.stx-nav-active a\s*\{[^}]*\}",
                        _SIDEBAR_CSS, _re.DOTALL)
         if m is not None:
             assert "font-weight" not in m.group(0), (
                 "Active TOC entry must not be bolded; use ::before indicator instead."
             )
         # And the new ::before indicator is in place.
-        assert ".stx-toc-active::before" in _SIDEBAR_CSS
+        assert ".stx-nav-active::before" in _SIDEBAR_CSS
 
 
 # ---------------------------------------------------------------------------
@@ -273,6 +276,81 @@ class TestSidebarResizeHandle:
             out = enrich_export_html(raw, toc=toc)
         assert "stx-sidebar-resize-handle" in out
         assert "pointerdown" in out
+
+
+# ---------------------------------------------------------------------------
+# Cross-context scroll-spy (stx_scroll_spy.js)
+# ---------------------------------------------------------------------------
+
+class TestScrollSpyJs:
+    """The same JS script is consumed by the live runtime
+    (``streamtex.marker_runtime``) and by the static export
+    (``enrich_export_html``) so the active indicator behaviour stays
+    identical across:
+      * live TOC sidebar panel,
+      * live Markers sidebar panel,
+      * static HTML export TOC sidebar.
+    """
+
+    def test_scroll_spy_asset_loaded(self):
+        assert _SCROLL_SPY_JS, "scroll-spy JS asset did not load at import"
+        # Idempotent guard (no double-mount on rerun).
+        assert "__stxScrollSpy" in _SCROLL_SPY_JS
+
+    def test_scroll_spy_uses_data_stx_block_selector(self):
+        """The script must target the cross-context attribute so the
+        live TOC, live Markers and static export all share the same
+        behaviour — that attribute is on every entry in all three."""
+        assert "data-stx-block" in _SCROLL_SPY_JS
+
+    def test_scroll_spy_applies_stx_nav_active_class(self):
+        assert "stx-nav-active" in _SCROLL_SPY_JS
+
+    def test_scroll_spy_has_click_and_scroll_handlers(self):
+        """Both click (instantaneous) and scroll (closest-anchor)
+        modes must be wired."""
+        assert "click" in _SCROLL_SPY_JS
+        assert "scroll" in _SCROLL_SPY_JS
+        # Click suppression window so smooth-scroll doesn't undo the
+        # click-triggered active state.
+        assert "CLICK_SUPPRESS_MS" in _SCROLL_SPY_JS
+
+    def test_scroll_spy_reapplies_class_on_reconciliation(self):
+        """Streamlit reconciliation can strip our ``stx-nav-active``
+        class on rerun — the script must re-apply via MutationObserver
+        on class-attribute changes."""
+        assert "MutationObserver" in _SCROLL_SPY_JS
+        assert "attributeFilter" in _SCROLL_SPY_JS
+        assert "'class'" in _SCROLL_SPY_JS
+
+    def test_scroll_spy_wired_into_export(self):
+        toc = [{"level": 1, "title": "Hello", "_reg_label": "Hello",
+                "key_anchor": "h1"}]
+        raw = ("<!DOCTYPE html><html><head><title>T</title><style></style>"
+               "</head><body><div class=\"streamtex-page\">x</div>"
+               "</body></html>")
+        with patch("streamtex.export.st.get_option") as mock_opt:
+            mock_opt.return_value = None
+            out = enrich_export_html(raw, toc=toc)
+        assert "__stxScrollSpy" in out
+        assert "stx-nav-active" in out
+
+    def test_sidebar_css_uses_nav_active_class(self):
+        """The static export's sidebar CSS now keys its active indicator
+        off ``.stx-nav-active`` (the cross-context class) rather than
+        the previous ``.stx-toc-active`` which was only ever set by the
+        marker-nav fallback."""
+        assert ".stx-toc-entry.stx-nav-active::before" in _SIDEBAR_CSS
+
+    def test_marker_nav_no_longer_drives_toc_active(self):
+        """The TOC active branch was removed from _MARKER_NAV_JS.updateUI()
+        — scroll-spy owns the class now.  Guard against a future
+        revert that would re-introduce the bias to L1 markers."""
+        from streamtex.export_enrich import _MARKER_NAV_JS
+        # The old logic queried '.stx-toc-entry a[href="#" + activeAnchor + '"]'
+        # and added .stx-toc-active.  Those phrases are gone.
+        assert ".stx-toc-entry a[href=" not in _MARKER_NAV_JS
+        assert "stx-toc-active" not in _MARKER_NAV_JS
 
 
 # ---------------------------------------------------------------------------

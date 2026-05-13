@@ -12,6 +12,15 @@ from pathlib import Path
 
 from .export import _get_theme_color
 
+# Path to the cross-context scroll-spy script.  Same file is used by the
+# live runtime via :mod:`streamtex.marker_runtime`.  Loading at import
+# time keeps the export fast — no I/O per export call.
+_SCROLL_SPY_JS_PATH = Path(__file__).resolve().parent / "static" / "js" / "stx_scroll_spy.js"
+try:
+    _SCROLL_SPY_JS = _SCROLL_SPY_JS_PATH.read_text(encoding="utf-8")
+except OSError:
+    _SCROLL_SPY_JS = ""
+
 # ---------------------------------------------------------------------------
 # Prop E — Auto-detect title from TOC
 # ---------------------------------------------------------------------------
@@ -176,17 +185,16 @@ body.stx-sidebar-resizing .streamtex-page { transition: none !important; }
  * sidebar (linkColor + underlined), driven by the project's theme via the
  * --stx-export-link variable.  No bold weight on any TOC item (per user
  * request): the active entry is marked by a subtle left-border indicator
- * rather than a font-weight change, so the typography stays uniform. */
-.stx-toc-entry {
-  position: relative;
-}
+ * via the cross-context ``.stx-nav-active`` class (driven by
+ * ``streamtex/static/js/stx_scroll_spy.js``), not a font-weight change. */
+.stx-toc-entry { position: relative; }
 .stx-toc-entry a {
   color: var(--stx-export-link, #1155cc);
   text-decoration: underline;
   font-weight: normal;
 }
 .stx-toc-entry a:hover { text-decoration: underline; }
-.stx-toc-entry.stx-toc-active::before {
+.stx-toc-entry.stx-nav-active::before {
   content: '';
   position: absolute;
   left: -8px; top: 4px; bottom: 4px;
@@ -435,21 +443,10 @@ _MARKER_NAV_JS = """
     counter.textContent = (currentIdx + 1) + ' / ' + visible.length;
     label.textContent = visible[currentIdx].label;
     highlightPopup();
-    // Highlight active TOC entry
-    document.querySelectorAll('.stx-toc-entry').forEach(function(el) { el.classList.remove('stx-toc-active'); });
-    var activeAnchor = visible[currentIdx].anchor;
-    var tocLink = document.querySelector('.stx-toc-entry a[href="#' + activeAnchor + '"]');
-    if (!tocLink) {
-      // Try matching by marker label to TOC title
-      var m = visible[currentIdx];
-      document.querySelectorAll('.stx-toc-entry a').forEach(function(a) {
-        if (a.textContent.indexOf(m.label) !== -1) {
-          a.parentElement.classList.add('stx-toc-active');
-        }
-      });
-    } else {
-      tocLink.parentElement.classList.add('stx-toc-active');
-    }
+    // The TOC sidebar active indicator is owned by the cross-context
+    // scroll-spy (stx_scroll_spy.js) since 0.6.32 — it tracks ALL TOC
+    // entry anchors (not just markers), so the indicator can land on
+    // any level and not just L1.  Nothing to do here.
   }
 
   function highlightPopup() {
@@ -764,6 +761,11 @@ def enrich_export_html(
         extra_js_parts.append(_SIDEBAR_TOGGLE_JS)
         # Resize handle JS — runs only when the sidebar is present.
         extra_js_parts.append(_SIDEBAR_RESIZE_JS)
+        # Cross-context scroll-spy (same script the live runtime uses
+        # via marker_runtime).  Drives `.stx-nav-active` on the entry
+        # closest to the viewport top or the one the user just clicked.
+        if _SCROLL_SPY_JS:
+            extra_js_parts.append(_SCROLL_SPY_JS)
 
     if has_markers:
         extra_css += _MARKER_NAV_CSS

@@ -191,6 +191,14 @@
   // even if Streamlit emits trailing mutations for several seconds
   // (async images, lazy-loaded components, etc.) the active entry
   // converges on the correct one within ~100 ms of the DOM stabilising.
+  //
+  // We ALSO observe `class` attribute mutations and route them through
+  // the same throttled recompute.  In practice Streamlit reconciles by
+  // node replacement (childList), but if anything strips
+  // `.stx-nav-active` via a pure attribute mutation with no surrounding
+  // DOM change, the childList-only path would miss it.  Routing through
+  // setActive() — the single writer — means the safety net cannot cause
+  // class flapping: setActive() reads the current state before writing.
   var Observer = hostWin.MutationObserver || window.MutationObserver;
   if (Observer) {
     var obs = new Observer(function (mutations) {
@@ -201,10 +209,15 @@
           scheduleRecompute();
           return;
         }
+        if (m.type === 'attributes' && m.attributeName === 'class') {
+          scheduleRecompute();
+          return;
+        }
       }
     });
     obs.observe(hostDoc.body, {
       childList: true, subtree: true,
+      attributes: true, attributeFilter: ['class'],
     });
     hostWin.__stxScrollSpyObs = obs;
   }

@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.38] — 2026-05-13
+
+### Added
+- **Scroll-spy class-strip safety net.** The `MutationObserver` in
+  `stx_scroll_spy.js` now also watches `class` attribute mutations
+  (in addition to `childList`) and routes them through the same
+  throttled `scheduleRecompute` path. This closes the only remaining
+  theoretical regression window from 0.6.37: if anything were to
+  strip `.stx-nav-active` via a pure attribute mutation with no
+  surrounding DOM change, the recompute would still fire and the
+  single-writer `setActive()` would re-apply the class within
+  ~100 ms. In practice Streamlit reconciles by node replacement
+  (childList), so this is belt-and-braces — but it is purely
+  additive: the safety net cannot cause class flapping because
+  `setActive()` reads current state before writing.
+- **Navigation-matrix E2E probe** (`tests/e2e/_nav_matrix_probe.py`)
+  exercises 5 paths not covered by `_instability_probe.py`:
+  TOC↔Markers tab swap, URL hash navigation (validates the
+  `hashchange` listener added in 0.6.37), search-filter activation
+  while highlight is set, mid-navigation tab swap (PageDown twice
+  then immediate tab switch), and direct class strip via JS
+  (regression test for the new safety net). All assertions pass on
+  the FC deck at 1920×1080.
+
+### Notes
+- Audit of all changes since 0.6.34 was completed. The
+  attribute-observation safety net is the only addition; no
+  behaviour was modified or removed.
+
 ## [0.6.37] — 2026-05-13
 
 ### Fixed

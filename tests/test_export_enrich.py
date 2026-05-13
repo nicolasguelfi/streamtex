@@ -386,16 +386,22 @@ class TestScrollSpyJs:
         to ``childList`` mutations in the body subtree by scheduling
         a recompute through ``findClosestAnchor`` + ``setActive``,
         which is the single source of truth for which entry is
-        active.  See 0.6.36 history: an earlier ``attributeFilter:
-        ['class']`` design tried to re-apply the class on every
-        reconciliation, but it kept the class on stale nodes whose
-        href had silently mutated."""
+        active.
+
+        Class-attribute mutations are also observed (additive safety
+        net for the rare case where something strips
+        ``.stx-nav-active`` without touching the DOM tree) but routed
+        through the same ``scheduleRecompute`` path — they never
+        re-add a class directly.  This sidesteps the 0.6.36-era bug
+        where direct re-add kept the class on stale nodes whose href
+        had silently mutated."""
         assert "MutationObserver" in _SCROLL_SPY_JS
-        # Recompute is driven by childList mutations (content rebuilt)
-        # not by class-attribute flips.
+        # Both childList AND class-attribute mutations are inputs.
         assert "childList" in _SCROLL_SPY_JS
+        assert "attributeFilter" in _SCROLL_SPY_JS
+        assert "'class'" in _SCROLL_SPY_JS
         # Single fire path through `setActive` (which handles both add
-        # and remove), called via the debounced `scheduleRecompute`.
+        # and remove), called via the throttled `scheduleRecompute`.
         assert "scheduleRecompute" in _SCROLL_SPY_JS
         assert "fireRecompute" in _SCROLL_SPY_JS
 

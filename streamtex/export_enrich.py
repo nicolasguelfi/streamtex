@@ -177,9 +177,14 @@ body.stx-sidebar-resizing .streamtex-page { transition: none !important; }
   background: var(--stx-export-sidebar-input-bg, #fff);
   color: var(--stx-export-sidebar-fg, #333);
 }
+/* Text-truncation lives on the inner <a>, not on the entry, so the active
+ * indicator's ``::before`` (positioned at left:-8px) is not clipped by the
+ * entry's own overflow box.  Keeping ``overflow: hidden`` on the entry
+ * (the historical placement) clipped the bar entirely in static exports —
+ * fixed in 0.6.33 by moving overflow/ellipsis down to the link. */
 .stx-toc-entry {
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   padding: 2px 0; line-height: 1.4;
+  position: relative;
 }
 /* TOC entries are rendered as hyperlinks — same look as the live Streamlit
  * sidebar (linkColor + underlined), driven by the project's theme via the
@@ -187,8 +192,9 @@ body.stx-sidebar-resizing .streamtex-page { transition: none !important; }
  * request): the active entry is marked by a subtle left-border indicator
  * via the cross-context ``.stx-nav-active`` class (driven by
  * ``streamtex/static/js/stx_scroll_spy.js``), not a font-weight change. */
-.stx-toc-entry { position: relative; }
 .stx-toc-entry a {
+  display: block;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   color: var(--stx-export-link, #1155cc);
   text-decoration: underline;
   font-weight: normal;

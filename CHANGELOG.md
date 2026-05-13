@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.33] — 2026-05-13
+
+### Fixed
+- **Static export: active TOC entry indicator was invisible.**  The
+  cyan ``::before`` bar introduced in 0.6.31 and driven by the
+  cross-context scroll-spy in 0.6.32 lived at ``left: -8px`` from the
+  entry box.  But ``.stx-toc-entry`` itself carried ``overflow:
+  hidden`` (for text-ellipsis truncation), and browsers clip
+  ``position: absolute`` descendants at the element's overflow box —
+  so the bar was entirely clipped away in the static export.  Live
+  Streamlit users didn't notice because the live sidebar also
+  highlights the current page via ``--stx-link-active-color`` on the
+  ``<a>`` (an independent per-page mechanism), which masked the
+  invisible bar.
+
+  Fix: move ``overflow: hidden; text-overflow: ellipsis; white-space:
+  nowrap`` from ``.stx-toc-entry`` down to the inner ``.stx-toc-entry
+  a`` (now ``display: block``).  The entry no longer clips, the
+  ``::before`` bar renders correctly, and text-ellipsis still works
+  because the ``<a>`` is the element that actually wraps the text.
+
+  Regression test added in
+  ``test_export_enrich.py::TestSidebarCssVars::test_toc_entry_does_not_clip_active_indicator``.
+
 ## [0.6.32] — 2026-05-13
 
 ### Added

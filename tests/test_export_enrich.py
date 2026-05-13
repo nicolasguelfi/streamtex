@@ -155,6 +155,42 @@ class TestSidebarCssVars:
             f".stx-toc-entry a must be underlined (matches live sidebar). Got: {text!r}"
         )
 
+    def test_toc_entry_does_not_clip_active_indicator(self):
+        """Regression for 0.6.33: the active-entry ``::before`` bar sits at
+        ``left: -8px`` from the entry's box.  If the entry has
+        ``overflow: hidden`` directly on it (the historical placement for
+        text-ellipsis), browsers clip the bar entirely → static-export
+        readers saw no cyan indicator at all.
+
+        Fix: text-ellipsis (``overflow: hidden; text-overflow: ellipsis;
+        white-space: nowrap``) lives on the inner ``<a>`` instead of the
+        entry.  This regression test guards the placement so we don't
+        silently move it back to the entry.
+        """
+        import re as _re
+        entry_block = _re.search(
+            r"\.stx-toc-entry\s*\{[^}]*\}", _SIDEBAR_CSS
+        )
+        assert entry_block is not None, "No .stx-toc-entry rule found"
+        body = entry_block.group(0)
+        assert "overflow: hidden" not in body, (
+            ".stx-toc-entry must NOT set overflow: hidden directly — that "
+            "clips the ::before active indicator at left:-8px. Move "
+            "overflow/ellipsis to .stx-toc-entry a. Got: " + repr(body)
+        )
+        # And the inner <a> carries the truncation rules.
+        link_block = _re.search(
+            r"\.stx-toc-entry a\s*\{[^}]*\}", _SIDEBAR_CSS
+        )
+        assert link_block is not None
+        link_body = link_block.group(0)
+        for prop in ("overflow: hidden", "text-overflow: ellipsis",
+                     "white-space: nowrap"):
+            assert prop in link_body, (
+                f".stx-toc-entry a must carry {prop!r} for text truncation. "
+                f"Got: {link_body!r}"
+            )
+
     def test_no_prefers_color_scheme_overrides_in_sidebar(self):
         """The dark-mode fork by OS preference is removed: the static
         sidebar follows the project's authored theme, not the reader's

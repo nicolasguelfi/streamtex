@@ -1043,16 +1043,11 @@ def populate_toc(toc_sidebar: Delta, toc_block: Delta = None, toc_content_style:
                     if entry['key_anchor'] in marker_anchors else ''
                 )
                 block_attr = f' data-stx-block="{entry.get("block_idx", 0)}"'
-                # Inner span carries the truncation styling; the outer div
-                # must stay overflow:visible so the scroll-spy `::before`
-                # active-indicator bar (positioned at left:-8px) is not
-                # clipped — same pattern as the export-side fix from 0.6.33.
                 toc_parts.append(
-                    f'<div{block_attr} style="padding:1px 0;font-size:14px;">'
-                    f'<span style="display:block;overflow:hidden;'
-                    f'text-overflow:ellipsis;white-space:nowrap;">'
+                    f'<div{block_attr} style="overflow:hidden;text-overflow:ellipsis;'
+                    f'white-space:nowrap;padding:1px 0;font-size:14px;">'
                     f'{indent}{dot}<a href="#{entry["key_anchor"]}">'
-                    f'{entry["title"]}</a></span></div>'
+                    f'{entry["title"]}</a></div>'
                 )
             toc_parts.append('<div style="height:40px;"></div>')
             st.markdown("\n".join(toc_parts), unsafe_allow_html=True)
@@ -1103,14 +1098,10 @@ def populate_markers_sidebar(markers_placeholder: Delta, block_index: dict[int, 
             parts = []
             for i, entry in enumerate(entries):
                 block_attr = f' data-stx-block="{entry.get("block_idx", 0)}"'
-                # See populate_toc above for the inner-span truncation pattern
-                # that keeps the scroll-spy `::before` indicator unclipped.
                 parts.append(
-                    f'<div{block_attr} style="padding:1px 0;font-size:14px;">'
-                    f'<span style="display:block;overflow:hidden;'
-                    f'text-overflow:ellipsis;white-space:nowrap;">'
-                    f'<a href="#{entry["anchor"]}">{i + 1}. {entry["label"]}</a>'
-                    f'</span></div>'
+                    f'<div{block_attr} style="overflow:hidden;text-overflow:ellipsis;'
+                    f'white-space:nowrap;padding:1px 0;font-size:14px;">'
+                    f'<a href="#{entry["anchor"]}">{i + 1}. {entry["label"]}</a></div>'
                 )
             parts.append('<div style="height:40px;"></div>')
             st.markdown("\n".join(parts), unsafe_allow_html=True)
@@ -1622,13 +1613,10 @@ def _build_paginated_sidebar(cache, current_page, total, toc_config, marker_conf
             page_idx = entry.get("page_idx", 0)
             title_esc = entry["title"]
             if page_idx == current_page:
-                # Same-page entries: anchor link, NO inline colour.  The
-                # scroll-spy is the single source of truth for which entry
-                # is currently "active" — applying a brighter colour to
-                # every entry on the current page (the historical 0.6.31
-                # behaviour) made it impossible to distinguish the truly
-                # active entry from its siblings on the same paginated page.
-                link = f'<a href="#{entry["key_anchor"]}">{title_esc}</a>'
+                link = (
+                    f'<a href="#{entry["key_anchor"]}" '
+                    f'style="color:var(--stx-link-active-color);">{title_esc}</a>'
+                )
             else:
                 link = (
                     f'<a href="#stx-goto-{page_idx}" class="stx-page-link">'
@@ -1636,10 +1624,9 @@ def _build_paginated_sidebar(cache, current_page, total, toc_config, marker_conf
                 )
             block_attr = f' data-stx-block="{page_idx}"' if show_search else ''
             toc_parts.append(
-                f'<div{block_attr} style="padding:1px 0;font-size:14px;">'
-                f'<span style="display:block;overflow:hidden;'
-                f'text-overflow:ellipsis;white-space:nowrap;">'
-                f'{indent}{dot}{link}</span></div>'
+                f'<div{block_attr} style="overflow:hidden;text-overflow:ellipsis;'
+                f'white-space:nowrap;padding:1px 0;font-size:14px;">'
+                f'{indent}{dot}{link}</div>'
             )
 
         # Bottom spacer so Download button doesn't overlap last entry
@@ -1658,12 +1645,9 @@ def _build_paginated_sidebar(cache, current_page, total, toc_config, marker_conf
                 marker_num = entry["index"] + 1
                 page_idx = entry.get("page_idx", 0)
                 if page_idx == current_page:
-                    # Same rationale as the paginated TOC just above: no
-                    # inline `--stx-link-active-color` here, scroll-spy is
-                    # the single source of "active" highlighting.
                     link = (
-                        f'<a href="#{entry["anchor"]}">'
-                        f'{marker_num}. {entry["label"]}</a>'
+                        f'<a href="#{entry["anchor"]}" '
+                        f'style="color:var(--stx-link-active-color);">{marker_num}. {entry["label"]}</a>'
                     )
                 else:
                     link = (
@@ -1672,9 +1656,8 @@ def _build_paginated_sidebar(cache, current_page, total, toc_config, marker_conf
                     )
                 block_attr = f' data-stx-block="{page_idx}"' if show_search else ''
                 marker_parts.append(
-                    f'<div{block_attr} style="font-size:14px;">'
-                    f'<span style="display:block;overflow:hidden;'
-                    f'text-overflow:ellipsis;white-space:nowrap;">{link}</span></div>'
+                    f'<div{block_attr} style="overflow:hidden;text-overflow:ellipsis;'
+                    f'white-space:nowrap;font-size:14px;">{link}</div>'
                 )
             marker_parts.append('<div style="height:40px;"></div>')
             with tab_markers:

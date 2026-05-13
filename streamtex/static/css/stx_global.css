@@ -43,16 +43,6 @@
   border-radius: 2px;
   pointer-events: none;
 }
-/* Brighter link text on the single active entry — mirrors the export-side
- * `.stx-toc-entry.stx-nav-active a` rule (0.6.34) so the live sidebar
- * gives the same visual cue as the static HTML export.  `color-mix`
- * derives the brighter shade from `--stx-export-link` at render time, so
- * dark themes shift visibly lighter without the project having to declare
- * a separate variable.  Falls back to `--stx-export-link` on Safari
- * < 16.2 / Chrome < 111 which lack `color-mix()`. */
-[data-stx-block].stx-nav-active a {
-  color: color-mix(in srgb, var(--stx-export-link, #43A9FB) 65%, white) !important;
-}
 
 /* ============================================================================
  * Phase 1 (0.6.12) — st_block / st_span

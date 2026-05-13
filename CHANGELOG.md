@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.41] — 2026-05-14
+
+### Reverted
+- **Restored navigation/highlight code to the 0.6.34 baseline.** The
+  series of scroll-spy / TOC / Markers modifications shipped in
+  0.6.36 → 0.6.40 (commits b7de23a, 69e635e, 2233d18, 91d4b99,
+  a691168) introduced a regression where double clicking the
+  floating-arrow widget or pressing arrow keys twice in quick
+  succession left the active-entry highlight permanently missing
+  in real browsers — despite headless E2E probes passing. The bug
+  could not be reproduced in headless Chromium (the Streamlit
+  rerun cycle completes too quickly for the mutation cadence issue
+  to surface), so successive forward-only patches accumulated
+  without addressing the real failure mode.
+
+  Files reverted to the `727bfba` (0.6.34) state:
+  - `streamtex/static/js/stx_scroll_spy.js`
+  - `streamtex/book.py` (TOC + Markers sidebar HTML)
+  - `tests/test_export_enrich.py` (scroll-spy test assertions)
+
+  CSS active-link colour rule (the `color-mix` brighter-text rule
+  added in 0.6.36) removed from `streamtex/static/css/stx_global.css`.
+
+  One-shot E2E probe scripts removed from `tests/e2e/` (those were
+  one-off validation runs tied to the reverted behaviour).
+
+### Preserved (intentionally kept from 0.6.35)
+- `3e8d6a7` — ordered-list counter rescue (CSS re-emission +
+  DOMPurify escape in `marker_runtime.py`).
+- `0d07d40` — `.stx-zoom` centering fix (`align-items: stretch`
+  + `width: 100%` in `stx_global.css`).
+
+These two addressed real bugs (counter rendering on long decks;
+centering loss on wide viewports) and are unrelated to the
+highlight regression.
+
 ## [0.6.40] — 2026-05-13
 
 ### Fixed

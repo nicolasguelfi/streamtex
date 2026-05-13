@@ -65,11 +65,7 @@
     currentActiveAnchor = anchor;
     var entries = getEntries();
     for (var i = 0; i < entries.length; i++) {
-      // `anchor === null` (no match) must NOT light up entries whose
-      // own anchorOf also returns null (e.g. entries that don't yet
-      // have an inner <a>).  Strict null guard:
-      var entryAnchor = anchorOf(entries[i]);
-      var isActive = (anchor !== null) && (entryAnchor === anchor);
+      var isActive = anchorOf(entries[i]) === anchor;
       var cur = entries[i].classList.contains(ACTIVE_CLS);
       if (isActive && !cur) entries[i].classList.add(ACTIVE_CLS);
       else if (!isActive && cur) entries[i].classList.remove(ACTIVE_CLS);
@@ -79,13 +75,6 @@
   function findClosestAnchor() {
     // Best = the anchor with the largest rect.top that is still <= TOP_OFFSET
     // (the most recently scrolled-past heading).
-    //
-    // Skip `stx-goto-*` anchors: those target the hidden Streamlit
-    // navigation buttons used by paginated mode, not real content
-    // headings.  They live at a degenerate position in the document
-    // (absolute, left:-9999px, top:auto) so their bounding rect would
-    // otherwise pollute the closest-anchor heuristic with arbitrary
-    // values that don't match the user's scroll position.
     var entries = getEntries();
     var bestBelow = null;
     var bestBelowTop = Infinity;
@@ -95,7 +84,6 @@
     for (var i = 0; i < entries.length; i++) {
       var a = anchorOf(entries[i]);
       if (!a || seen[a]) continue;
-      if (a.indexOf('stx-goto-') === 0) continue;
       seen[a] = true;
       var target = hostDoc.getElementById(a);
       if (!target) continue;
@@ -115,169 +103,57 @@
     return bestAbove || bestBelow;
   }
 
-  // Post-navigation safety net: ANY click anywhere in the host body
-  // or any arrow / page key on the host window may trigger a
-  // Streamlit-driven page change (floating-arrow widget, banner
-  // click, keyboard navigation).  In paginated mode this dispatches
-  // a hidden Streamlit button click and reruns the script — during
-  // the rerun, MutationObserver fires repeatedly, but the cadence
-  // of `childList` events can settle (in some browsers / network
-  // conditions) WITHOUT a final mutation after the page becomes
-  // stable.  When that happens the last `fireRecompute()` call ran
-  // against a half-rendered DOM and returned `null`, leaving the
-  // highlight in whatever state it was at the start of the rerun.
-  //
-  // Schedule explicit recomputes at +500/+1500/+3000 ms after any
-  // potential navigation trigger.  Each is just another
-  // `scheduleRecompute` call — throttled and idempotent — so the
-  // total cost is at most three extra `fireRecompute` invocations
-  // per interaction, each of which is a no-op when state is
-  // already correct.
-  function scheduleNavSafetyNet() {
-    setTimeout(scheduleRecompute, 500);
-    setTimeout(scheduleRecompute, 1500);
-    setTimeout(scheduleRecompute, 3000);
-  }
-
-  // Click handler — instantaneous active update for anchor clicks,
-  // plus a short suppression window so the subsequent smooth-scroll
-  // doesn't undo it.  Also: every click fires the nav safety net,
-  // because we cannot tell from inside scroll-spy whether the click
-  // hit a Streamlit nav button.
+  // Click handler — instantaneous active update, plus a short
+  // suppression window so the subsequent smooth-scroll doesn't undo it.
   hostDoc.body.addEventListener('click', function (e) {
-    if (e.target && e.target.closest) {
-      var a = e.target.closest('a[href^="#"]');
-      if (a) {
-        var entry = a.closest(ENTRY_SEL);
-        if (entry) {
-          var anchor = decodeURIComponent(a.getAttribute('href').slice(1));
-          if (anchor) {
-            setActive(anchor);
-            suppressUntil = Date.now() + CLICK_SUPPRESS_MS;
-          }
-        }
-      }
-    }
-    scheduleNavSafetyNet();
+    if (!e.target || !e.target.closest) return;
+    var a = e.target.closest('a[href^="#"]');
+    if (!a) return;
+    var entry = a.closest(ENTRY_SEL);
+    if (!entry) return;
+    var anchor = decodeURIComponent(a.getAttribute('href').slice(1));
+    if (!anchor) return;
+    setActive(anchor);
+    suppressUntil = Date.now() + CLICK_SUPPRESS_MS;
   }, true);
 
-  // Keyboard handler — navigation keys (Page/Arrow/Home/End) can
-  // trigger paginated reruns via marker.py's keydown handler.  We
-  // listen on the host window (and the iframe-attached document
-  // via Streamlit's reattachment scanIframes pattern is unnecessary
-  // here — keydown bubbles to window).
-  hostWin.addEventListener('keydown', function (e) {
-    var k = e.key || '';
-    if (k === 'PageDown' || k === 'PageUp' ||
-        k === 'ArrowRight' || k === 'ArrowLeft' ||
-        k === 'ArrowDown' || k === 'ArrowUp' ||
-        k === 'Home' || k === 'End' || k === 'Space' || k === ' ') {
-      scheduleNavSafetyNet();
-    }
-  }, true);
-
-  // Single fire path for recomputing the active entry.
-  //
-  // setActive() is the SOLE writer of `.stx-nav-active` (add + remove).
-  // We always call it with a NON-NULL result of findClosestAnchor():
-  // setActive(rightAnchor) strips the class from non-matching entries
-  // as it adds it to the matching one, so the "same anchor → different
-  // DOM node after Streamlit reconciliation" case is handled (each
-  // call re-evaluates which DOM node currently maps to that anchor).
-  //
-  // When findClosestAnchor() returns `null` we do NOT clear.  In
-  // practice null is almost always transient — it means the DOM is
-  // mid-rerun and target headings are not yet in the document (e.g.
-  // immediately after a floating-arrow / keyboard-arrow click triggers
-  // a paginated navigation).  Clearing would briefly hide the
-  // indicator, and if no further mutation arrived (Streamlit can
-  // settle without emitting a final childList change), the highlight
-  // would stay missing.  Keeping the previous highlight in place
-  // during transients is safe: as soon as a valid anchor is found,
-  // setActive(a) replaces it.  The only state we never reach is
-  // "stable page with class still set on a node that no longer
-  // represents a heading" — Streamlit's node-replacement strips the
-  // class with the old node.
-  function fireRecompute() {
+  // Scroll handler — debounced.
+  var scrollTimer = null;
+  function onScroll() {
     if (Date.now() < suppressUntil) return;
-    var a = findClosestAnchor();
-    if (a !== null) setActive(a);
+    if (scrollTimer) clearTimeout(scrollTimer);
+    scrollTimer = setTimeout(function () {
+      var anchor = findClosestAnchor();
+      if (anchor && anchor !== currentActiveAnchor) setActive(anchor);
+    }, 80);
   }
-
-  // Throttle: fire at most once per 100 ms, but ALWAYS fire within
-  // 100 ms of any pending signal.  This is critical for the rapid-
-  // navigation case (double PageDown, floating-arrow burst): a pure
-  // debounce would keep getting postponed by trailing mutations and
-  // the highlight could end up stuck on a stale node forever.
-  // Throttling gives us a guaranteed cadence.
-  var THROTTLE_MS = 100;
-  var lastFireMs = 0;
-  var pendingTimer = null;
-  function scheduleRecompute() {
-    var now = Date.now();
-    var sinceLast = now - lastFireMs;
-    if (sinceLast >= THROTTLE_MS) {
-      lastFireMs = now;
-      fireRecompute();
-      return;
-    }
-    if (pendingTimer) return;  // already scheduled
-    pendingTimer = setTimeout(function () {
-      pendingTimer = null;
-      lastFireMs = Date.now();
-      fireRecompute();
-    }, THROTTLE_MS - sinceLast);
-  }
-
-  // Scroll → throttled recompute.
-  hostWin.addEventListener('scroll', scheduleRecompute, { passive: true });
-
-  // Hashchange: some Streamlit navigation paths update the URL hash,
-  // others don't.  Listening here costs nothing and helps the few
-  // paths that do (sidebar TOC click on a `#stx-goto-N` link).
-  hostWin.addEventListener('hashchange', scheduleRecompute);
+  hostWin.addEventListener('scroll', onScroll, { passive: true });
 
   // Initial pass — fire once after the DOM settles.
   if (hostDoc.readyState === 'complete' || hostDoc.readyState === 'interactive') {
-    setTimeout(fireRecompute, 80);
+    setTimeout(onScroll, 50);
   } else {
-    hostWin.addEventListener('load', function () { setTimeout(fireRecompute, 80); });
+    hostWin.addEventListener('load', function () { setTimeout(onScroll, 50); });
   }
 
-  // MutationObserver: any childList mutation in the body subtree
-  // (which is what Streamlit reconciliation produces on every rerun)
-  // schedules a recompute.  Combined with the 100 ms throttle, this
-  // gives us a guaranteed recompute cadence during DOM churn — so
-  // even if Streamlit emits trailing mutations for several seconds
-  // (async images, lazy-loaded components, etc.) the active entry
-  // converges on the correct one within ~100 ms of the DOM stabilising.
-  //
-  // We ALSO observe `class` attribute mutations and route them through
-  // the same throttled recompute.  In practice Streamlit reconciles by
-  // node replacement (childList), but if anything strips
-  // `.stx-nav-active` via a pure attribute mutation with no surrounding
-  // DOM change, the childList-only path would miss it.  Routing through
-  // setActive() — the single writer — means the safety net cannot cause
-  // class flapping: setActive() reads the current state before writing.
+  // MutationObserver — re-apply the active class if Streamlit's
+  // reconciliation strips it on a rerun (live context).  Scoped to
+  // class-attribute mutations so the cost is bounded.
   var Observer = hostWin.MutationObserver || window.MutationObserver;
   if (Observer) {
-    var obs = new Observer(function (mutations) {
-      for (var j = 0; j < mutations.length; j++) {
-        var m = mutations[j];
-        if (m.type === 'childList' &&
-            (m.addedNodes.length > 0 || m.removedNodes.length > 0)) {
-          scheduleRecompute();
-          return;
-        }
-        if (m.type === 'attributes' && m.attributeName === 'class') {
-          scheduleRecompute();
-          return;
+    var obs = new Observer(function () {
+      if (!currentActiveAnchor) return;
+      var entries = getEntries();
+      for (var i = 0; i < entries.length; i++) {
+        if (anchorOf(entries[i]) === currentActiveAnchor &&
+            !entries[i].classList.contains(ACTIVE_CLS)) {
+          entries[i].classList.add(ACTIVE_CLS);
         }
       }
     });
     obs.observe(hostDoc.body, {
       childList: true, subtree: true,
-      attributes: true, attributeFilter: ['class'],
+      attributes: true, attributeFilter: ['class']
     });
     hostWin.__stxScrollSpyObs = obs;
   }

@@ -155,6 +155,33 @@ class TestSidebarCssVars:
             f".stx-toc-entry a must be underlined (matches live sidebar). Got: {text!r}"
         )
 
+    def test_active_entry_text_uses_brighter_link_color(self):
+        """0.6.34: in the live Streamlit sidebar, the entry pointing at
+        the current page is rendered in ``--stx-link-active-color``
+        (a brighter cyan than ``--stx-link-color`` in dark themes).
+        The export must mirror this so the active row isn't visually
+        identical to its neighbours — the 3 px ``::before`` bar alone is
+        too subtle.
+
+        We derive the active colour at render time with ``color-mix()``
+        (lighten the theme's ``--stx-export-link`` by ~35 % white) so
+        the project doesn't have to declare a separate active palette.
+        """
+        import re as _re
+        block = _re.search(
+            r"\.stx-toc-entry\.stx-nav-active a\s*\{[^}]*\}", _SIDEBAR_CSS
+        )
+        assert block is not None, (
+            "Missing .stx-toc-entry.stx-nav-active a rule — the active "
+            "entry's text colour distinction is what tells the reader "
+            "which row is current."
+        )
+        body = block.group(0)
+        assert "color-mix" in body and "var(--stx-export-link" in body, (
+            f"Active entry colour must be derived from --stx-export-link "
+            f"via color-mix(). Got: {body!r}"
+        )
+
     def test_toc_entry_does_not_clip_active_indicator(self):
         """Regression for 0.6.33: the active-entry ``::before`` bar sits at
         ``left: -8px`` from the entry's box.  If the entry has

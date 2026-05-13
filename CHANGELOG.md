@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.34] — 2026-05-13
+
+### Added
+- **Static export: brighter cyan text on the active TOC entry.**  The
+  3 px ``::before`` bar introduced in 0.6.31 (and unclipped in 0.6.33)
+  was correct but too subtle on its own.  The active entry's ``<a>``
+  text now uses ``color-mix(in srgb, var(--stx-export-link) 65%,
+  white)`` so it shifts visibly lighter than its neighbours — same
+  read as the live Streamlit sidebar where the current-page entries
+  switch to ``--stx-link-active-color``.  No separate theme variable
+  required; the brighter shade is derived at render time from the
+  project's ``theme.linkColor``.
+
+  Verified via Playwright: active entry text computes to
+  ``srgb(0.52, 0.78, 0.99)`` vs inactive ``rgb(67, 169, 251)`` =
+  ``(0.26, 0.66, 0.98)`` — clearly distinct.
+
+  Falls through to ``--stx-export-link`` on browsers without
+  ``color-mix()`` (Safari < 16.2 / Chrome < 111).
+
+  Regression test added in
+  ``test_export_enrich.py::TestSidebarCssVars::test_active_entry_text_uses_brighter_link_color``.
+
 ## [0.6.33] — 2026-05-13
 
 ### Fixed

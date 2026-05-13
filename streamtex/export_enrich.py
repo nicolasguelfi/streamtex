@@ -208,6 +208,16 @@ body.stx-sidebar-resizing .streamtex-page { transition: none !important; }
   background: var(--stx-export-link, #1155cc);
   border-radius: 2px;
 }
+/* Brighter text for the active entry — mirrors the live Streamlit
+ * sidebar's per-page colouring (``--stx-link-active-color``).  The
+ * project's theme only sets ``linkColor``; the active variant is
+ * derived at render time via ``color-mix(white 35%)`` so dark themes
+ * shift visibly lighter without the project having to declare a
+ * separate active colour.  Falls through to ``--stx-export-link`` on
+ * browsers without ``color-mix()`` (Safari < 16.2 / Chrome < 111). */
+.stx-toc-entry.stx-nav-active a {
+  color: color-mix(in srgb, var(--stx-export-link, #1155cc) 65%, white);
+}
 .stx-toc-l2 { padding-left: 16px; }
 .stx-toc-l3 { padding-left: 32px; font-size: 13px; }
 .stx-toc-l4 { padding-left: 48px; font-size: 12px; }

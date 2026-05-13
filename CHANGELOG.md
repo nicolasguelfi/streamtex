@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.35] — 2026-05-13
+
+### Fixed
+- **Ordered-list counters rendering as `0.` on long decks (FC "Fifteen
+  Propositions" regression).** Two independent issues conspired in
+  `inject_marker_runtime` to drop the global stylesheet between reruns:
+  - The shipped `stx_global.css` references literal `<style>` /
+    `</style>` substrings inside documentation comments. Streamlit's
+    `st.html` pipeline runs DOMPurify on the payload, which treats those
+    substrings as a forbidden nested style tag and rejects the entire
+    injection. We now escape those two tokens with a single invisible
+    whitespace before injection — the CSS parser ignores the whitespace
+    inside `/* … */` but the DOMPurify tag-open lexer no longer fires.
+  - `inject_marker_runtime` was gated by a single `_SESSION_KEY` flag,
+    so CSS *and* observer registration both fired only on the first
+    rerun. Streamlit reconciliation then removed the resulting `<style>`
+    element on every subsequent rerun (no corresponding call from the
+    new run), and `counter-reset` / `counter-increment` rules silently
+    disappeared. The gate is now split: CSS is re-emitted on every
+    `inject_marker_runtime` call (Streamlit reconciles identical
+    payloads in place), while the `st.components.v2.component`
+    registration still fires once per session — re-registering would
+    log `Component … is already registered` warnings. The observer's
+    self-installed `window.__stxMarkerObsHandle` survives reconciliation
+    of the component host, so single-shot registration remains
+    sufficient.
+
 ### Changed
 - **CE lifecycle refonte (cross-repo, see `streamtex-claude` branch `feat/ce-lifecycle-incremental`)**.
   The CE cycle now supports iterative and incremental production: a cycle can

@@ -37,14 +37,31 @@ def _reset_marker_session():
 # ---------------------------------------------------------------------------
 
 class TestInjectMarkerRuntime:
-    def test_injects_once_per_session(self):
+    def test_css_re_emits_every_call_js_registers_once(self):
+        """CSS and JS have different lifecycles.
+
+        Streamlit reconciliation removes a one-shot ``st.html`` element on
+        subsequent reruns (where the call is absent), so the CSS must be
+        re-emitted on every ``inject_marker_runtime`` call — otherwise the
+        global stylesheet disappears after the first user interaction (the
+        FC "0. everywhere" regression).
+
+        The v2.component, however, must register *once per session*:
+        re-registering on every rerun logs a ``Component … is already
+        registered`` warning. The observer self-installs to
+        ``window.__stxMarkerObsHandle`` and survives reconciliation, so
+        single-shot registration is sufficient.
+        """
         mock_v2 = MagicMock()
         with patch("streamtex.marker_runtime.st.html") as mock_html, \
              patch("streamtex.marker_runtime.st.components.v2.component",
                    return_value=mock_v2) as mock_v2_factory:
             inject_marker_runtime()
             inject_marker_runtime()  # second call same session
-            assert mock_html.call_count == 1
+            inject_marker_runtime()  # third call same session
+            # CSS path fires every call (re-emit so reconciliation keeps element)
+            assert mock_html.call_count == 3
+            # JS component path registers + mounts ONCE
             assert mock_v2_factory.call_count == 1
             assert mock_v2.call_count == 1
         assert st.session_state.get(_SESSION_KEY) is True
@@ -59,6 +76,44 @@ class TestInjectMarkerRuntime:
         assert "<style>" in css_payload
         assert "stx-marker-cell" in css_payload  # universal marker-cell rule
         assert "<script>" not in css_payload     # no JS in this call
+
+    def test_css_payload_escapes_inner_style_tags(self):
+        """The shipped stx_global.css contains documentation comments that
+        reference literal ``<style>`` / ``</style>`` substrings (see
+        ``streamtex/static/css/stx_global.css`` — comments mention per-item
+        / per-instance ``<style>`` injection sites).  When wrapped inside
+        an outer ``<style>…</style>`` and handed to ``st.html``, DOMPurify
+        treats those inner tokens as a nested style tag and silently drops
+        the whole injection — most visibly, ``counter-reset:
+        streamtex-counter`` never lands and ordered-list bullets render as
+        ``0.`` instead of ``1., 2., …``.
+
+        We mitigate by inserting a single space inside the literal token
+        (``<style>`` → ``< style>``), which is invisible inside a CSS
+        comment but breaks the HTML tag-open lexer.
+        """
+        # Sanity check: the asset really does contain the problematic token,
+        # otherwise this test would silently pass.
+        raw_css = _CSS_PATH.read_text(encoding="utf-8")
+        assert "<style>" in raw_css, (
+            "stx_global.css no longer contains a literal `<style>` substring — "
+            "the regression this test guards against has changed shape."
+        )
+
+        with patch("streamtex.marker_runtime.st.html") as mock_html, \
+             patch("streamtex.marker_runtime.st.components.v2.component"):
+            inject_marker_runtime()
+
+        payload = mock_html.call_args[0][0]
+        # The payload is the outer style tag plus the (sanitised) inner CSS.
+        assert payload.startswith("<style>") and payload.endswith("</style>")
+        inner = payload[len("<style>"): -len("</style>")]
+        # No raw <style>/</style> substring may survive in the inner CSS.
+        assert "<style>" not in inner, "inner CSS still contains a raw `<style>` token"
+        assert "</style>" not in inner, "inner CSS still contains a raw `</style>` token"
+        # The escaped form must be present (proves the replacement ran on
+        # every occurrence, not just the first).
+        assert "< style>" in inner
 
     def test_js_via_v2_component(self):
         """JS observer must go through st.components.v2.component with

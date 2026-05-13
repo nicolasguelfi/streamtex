@@ -91,23 +91,33 @@ def _wrap_observer_for_v2(*js_bodies: str) -> str:
 
 
 def inject_marker_runtime() -> None:
-    """Inject the global stylesheet + observer script, once per session.
+    """Inject the global stylesheet + observer script.
 
-    Idempotent across reruns: the Streamlit ``session_state`` flag prevents
-    re-emission within a session, and the JavaScript itself is guarded at
-    the DOM level via ``window.__stxMarkerObsHandle`` (disconnect-then-
-    reinstall on every script execution — see the observer JS).
+    The two assets live on different lifecycles:
 
-    Two separate Streamlit calls:
+    * **CSS** is re-emitted on every rerun via ``st.html``. Streamlit's
+      reconciliation removes any element produced inside ``st_book`` if the
+      corresponding call is absent on a subsequent rerun, so a one-shot
+      ``st.html`` would silently disappear after the first user interaction.
+      Re-emitting is cheap (the payload is identical, so the reconciler
+      keeps the existing ``<style>`` element in place).
 
-    * ``st.html("<style>…</style>")`` — inline CSS in the host page.
-    * ``st.components.v2.component(name, js=…, isolate_styles=False)`` —
-      observer JS executed inline in the host page (no iframe, no shadow
-      DOM).  The component is rendered as an invisible empty element.
+    * **JS observer + scroll-spy** is registered *once per session* via
+      ``st.components.v2.component``. Re-registering on every rerun would
+      log a ``Component … is already registered`` warning. The observer
+      itself self-installs to ``window.__stxMarkerObsHandle`` and survives
+      reconciliation of the component's host element, so single-shot
+      registration is sufficient — every new DOM mutation across reruns
+      is still picked up.
+
+    The CSS path also guards against a DOMPurify quirk: the payload is
+    handed to Streamlit's frontend, which runs it through DOMPurify, which
+    rejects the entire ``st.html`` injection if it spots a literal
+    ``<style>`` / ``</style>`` substring nested inside the outer style
+    element (treats it as a forbidden nested style tag). The shipped
+    ``stx_global.css`` references those tokens in documentation comments,
+    so we break them with a single invisible whitespace before injection.
     """
-    if st.session_state.get(_SESSION_KEY):
-        return
-
     css = _read_asset(_CSS_PATH)
     js = _read_asset(_JS_PATH)
     scroll_spy_js = _read_asset(_SCROLL_SPY_JS_PATH)
@@ -115,19 +125,25 @@ def inject_marker_runtime() -> None:
         return
 
     if css:
-        st.html(f"<style>{css}</style>")
-    if js or scroll_spy_js:
-        component = st.components.v2.component(
-            _COMPONENT_NAME,
-            js=_wrap_observer_for_v2(js, scroll_spy_js),
-            isolate_styles=False,
+        # See docstring: defeat DOMPurify's nested-style-tag rejection.
+        safe_css = css.replace("<style>", "< style>").replace("</style>", "</ style>")
+        st.html(f"<style>{safe_css}</style>")
+
+    # Component registration is gated to once per session to avoid
+    # `is already registered` console warnings on every rerun.
+    if not st.session_state.get(_SESSION_KEY):
+        if js or scroll_spy_js:
+            component = st.components.v2.component(
+                _COMPONENT_NAME,
+                js=_wrap_observer_for_v2(js, scroll_spy_js),
+                isolate_styles=False,
+            )
+            component()
+        st.session_state[_SESSION_KEY] = True
+        logger.debug(
+            "marker_runtime: registered (css=%d bytes, observer_js=%d bytes, scroll_spy_js=%d bytes)",
+            len(css), len(js), len(scroll_spy_js),
         )
-        component()
-    st.session_state[_SESSION_KEY] = True
-    logger.debug(
-        "marker_runtime: injected (css=%d bytes, observer_js=%d bytes, scroll_spy_js=%d bytes)",
-        len(css), len(js), len(scroll_spy_js),
-    )
 
 
 def _reset_for_tests() -> None:

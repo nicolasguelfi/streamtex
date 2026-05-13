@@ -10,6 +10,8 @@ import json
 import re
 from pathlib import Path
 
+from .export import _get_theme_color
+
 # ---------------------------------------------------------------------------
 # Prop E — Auto-detect title from TOC
 # ---------------------------------------------------------------------------
@@ -86,38 +88,36 @@ def _strip_streamlit_css(css: str) -> str:
 # ---------------------------------------------------------------------------
 
 _SIDEBAR_CSS = """
-/* --- Export sidebar navigation --- */
+/* --- Export sidebar navigation ---
+ *
+ * Colors are pulled from CSS custom properties on :root that ``enrich_export_html``
+ * sets from the project's ``.streamlit/config.toml`` theme (with Streamlit 1.56
+ * dark/light defaults as fallback).  This keeps the static export visually
+ * aligned with the live app instead of switching to a hardcoded palette based
+ * on the reader's OS ``prefers-color-scheme`` preference.
+ */
 .stx-export-sidebar {
   position: fixed; top: 0; left: 0; bottom: 0;
   width: 280px; overflow-y: auto; overflow-x: hidden;
-  background: #f8f9fa; border-right: 1px solid #e0e0e0;
+  background: var(--stx-export-sidebar-bg, #f8f9fa);
+  color: var(--stx-export-sidebar-fg, #333);
+  border-right: 1px solid var(--stx-export-sidebar-border, #e0e0e0);
   padding: 16px 12px; z-index: 1000;
   font-family: Arial, Helvetica, sans-serif; font-size: 14px;
   scrollbar-width: thin;
 }
-@media (prefers-color-scheme: dark) {
-  .stx-export-sidebar {
-    background: #1a1a2e; border-right-color: #333;
-    color: #e0e0e0;
-  }
-}
 .stx-sidebar-header {
   display: flex; align-items: center; gap: 8px;
   margin-bottom: 12px; padding-bottom: 8px;
-  border-bottom: 1px solid #e0e0e0;
-}
-@media (prefers-color-scheme: dark) {
-  .stx-sidebar-header { border-bottom-color: #444; }
+  border-bottom: 1px solid var(--stx-export-sidebar-border, #e0e0e0);
 }
 .stx-sidebar-header .stx-sidebar-collapse {
   background: none; border: none; cursor: pointer;
   font-size: 18px; line-height: 1; padding: 2px 6px;
-  color: #888; border-radius: 4px; flex-shrink: 0;
+  color: var(--stx-export-sidebar-muted, #888); border-radius: 4px; flex-shrink: 0;
 }
-.stx-sidebar-header .stx-sidebar-collapse:hover { background: #e8e8e8; }
-@media (prefers-color-scheme: dark) {
-  .stx-sidebar-header .stx-sidebar-collapse { color: #aaa; }
-  .stx-sidebar-header .stx-sidebar-collapse:hover { background: #333; }
+.stx-sidebar-header .stx-sidebar-collapse:hover {
+  background: var(--stx-export-sidebar-hover, #e8e8e8);
 }
 .stx-sidebar-logo {
   display: flex; align-items: center; gap: 6px;
@@ -126,21 +126,17 @@ _SIDEBAR_CSS = """
 }
 .stx-sidebar-logo svg { flex-shrink: 0; }
 .stx-sidebar-logo span {
-  font-size: 14px; font-weight: 700; color: #555;
+  font-size: 14px; font-weight: 700;
+  color: var(--stx-export-sidebar-fg, #555);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-@media (prefers-color-scheme: dark) {
-  .stx-sidebar-logo span { color: #ccc; }
-}
 .stx-export-sidebar .stx-search-box {
-  width: 100%; padding: 6px 10px; border: 1px solid #ccc;
+  width: 100%; padding: 6px 10px;
+  border: 1px solid var(--stx-export-sidebar-input-border, #ccc);
   border-radius: 6px; font-size: 13px; box-sizing: border-box;
-  outline: none; margin-bottom: 10px; background: #fff; color: #333;
-}
-@media (prefers-color-scheme: dark) {
-  .stx-export-sidebar .stx-search-box {
-    background: #2a2a3e; border-color: #555; color: #e0e0e0;
-  }
+  outline: none; margin-bottom: 10px;
+  background: var(--stx-export-sidebar-input-bg, #fff);
+  color: var(--stx-export-sidebar-fg, #333);
 }
 .stx-toc-entry {
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -148,9 +144,9 @@ _SIDEBAR_CSS = """
 }
 .stx-toc-entry a { text-decoration: none; color: inherit; }
 .stx-toc-entry a:hover { text-decoration: underline; }
-.stx-toc-entry.stx-toc-active a { font-weight: 700; color: #1155cc; }
-@media (prefers-color-scheme: dark) {
-  .stx-toc-entry.stx-toc-active a { color: #42D0F3; }
+.stx-toc-entry.stx-toc-active a {
+  font-weight: 700;
+  color: var(--stx-export-link-active, #1155cc);
 }
 .stx-toc-l1 { font-weight: 600; }
 .stx-toc-l2 { padding-left: 16px; }
@@ -163,14 +159,14 @@ _SIDEBAR_CSS = """
 /* External toggle — only visible when sidebar is hidden */
 .stx-sidebar-toggle {
   display: none; position: fixed; top: 12px; left: 12px;
-  z-index: 1001; background: #f8f9fa; border: 1px solid #ddd;
+  z-index: 1001;
+  background: var(--stx-export-sidebar-bg, #f8f9fa);
+  border: 1px solid var(--stx-export-sidebar-input-border, #ddd);
+  color: var(--stx-export-sidebar-fg, inherit);
   border-radius: 6px; padding: 6px 10px; cursor: pointer;
   font-size: 18px; line-height: 1;
 }
 .stx-sidebar-hidden .stx-sidebar-toggle { display: block; }
-@media (prefers-color-scheme: dark) {
-  .stx-sidebar-toggle { background: #1a1a2e; border-color: #555; color: #e0e0e0; }
-}
 
 /* Sidebar transition */
 .stx-export-sidebar { transition: transform 0.25s; }
@@ -540,6 +536,32 @@ _SMOOTH_SCROLL_CSS = "html { scroll-behavior: smooth; }\n"
 # Main enrichment function
 # ---------------------------------------------------------------------------
 
+def _build_theme_vars_css() -> str:
+    """Emit a ``:root`` block of theme-derived CSS custom properties.
+
+    Reads the project's theme via :func:`streamtex.export._get_theme_color`
+    (which consults ``.streamlit/config.toml`` and falls back to Streamlit
+    1.56's resolved dark defaults when ``base = "dark"`` is set without
+    per-key overrides — including the values ``#1C1E1F`` for the sidebar
+    background and ``#43A9FB`` for links that Streamlit's frontend
+    computes at runtime).
+
+    The variables emitted here are consumed by ``_SIDEBAR_CSS`` and feed
+    every theme-sensitive value in the static sidebar.  Without this
+    block the var() lookups resolve to the light-mode literal fallbacks.
+    """
+    sidebar_bg = _get_theme_color("theme.secondaryBackgroundColor", "#f8f9fa")
+    sidebar_fg = _get_theme_color("theme.textColor", "#333333")
+    link_color = _get_theme_color("theme.linkColor", "#1155cc")
+    return (
+        ":root {\n"
+        f"  --stx-export-sidebar-bg: {sidebar_bg};\n"
+        f"  --stx-export-sidebar-fg: {sidebar_fg};\n"
+        f"  --stx-export-link-active: {link_color};\n"
+        "}\n"
+    )
+
+
 def enrich_export_html(
     raw_html: str,
     toc: list[dict] | None = None,
@@ -594,6 +616,13 @@ def enrich_export_html(
     extra_js_parts = []
 
     if has_toc:
+        # Emit the :root theme variables BEFORE the sidebar CSS so the
+        # var() lookups resolve to the project's theme (read from
+        # .streamlit/config.toml with Streamlit 1.56 dark/light defaults
+        # as fallback).  Without this block, the sidebar falls back to
+        # the light-mode literal values baked into _SIDEBAR_CSS — still
+        # readable, but not theme-aligned.
+        extra_css += _build_theme_vars_css()
         extra_css += _SIDEBAR_CSS
         extra_js_parts.append(_SIDEBAR_TOGGLE_JS)
 

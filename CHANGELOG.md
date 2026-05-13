@@ -5,6 +5,55 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.29] — 2026-05-13
+
+### Changed
+- **Static HTML export sidebar now follows the project's theme instead
+  of the reader's OS preference.**  Previously, ``export_enrich.py``
+  baked a light palette into the sidebar CSS with an ``@media
+  (prefers-color-scheme: dark)`` block that swapped to a hardcoded dark
+  palette (``#1a1a2e`` background, ``#42D0F3`` active link, …) based on
+  the reader's operating system.  The live Streamlit app, in contrast,
+  picks up the project's ``.streamlit/config.toml`` ``[theme]`` block
+  — meaning the static export and the live app could diverge on the
+  same machine, and an author's dark-themed project would render light
+  on a reader with a Light OS preference.
+
+  ``_SIDEBAR_CSS`` is refactored to resolve every theme-sensitive
+  value through CSS custom properties (``var(--stx-export-sidebar-bg)``,
+  ``var(--stx-export-sidebar-fg)``, ``var(--stx-export-link-active)``,
+  …).  A new ``_build_theme_vars_css()`` emits a ``:root`` block at
+  the top of the injected CSS that reads those values via
+  ``_get_theme_color`` (already used by ``generate_full_html`` for the
+  main content area), so the project's ``.streamlit/config.toml`` is
+  now the single source of truth for both live and static rendering.
+
+  Fallbacks for projects that declare only ``base = "dark"`` without
+  per-key overrides are encoded in ``_get_theme_color``'s
+  ``_dark_defaults``: ``secondaryBackgroundColor = "#1C1E1F"`` (the
+  sidebar background) and ``linkColor = "#43A9FB"`` (links) — the
+  exact values Streamlit 1.56's frontend computes at runtime.
+
+  No public API change.  Projects that customise ``[theme]``
+  ``secondaryBackgroundColor`` / ``textColor`` / ``linkColor`` see their
+  values flow into the exported sidebar automatically; projects that
+  declare only ``base = "dark"`` get the Streamlit defaults baked in
+  rather than the previous hardcoded violet-dark palette.
+
+### Added
+- ``tests/test_export_enrich.py`` — 15 tests covering the extended
+  dark defaults in ``_get_theme_color``, the ``:root`` block emission
+  in ``_build_theme_vars_css``, the ``var()`` usage in ``_SIDEBAR_CSS``
+  (with explicit assertions that the previous hardcoded dark palette
+  and ``prefers-color-scheme`` overrides are gone), and the full
+  ``enrich_export_html`` integration with both light and dark base.
+
+### Notes
+- The marker navigation bar (floating bottom bar in paginated mode)
+  is intentionally left out of this change — its colours are a separate
+  concern that does not affect the sidebar bug reported here.  A
+  follow-up can apply the same ``var()`` treatment if desired.
+
 ## [0.6.28] — 2026-05-12
 
 ### Fixed

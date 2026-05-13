@@ -403,7 +403,13 @@ def _get_theme_color(option: str, fallback: str) -> str:
             return val
     except Exception:
         logger.debug("Failed to read Streamlit theme option '%s'", option, exc_info=True)
-    # Detect dark theme base and provide matching defaults
+    # Detect dark theme base and provide matching defaults.  The values
+    # below mirror what Streamlit 1.56's frontend resolves for a project
+    # that declares only ``base = "dark"`` — they are NOT defined as
+    # constants in the Streamlit package (the theme provider computes
+    # them in React), so we encode them here so the static export stays
+    # visually aligned with the live app.  Update these when bumping the
+    # Streamlit baseline.
     try:
         base = st.get_option("theme.base")
         if base == "dark":
@@ -411,6 +417,11 @@ def _get_theme_color(option: str, fallback: str) -> str:
                 "theme.backgroundColor": "#0e1117",
                 "theme.textColor": "#fafafa",
                 "theme.primaryColor": "#ff4b4b",
+                # Sidebar background (= Streamlit ``secondaryBackgroundColor``
+                # when no per-sidebar override is set).
+                "theme.secondaryBackgroundColor": "#1C1E1F",
+                # Default link colour in dark theme.
+                "theme.linkColor": "#43A9FB",
             }
             return _dark_defaults.get(option, fallback)
     except Exception:

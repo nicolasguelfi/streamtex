@@ -142,12 +142,15 @@ _SIDEBAR_CSS = """
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   padding: 2px 0; line-height: 1.4;
 }
-.stx-toc-entry a { text-decoration: none; color: inherit; }
-.stx-toc-entry a:hover { text-decoration: underline; }
-.stx-toc-entry.stx-toc-active a {
-  font-weight: 700;
-  color: var(--stx-export-link-active, #1155cc);
+/* TOC entries are rendered as hyperlinks — same look as the live Streamlit
+ * sidebar (linkColor + underlined), driven by the project's theme via the
+ * --stx-export-link variable. */
+.stx-toc-entry a {
+  color: var(--stx-export-link, #1155cc);
+  text-decoration: underline;
 }
+.stx-toc-entry a:hover { text-decoration: underline; }
+.stx-toc-entry.stx-toc-active a { font-weight: 700; }
 .stx-toc-l1 { font-weight: 600; }
 .stx-toc-l2 { padding-left: 16px; }
 .stx-toc-l3 { padding-left: 32px; font-size: 13px; }
@@ -557,7 +560,7 @@ def _build_theme_vars_css() -> str:
         ":root {\n"
         f"  --stx-export-sidebar-bg: {sidebar_bg};\n"
         f"  --stx-export-sidebar-fg: {sidebar_fg};\n"
-        f"  --stx-export-link-active: {link_color};\n"
+        f"  --stx-export-link: {link_color};\n"
         "}\n"
     )
 

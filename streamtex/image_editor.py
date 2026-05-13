@@ -483,7 +483,7 @@ def _load_display_from_metadata(name: str, prefix: str) -> None:
         from .ai.history import get_current_metadata
         meta = get_current_metadata(name)
         if meta:
-            logger.warning("[DIAG:LOAD] '%s' zoom=%s width=%s", name, meta.display_zoom, meta.display_width)
+            # logger.warning("[DIAG:LOAD] '%s' zoom=%s width=%s", name, meta.display_zoom, meta.display_width)
             if meta.display_zoom is not None:
                 st.session_state.setdefault(f"{prefix}_zoom", meta.display_zoom)
             if meta.display_width is not None:
@@ -492,10 +492,11 @@ def _load_display_from_metadata(name: str, prefix: str) -> None:
                 st.session_state.setdefault(f"{prefix}_height", meta.display_height)
             if meta.display_keep_ratio is not None:
                 st.session_state.setdefault(f"{prefix}_keep_ratio", meta.display_keep_ratio)
-        else:
-            logger.warning("[DIAG:LOAD] '%s' get_current_metadata returned None — no metadata file found", name)
+        # else:
+        #     logger.warning("[DIAG:LOAD] '%s' get_current_metadata returned None — no metadata file found", name)
     except Exception:
-        logger.warning("[DIAG:LOAD] '%s' EXCEPTION — zoom NOT loaded, flag set", name, exc_info=True)
+        # logger.warning("[DIAG:LOAD] '%s' EXCEPTION — zoom NOT loaded, flag set", name, exc_info=True)
+        pass
 
 
 def _persist_display_to_metadata(name: str, prefix: str) -> None:

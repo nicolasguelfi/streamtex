@@ -3,7 +3,7 @@
 These tests pin the contract that:
 
   * The static export sidebar resolves its colors from CSS custom properties
-    (``var(--stx-export-sidebar-bg)``, ``var(--stx-export-link-active)``)
+    (``var(--stx-export-sidebar-bg)``, ``var(--stx-export-link)``)
     rather than hardcoded literals.
   * The ``:root`` block of variables is emitted at the top of the injected
     CSS and reads values from the project's ``.streamlit/config.toml`` theme
@@ -81,7 +81,7 @@ class TestBuildThemeVarsCss:
         assert ":root" in css
         assert "--stx-export-sidebar-bg" in css
         assert "--stx-export-sidebar-fg" in css
-        assert "--stx-export-link-active" in css
+        assert "--stx-export-link" in css
 
     def test_dark_theme_values(self):
         """With ``base="dark"`` and no overrides, the :root block contains
@@ -123,11 +123,34 @@ class TestSidebarCssVars:
     def test_sidebar_uses_var_for_background(self):
         assert "var(--stx-export-sidebar-bg" in _SIDEBAR_CSS
 
-    def test_sidebar_uses_var_for_link_active(self):
-        assert "var(--stx-export-link-active" in _SIDEBAR_CSS
+    def test_sidebar_uses_var_for_link(self):
+        assert "var(--stx-export-link" in _SIDEBAR_CSS
 
     def test_sidebar_uses_var_for_text(self):
         assert "var(--stx-export-sidebar-fg" in _SIDEBAR_CSS
+
+    def test_toc_entries_styled_as_hyperlinks_underlined(self):
+        """The live Streamlit sidebar renders TOC entries as hyperlinks
+        in ``linkColor`` with an underline; the static export must
+        match.  Pre-0.6.30 the entries were ``color: inherit;
+        text-decoration: none`` — white text in dark themes, regardless
+        of the project's link colour (FC slide regression observed by
+        the user, the export showed white items instead of #43A9FB).
+        """
+        # Capture the first TOC selector block — assert both color
+        # variable and underline are present.
+        import re as _re
+        block = _re.search(
+            r"\.stx-toc-entry a\s*\{[^}]*\}", _SIDEBAR_CSS
+        )
+        assert block is not None, "No .stx-toc-entry a rule found"
+        text = block.group(0)
+        assert "var(--stx-export-link" in text, (
+            f".stx-toc-entry a must use var(--stx-export-link, …) for color. Got: {text!r}"
+        )
+        assert "text-decoration: underline" in text, (
+            f".stx-toc-entry a must be underlined (matches live sidebar). Got: {text!r}"
+        )
 
     def test_no_prefers_color_scheme_overrides_in_sidebar(self):
         """The dark-mode fork by OS preference is removed: the static

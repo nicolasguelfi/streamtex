@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.30] — 2026-05-13
+
+### Fixed
+- **Static HTML export: TOC entries appeared in white text instead of
+  the project's ``linkColor`` (follow-up to 0.6.29).**  0.6.29 aligned
+  the sidebar background with the project theme but left the TOC
+  entries themselves as ``color: inherit; text-decoration: none`` —
+  i.e. plain text in the project's ``textColor``.  On a dark theme
+  this produced bold-white labels, while the live Streamlit sidebar
+  renders them as underlined hyperlinks in ``linkColor``
+  (``#43A9FB`` by default in dark mode).
+
+  ``_SIDEBAR_CSS`` now styles ``.stx-toc-entry a`` as a real hyperlink:
+  ``color: var(--stx-export-link, …); text-decoration: underline``.  The
+  active-entry marker keeps ``font-weight: 700`` for visual distinction.
+
+  The CSS variable previously named ``--stx-export-link-active`` is
+  renamed to ``--stx-export-link`` since it represents the project's
+  link colour, not an "active" state.  Internal-only, no public API
+  change.
+
+### Changed
+- **Commented out the ``[DIAG:LOAD]`` / ``[DIAG:APPLY]`` console logs**
+  in ``streamtex/image_editor.py`` and ``streamtex/image.py``.  These
+  were diagnostic ``logger.warning`` calls that surfaced in every
+  project's console output (one per image-editor mount).  Lines are
+  preserved as comments so they can be re-enabled by uncommenting
+  during future debugging.
+
 ## [0.6.29] — 2026-05-13
 
 ### Changed

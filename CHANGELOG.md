@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- **CE lifecycle refonte (cross-repo, see `streamtex-claude` branch `feat/ce-lifecycle-incremental`)**.
+  The CE cycle now supports iterative and incremental production: a cycle can
+  cover the full document or a single increment (part, section, blocks). A new
+  PROTOTYPE phase sits between PLAN and PRODUCE to validate styles by example
+  and capture reusable graphic patterns. Project state is driven by a living
+  master plan (`docs/master-plan.yaml` pilotage + `docs/master-plan.md`
+  contenu détaillé), versioned via paired snapshots in
+  `docs/master-plan/archive/`. All user interactions are unified QCMs with a
+  recommended default plus `Discutons-en` and `Autre` escapes; the producer
+  profile `dialog_level` field (`minimal` / `guided` / `exhaustive`) modulates
+  frequency. The pattern catalog now has three explicit levels: draft, local
+  (`.claude/custom/streamtex-patterns/`), shared (`streamtex-patterns` repo).
+  The library itself is unchanged — all changes are in the Claude profile and
+  the documentation manuals. See
+  `documentation/maintenance/CE/plan_ce_lifecycle_incremental.md` and
+  `documentation/maintenance/CE/scenario_e2e.md`.
+
 ## [0.6.34] — 2026-05-13
 
 ### Added

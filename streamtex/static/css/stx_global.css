@@ -26,6 +26,24 @@
   display: none !important;
 }
 
+/* --- Cross-context scroll-spy active indicator -------------------------- */
+/* Driven by streamtex/static/js/stx_scroll_spy.js — adds .stx-nav-active to
+ * the TOC / Markers sidebar entry (any [data-stx-block]) that matches the
+ * reader's current scroll position or last click.  Visual: a 3 px vertical
+ * accent bar on the left edge of the entry, in the project's link colour
+ * (linked to --stx-export-link when present, fall back to Streamlit dark's
+ * default link colour #43A9FB). */
+[data-stx-block] { position: relative; }
+[data-stx-block].stx-nav-active::before {
+  content: '';
+  position: absolute;
+  left: -8px; top: 4px; bottom: 4px;
+  width: 3px;
+  background: var(--stx-export-link, #43A9FB);
+  border-radius: 2px;
+  pointer-events: none;
+}
+
 /* ============================================================================
  * Phase 1 (0.6.12) — st_block / st_span
  * Replaces the legacy per-instance :has() selectors in streamtex/container.py.

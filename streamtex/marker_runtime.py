@@ -59,6 +59,7 @@ _SESSION_KEY = "__stx_marker_runtime_injected__"
 _STATIC_DIR = Path(__file__).resolve().parent / "static"
 _CSS_PATH = _STATIC_DIR / "css" / "stx_global.css"
 _JS_PATH = _STATIC_DIR / "js" / "stx_marker_observer.js"
+_SCROLL_SPY_JS_PATH = _STATIC_DIR / "js" / "stx_scroll_spy.js"
 
 _COMPONENT_NAME = "stx_marker_observer"
 
@@ -72,17 +73,21 @@ def _read_asset(path: Path) -> str:
         return ""
 
 
-def _wrap_observer_for_v2(js_body: str) -> str:
-    """Wrap the streamtex observer IIFE inside a V2 default-export function.
+def _wrap_observer_for_v2(*js_bodies: str) -> str:
+    """Wrap one or more streamtex IIFEs inside a V2 default-export function.
 
-    The shipped observer is an auto-installing IIFE (``(function(){…})();``).
+    The shipped scripts are auto-installing IIFEs (``(function(){…})();``).
     V2 expects a module-style ``export default function(ctx) { … }`` that
-    Streamlit calls on mount.  We simply place the IIFE inside the function
-    body so it runs when the component mounts.  ``ctx`` is unused — the
-    observer reaches the host DOM directly because ``isolate_styles=False``
-    mounts it inline (not in a shadow root).
+    Streamlit calls on mount.  We concatenate the IIFEs inside one
+    function body so a single ``components.v2.component`` mount installs
+    every runtime script in one shot — both the marker observer
+    (``stx_marker_observer.js``) and the cross-context scroll-spy
+    (``stx_scroll_spy.js``) ride together.  ``ctx`` is unused — the
+    scripts reach the host DOM directly because ``isolate_styles=False``
+    mounts inline (not in a shadow root).
     """
-    return f"export default function(_ctx) {{\n{js_body}\n}}\n"
+    body = "\n".join(b for b in js_bodies if b)
+    return f"export default function(_ctx) {{\n{body}\n}}\n"
 
 
 def inject_marker_runtime() -> None:
@@ -105,20 +110,24 @@ def inject_marker_runtime() -> None:
 
     css = _read_asset(_CSS_PATH)
     js = _read_asset(_JS_PATH)
-    if not css and not js:
+    scroll_spy_js = _read_asset(_SCROLL_SPY_JS_PATH)
+    if not css and not js and not scroll_spy_js:
         return
 
     if css:
         st.html(f"<style>{css}</style>")
-    if js:
+    if js or scroll_spy_js:
         component = st.components.v2.component(
             _COMPONENT_NAME,
-            js=_wrap_observer_for_v2(js),
+            js=_wrap_observer_for_v2(js, scroll_spy_js),
             isolate_styles=False,
         )
         component()
     st.session_state[_SESSION_KEY] = True
-    logger.debug("marker_runtime: injected (css=%d bytes, js=%d bytes)", len(css), len(js))
+    logger.debug(
+        "marker_runtime: injected (css=%d bytes, observer_js=%d bytes, scroll_spy_js=%d bytes)",
+        len(css), len(js), len(scroll_spy_js),
+    )
 
 
 def _reset_for_tests() -> None:

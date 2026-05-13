@@ -12,6 +12,15 @@ from pathlib import Path
 
 from .export import _get_theme_color
 
+# Path to the cross-context scroll-spy script.  Same file is used by the
+# live runtime via :mod:`streamtex.marker_runtime`.  Loading at import
+# time keeps the export fast — no I/O per export call.
+_SCROLL_SPY_JS_PATH = Path(__file__).resolve().parent / "static" / "js" / "stx_scroll_spy.js"
+try:
+    _SCROLL_SPY_JS = _SCROLL_SPY_JS_PATH.read_text(encoding="utf-8")
+except OSError:
+    _SCROLL_SPY_JS = ""
+
 # ---------------------------------------------------------------------------
 # Prop E — Auto-detect title from TOC
 # ---------------------------------------------------------------------------
@@ -96,9 +105,16 @@ _SIDEBAR_CSS = """
  * aligned with the live app instead of switching to a hardcoded palette based
  * on the reader's OS ``prefers-color-scheme`` preference.
  */
+/* Layout variable for the sidebar width.  The default 280px is also the
+ * "reset" target for the double-click on the resize handle (see
+ * _SIDEBAR_RESIZE_JS).  At runtime the JS reads any persisted width
+ * from localStorage and updates this variable. */
+:root { --stx-sidebar-width: 280px; }
+
 .stx-export-sidebar {
   position: fixed; top: 0; left: 0; bottom: 0;
-  width: 280px; overflow-y: auto; overflow-x: hidden;
+  width: var(--stx-sidebar-width, 280px);
+  overflow-y: auto; overflow-x: hidden;
   background: var(--stx-export-sidebar-bg, #f8f9fa);
   color: var(--stx-export-sidebar-fg, #333);
   border-right: 1px solid var(--stx-export-sidebar-border, #e0e0e0);
@@ -106,6 +122,29 @@ _SIDEBAR_CSS = """
   font-family: Arial, Helvetica, sans-serif; font-size: 14px;
   scrollbar-width: thin;
 }
+
+/* Drag-resize handle (P1 + P4: drag + double-click to reset). */
+.stx-sidebar-resize-handle {
+  position: absolute; top: 0; right: 0; bottom: 0;
+  width: 6px; cursor: ew-resize;
+  background: transparent;
+  transition: background 0.15s;
+  /* Make it click-through-safe when the user is not actively grabbing it. */
+  touch-action: none;
+}
+.stx-sidebar-resize-handle:hover,
+.stx-sidebar-resize-handle:focus-visible,
+body.stx-sidebar-resizing .stx-sidebar-resize-handle {
+  background: var(--stx-export-link, #1155cc);
+  opacity: 0.5;
+}
+.stx-sidebar-resize-handle:focus { outline: none; }
+
+/* While dragging, prevent text selection and freeze the margin/width
+ * transition so the resize tracks the pointer with no lag. */
+body.stx-sidebar-resizing { user-select: none; cursor: ew-resize; }
+body.stx-sidebar-resizing .stx-export-sidebar,
+body.stx-sidebar-resizing .streamtex-page { transition: none !important; }
 .stx-sidebar-header {
   display: flex; align-items: center; gap: 8px;
   margin-bottom: 12px; padding-bottom: 8px;
@@ -138,23 +177,59 @@ _SIDEBAR_CSS = """
   background: var(--stx-export-sidebar-input-bg, #fff);
   color: var(--stx-export-sidebar-fg, #333);
 }
+/* Text-truncation lives on the inner <a>, not on the entry, so the active
+ * indicator's ``::before`` (positioned at left:-8px) is not clipped by the
+ * entry's own overflow box.  Keeping ``overflow: hidden`` on the entry
+ * (the historical placement) clipped the bar entirely in static exports —
+ * fixed in 0.6.33 by moving overflow/ellipsis down to the link. */
 .stx-toc-entry {
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   padding: 2px 0; line-height: 1.4;
+  position: relative;
 }
-.stx-toc-entry a { text-decoration: none; color: inherit; }
+/* TOC entries are rendered as hyperlinks — same look as the live Streamlit
+ * sidebar (linkColor + underlined), driven by the project's theme via the
+ * --stx-export-link variable.  No bold weight on any TOC item (per user
+ * request): the active entry is marked by a subtle left-border indicator
+ * via the cross-context ``.stx-nav-active`` class (driven by
+ * ``streamtex/static/js/stx_scroll_spy.js``), not a font-weight change. */
+.stx-toc-entry a {
+  display: block;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: var(--stx-export-link, #1155cc);
+  text-decoration: underline;
+  font-weight: normal;
+}
 .stx-toc-entry a:hover { text-decoration: underline; }
-.stx-toc-entry.stx-toc-active a {
-  font-weight: 700;
-  color: var(--stx-export-link-active, #1155cc);
+.stx-toc-entry.stx-nav-active::before {
+  content: '';
+  position: absolute;
+  left: -8px; top: 4px; bottom: 4px;
+  width: 3px;
+  background: var(--stx-export-link, #1155cc);
+  border-radius: 2px;
 }
-.stx-toc-l1 { font-weight: 600; }
+/* Brighter text for the active entry — mirrors the live Streamlit
+ * sidebar's per-page colouring (``--stx-link-active-color``).  The
+ * project's theme only sets ``linkColor``; the active variant is
+ * derived at render time via ``color-mix(white 35%)`` so dark themes
+ * shift visibly lighter without the project having to declare a
+ * separate active colour.  Falls through to ``--stx-export-link`` on
+ * browsers without ``color-mix()`` (Safari < 16.2 / Chrome < 111). */
+.stx-toc-entry.stx-nav-active a {
+  color: color-mix(in srgb, var(--stx-export-link, #1155cc) 65%, white);
+}
 .stx-toc-l2 { padding-left: 16px; }
 .stx-toc-l3 { padding-left: 32px; font-size: 13px; }
 .stx-toc-l4 { padding-left: 48px; font-size: 12px; }
 
-/* Main content offset — transitions with sidebar */
-.streamtex-page { margin-left: 280px; transition: margin-left 0.25s; }
+/* Main content offset — transitions with sidebar.  The margin tracks
+ * the same --stx-sidebar-width variable that the sidebar's own width
+ * uses, so resizing or toggling stays in lockstep with a single CSS
+ * write. */
+.streamtex-page {
+  margin-left: var(--stx-sidebar-width, 280px);
+  transition: margin-left 0.25s;
+}
 
 /* External toggle — only visible when sidebar is hidden */
 .stx-sidebar-toggle {
@@ -238,6 +313,15 @@ def _build_sidebar_html(toc: list[dict], has_search: bool = False,
             f'{_ver_text}</div>'
         )
     parts.append('<div style="height:40px;"></div>')  # bottom spacer
+    # Drag-resize handle on the right edge.  Double-click resets to 280px.
+    # tabindex=0 + role="separator" makes it keyboard-focusable; the JS
+    # listens for ArrowLeft/ArrowRight (Shift = bigger step) when focused.
+    parts.append(
+        '<div class="stx-sidebar-resize-handle" '
+        'role="separator" aria-orientation="vertical" '
+        'aria-label="Resize sidebar (double-click to reset)" '
+        'tabindex="0"></div>'
+    )
     parts.append('</nav>')
     # Hamburger toggle for mobile
     parts.append(
@@ -375,21 +459,10 @@ _MARKER_NAV_JS = """
     counter.textContent = (currentIdx + 1) + ' / ' + visible.length;
     label.textContent = visible[currentIdx].label;
     highlightPopup();
-    // Highlight active TOC entry
-    document.querySelectorAll('.stx-toc-entry').forEach(function(el) { el.classList.remove('stx-toc-active'); });
-    var activeAnchor = visible[currentIdx].anchor;
-    var tocLink = document.querySelector('.stx-toc-entry a[href="#' + activeAnchor + '"]');
-    if (!tocLink) {
-      // Try matching by marker label to TOC title
-      var m = visible[currentIdx];
-      document.querySelectorAll('.stx-toc-entry a').forEach(function(a) {
-        if (a.textContent.indexOf(m.label) !== -1) {
-          a.parentElement.classList.add('stx-toc-active');
-        }
-      });
-    } else {
-      tocLink.parentElement.classList.add('stx-toc-active');
-    }
+    // The TOC sidebar active indicator is owned by the cross-context
+    // scroll-spy (stx_scroll_spy.js) since 0.6.32 — it tracks ALL TOC
+    // entry anchors (not just markers), so the indicator can land on
+    // any level and not just L1.  Nothing to do here.
   }
 
   function highlightPopup() {
@@ -479,6 +552,83 @@ _SEARCH_JS = """
 # Sidebar toggle JS
 # ---------------------------------------------------------------------------
 
+_SIDEBAR_RESIZE_JS = """
+(function() {
+  var sidebar = document.getElementById('stx-sidebar');
+  if (!sidebar) return;
+  var handle = sidebar.querySelector('.stx-sidebar-resize-handle');
+  if (!handle) return;
+  var root = document.documentElement;
+  var body = document.body;
+  var MIN = 180;
+  var MAX_FRAC = 0.5;
+  var DEFAULT = 280;
+  var STORAGE_KEY = 'stx-sidebar-width';
+
+  function maxAllowed() {
+    return Math.max(MIN, Math.floor(window.innerWidth * MAX_FRAC));
+  }
+  function clamp(px) {
+    return Math.max(MIN, Math.min(px, maxAllowed()));
+  }
+  function setWidth(px, persist) {
+    root.style.setProperty('--stx-sidebar-width', px + 'px');
+    if (persist) {
+      try { localStorage.setItem(STORAGE_KEY, String(px)); } catch (e) {}
+    }
+  }
+  function currentWidth() {
+    var v = parseInt(getComputedStyle(root).getPropertyValue('--stx-sidebar-width'), 10);
+    return isNaN(v) ? DEFAULT : v;
+  }
+
+  // Restore persisted width on load (desktop only).
+  try {
+    var saved = parseInt(localStorage.getItem(STORAGE_KEY), 10);
+    if (saved && window.innerWidth > 768) setWidth(clamp(saved), false);
+  } catch (e) {}
+
+  // --- Drag-to-resize ---------------------------------------------------
+  var dragging = false;
+  handle.addEventListener('pointerdown', function(e) {
+    if (window.innerWidth <= 768) return;  // disabled on mobile
+    dragging = true;
+    body.classList.add('stx-sidebar-resizing');
+    try { handle.setPointerCapture(e.pointerId); } catch (err) {}
+    e.preventDefault();
+  });
+  handle.addEventListener('pointermove', function(e) {
+    if (!dragging) return;
+    setWidth(clamp(e.clientX), false);
+  });
+  function endDrag(e) {
+    if (!dragging) return;
+    dragging = false;
+    body.classList.remove('stx-sidebar-resizing');
+    try { handle.releasePointerCapture(e.pointerId); } catch (err) {}
+    // Persist the final width once, not on every pointermove.
+    try { localStorage.setItem(STORAGE_KEY, String(currentWidth())); } catch (err) {}
+  }
+  handle.addEventListener('pointerup', endDrag);
+  handle.addEventListener('pointercancel', endDrag);
+
+  // --- Double-click resets to the default (P4) -------------------------
+  handle.addEventListener('dblclick', function() {
+    setWidth(DEFAULT, true);
+  });
+
+  // --- Keyboard accessibility ------------------------------------------
+  handle.addEventListener('keydown', function(e) {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    var step = e.shiftKey ? 50 : 10;
+    var delta = e.key === 'ArrowRight' ? step : -step;
+    setWidth(clamp(currentWidth() + delta), true);
+    e.preventDefault();
+  });
+})();
+"""
+
+
 _SIDEBAR_TOGGLE_JS = """
 (function() {
   var extBtn = document.getElementById('stx-sidebar-toggle');
@@ -557,7 +707,7 @@ def _build_theme_vars_css() -> str:
         ":root {\n"
         f"  --stx-export-sidebar-bg: {sidebar_bg};\n"
         f"  --stx-export-sidebar-fg: {sidebar_fg};\n"
-        f"  --stx-export-link-active: {link_color};\n"
+        f"  --stx-export-link: {link_color};\n"
         "}\n"
     )
 
@@ -625,6 +775,13 @@ def enrich_export_html(
         extra_css += _build_theme_vars_css()
         extra_css += _SIDEBAR_CSS
         extra_js_parts.append(_SIDEBAR_TOGGLE_JS)
+        # Resize handle JS — runs only when the sidebar is present.
+        extra_js_parts.append(_SIDEBAR_RESIZE_JS)
+        # Cross-context scroll-spy (same script the live runtime uses
+        # via marker_runtime).  Drives `.stx-nav-active` on the entry
+        # closest to the viewport top or the one the user just clicked.
+        if _SCROLL_SPY_JS:
+            extra_js_parts.append(_SCROLL_SPY_JS)
 
     if has_markers:
         extra_css += _MARKER_NAV_CSS

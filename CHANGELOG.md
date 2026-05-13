@@ -5,6 +5,152 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.34] — 2026-05-13
+
+### Added
+- **Static export: brighter cyan text on the active TOC entry.**  The
+  3 px ``::before`` bar introduced in 0.6.31 (and unclipped in 0.6.33)
+  was correct but too subtle on its own.  The active entry's ``<a>``
+  text now uses ``color-mix(in srgb, var(--stx-export-link) 65%,
+  white)`` so it shifts visibly lighter than its neighbours — same
+  read as the live Streamlit sidebar where the current-page entries
+  switch to ``--stx-link-active-color``.  No separate theme variable
+  required; the brighter shade is derived at render time from the
+  project's ``theme.linkColor``.
+
+  Verified via Playwright: active entry text computes to
+  ``srgb(0.52, 0.78, 0.99)`` vs inactive ``rgb(67, 169, 251)`` =
+  ``(0.26, 0.66, 0.98)`` — clearly distinct.
+
+  Falls through to ``--stx-export-link`` on browsers without
+  ``color-mix()`` (Safari < 16.2 / Chrome < 111).
+
+  Regression test added in
+  ``test_export_enrich.py::TestSidebarCssVars::test_active_entry_text_uses_brighter_link_color``.
+
+## [0.6.33] — 2026-05-13
+
+### Fixed
+- **Static export: active TOC entry indicator was invisible.**  The
+  cyan ``::before`` bar introduced in 0.6.31 and driven by the
+  cross-context scroll-spy in 0.6.32 lived at ``left: -8px`` from the
+  entry box.  But ``.stx-toc-entry`` itself carried ``overflow:
+  hidden`` (for text-ellipsis truncation), and browsers clip
+  ``position: absolute`` descendants at the element's overflow box —
+  so the bar was entirely clipped away in the static export.  Live
+  Streamlit users didn't notice because the live sidebar also
+  highlights the current page via ``--stx-link-active-color`` on the
+  ``<a>`` (an independent per-page mechanism), which masked the
+  invisible bar.
+
+  Fix: move ``overflow: hidden; text-overflow: ellipsis; white-space:
+  nowrap`` from ``.stx-toc-entry`` down to the inner ``.stx-toc-entry
+  a`` (now ``display: block``).  The entry no longer clips, the
+  ``::before`` bar renders correctly, and text-ellipsis still works
+  because the ``<a>`` is the element that actually wraps the text.
+
+  Regression test added in
+  ``test_export_enrich.py::TestSidebarCssVars::test_toc_entry_does_not_clip_active_indicator``.
+
+## [0.6.32] — 2026-05-13
+
+### Added
+- **Cross-context scroll-spy for TOC / Markers navigation.**  A new
+  unified JavaScript module (``streamtex/static/js/stx_scroll_spy.js``)
+  drives the cyan active-entry indicator across all three contexts the
+  reader can encounter:
+
+  1. Live Streamlit + sidebar tab "TOC"
+  2. Live Streamlit + sidebar tab "Markers"
+  3. Static HTML export sidebar
+
+  All three contexts already share the ``[data-stx-block]`` attribute on
+  each navigation entry, which makes a single data-driven module
+  possible.  Behaviour:
+
+  - Clicking any entry (any depth, not just L1) marks it active
+    immediately and suppresses the scroll handler for 400 ms so the
+    smooth-scroll animation doesn't bounce the active state away.
+  - On scroll, the entry whose anchor target is closest to (but at or
+    above) ~120 px from the viewport top wins.  At the very top of the
+    document the first anchor below the line wins.
+
+  Robustness: ``window.__stxScrollSpy`` guard prevents double-mount on
+  Streamlit reruns, and a ``MutationObserver`` re-applies the active
+  class if Streamlit's reconciliation strips it.
+
+### Changed
+- **Renamed CSS class ``.stx-toc-active`` → ``.stx-nav-active``.**  The
+  active-entry indicator is no longer TOC-specific — it covers TOC,
+  Markers, and export in one rule.  The selector lives in
+  ``streamtex/static/css/stx_global.css`` (so live mode gets it via the
+  marker-observer injection) and is mirrored in the export sidebar CSS
+  for static exports.
+- ``_MARKER_NAV_JS.updateUI()`` no longer touches the sidebar's active
+  class — scroll-spy now owns this responsibility across all contexts,
+  removing the previous coupling between the marker-navigation runtime
+  and the sidebar's visual state.
+
+## [0.6.31] — 2026-05-13
+
+### Added
+- **Resizable sidebar in the static HTML export.**  A drag handle on
+  the sidebar's right edge lets the reader pick any width between
+  180px and 50% of the viewport.  The main content's ``margin-left``
+  shares the same ``--stx-sidebar-width`` CSS variable, so the content
+  area reflows in real time with the same "respiration" effect the
+  open/close toggle already produces.  Double-clicking the handle
+  resets to the 280px default.  The chosen width is persisted in
+  ``localStorage`` and restored on subsequent page loads.
+
+  Accessibility: the handle is keyboard-focusable
+  (``role="separator"`` + ``tabindex="0"``) and reacts to
+  ``ArrowLeft`` / ``ArrowRight`` (Shift = ×5 step).  Touch + pen
+  inputs work via pointer events.  Mobile (≤768px viewport) keeps the
+  existing slide-in toggle behaviour and disables resize.
+
+  Implementation: new ``_SIDEBAR_RESIZE_JS`` block wired in
+  ``enrich_export_html`` alongside ``_SIDEBAR_TOGGLE_JS``; both share
+  the same ``--stx-sidebar-width`` variable so toggling and resizing
+  stay in lockstep.
+
+### Changed
+- **TOC entries are no longer bolded.**  Previously the L1 level had
+  ``font-weight: 600`` and the active entry had ``font-weight: 700``.
+  Per user request the entries now render at the default weight; the
+  active entry is marked by a subtle left-border (``::before``
+  pseudo-element in ``var(--stx-export-link)``) instead of a heavier
+  font weight, so the typography stays uniform.
+
+## [0.6.30] — 2026-05-13
+
+### Fixed
+- **Static HTML export: TOC entries appeared in white text instead of
+  the project's ``linkColor`` (follow-up to 0.6.29).**  0.6.29 aligned
+  the sidebar background with the project theme but left the TOC
+  entries themselves as ``color: inherit; text-decoration: none`` —
+  i.e. plain text in the project's ``textColor``.  On a dark theme
+  this produced bold-white labels, while the live Streamlit sidebar
+  renders them as underlined hyperlinks in ``linkColor``
+  (``#43A9FB`` by default in dark mode).
+
+  ``_SIDEBAR_CSS`` now styles ``.stx-toc-entry a`` as a real hyperlink:
+  ``color: var(--stx-export-link, …); text-decoration: underline``.  The
+  active-entry marker keeps ``font-weight: 700`` for visual distinction.
+
+  The CSS variable previously named ``--stx-export-link-active`` is
+  renamed to ``--stx-export-link`` since it represents the project's
+  link colour, not an "active" state.  Internal-only, no public API
+  change.
+
+### Changed
+- **Commented out the ``[DIAG:LOAD]`` / ``[DIAG:APPLY]`` console logs**
+  in ``streamtex/image_editor.py`` and ``streamtex/image.py``.  These
+  were diagnostic ``logger.warning`` calls that surfaced in every
+  project's console output (one per image-editor mount).  Lines are
+  preserved as comments so they can be re-enabled by uncommenting
+  during future debugging.
+
 ## [0.6.29] — 2026-05-13
 
 ### Changed

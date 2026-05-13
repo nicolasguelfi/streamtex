@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.39] — 2026-05-13
+
+### Fixed
+- **Highlight disappeared after floating-arrow / keyboard-arrow
+  navigation (regression from 0.6.37).** A user reported that after
+  clicking a floating navigation arrow or pressing ArrowRight /
+  PageDown, the active indicator (bar + brighter text) would
+  disappear and not return — and that two rapid clicks made the
+  highlight never reappear at all.
+
+  Root cause: 0.6.37 made `setActive()` the sole writer of
+  `.stx-nav-active` and called it *unconditionally* on every
+  recompute, including when `findClosestAnchor()` returned `null`.
+  During a paginated navigation rerun there is a brief window where
+  the old page's target headings have been removed but the new
+  page's headings are not yet in the DOM — `findClosestAnchor()`
+  returns `null` and `setActive(null)` strips every highlight. If
+  no further mutation arrives at the right moment (Streamlit can
+  settle without emitting a final childList change after a
+  paginated rerun in some timing patterns), the highlight stays
+  cleared. Two clicks compound the problem because click #2 lands
+  mid-rerun from click #1.
+
+  Fix: `fireRecompute()` now only calls `setActive()` when
+  `findClosestAnchor()` returns a non-null value. The "same anchor
+  → different DOM node after reconciliation" case is still handled
+  because `setActive(a)` strips the class from non-matching entries
+  as it adds it to the matching one (the original purpose of the
+  0.6.37 unconditional-call change). Null results — only ever
+  transient in practice — leave the existing highlight in place,
+  and the next mutation that produces a valid anchor replaces it.
+
+  Validated with the existing instability / nav-matrix probes plus
+  a new `_arrow_burst_probe.py` that fires two consecutive arrow
+  clicks 200 ms apart and samples state every 50 ms.
+
 ## [0.6.38] — 2026-05-13
 
 ### Added

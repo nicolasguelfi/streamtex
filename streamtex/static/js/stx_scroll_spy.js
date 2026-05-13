@@ -132,16 +132,29 @@
   // Single fire path for recomputing the active entry.
   //
   // setActive() is the SOLE writer of `.stx-nav-active` (add + remove).
-  // On every recompute we call it with the result of
-  // findClosestAnchor() — `null` means "no anchor visible" and clears
-  // every existing active class.  We never gate on
-  // "anchor === currentActiveAnchor" because the same value can map to
-  // a DIFFERENT DOM node after Streamlit's reconciliation (a node's
-  // inner <a href> can flip between content-anchor and `stx-goto-N`
-  // depending on which page is current).
+  // We always call it with a NON-NULL result of findClosestAnchor():
+  // setActive(rightAnchor) strips the class from non-matching entries
+  // as it adds it to the matching one, so the "same anchor → different
+  // DOM node after Streamlit reconciliation" case is handled (each
+  // call re-evaluates which DOM node currently maps to that anchor).
+  //
+  // When findClosestAnchor() returns `null` we do NOT clear.  In
+  // practice null is almost always transient — it means the DOM is
+  // mid-rerun and target headings are not yet in the document (e.g.
+  // immediately after a floating-arrow / keyboard-arrow click triggers
+  // a paginated navigation).  Clearing would briefly hide the
+  // indicator, and if no further mutation arrived (Streamlit can
+  // settle without emitting a final childList change), the highlight
+  // would stay missing.  Keeping the previous highlight in place
+  // during transients is safe: as soon as a valid anchor is found,
+  // setActive(a) replaces it.  The only state we never reach is
+  // "stable page with class still set on a node that no longer
+  // represents a heading" — Streamlit's node-replacement strips the
+  // class with the old node.
   function fireRecompute() {
     if (Date.now() < suppressUntil) return;
-    setActive(findClosestAnchor());
+    var a = findClosestAnchor();
+    if (a !== null) setActive(a);
   }
 
   // Throttle: fire at most once per 100 ms, but ALWAYS fire within

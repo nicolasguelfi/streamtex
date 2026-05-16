@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Composite picker: per-preset 'Customize?' after add + Remove choices
+  grouped by provenance.** Closes a discoverability gap in the v3
+  picker: when the user added a preset, its contents were absorbed
+  silently and the only way to drop one of its patterns was to navigate
+  to the separate Remove action — non-obvious. Now:
+  * After multi-selecting presets, the picker asks
+    *"Customize '<preset>'? [y/N]"* once per newly-added preset (default
+    No). Saying Yes opens a checkbox of that preset's patterns with all
+    currently-kept items pre-checked; unchecked patterns are added to
+    `working.excludes`. Excludes remain global by design (consistent
+    with declarative `--exclude` and with how a single excluded pattern
+    affects every preset that brings it).
+  * The Remove action now groups choices by provenance with one
+    `── preset:<name> ──` / `── individual ──` / `── all ──` separator
+    per group, so the user can see where each pattern comes from when
+    deciding what to drop.
+  New helper `_compute_provenance(working, resolved, source)` returns
+  the per-pattern provenance label and is reused by both flows.
+  (`streamtex/patterns/picker.py`)
+
 ### Added
 - **`.patterns-meta.json` schema v3 — composite selection.** The
   ``selection`` field generalises from a single mode+items pair into

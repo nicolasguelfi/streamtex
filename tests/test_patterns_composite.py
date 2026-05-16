@@ -289,6 +289,109 @@ def test_picker_remove_adds_to_excludes(source: Path) -> None:
     assert resolve_selection(result, source) == ("ptn_alpha",)
 
 
+def test_picker_add_preset_with_customize_excludes_unchecked(source: Path) -> None:
+    """After adding preset 'core', user says yes to 'Customize?' and unchecks
+    ptn_beta — excludes should contain ptn_beta."""
+    catalog = collect_pattern_catalog(source)
+    menu_iter = iter(["add_preset", "done"])
+    confirm_iter = iter([True])  # customize 'core'? → yes
+    checkbox_calls = iter([
+        ["core"],          # multi-select presets
+        ["ptn_alpha"],     # customize 'core' → keep only ptn_alpha
+    ])
+    with (
+        patch("questionary.select",
+              side_effect=lambda *a, **kw: _FakeAsk(next(menu_iter))),
+        patch("questionary.confirm",
+              side_effect=lambda *a, **kw: _FakeAsk(next(confirm_iter))),
+        patch("questionary.checkbox",
+              side_effect=lambda *a, **kw: _FakeAsk(next(checkbox_calls))),
+        patch("questionary.print"),
+    ):
+        result = select_patterns_compositely(catalog, source)
+    assert result.presets == ("core",)
+    assert "ptn_beta" in result.excludes
+    assert "ptn_alpha" not in result.excludes
+    # The effective install set is just ptn_alpha
+    assert resolve_selection(result, source) == ("ptn_alpha",)
+
+
+def test_picker_add_preset_no_customize_keeps_all(source: Path) -> None:
+    """Saying no to 'Customize?' keeps the preset as-is, no excludes added."""
+    catalog = collect_pattern_catalog(source)
+    menu_iter = iter(["add_preset", "done"])
+    with (
+        patch("questionary.select",
+              side_effect=lambda *a, **kw: _FakeAsk(next(menu_iter))),
+        patch("questionary.confirm", return_value=_FakeAsk(False)),
+        patch("questionary.checkbox", return_value=_FakeAsk(["core"])),
+        patch("questionary.print"),
+    ):
+        result = select_patterns_compositely(catalog, source)
+    assert result.presets == ("core",)
+    assert result.excludes == ()
+
+
+def test_picker_customize_asks_once_per_newly_added_preset(source: Path) -> None:
+    """Adding two presets at once → two 'Customize?' confirm calls."""
+    catalog = collect_pattern_catalog(source)
+    menu_iter = iter(["add_preset", "done"])
+    confirm_iter = iter([False, False])  # decline both
+    with (
+        patch("questionary.select",
+              side_effect=lambda *a, **kw: _FakeAsk(next(menu_iter))),
+        patch("questionary.confirm",
+              side_effect=lambda *a, **kw: _FakeAsk(next(confirm_iter))) as cm,
+        patch("questionary.checkbox",
+              return_value=_FakeAsk(["core", "slides"])),
+        patch("questionary.print"),
+    ):
+        result = select_patterns_compositely(catalog, source)
+    assert result.presets == ("core", "slides")
+    # Confirm called exactly once per newly-added preset.
+    assert cm.call_count == 2
+
+
+def test_action_remove_groups_by_provenance(source: Path) -> None:
+    """The Remove sub-prompt receives Separator entries labelled by provenance."""
+    catalog = collect_pattern_catalog(source)
+    # Set up: add core preset + individual ptn_hero, then trigger remove.
+    menu_iter = iter(["add_preset", "add_individual", "remove", "done"])
+    confirm_iter = iter([False])  # don't customize on add_preset
+    checkbox_calls = iter([
+        ["core"],          # add_preset
+        ["ptn_hero"],      # add_individual
+        [],                # remove → don't actually remove anything; we
+                           # just want to inspect the choices structure
+    ])
+    captured: dict = {}
+
+    def _capture_remove_checkbox(message, choices):
+        # The third checkbox call is the Remove one (message starts with "Pick patterns to REMOVE").
+        if "REMOVE" in message:
+            captured["choices"] = choices
+        return _FakeAsk(next(checkbox_calls))
+
+    with (
+        patch("questionary.select",
+              side_effect=lambda *a, **kw: _FakeAsk(next(menu_iter))),
+        patch("questionary.confirm",
+              side_effect=lambda *a, **kw: _FakeAsk(next(confirm_iter))),
+        patch("questionary.checkbox", side_effect=_capture_remove_checkbox),
+        patch("questionary.print"),
+    ):
+        select_patterns_compositely(catalog, source)
+
+    from questionary import Separator
+    separator_titles = [
+        getattr(c, "title", str(c)) for c in captured["choices"]
+        if isinstance(c, Separator)
+    ]
+    # Expect at least one "preset:core" and one "individual" separator.
+    assert any("preset:core" in t for t in separator_titles)
+    assert any("individual" in t for t in separator_titles)
+
+
 def test_picker_remove_individual_drops_from_individuals(source: Path) -> None:
     # add individuals=[alpha, hero], then remove [hero]
     # → individuals=(alpha,), excludes=()

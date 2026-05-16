@@ -332,7 +332,7 @@ def select_patterns_compositely(
         elif action == _ACTION_ADD_INDIVIDUAL:
             working = _action_add_individuals(working, catalog, resolved)
         elif action == _ACTION_REMOVE:
-            working = _action_remove(working, resolved)
+            working = _action_remove(working, resolved, source)
         elif action == _ACTION_TOGGLE_ALL:
             working = _action_toggle_all(working)
         elif action == _ACTION_SUMMARY:
@@ -348,7 +348,16 @@ def _action_add_presets(
     presets: list[Preset],
     source: Path,
 ) -> PatternSelection:
-    """Multi-select among presets not yet in ``working.presets``."""
+    """Multi-select presets, then optionally customize each newly-added one.
+
+    After confirming the preset picks, for every newly-added preset, the
+    user is asked whether they want to *customize* it. Saying yes opens a
+    sub-prompt listing the preset's patterns (all pre-checked); unchecking
+    any pattern adds it to ``working.excludes``, which then applies
+    globally (so an exclude introduced via preset X also affects preset Y
+    if they share that pattern — this is by design and consistent with
+    declarative ``--exclude``).
+    """
     import questionary
 
     available = [p for p in presets if p.name not in working.presets]
@@ -376,11 +385,78 @@ def _action_add_presets(
         return working
 
     new_presets = tuple(list(working.presets) + list(chosen))
-    return dataclasses.replace(
+    working = dataclasses.replace(
         working,
         presets=new_presets,
         # Adding a preset implies you don't want literal-all mode anymore.
         all_flag=False,
+    )
+
+    # Per-preset optional customization (Option F).
+    for preset_name in chosen:
+        working = _maybe_customize_preset(working, preset_name, source)
+
+    return working
+
+
+def _maybe_customize_preset(
+    working: PatternSelection,
+    preset_name: str,
+    source: Path,
+) -> PatternSelection:
+    """Ask 'Customize <preset>?'; if yes, open a checkbox to drop patterns.
+
+    Unchecked patterns are added to ``working.excludes``. The exclude is
+    global by design (it would also affect another preset that brings the
+    same pattern), matching the declarative ``--exclude`` flag's semantics.
+    """
+    import questionary
+
+    do_customize = questionary.confirm(
+        f"Customize '{preset_name}' (uncheck patterns to drop)?",
+        default=False,
+    ).ask()
+    if not do_customize:
+        return working
+
+    try:
+        rp = resolve_preset(source, preset_name)
+    except Exception as exc:
+        questionary.print(
+            f"  Could not resolve preset '{preset_name}': {exc}",
+            style="fg:ansired",
+        )
+        return working
+
+    if not rp.pattern_files:
+        return working
+
+    current_excludes = set(working.excludes)
+    choices = [
+        questionary.Choice(
+            title=p.stem,
+            value=p.stem,
+            # Pre-check everything that is currently kept (i.e. not in excludes).
+            checked=p.stem not in current_excludes,
+        )
+        for p in rp.pattern_files
+    ]
+
+    kept = questionary.checkbox(
+        f"Patterns from '{preset_name}' (uncheck to exclude — excludes are global):",
+        choices=choices,
+    ).ask()
+    if kept is None:
+        # User cancelled the sub-prompt: leave the preset as-is.
+        return working
+
+    all_in_preset = {p.stem for p in rp.pattern_files}
+    new_excludes = (current_excludes - all_in_preset) | (
+        all_in_preset - set(kept)
+    )
+    return dataclasses.replace(
+        working,
+        excludes=tuple(sorted(new_excludes)),
     )
 
 
@@ -436,22 +512,39 @@ def _action_add_individuals(
 def _action_remove(
     working: PatternSelection,
     currently_resolved: tuple[str, ...],
+    source: Path,
 ) -> PatternSelection:
     """Multi-select among currently-resolved patterns; checked = REMOVE.
 
-    The user's intent is "drop these from the install". For each checked
-    name, we either remove it from ``individuals`` (if it was added that
-    way) or add it to ``excludes`` (if it came from a preset / from --all).
+    Choices are **grouped by provenance** (preset:X / individual / all)
+    with a separator per group, so the user sees where each pattern
+    comes from and which group it will leave when checked.
+
+    For each checked name, we either remove it from ``individuals`` (if
+    it was added that way) or add it to ``excludes`` (if it came from a
+    preset / from --all).
     """
     import questionary
 
     if not currently_resolved:
         return working
 
-    choices = [
-        questionary.Choice(title=name, value=name)
-        for name in currently_resolved
-    ]
+    provenance = _compute_provenance(working, currently_resolved, source)
+
+    # Sort by (provenance, name) so groups appear contiguously.
+    sorted_names = sorted(
+        currently_resolved, key=lambda n: (provenance[n], n),
+    )
+
+    choices: list = []
+    current_group: str | None = None
+    for name in sorted_names:
+        group = provenance[name]
+        if group != current_group:
+            choices.append(questionary.Separator(f"── {group} ──"))
+            current_group = group
+        choices.append(questionary.Choice(title=name, value=name))
+
     chosen = questionary.checkbox(
         "Pick patterns to REMOVE from the current selection:",
         choices=choices,
@@ -469,6 +562,41 @@ def _action_remove(
         individuals=new_individuals,
         excludes=new_excludes,
     )
+
+
+def _compute_provenance(
+    working: PatternSelection,
+    currently_resolved: tuple[str, ...],
+    source: Path,
+) -> dict[str, str]:
+    """Return ``{pattern_name: provenance_label}`` for each resolved name.
+
+    Labels: ``preset:<name>`` (first matching preset wins), ``individual``,
+    ``all`` (when ``working.all_flag`` is set), or ``?`` as a safe
+    fallback for the rare case where resolution disagrees with our walk.
+    """
+    provenance: dict[str, str] = {}
+    if working.all_flag:
+        for name in currently_resolved:
+            provenance[name] = "all"
+        return provenance
+
+    for preset_name in working.presets:
+        try:
+            rp = resolve_preset(source, preset_name)
+        except Exception:
+            continue
+        for p in rp.pattern_files:
+            if p.stem in currently_resolved and p.stem not in provenance:
+                provenance[p.stem] = f"preset:{preset_name}"
+
+    for name in working.individuals:
+        if name in currently_resolved and name not in provenance:
+            provenance[name] = "individual"
+
+    for name in currently_resolved:
+        provenance.setdefault(name, "?")
+    return provenance
 
 
 def _action_toggle_all(working: PatternSelection) -> PatternSelection:

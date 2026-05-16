@@ -205,6 +205,59 @@ _ACTION_DONE = "done"
 _ACTION_CANCEL = "cancel"
 
 
+_CHECKBOX_HELP = (
+    "  (↑↓ navigate · SPACE to toggle · ENTER to confirm · ESC to cancel)"
+)
+"""One-line reminder printed before each multi-select prompt.
+
+The classic questionary trap: pressing ENTER without first using SPACE
+returns an empty selection. The help line plus :func:`_checkbox_with_empty_retry`
+catch the 99% of cases where new users miss the SPACE step.
+"""
+
+
+def _print_checkbox_help() -> None:
+    """Print the dim help line above the next ``questionary.checkbox``."""
+    import questionary
+
+    questionary.print(_CHECKBOX_HELP, style="fg:#888888")
+
+
+def _checkbox_with_empty_retry(
+    message: str, choices: list, *, retry_hint: str,
+) -> list[str] | None:
+    """Run ``questionary.checkbox(...).ask()`` with a one-shot retry on empty.
+
+    Returns:
+        - ``None`` when the user truly cancels (Esc / Ctrl-C).
+        - A non-empty list of selected values when the user picks anything.
+        - ``[]`` only when the user submitted twice in a row with nothing
+          selected — at that point we assume they really meant "nothing".
+
+    The first empty submission prints a clear warning that includes
+    ``retry_hint`` (caller-supplied phrasing of what they should do
+    differently). This addresses the common questionary pitfall where
+    users press ENTER without ever pressing SPACE first.
+    """
+    import questionary
+
+    answer = questionary.checkbox(message, choices=choices).ask()
+    if answer is None:
+        return None
+    if answer:
+        return answer
+
+    questionary.print(
+        f"  Nothing was selected. {retry_hint}",
+        style="fg:ansiyellow",
+    )
+    _print_checkbox_help()
+    answer = questionary.checkbox(message, choices=choices).ask()
+    if answer is None:
+        return None
+    return answer  # may be [] — caller treats as legitimate "nothing"
+
+
 def _try_resolve(selection: PatternSelection, source: Path) -> tuple[str, ...]:
     """Resolve a selection but degrade to ``()`` on error.
 
@@ -377,10 +430,15 @@ def _action_add_presets(
         title = f"{p.name:<12} {p.description}{suffix}"
         choices.append(questionary.Choice(title=title, value=p.name))
 
-    chosen = questionary.checkbox(
-        "Add presets (space to toggle, enter to confirm):",
-        choices=choices,
-    ).ask()
+    _print_checkbox_help()
+    chosen = _checkbox_with_empty_retry(
+        "Add presets:",
+        choices,
+        retry_hint=(
+            "Use SPACE to check the preset(s) you want, then ENTER. "
+            "Press ENTER on an empty selection again to cancel."
+        ),
+    )
     if not chosen:
         return working
 
@@ -442,6 +500,7 @@ def _maybe_customize_preset(
         for p in rp.pattern_files
     ]
 
+    _print_checkbox_help()
     kept = questionary.checkbox(
         f"Patterns from '{preset_name}' (uncheck to exclude — excludes are global):",
         choices=choices,
@@ -490,10 +549,15 @@ def _action_add_individuals(
             questionary.Choice(title=_format_choice_title(e), value=e.name),
         )
 
-    chosen = questionary.checkbox(
-        "Add individual patterns (space toggles, enter confirms):",
-        choices=choices,
-    ).ask()
+    _print_checkbox_help()
+    chosen = _checkbox_with_empty_retry(
+        "Add individual patterns:",
+        choices,
+        retry_hint=(
+            "Use SPACE to check the pattern(s) you want, then ENTER. "
+            "Press ENTER on an empty selection again to cancel."
+        ),
+    )
     if not chosen:
         return working
 
@@ -545,6 +609,7 @@ def _action_remove(
             current_group = group
         choices.append(questionary.Choice(title=name, value=name))
 
+    _print_checkbox_help()
     chosen = questionary.checkbox(
         "Pick patterns to REMOVE from the current selection:",
         choices=choices,

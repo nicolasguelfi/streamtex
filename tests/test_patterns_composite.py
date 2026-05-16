@@ -392,6 +392,112 @@ def test_action_remove_groups_by_provenance(source: Path) -> None:
     assert any("individual" in t for t in separator_titles)
 
 
+def test_picker_add_preset_empty_then_valid_retries(source: Path) -> None:
+    """First Enter-without-SPACE returns [] → picker warns + re-prompts;
+    second checkbox call returns a real selection → preset is added."""
+    catalog = collect_pattern_catalog(source)
+    menu_iter = iter(["add_preset", "done"])
+    # checkbox returns: first call (preset multi-select) = [] (forgot SPACE),
+    # second call (retry) = ["core"]. confirm = no customize.
+    checkbox_calls = iter([[], ["core"]])
+    with (
+        patch("questionary.select",
+              side_effect=lambda *a, **kw: _FakeAsk(next(menu_iter))),
+        patch("questionary.confirm", return_value=_FakeAsk(False)),
+        patch("questionary.checkbox",
+              side_effect=lambda *a, **kw: _FakeAsk(next(checkbox_calls))),
+        patch("questionary.print"),
+    ):
+        result = select_patterns_compositely(catalog, source)
+    assert result.presets == ("core",)
+
+
+def test_picker_add_preset_double_empty_returns_to_menu(source: Path) -> None:
+    """Two consecutive empty submissions are treated as "user really meant
+    nothing" — back to the menu with no preset added (no infinite loop)."""
+    catalog = collect_pattern_catalog(source)
+    menu_iter = iter(["add_preset", "done"])
+    checkbox_calls = iter([[], []])
+    confirm_iter = iter([True])  # confirm empty Done? → yes, abort
+    with (
+        patch("questionary.select",
+              side_effect=lambda *a, **kw: _FakeAsk(next(menu_iter))),
+        patch("questionary.confirm",
+              side_effect=lambda *a, **kw: _FakeAsk(next(confirm_iter))),
+        patch("questionary.checkbox",
+              side_effect=lambda *a, **kw: _FakeAsk(next(checkbox_calls))),
+        patch("questionary.print"),
+    ):
+        with pytest.raises(InteractiveAborted):
+            select_patterns_compositely(catalog, source)
+
+
+def test_picker_add_preset_esc_skips_retry(source: Path) -> None:
+    """None (Esc/Ctrl-C) from the first checkbox bypasses the retry and
+    returns to the menu directly."""
+    catalog = collect_pattern_catalog(source)
+    menu_iter = iter(["add_preset", "done"])
+    confirm_iter = iter([True])  # empty done → confirm cancel
+    checkbox_call_count = {"n": 0}
+
+    def _checkbox_side(*a, **kw):
+        checkbox_call_count["n"] += 1
+        return _FakeAsk(None)  # Esc on first try
+
+    with (
+        patch("questionary.select",
+              side_effect=lambda *a, **kw: _FakeAsk(next(menu_iter))),
+        patch("questionary.confirm",
+              side_effect=lambda *a, **kw: _FakeAsk(next(confirm_iter))),
+        patch("questionary.checkbox", side_effect=_checkbox_side),
+        patch("questionary.print"),
+    ):
+        with pytest.raises(InteractiveAborted):
+            select_patterns_compositely(catalog, source)
+
+    # The checkbox was called exactly once — retry was correctly skipped.
+    assert checkbox_call_count["n"] == 1
+
+
+def test_picker_add_individual_also_retries_on_empty(source: Path) -> None:
+    """The retry behaviour applies to `Add individual patterns` too."""
+    catalog = collect_pattern_catalog(source)
+    menu_iter = iter(["add_individual", "done"])
+    checkbox_calls = iter([[], ["ptn_alpha"]])
+    with (
+        patch("questionary.select",
+              side_effect=lambda *a, **kw: _FakeAsk(next(menu_iter))),
+        patch("questionary.confirm", return_value=_FakeAsk(False)),
+        patch("questionary.checkbox",
+              side_effect=lambda *a, **kw: _FakeAsk(next(checkbox_calls))),
+        patch("questionary.print"),
+    ):
+        result = select_patterns_compositely(catalog, source)
+    assert result.individuals == ("ptn_alpha",)
+
+
+def test_picker_help_line_printed_before_each_checkbox(source: Path) -> None:
+    """The dim SPACE/ENTER help line is printed before every checkbox."""
+    catalog = collect_pattern_catalog(source)
+    menu_iter = iter(["add_preset", "done"])
+    help_calls: list[str] = []
+
+    def _capture_print(message, *a, **kw):
+        if "SPACE" in str(message):
+            help_calls.append(str(message))
+
+    with (
+        patch("questionary.select",
+              side_effect=lambda *a, **kw: _FakeAsk(next(menu_iter))),
+        patch("questionary.confirm", return_value=_FakeAsk(False)),
+        patch("questionary.checkbox", return_value=_FakeAsk(["core"])),
+        patch("questionary.print", side_effect=_capture_print),
+    ):
+        select_patterns_compositely(catalog, source)
+    # Help printed at least once (before the add_preset checkbox).
+    assert len(help_calls) >= 1
+
+
 def test_picker_remove_individual_drops_from_individuals(source: Path) -> None:
     # add individuals=[alpha, hero], then remove [hero]
     # → individuals=(alpha,), excludes=()

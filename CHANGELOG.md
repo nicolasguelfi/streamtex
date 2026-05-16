@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Composite picker: empty checkbox submission no longer silently
+  cancels an add.** The classic questionary trap — pressing ENTER
+  without first using SPACE to toggle items — used to return the user
+  silently to the main menu with no preset / no pattern added, leaving
+  them confused (the report was *"the picker did not even propose
+  preset contents"* — in reality the picker did, but the empty
+  submission discarded everything). Two complementary mitigations:
+  * Every multi-select prompt now prints a dim help line just above the
+    checkbox: `(↑↓ navigate · SPACE to toggle · ENTER to confirm · ESC to cancel)`.
+  * `Add preset(s)` and `Add individual pattern(s)` use a new
+    `_checkbox_with_empty_retry()` helper: on an empty submission, a
+    yellow warning explains the SPACE step and the prompt is re-opened
+    once. A second empty submission returns to the menu (no infinite
+    loop). ESC / Ctrl-C still propagates as a genuine cancel without
+    going through the retry path.
+  * `Customize a preset` and `Remove` keep their existing semantics
+    (empty submission there is legitimate — "drop everything from this
+    preset" or "I changed my mind, remove nothing") and only get the
+    help line, not the retry.
+  (`streamtex/patterns/picker.py`)
+
 ### Changed
 - **Composite picker: per-preset 'Customize?' after add + Remove choices
   grouped by provenance.** Closes a discoverability gap in the v3

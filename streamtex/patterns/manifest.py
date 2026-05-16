@@ -16,7 +16,12 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
-from . import ManifestError, MetaError, __version_schema__
+from . import (
+    SUPPORTED_SCHEMA_VERSIONS,
+    ManifestError,
+    MetaError,
+    __version_schema__,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -220,6 +225,147 @@ class PatternRecord:
         }
 
 
+EFFECTIVE_MODES = ("empty", "preset", "individual", "all", "composite")
+"""Possible return values of :attr:`PatternSelection.effective_mode`.
+
+This is a *derived* classification of a selection, not an input mode.
+Persistence is always done in the v3 composite shape; ``effective_mode``
+is a convenience for callers that just want to label "what kind of
+selection is this" (e.g. for log messages or analytics).
+"""
+
+# Legacy v2 mode strings — still accepted on read for back-compat.
+_LEGACY_V2_MODES = ("preset", "individual", "all")
+
+
+@dataclass
+class PatternSelection:
+    """User-expressed install intent persisted across syncs (schema v3).
+
+    A selection is the *intent* — a composable recipe — as opposed to
+    ``PatternsMeta.patterns`` which is the *resolved snapshot* of what's
+    actually on disk. ``stx patterns sync`` re-resolves the intent on a
+    fresh clone or after the source repo evolves.
+
+    Composition rules:
+        1. If ``all_flag`` is True → every pattern in the source.
+        2. Otherwise: union of patterns(p) for p in ``presets``,
+           plus ``individuals``, minus ``excludes``.
+
+    All fields default to empty so the "no intent" case is representable
+    (and recognisable via :meth:`is_empty`).
+    """
+
+    presets: tuple[str, ...] = ()
+    """Preset names taken in full (subject to ``excludes``)."""
+
+    individuals: tuple[str, ...] = ()
+    """Pattern names picked explicitly, on top of any preset contents."""
+
+    excludes: tuple[str, ...] = ()
+    """Pattern names to subtract from the resolved set (presets + individuals)."""
+
+    all_flag: bool = False
+    """When True, take every pattern in the source (still subject to ``excludes``)."""
+
+    def __post_init__(self) -> None:
+        # Coerce to tuples in case callers pass lists.
+        object.__setattr__(self, "presets", tuple(self.presets))
+        object.__setattr__(self, "individuals", tuple(self.individuals))
+        object.__setattr__(self, "excludes", tuple(self.excludes))
+        if self.all_flag and (self.presets or self.individuals):
+            raise MetaError(
+                "selection.all=true is exclusive with presets/individuals "
+                "(use excludes to subtract instead)"
+            )
+
+    # ---- Derived helpers ---------------------------------------------------
+
+    @property
+    def effective_mode(self) -> str:
+        """Classify this selection — see :data:`EFFECTIVE_MODES`."""
+        if self.is_empty():
+            return "empty"
+        if self.all_flag:
+            return "all"
+        if self.presets and not self.individuals and len(self.presets) == 1:
+            return "preset"
+        if self.individuals and not self.presets:
+            return "individual"
+        return "composite"
+
+    def is_empty(self) -> bool:
+        """True iff this selection would resolve to no patterns."""
+        return not (self.all_flag or self.presets or self.individuals)
+
+    # ---- Serialisation -----------------------------------------------------
+
+    def to_dict(self) -> dict[str, Any]:
+        """Emit the v3 canonical JSON/TOML shape."""
+        return {
+            "presets": list(self.presets),
+            "individuals": list(self.individuals),
+            "excludes": list(self.excludes),
+            "all": self.all_flag,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> PatternSelection:
+        """Build from either v3 canonical or v2 (``mode``+``items``) shape."""
+        # v3 shape (preferred): presence of any of the new fields decides.
+        v3_keys = {"presets", "individuals", "excludes", "all"}
+        if v3_keys & data.keys():
+            return cls(
+                presets=_coerce_str_tuple(data.get("presets", []), "presets"),
+                individuals=_coerce_str_tuple(data.get("individuals", []), "individuals"),
+                excludes=_coerce_str_tuple(data.get("excludes", []), "excludes"),
+                all_flag=bool(data.get("all", False)),
+            )
+        # v2 legacy shape: {"mode": "...", "items": [...]}.
+        if "mode" in data:
+            return cls.from_legacy(
+                mode=str(data.get("mode", "")),
+                items=_coerce_str_tuple(data.get("items", []), "items"),
+            )
+        # Empty / unknown → empty selection (no intent recorded).
+        return cls()
+
+    @classmethod
+    def from_legacy(cls, mode: str, items: tuple[str, ...]) -> PatternSelection:
+        """Build a v3 selection from the v2 (mode, items) pair.
+
+        Used for both meta-file migration (v2 → v3) and for the legacy
+        positional API (still useful in tests).
+        """
+        if mode not in _LEGACY_V2_MODES:
+            raise MetaError(
+                f"invalid legacy mode {mode!r} (expected one of {_LEGACY_V2_MODES})"
+            )
+        if mode == "preset":
+            if len(items) != 1:
+                raise MetaError(
+                    "legacy mode='preset' requires exactly one item"
+                )
+            return cls(presets=items)
+        if mode == "individual":
+            return cls(individuals=items)
+        # mode == "all"
+        if items:
+            raise MetaError("legacy mode='all' must have an empty items list")
+        return cls(all_flag=True)
+
+
+def _coerce_str_tuple(value: object, field_name: str) -> tuple[str, ...]:
+    """Best-effort: turn a JSON/TOML list value into a tuple of str."""
+    if value is None:
+        return ()
+    if not isinstance(value, (list, tuple)):
+        raise MetaError(
+            f"selection.{field_name} must be a list, got {type(value).__name__}"
+        )
+    return tuple(str(x) for x in value)
+
+
 @dataclass
 class PatternsMeta:
     """The complete ``.patterns-meta.json`` document."""
@@ -231,9 +377,11 @@ class PatternsMeta:
     mode: str
     installed_at: str
     patterns: list[PatternRecord]
+    selection: PatternSelection | None = None
+    """User intent (schema v2+). ``None`` for v1 files migrated in-memory."""
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        out: dict[str, Any] = {
             "schema_version": self.schema_version,
             "source": self.source,
             "source_commit": self.source_commit,
@@ -242,6 +390,9 @@ class PatternsMeta:
             "installed_at": self.installed_at,
             "patterns": [p.to_dict() for p in self.patterns],
         }
+        if self.schema_version >= 2:
+            out["selection"] = self.selection.to_dict() if self.selection else None
+        return out
 
 
 def load_meta(target_dir: Path) -> PatternsMeta:
@@ -259,10 +410,10 @@ def load_meta(target_dir: Path) -> PatternsMeta:
         raise MetaError(f"{path}: invalid JSON: {exc}") from exc
 
     schema = data.get("schema_version")
-    if schema != __version_schema__:
+    if schema not in SUPPORTED_SCHEMA_VERSIONS:
         raise MetaError(
             f"{path}: unsupported schema_version {schema!r} "
-            f"(expected {__version_schema__})"
+            f"(supported: {SUPPORTED_SCHEMA_VERSIONS})"
         )
 
     raw_patterns = data.get("patterns", [])
@@ -280,14 +431,33 @@ def load_meta(target_dir: Path) -> PatternsMeta:
         except KeyError as exc:
             raise MetaError(f"{path}: pattern entry missing field {exc}") from exc
 
+    selection: PatternSelection | None = None
+    if int(schema) >= 2:
+        raw_sel = data.get("selection")
+        if isinstance(raw_sel, dict):
+            try:
+                # from_dict accepts both v2 (mode/items) and v3 shapes.
+                selection = PatternSelection.from_dict(raw_sel)
+            except MetaError as exc:
+                raise MetaError(f"{path}: {exc}") from exc
+    else:
+        # v1 → v3 in-memory migration: infer selection from `preset` when
+        # possible so sync stays functional. Otherwise leave None and let
+        # the next install/sync record the user's explicit intent.
+        if data.get("preset"):
+            selection = PatternSelection.from_legacy(
+                mode="preset", items=(str(data["preset"]),),
+            )
+
     return PatternsMeta(
-        schema_version=int(schema),
+        schema_version=__version_schema__,
         source=str(data.get("source", "")),
         source_commit=data.get("source_commit"),
         preset=data.get("preset"),
         mode=str(data.get("mode", "copy")),
         installed_at=str(data.get("installed_at", "")),
         patterns=patterns,
+        selection=selection,
     )
 
 

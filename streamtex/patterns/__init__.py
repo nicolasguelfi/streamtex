@@ -14,6 +14,7 @@ from __future__ import annotations
 
 __all__ = [
     "__version_schema__",
+    "SUPPORTED_SCHEMA_VERSIONS",
     "PatternError",
     "SourceNotFoundError",
     "PresetError",
@@ -23,8 +24,18 @@ __all__ = [
     "MetaError",
 ]
 
-__version_schema__: int = 1
-"""Schema version embedded in ``.patterns-meta.json``."""
+__version_schema__: int = 3
+"""Current schema version written into ``.patterns-meta.json``.
+
+v3 generalises ``selection`` from a single mode+items pair into a
+composite shape: ``presets[]`` (taken in full by default), ``individuals[]``
+(added on top), ``excludes[]`` (subtracted from the resolved set), and an
+``all`` flag. v2 selections (single ``mode``+``items``) are silently
+migrated in-memory on load; v1 files (no selection) carry over too.
+"""
+
+SUPPORTED_SCHEMA_VERSIONS: tuple[int, ...] = (1, 2, 3)
+"""Schema versions ``load_meta`` accepts; older files are migrated in-memory."""
 
 
 # --- Exception hierarchy ---------------------------------------------------

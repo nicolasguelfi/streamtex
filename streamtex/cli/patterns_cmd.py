@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from functools import wraps
 from pathlib import Path
 
@@ -15,29 +16,51 @@ import click
 
 from streamtex.patterns import (
     DriftError,
+    MetaError,
     PatternError,
     SourceNotFoundError,
     ValidationError,
 )
 from streamtex.patterns.installer import (
+    DEFAULT_PATTERNS_REPO_URL,
     DEFAULT_TARGET_REL,
     build_install_plan,
+    clone_patterns_source,
     execute_install,
     remove_pattern,
+    resolve_selection,
 )
-from streamtex.patterns.manifest import load_meta, sha256_file
+from streamtex.patterns.installer import (
+    _all_patterns as _all_patterns,  # noqa: F401 — re-export used by tests/picker
+)
+from streamtex.patterns.manifest import PatternSelection, load_meta, sha256_file
+from streamtex.patterns.picker import (
+    InteractiveAborted,
+    collect_pattern_catalog,
+    select_patterns_compositely,
+    select_patterns_interactively,
+)
 from streamtex.patterns.preset import (
     list_presets as _list_presets,
 )
 from streamtex.patterns.preset import (
     resolve_preset,
 )
-from streamtex.patterns.resolver import resolve_source
+from streamtex.patterns.project_toml import (
+    read_project_selection,
+    write_project_selection,
+    write_project_source,
+)
+from streamtex.patterns.resolver import (
+    TraceStatus,
+    resolve_source,
+    trace_source,
+)
 from streamtex.patterns.updater import apply_update, compute_drift
 from streamtex.patterns.validator import validate_all, validate_file
 
 from .console import get_console
-from .workspace_cmd import find_workspace_root
+from .workspace_cmd import find_workspace_root, load_stx_toml
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +68,18 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+def _is_interactive() -> bool:
+    """True iff we can open a TUI. Extracted so tests can monkeypatch it.
+
+    CliRunner replaces sys.stdin with a non-tty stream, so we route the
+    check through this helper rather than calling ``sys.stdin.isatty()``
+    inline.
+    """
+    import sys
+
+    return sys.stdin.isatty()
+
 
 def _handle_errors(func):
     """Decorator: convert ``PatternError`` to ``click.ClickException``."""
@@ -85,6 +120,25 @@ def _resolve_project_dir() -> Path:
 def _resolve_workspace_root() -> Path | None:
     ws = find_workspace_root()
     return Path(ws).resolve() if ws else None
+
+
+def _read_initial_selection(
+    target_path: Path, project_dir: Path,
+) -> PatternSelection | None:
+    """Return the currently-persisted selection (TOML wins over meta).
+
+    Used to pre-fill the composite picker so users see "what's currently
+    declared for this project" and can iterate from there rather than
+    starting empty.
+    """
+    sel = read_project_selection(project_dir)
+    if sel is not None:
+        return sel
+    try:
+        meta = load_meta(target_path)
+        return meta.selection
+    except MetaError:
+        return None
 
 
 def _resolve(source_override: str | None):
@@ -246,45 +300,162 @@ def presets_cmd(source_override: str | None, fmt: str) -> None:
 
 @patterns.command(name="install")
 @click.argument("patterns_args", nargs=-1)
-@click.option("--preset", default=None, help="Install a preset.")
+@click.option("--preset", "preset_names", multiple=True,
+              help="Install a preset (may be repeated for multiple presets).")
 @click.option("--pattern", "pattern_csv", default=None,
               help="Install specific patterns (comma-separated).")
-@click.option("--all", "install_all", is_flag=True, help="Install all patterns.")
-@click.option("--exclude", default=None, help="Exclude patterns (comma-separated).")
+@click.option("--all", "install_all", is_flag=True,
+              help="Install every pattern in the source.")
+@click.option("--exclude", default=None,
+              help="Exclude patterns (comma-separated). Subtracted from the "
+                   "resolved set in every mode, including --all.")
 @click.option("--mode", type=click.Choice(["copy", "symlink"]), default="copy")
 @click.option("--source", "source_override", default=None)
 @click.option("--target", default=None,
               help=f"Target directory (default: {DEFAULT_TARGET_REL}).")
 @click.option("--force", is_flag=True, help="Overwrite locally modified patterns.")
 @click.option("--dry-run", is_flag=True, help="Show plan without writing.")
+@click.option("--tag", default=None,
+              help="(Interactive mode) only show patterns whose tags include this value.")
 @_handle_errors
-def install_cmd(patterns_args: tuple[str, ...], preset: str | None,
+def install_cmd(patterns_args: tuple[str, ...], preset_names: tuple[str, ...],
                 pattern_csv: str | None, install_all: bool,
                 exclude: str | None, mode: str, source_override: str | None,
-                target: str | None, force: bool, dry_run: bool) -> None:
-    """Install patterns into the project."""
+                target: str | None, force: bool, dry_run: bool,
+                tag: str | None) -> None:
+    """Install patterns into the project.
+
+    Composable declarative selectors (all may be combined except --all):
+      * --preset NAME           — repeat for multiple presets
+      * --pattern A,B,C         — explicit list (also accepts positional NAMES)
+      * --exclude X,Y           — subtract from the resolved set
+      * --all                   — every pattern in the source (excludes still apply)
+
+    Interactive fallback (no selector given, TTY only):
+      * default                 — menu-driven composite picker
+      * --tag VALUE             — flat picker narrowed by tag
+
+    Non-TTY contexts (CI, scripts) refuse the interactive fallback.
+    """
     console = get_console()
     resolved = _resolve(source_override)
     target_path = _resolve_target(target)
 
     individual = tuple(patterns_args) + _split_csv(pattern_csv)
+    exclude_list = _split_csv(exclude)
+
+    # --all is exclusive with --preset and --pattern (but not with --exclude).
+    if install_all and (preset_names or individual):
+        raise click.ClickException(
+            "--all is exclusive with --preset / --pattern (use --exclude to "
+            "subtract specific patterns from --all).",
+        )
+
+    # --- Interactive mode trigger ----------------------------------------
+    nothing_chosen = not preset_names and not individual and not install_all
+    composite_selection: PatternSelection | None = None
+    if nothing_chosen:
+        if not _is_interactive():
+            raise click.ClickException(
+                "no selector given and stdin is not a terminal. "
+                "Pass --preset, --pattern, or --all (or run interactively).",
+            )
+
+        catalog = collect_pattern_catalog(resolved.path)
+        if not catalog:
+            raise click.ClickException(
+                f"no patterns found in source {resolved.path}",
+            )
+
+        # The --tag flag is a narrowing convenience that only the flat
+        # picker honours; pick the picker accordingly.
+        if tag:
+            preselected: set[str] = set()
+            try:
+                existing_meta = load_meta(target_path)
+                preselected = {r.name for r in existing_meta.patterns}
+            except MetaError:
+                pass
+            try:
+                picked = select_patterns_interactively(
+                    catalog, preselected=preselected, tag_filter=tag,
+                )
+            except InteractiveAborted as exc:
+                raise click.ClickException(
+                    f"interactive install aborted: {exc}",
+                ) from exc
+            individual = tuple(picked)
+            console.print(
+                f"  [dim]picked {len(individual)} pattern(s) "
+                f"interactively (tag={tag!r})[/dim]"
+            )
+        else:
+            # Default interactive mode: composite menu-driven picker.
+            initial = _read_initial_selection(target_path, _resolve_project_dir())
+            try:
+                composite_selection = select_patterns_compositely(
+                    catalog, resolved.path, initial=initial,
+                )
+            except InteractiveAborted as exc:
+                raise click.ClickException(
+                    f"interactive install aborted: {exc}",
+                ) from exc
+            # Resolve composite → individual list for build_install_plan;
+            # the canonical v3 selection is persisted via selection_override.
+            individual = resolve_selection(composite_selection, resolved.path)
+            console.print(
+                f"  [dim]picked {composite_selection.effective_mode} "
+                f"selection → {len(individual)} pattern(s)[/dim]"
+            )
+    else:
+        # Declarative path: build the composite from flags so multiple
+        # --preset, individual lists, and --exclude can all be combined
+        # in one install. The single-preset shortcut (one --preset only,
+        # no individuals, no excludes) still goes through the legacy
+        # build_install_plan branch below for backwards compatibility
+        # of the per-flag selection it records in meta.
+        cli_uses_composite = (
+            len(preset_names) > 1
+            or (preset_names and individual)
+            or (preset_names and exclude_list)
+            or (install_all and exclude_list)
+        )
+        if cli_uses_composite:
+            if install_all:
+                composite_selection = PatternSelection(
+                    all_flag=True, excludes=exclude_list,
+                )
+            else:
+                composite_selection = PatternSelection(
+                    presets=preset_names,
+                    individuals=individual,
+                    excludes=exclude_list,
+                )
+            individual = resolve_selection(composite_selection, resolved.path)
+
+    # Single-flag preset shortcut still uses the legacy plan branch so
+    # downstream tests/back-compat behaviour is unchanged.
+    legacy_preset = preset_names[0] if (
+        len(preset_names) == 1 and composite_selection is None
+    ) else None
 
     plan = build_install_plan(
         target=target_path,
         source=resolved.path,
-        preset=preset,
+        preset=legacy_preset,
         individual_patterns=individual,
-        install_all=install_all,
-        exclude=_split_csv(exclude),
+        install_all=install_all and composite_selection is None,
+        exclude=exclude_list if composite_selection is None else (),
         mode=mode,
         force=force,
+        selection_override=composite_selection,
     )
 
     if dry_run:
         console.print(
             f"[bold]Dry-run install[/bold] -> {target_path}\n"
             f"  source: {resolved.path}\n"
-            f"  preset: {preset or '—'}  mode: {mode}  "
+            f"  preset(s): {', '.join(preset_names) or '—'}  mode: {mode}  "
             f"force: {force}  initial: {plan.is_initial}"
         )
         for src in plan.selected_files:
@@ -302,6 +473,26 @@ def install_cmd(patterns_args: tuple[str, ...], preset: str | None,
     console.print(f"  target: {result.target}")
     if result.meta_path:
         console.print(f"  meta:   {result.meta_path}")
+
+    # Persist user intent into the project's TOML so sync can restore the
+    # selection on a fresh clone. Best-effort: skip silently when --target
+    # points outside the current project, or when no project dir is around.
+    if plan.selection is not None:
+        project_dir = _resolve_project_dir()
+        try:
+            target_in_project = target_path.is_relative_to(project_dir)
+        except (AttributeError, ValueError):
+            target_in_project = str(target_path).startswith(str(project_dir))
+        if target_in_project:
+            try:
+                toml_path = write_project_selection(
+                    project_dir,
+                    plan.selection,
+                    source=resolved.raw_value,
+                )
+                console.print(f"  intent: {toml_path}")
+            except Exception as exc:
+                logger.warning("failed to persist selection to project TOML: %s", exc)
 
 
 # ---------------------------------------------------------------------------
@@ -351,35 +542,75 @@ def update_cmd(names: tuple[str, ...], source_override: str | None,
 @_handle_errors
 def sync_cmd(source_override: str | None, target: str | None,
              force: bool, dry_run: bool) -> None:
-    """Idempotent: install missing + update existing patterns."""
+    """Idempotent: install missing + update existing patterns.
+
+    Honours the user's recorded intent in precedence order:
+      1. ``stx.toml [patterns.selection]`` (or shortcuts) — source of truth.
+      2. ``.patterns-meta.json`` ``selection`` field (schema v2+).
+      3. ``.patterns-meta.json`` ``preset`` field (v1, migrated in-memory).
+      4. No intent → just refresh what's already on disk.
+    """
+    console = get_console()
     resolved = _resolve(source_override)
     target_path = _resolve_target(target)
-    meta = load_meta(target_path)
-    preset = meta.preset
+    project_dir = _resolve_project_dir()
 
-    if preset is None:
-        # No preset stored: just run update.
+    # --- Determine effective intent ---------------------------------------
+    selection = read_project_selection(project_dir)
+
+    try:
+        meta = load_meta(target_path)
+    except MetaError:
+        meta = None
+
+    if selection is None and meta is not None:
+        selection = meta.selection
+    if selection is None and meta is not None and meta.preset:
+        selection = PatternSelection.from_legacy(
+            mode="preset", items=(meta.preset,),
+        )
+
+    # --- No intent → plain update ----------------------------------------
+    if selection is None or selection.is_empty():
+        if meta is None:
+            console.print(
+                "[yellow]Nothing to sync: no .patterns-meta.json and no "
+                "[patterns] intent in stx.toml/pyproject.toml.[/yellow]"
+            )
+            return
         apply_update(target_path, resolved.path, force=force, dry_run=dry_run)
+        console.print("[green]Sync complete (no recorded selection).[/green]")
         return
 
-    # Compute missing files
-    rp = resolve_preset(resolved.path, preset)
-    have = {r.name for r in meta.patterns}
-    missing = [p for p in rp.pattern_files if p.stem not in have]
+    # --- Resolve composite selection → target name set -------------------
+    target_names = resolve_selection(selection, resolved.path)
+    have = {r.name for r in meta.patterns} if meta else set()
+    missing = [n for n in target_names if n not in have]
 
     if missing:
         plan = build_install_plan(
             target=target_path,
             source=resolved.path,
-            individual_patterns=tuple(p.stem for p in missing),
-            mode=meta.mode,
+            individual_patterns=tuple(missing),
+            mode=meta.mode if meta else "copy",
             force=force,
+            record_selection=False,
         )
         if not dry_run:
-            execute_install(plan, raw_source=meta.source)
+            execute_install(
+                plan,
+                raw_source=meta.source if meta else resolved.raw_value,
+            )
+        console.print(
+            f"  installed {len(missing)} missing pattern(s) from intent "
+            f"({selection.mode})"
+        )
 
-    apply_update(target_path, resolved.path, force=force, dry_run=dry_run)
-    get_console().print("[green]Sync complete.[/green]")
+    if meta is not None or missing:
+        # apply_update needs meta on disk; missing install just wrote one.
+        apply_update(target_path, resolved.path, force=force, dry_run=dry_run)
+
+    console.print("[green]Sync complete.[/green]")
 
 
 # ---------------------------------------------------------------------------
@@ -703,3 +934,240 @@ def init_cmd(name: str, scope: str, source_override: str | None,
     target_file.parent.mkdir(parents=True, exist_ok=True)
     target_file.write_text(body, encoding="utf-8")
     get_console().print(f"[green]Created {target_file}[/green]")
+
+
+# ---------------------------------------------------------------------------
+# source subgroup — inspect / clone / link / set the patterns source path
+# ---------------------------------------------------------------------------
+
+@patterns.group(name="source")
+def source_group() -> None:
+    """Inspect or configure where ``stx patterns`` resolves its source repo."""
+
+
+_STATUS_COLOR = {
+    TraceStatus.MATCHED: "green",
+    TraceStatus.UNREACHED: "dim",
+    TraceStatus.SKIPPED: "dim",
+    TraceStatus.NOT_FOUND: "yellow",
+    TraceStatus.INVALID: "red",
+}
+
+
+@source_group.command(name="show")
+@click.option(
+    "--source", "source_override", default=None,
+    help="Probe resolution as if --source were passed (does not write).",
+)
+@_handle_errors
+def source_show_cmd(source_override: str | None) -> None:
+    """Print the R4 resolution chain — what was tried, what matched.
+
+    Useful to debug "patterns: no usable source found" without running an
+    actual install/list command.
+    """
+    console = get_console()
+    project_dir = _resolve_project_dir()
+    workspace = _resolve_workspace_root()
+    entries, resolved = trace_source(
+        project_dir,
+        cli_override=source_override,
+        workspace_root=workspace,
+    )
+
+    from rich.table import Table
+    table = Table(
+        title=f"Patterns source — R4 resolution from {project_dir}",
+    )
+    table.add_column("Level", style="cyan", no_wrap=True)
+    table.add_column("Status", no_wrap=True)
+    table.add_column("Candidate / Reason")
+    for e in entries:
+        color = _STATUS_COLOR.get(e.status, "")
+        status = (
+            f"[{color}]{e.status.value}[/{color}]" if color else e.status.value
+        )
+        candidate = e.candidate or "(none)"
+        detail = f" — {e.detail}" if e.detail else ""
+        table.add_row(
+            f"L{e.level.value} {e.level.name.lower()}",
+            status,
+            f"{candidate}{detail}",
+        )
+    console.print(table)
+
+    if resolved:
+        console.print(
+            f"\n[bold green]Resolved[/bold green] → {resolved.path}"
+            f"  [dim](level: {resolved.level.name.lower()})[/dim]"
+        )
+        if resolved.raw_value:
+            console.print(f"  raw value:   {resolved.raw_value}")
+        if resolved.declared_at:
+            console.print(f"  declared at: {resolved.declared_at}")
+    else:
+        console.print(
+            "\n[bold red]No source resolved.[/bold red]\n"
+            "  Next steps:\n"
+            "    [cyan]stx patterns source clone[/cyan]"
+            "          fetch the official repo into this workspace\n"
+            "    [cyan]stx patterns source link PATH[/cyan]"
+            "    point to an existing local clone\n"
+            "    [cyan]stx patterns source set PATH[/cyan]"
+            "     record a custom path in stx.toml"
+        )
+
+
+def _default_patterns_url(workspace_root: Path | None) -> str:
+    """Return the URL to clone, preferring the workspace's declaration."""
+    if workspace_root is None:
+        return DEFAULT_PATTERNS_REPO_URL
+    try:
+        config = load_stx_toml(str(workspace_root))
+    except click.ClickException:
+        return DEFAULT_PATTERNS_REPO_URL
+    repos = config.get("repos", {})
+    entry = repos.get("streamtex-patterns")
+    if isinstance(entry, dict) and entry.get("url"):
+        return str(entry["url"])
+    return DEFAULT_PATTERNS_REPO_URL
+
+
+def _is_empty_dir(path: Path) -> bool:
+    """True iff *path* is a directory with no entries (not even hidden)."""
+    return path.is_dir() and not any(path.iterdir())
+
+
+@source_group.command(name="clone")
+@click.option("--url", default=None,
+              help="Git URL to clone (default: workspace [repos.streamtex-patterns].url, "
+                   "else the official repo).")
+@click.option("--branch", default=None, help="Branch or tag to check out.")
+@click.option("--target", default=None,
+              help="Where to clone (default: <workspace>/streamtex-patterns).")
+@click.option("--force", is_flag=True,
+              help="Allow cloning over a non-empty existing directory (it is removed first).")
+@_handle_errors
+def source_clone_cmd(url: str | None, branch: str | None,
+                     target: str | None, force: bool) -> None:
+    """Clone the patterns source repo into the workspace (R4 level 4)."""
+    console = get_console()
+    workspace = _resolve_workspace_root()
+
+    if target:
+        target_path = Path(target).expanduser().resolve()
+    elif workspace is not None:
+        target_path = (workspace / "streamtex-patterns").resolve()
+    else:
+        raise click.ClickException(
+            "no workspace detected and no --target specified — "
+            "pass --target PATH or run inside a stx workspace."
+        )
+
+    effective_url = url or _default_patterns_url(workspace)
+    console.print(f"[cyan]Cloning[/cyan] {effective_url} → {target_path}")
+
+    clone_patterns_source(
+        effective_url, target_path, branch=branch, force=force,
+    )
+
+    console.print("[green]Cloned successfully.[/green]")
+    console.print(
+        "  Run [cyan]stx patterns source show[/cyan] to confirm the new "
+        "resolution, then [cyan]stx patterns install[/cyan]."
+    )
+
+
+@source_group.command(name="link")
+@click.argument("path")
+@click.option("--force", is_flag=True,
+              help="Replace an existing <workspace>/streamtex-patterns symlink or directory.")
+@_handle_errors
+def source_link_cmd(path: str, force: bool) -> None:
+    """Symlink ``<workspace>/streamtex-patterns`` to an existing local clone.
+
+    Use this when you already have a streamtex-patterns checkout on disk
+    that you want several workspaces to share, or when iterating on pattern
+    files (edits show up live in every consuming project).
+    """
+    console = get_console()
+    workspace = _resolve_workspace_root()
+    if workspace is None:
+        raise click.ClickException(
+            "no workspace detected — run inside a stx workspace, or use "
+            "`stx patterns source set PATH` to record a custom path instead."
+        )
+
+    src = Path(path).expanduser().resolve()
+    if not src.is_dir():
+        raise click.ClickException(f"target {src} is not a directory.")
+    if not (src / "manifest.toml").is_file():
+        raise click.ClickException(
+            f"{src} is not a valid patterns source (no manifest.toml).",
+        )
+
+    dst = (workspace / "streamtex-patterns").resolve()
+    if dst.exists() or dst.is_symlink():
+        if not force:
+            raise click.ClickException(
+                f"{dst} already exists; pass --force to replace it."
+            )
+        if dst.is_symlink() or dst.is_file():
+            dst.unlink()
+        else:
+            import shutil
+            shutil.rmtree(dst)
+
+    try:
+        os.symlink(src, dst)
+    except OSError as exc:
+        raise click.ClickException(f"symlink failed: {exc}") from exc
+
+    console.print(f"[green]Linked[/green] {dst} → {src}")
+    console.print(
+        "  Run [cyan]stx patterns source show[/cyan] to confirm the new "
+        "resolution."
+    )
+
+
+@source_group.command(name="set")
+@click.argument("path")
+@click.option("--scope", type=click.Choice(["project", "workspace"]),
+              default="project",
+              help="Write [patterns].source in the current project (default) or workspace stx.toml.")
+@click.option("--allow-missing", is_flag=True,
+              help="Skip the manifest.toml validation (record the path even if invalid today).")
+@_handle_errors
+def source_set_cmd(path: str, scope: str, allow_missing: bool) -> None:
+    """Record ``[patterns].source = PATH`` in stx.toml without cloning anything."""
+    console = get_console()
+
+    raw = path  # keep what the user typed (relative or absolute)
+    abs_path = Path(path).expanduser().resolve()
+    if not allow_missing:
+        if not abs_path.is_dir():
+            raise click.ClickException(
+                f"{abs_path} is not a directory; pass --allow-missing to record it anyway."
+            )
+        if not (abs_path / "manifest.toml").is_file():
+            raise click.ClickException(
+                f"{abs_path} has no manifest.toml; pass --allow-missing to record it anyway."
+            )
+
+    if scope == "workspace":
+        target_dir = _resolve_workspace_root()
+        if target_dir is None:
+            raise click.ClickException(
+                "no workspace detected — cannot set --scope workspace."
+            )
+    else:
+        target_dir = _resolve_project_dir()
+
+    toml_path = write_project_source(target_dir, raw)
+    console.print(
+        f"[green]Wrote[/green] [patterns].source = {raw!r} → {toml_path}"
+    )
+    console.print(
+        "  Run [cyan]stx patterns source show[/cyan] to confirm the new "
+        "resolution."
+    )

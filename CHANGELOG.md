@@ -7,6 +7,248 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`.patterns-meta.json` schema v3 — composite selection.** The
+  ``selection`` field generalises from a single mode+items pair into
+  four composable parts: ``presets[]`` (taken in full), ``individuals[]``
+  (added on top), ``excludes[]`` (subtracted from the resolved set),
+  and an ``all`` flag (everything in the source, still subject to
+  excludes). v1 and v2 selections migrate silently in-memory on load;
+  v1/v2 shapes are also still accepted on read in ``stx.toml`` for
+  hand-edited files. Bumps ``__version_schema__`` to 3,
+  ``SUPPORTED_SCHEMA_VERSIONS`` to ``(1, 2, 3)``. The legacy ``mode`` /
+  ``items`` attributes are gone from ``PatternSelection``; a derived
+  ``effective_mode`` property classifies a selection as
+  ``empty``/``preset``/``individual``/``all``/``composite``.
+  (`streamtex/patterns/__init__.py`, `streamtex/patterns/manifest.py`,
+  `streamtex/patterns/installer.py`, `streamtex/patterns/project_toml.py`)
+- **`stx patterns install` — composite menu-driven picker.** When no
+  selector flag is passed in a TTY, the interactive mode now opens a
+  persistent menu loop instead of a single multi-select:
+  *Add preset(s)* / *Add individual pattern(s)* / *Remove pattern(s)
+  from current selection* / *Toggle 'all' mode* / *Show summary* /
+  *Done* / *Cancel*. Each action mutates a working ``PatternSelection``
+  v3, with a header line showing the current composition and the
+  resolved pattern count. The flat picker (one screen, multi-select
+  grouped by scope) is still available via ``--tag VALUE``.
+  (`streamtex/patterns/picker.py`, `streamtex/cli/patterns_cmd.py`)
+- **Composable declarative CLI.** ``--preset`` is now repeatable
+  (``--preset slides --preset docs``); ``--preset`` + ``--pattern``
+  + ``--exclude`` may be combined freely; ``--all`` is exclusive with
+  ``--preset/--pattern`` but still accepts ``--exclude``. The composite
+  selection is built from flags and persisted to
+  ``stx.toml [patterns.selection]`` in canonical v3 form.
+  (`streamtex/cli/patterns_cmd.py`)
+- **``resolve_selection(selection, source)`` helper.** Pure function
+  that resolves a v3 selection against a source repo into a sorted
+  tuple of pattern names. Algorithm: ``all_flag`` ⇒ every pattern;
+  else union of ``patterns(preset)`` for each preset + ``individuals``;
+  always subtract ``excludes``. Used by ``install``, ``sync``, and the
+  picker's summary view. (`streamtex/patterns/installer.py`)
+- **`stx install --project NAME`: opt-in design-patterns prompt at the
+  end of project creation.** Two-stage, both default to NO; the whole
+  helper is skipped silently in non-TTY contexts so CI/scripts remain
+  reproducible. (1) If no patterns source is resolvable for the new
+  project, ask whether to clone `streamtex-patterns` into the workspace
+  (URL inherits from `[repos.streamtex-patterns].url` if declared, else
+  the official repo). (2) Then, if a source is reachable, ask whether to
+  open the interactive picker; selected patterns are installed into
+  `<project>/.claude/custom/streamtex-patterns/` and the choice is
+  persisted as `[patterns.selection]` in the project `stx.toml`. New
+  flag `--no-patterns` short-circuits both stages. Clone/install
+  failures degrade to a warning — they never break `stx install`.
+  (`streamtex/cli/install_cmd.py`)
+- **Reusable `clone_patterns_source(url, target, branch=None, force=False)`.**
+  Extracted from `stx patterns source clone` so the opt-in prompt above
+  and the explicit subcommand share one validated implementation
+  (git presence check, empty-dir handling, manifest verification,
+  subprocess timeout). (`streamtex/patterns/installer.py`)
+- **`stx patterns install` — interactive multi-select picker when no
+  selector is passed.** Running `stx patterns install` (no `--preset`,
+  no `--pattern`, no `--all`) in a TTY now opens a `questionary`
+  checkbox grouped by scope (`core`, `slides`, `docs`, `projects/<id>`).
+  Already-installed patterns are pre-checked, so a re-run shows current
+  state and lets you toggle. Empty selection or Ctrl-C aborts cleanly.
+  New flag `--tag VALUE` narrows the picker to patterns whose frontmatter
+  tags include `VALUE` (case-insensitive). Non-TTY contexts (CI, scripts)
+  refuse with a clear error pointing at the explicit flags — no hidden
+  install ever happens. (`streamtex/patterns/picker.py`,
+  `streamtex/cli/patterns_cmd.py`)
+- **`collect_pattern_catalog()` + `filter_by_tag()` helpers.** Walk a
+  source repo and return one `CatalogEntry(name, scope, description,
+  tags, path, extrapolable, since)` per pattern, skipping malformed
+  files with a warning so the picker never crashes on bad input.
+  (`streamtex/patterns/picker.py`)
+- **`st_book(..., block_args=(...), block_kwargs={...})`: explicit
+  forwarding of args/kwargs to each `block.build()`.** Replaces the
+  previous implicit `*args/**kwargs` capture, which silently forwarded
+  any unknown kwarg to every block and caused confusing deep
+  `TypeError: build() got an unexpected keyword argument ...` cascades
+  (e.g. when a scaffolded `book.py` passed `title="..."` to st_book).
+  The explicit API gives clear IDE/type-check support and a single
+  documented contract; internal helpers (`_paginated_book`,
+  `_build_page_cache`, `_warmup_build_cache`) lost their `*args/**kwargs`
+  pass-through and now take `block_args`/`block_kwargs` directly.
+  (`streamtex/book.py`)
+- **New subgroup `stx patterns source` — inspect & configure the patterns
+  source path.** Four subcommands replace the previous "edit `stx.toml` by
+  hand or guess" workflow:
+  - `stx patterns source show` — print the R4 resolution chain (which level
+    matched, what each level probed, why others failed) plus next-step
+    suggestions when nothing resolves.
+  - `stx patterns source clone [--url URL] [--branch B] [--target DIR] [--force]` —
+    git-clone the patterns repo into `<workspace>/streamtex-patterns` (or a
+    custom target). Default URL is read from `[repos.streamtex-patterns].url`
+    in the workspace `stx.toml`, falling back to the official repo. Refuses
+    cloning into a non-empty directory without `--force`.
+  - `stx patterns source link PATH [--force]` — symlink
+    `<workspace>/streamtex-patterns` to an existing local clone (for sharing
+    one checkout across many workspaces, or for pattern-author iteration).
+  - `stx patterns source set PATH [--scope project|workspace] [--allow-missing]` —
+    record `[patterns].source = PATH` in `stx.toml` (or `pyproject.toml`
+    under `[tool.patterns]` when no `stx.toml` exists) via `tomlkit`,
+    preserving comments and unrelated keys.
+  (`streamtex/cli/patterns_cmd.py`, `streamtex/patterns/project_toml.py`)
+- **`trace_source()` — structured introspection of the R4 chain.** Returns
+  per-level `(status, candidate, detail)` entries without raising; reused
+  by `source show` and by `SourceNotFoundError`'s enriched message.
+  (`streamtex/patterns/resolver.py`)
+- **`.patterns-meta.json` schema v2 — record user install intent.** Adds a
+  new `selection` field (`{mode: "preset"|"individual"|"all", items: [...]}`)
+  so `stx patterns sync` can restore a hand-picked selection on a fresh
+  clone, not just a preset. v1 files load transparently (silent in-memory
+  migration; `preset`-only files are upgraded to `selection.mode="preset"`).
+  (`streamtex/patterns/__init__.py`, `streamtex/patterns/manifest.py`,
+  `streamtex/patterns/installer.py`)
+- **`stx patterns` writes user intent to the project TOML.** After every
+  successful `stx patterns install`, the chosen preset/pattern list is
+  persisted to `<project>/stx.toml` under `[patterns.selection]` (or to
+  `[tool.patterns]` in `pyproject.toml` when `stx.toml` is absent). Three
+  shortcut forms are accepted on read for hand-edited files:
+  `preset = "..."`, `selected = [...]`, `all = true`. The canonical
+  sub-table is written back, removing legacy shortcuts. Comments and
+  unrelated keys are preserved via `tomlkit`. (new module
+  `streamtex/patterns/project_toml.py`, `streamtex/cli/patterns_cmd.py`)
+- **`stx patterns sync` honors recorded intent.** Precedence order:
+  `stx.toml [patterns.selection]` → `.patterns-meta.json` `selection` →
+  legacy `preset` field → fallback to a plain refresh of installed files.
+  Missing patterns are installed without overwriting the recorded intent
+  (new `build_install_plan(record_selection=False)` flag).
+  (`streamtex/cli/patterns_cmd.py`, `streamtex/patterns/installer.py`)
+- **CLI extra `[cli]` gains `tomlkit>=0.13` and `questionary>=2.0`.**
+  `tomlkit` is used for round-trip-safe edits of `stx.toml`/`pyproject.toml`;
+  `questionary` is prepared for the upcoming interactive multi-select
+  picker (`stx patterns install` without arguments). (`pyproject.toml`)
+
+### Deprecated
+- **Passing extra args/kwargs directly to `st_book` is now deprecated.**
+  `st_book(modules, theme="dark")` still forwards `theme` to each
+  `block.build()` but emits a `DeprecationWarning`. Use the explicit
+  `st_book(modules, block_kwargs={"theme": "dark"})` instead. The
+  legacy capture will be removed in a future major release; unknown
+  kwargs will then raise `TypeError` at the call site rather than
+  crashing deep inside block code. (`streamtex/book.py`)
+
+### Documentation
+- **End-to-end install flow documented in three places.** (1) New block
+  `bck_install_flow.py` in `streamtex-docs/manuals/stx_manual_patterns/`
+  walks through source resolution, interactive picker, declarative flags,
+  the opt-in prompt at project creation, and intent persistence for
+  `sync`. (2) `bck_cli_overview.py` reorganised into four thematic
+  groups (lifecycle / source / catalog / authoring) covering all 15
+  subcommands. (3) New "Design Patterns" section in
+  `streamtex/README.md` with a 4-step quickstart and a link to the
+  manual. (4) `streamtex-patterns/README.md` rewritten around the
+  interactive picker, the `source` subgroup, and `[patterns.selection]`.
+
+### Changed
+- **`SourceNotFoundError` now points at the new tooling.** The error
+  message includes the per-level R4 trace and ends with a hint listing
+  `stx patterns source clone | link | set | show` so users know how to
+  resolve the situation without grepping the source. The resolver no
+  longer collects ad-hoc strings; it delegates to `trace_source()`.
+  (`streamtex/patterns/resolver.py`)
+- **`stx install --dev`: auto-link the registered streamtex source into a
+  new project's venv.** When creating a project with `--project NAME`,
+  passing `--dev` runs the equivalent of `stx dev link streamtex` inside
+  the freshly-scaffolded project: writes `[tool.uv.sources]` to its
+  `pyproject.toml` and re-syncs uv so the project uses the dev-source
+  immediately, no manual follow-up needed. No-op (with a hint) when
+  `streamtex` is not registered globally via `stx dev register`.
+  (`streamtex/cli/install_cmd.py`)
+
+### Fixed
+- **Invisible JS-bus iframes no longer render as visible light bars.**
+  StreamTeX injects JavaScript into the parent document via
+  `st.iframe(js, height=1)` from 10+ call sites (loading overlay,
+  marker navigation, banner, paginated nav, search refresh, bib
+  hover-preview, Chrome banner, password keyboard capture). Streamlit's
+  default iframe chrome (light background + border) made each 1px host
+  appear as a thin horizontal line — particularly noticeable in dark
+  themes. Added a single CSS rule in `streamtex/static/default.css`
+  that collapses `iframe[height="1"]` to `height: 0` and uses
+  `visibility: hidden` (not `display: none`, which would prevent
+  the JS from loading). (`streamtex/static/default.css`)
+- **`generate_book_py()` no longer passes `title="{name}"` to `st_book`.**
+  That kwarg is not part of `st_book`'s API; under the legacy forwarding
+  it was sent verbatim to every `block.build()` and crashed any block
+  whose signature didn't accept it (i.e. every scaffolded block). The
+  page title is already set via `st.set_page_config(page_title=...)`
+  earlier in the generated file, so this argument was redundant on top
+  of being broken. (`streamtex/cli/project_cmd.py`)
+- **`stx install`: skip cloning repos that are dev-linked.** Step 2
+  ("Clone missing repos") now calls `resolve_repo_path()` to detect
+  repos registered via `stx dev register` and skips `git clone` for
+  them, matching the existing behaviour of `stx update`. Avoids
+  creating redundant `<workspace>/streamtex-claude/` and
+  `<workspace>/streamtex-docs/` clones when a global dev link is
+  active. (`streamtex/cli/install_cmd.py`)
+- **`stx project new --template` / `stx install --template`: honor
+  dev-linked `streamtex-docs`.** `_copy_rich_template()` now resolves
+  the docs repo through `resolve_repo_path()` instead of hardcoding
+  `<workspace>/streamtex-docs/templates/…`, so rich templates work
+  when docs is dev-linked rather than cloned into the workspace.
+  (`streamtex/cli/project_cmd.py`)
+- **`stx install`: don't offer to clone `streamtex-docs` if it is
+  dev-linked.** `_maybe_clone_docs_for_template()` checks
+  `resolve_repo_path()` before testing the workspace path and reports
+  the dev link as satisfying the template requirement.
+  (`streamtex/cli/install_cmd.py`)
+- **`stx status`: read library version from the dev-linked source.**
+  `_get_source_version()` now resolves the library repo through
+  `resolve_repo_path()` so the displayed source version reflects the
+  dev-linked checkout when one is registered.
+  (`streamtex/cli/status_cmd.py`)
+- **Scaffolded `blocks/__init__.py` now passes the parent directory to
+  `ProjectBlockRegistry`, not `__file__`.** Root cause of the "StreamTeX
+  Initializing…" loading loop seen on freshly-scaffolded projects:
+  `ProjectBlockRegistry(__file__)` made `self.blocks_dir` a file path,
+  `Path.glob("bck_*.py")` silently returned empty, the manifest stayed
+  empty, `_paginated_book` early-returned on `total == 0` without
+  removing the loading overlay. Generator now emits
+  `ProjectBlockRegistry(Path(__file__).parent)` (matches the docstring
+  and the `streamtex-docs` template). (`streamtex/cli/project_cmd.py`)
+- **`ProjectBlockRegistry.__init__` now validates that the path is a
+  directory.** Passing a file (or non-existent path) now raises a clear
+  `ValueError` with the correct usage hint, instead of silently
+  producing an empty registry. Catches the bug above at the lib level
+  for any user writing `blocks/__init__.py` by hand. (`streamtex/blocks.py`)
+- **`_paginated_book` removes the loading overlay before the
+  `total == 0` early-return.** Defensive cleanup so a legitimately
+  empty book (or any other path that produces `total == 0`) no longer
+  leaves the "Initializing…" overlay stuck on screen.
+  (`streamtex/book.py`)
+- **`ProjectBlockRegistry` implements the Python sequence protocol
+  (`__len__` / `__iter__` / `__getitem__`).** Fixes `TypeError: object
+  of type 'ProjectBlockRegistry' has no len()` raised by
+  `st_book(registry, ...)` — the form produced by `generate_book_py()`
+  for new projects. Per-block lazy loading is preserved: `__len__`
+  reads the manifest without importing anything, and `__iter__` yields
+  blocks one at a time so `st_book` only imports the blocks it
+  actually renders. Blocks are ordered alphabetically by name (use the
+  convention `bck_NN_xxx.py` for explicit ordering).
+  (`streamtex/blocks.py`)
+
 ## [0.6.41] — 2026-05-14
 
 ### Reverted

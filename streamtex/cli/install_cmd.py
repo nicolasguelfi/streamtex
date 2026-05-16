@@ -115,6 +115,19 @@ def _maybe_clone_docs_for_template(
     if "docs" in preset_repos:
         return True  # already included
 
+    # Honor dev-link first — no clone needed if user has registered a local source.
+    from .dev_config import resolve_repo_path
+
+    try:
+        _resolved, is_dev = resolve_repo_path("streamtex-docs", ws_root, config)
+        if is_dev:
+            console.print(
+                "  [dim]streamtex-docs: dev-linked — no clone needed.[/dim]"
+            )
+            return True
+    except FileNotFoundError:
+        pass
+
     docs_path = os.path.join(ws_root, "streamtex-docs")
     if os.path.isdir(docs_path):
         return True  # already cloned from a previous session
@@ -160,11 +173,29 @@ def _maybe_clone_docs_for_template(
     default=None,
     help="Project template (project, collection, slides).",
 )
-def install(preset, project, template):
+@click.option(
+    "--dev",
+    is_flag=True,
+    default=False,
+    help="Link the globally-registered streamtex dev source into the new "
+         "project's venv (equivalent to `stx dev link streamtex` inside it). "
+         "Requires `stx dev register streamtex /path/...` first. "
+         "No-op without --project.",
+)
+@click.option(
+    "--no-patterns",
+    is_flag=True,
+    default=False,
+    help="Skip the opt-in 'install design patterns?' prompt after project "
+         "creation. The prompt is also skipped automatically in non-TTY "
+         "contexts (CI, scripts).",
+)
+def install(preset, project, template, dev, no_patterns):
     """Install or update a StreamTeX workspace, optionally creating a project.
 
     First run:  stx install --preset power --project hello
     Add project: stx install --project myapp --template collection
+    Dev mode:    stx install --project myapp --dev
     """
     console = get_console()
     ws_root = find_workspace_root()
@@ -215,11 +246,19 @@ def install(preset, project, template):
             "steps": {},
         }
 
+    # Validate flag combinations
+    if dev and project is None:
+        console.print(
+            "[yellow]--dev has no effect without --project (no project to link).[/yellow]"
+        )
+
     # Count total steps
     total_steps = 6  # init, clone, sync, global_commands, profiles, hooks
     has_project = project is not None
     if has_project:
         total_steps += 1  # project creation
+        if dev:
+            total_steps += 1  # dev-link streamtex into project
     step = 0
 
     def _step(label: str) -> None:
@@ -252,8 +291,22 @@ def install(preset, project, template):
 
     # --- Step 2: Clone missing repos ---
     if not _step_done(state, "clone"):
+        # Detect dev-linked repos so we never clone over a registered source.
+        from .dev_config import resolve_repo_path
+
+        dev_linked: dict[str, str] = {}
+        for repo_name in repos:
+            try:
+                resolved, is_dev = resolve_repo_path(repo_name, ws_root, config)
+                if is_dev:
+                    dev_linked[repo_name] = resolved
+            except FileNotFoundError:
+                pass
+
         missing = []
         for repo_name, repo_conf in repos.items():
+            if repo_name in dev_linked:
+                continue
             rel_path = repo_conf.get("path", repo_name)
             target_path = os.path.join(ws_root, rel_path)
             url = repo_conf.get("url", "")
@@ -261,6 +314,12 @@ def install(preset, project, template):
                 missing.append((repo_name, url, target_path))
 
         _step(f"Cloning {len(missing)} missing repo(s) ...")
+        if dev_linked:
+            for repo_name, resolved in dev_linked.items():
+                console.print(
+                    f"  [cyan]{repo_name}[/cyan]: dev-linked — skip clone "
+                    f"[dim]({resolved})[/dim]"
+                )
         if missing:
             for repo_name, url, target_path in missing:
                 os.makedirs(os.path.dirname(target_path), exist_ok=True)
@@ -275,7 +334,7 @@ def install(preset, project, template):
                     console.print(f"  [red]{repo_name}[/red]: clone failed")
                     if result.stderr:
                         console.print(f"    {result.stderr.strip()}")
-        else:
+        elif not dev_linked:
             console.print("  No missing repos.")
         _mark_step(ws_root, state, "clone")
     else:
@@ -297,6 +356,15 @@ def install(preset, project, template):
                 ws_root, config, project, template, effective_preset, console,
             )
             _mark_step(ws_root, state, "project")
+        else:
+            step += 1
+
+    # --- Step 4b: Link streamtex dev source into project (if --dev) ---
+    if has_project and dev:
+        if not _step_done(state, "dev_link"):
+            _step(f"Linking dev streamtex into projects/{project} ...")
+            _apply_dev_link_to_project(ws_root, project, console)
+            _mark_step(ws_root, state, "dev_link")
         else:
             step += 1
 
@@ -340,6 +408,10 @@ def install(preset, project, template):
         _mark_step(ws_root, state, "hooks")
     else:
         step += 1
+
+    # --- Optional: opt-in design patterns offer (project only) ---
+    if has_project and not no_patterns:
+        _maybe_offer_patterns(ws_root, project, console)
 
     # --- Done ---
     _clear_state(ws_root)
@@ -511,3 +583,193 @@ def _do_upgrade(
     console.print(f"[green]Upgraded from '{current}' to '{target_preset}'.[/green]")
     for repo_key in sorted(to_add):
         console.print(f"  + {ALL_REPOS[repo_key]['name']}")
+
+
+# ---------------------------------------------------------------------------
+# Dev-link integration (--dev flag)
+# ---------------------------------------------------------------------------
+
+def _apply_dev_link_to_project(ws_root: str, project_name: str, console) -> None:
+    """Link the globally-registered streamtex source into a project's venv.
+
+    Mirrors the effect of running `stx dev link streamtex` inside the project:
+    writes `[tool.uv.sources]` to pyproject.toml and re-syncs uv so that the
+    project's .venv uses the dev source instead of the PyPI release.
+
+    No-op when streamtex is not registered globally (prints a hint).
+    """
+    from pathlib import Path
+
+    from .dev_cmd import _add_uv_source, _ensure_gitignore, _uv_sync
+    from .dev_config import GlobalDevConfig, validate_repo_path
+
+    project_dir = Path(ws_root) / "projects" / project_name
+    if not project_dir.is_dir():
+        console.print(
+            f"  [yellow]projects/{project_name} not found — skipped.[/yellow]"
+        )
+        return
+
+    gcfg = GlobalDevConfig.load()
+    streamtex_path = gcfg.repos.get("streamtex")
+    if not streamtex_path:
+        console.print(
+            "  [yellow]streamtex is not registered globally — nothing to link.[/yellow]\n"
+            "  [dim]Run: stx dev register streamtex /path/to/streamtex[/dim]"
+        )
+        return
+
+    try:
+        resolved = validate_repo_path("streamtex", streamtex_path)
+    except ValueError as e:
+        console.print(f"  [red]Invalid registered path:[/red] {e}")
+        return
+
+    console.print(f"  [cyan]streamtex[/cyan] → {resolved}")
+    _add_uv_source(project_dir, str(resolved))
+    _uv_sync(project_dir, console)
+    _ensure_gitignore(project_dir)
+
+
+# ---------------------------------------------------------------------------
+# Opt-in patterns offer (called after project creation; never imposes anything)
+# ---------------------------------------------------------------------------
+
+def _install_is_interactive() -> bool:
+    """True iff stdin is a terminal. Extracted so tests can monkeypatch it."""
+    import sys
+
+    return sys.stdin.isatty()
+
+
+def _maybe_offer_patterns(ws_root: str, project_name: str, console) -> None:
+    """Two-stage opt-in: clone patterns repo (if missing) → pick & install.
+
+    Both stages default to NO. The whole helper short-circuits in non-TTY
+    contexts to keep CI runs silent and reproducible. Errors in either
+    stage are converted to warnings — they never break ``stx install``.
+    """
+    from pathlib import Path
+
+    if not _install_is_interactive():
+        return
+
+    from streamtex.patterns import PatternError
+    from streamtex.patterns.installer import (
+        DEFAULT_PATTERNS_REPO_URL,
+        build_install_plan,
+        clone_patterns_source,
+        execute_install,
+        resolve_selection,
+    )
+    from streamtex.patterns.picker import (
+        InteractiveAborted,
+        collect_pattern_catalog,
+        select_patterns_compositely,
+    )
+    from streamtex.patterns.project_toml import write_project_selection
+    from streamtex.patterns.resolver import trace_source
+
+    project_dir = Path(ws_root) / "projects" / project_name
+    if not project_dir.is_dir():
+        return
+
+    console.print("\n[bold cyan]Design patterns (optional)[/bold cyan]")
+    _, resolved = trace_source(project_dir, workspace_root=Path(ws_root))
+
+    # --- Stage 1: clone the patterns repo if no source is reachable ------
+    if resolved is None:
+        console.print(
+            "  No patterns repository detected for this workspace.\n"
+            "  Cloning it lets you reuse curated design recipes "
+            "(callouts, hero stats, grids…) across projects."
+        )
+        if not click.confirm(
+            "  Clone streamtex-patterns into the workspace now?", default=False,
+        ):
+            console.print(
+                "  [dim]Skipped. Later: `stx patterns source clone` or "
+                "`stx patterns source set PATH`.[/dim]"
+            )
+            return
+
+        # URL precedence: workspace [repos.streamtex-patterns].url, else default
+        try:
+            config = load_stx_toml(ws_root)
+        except click.ClickException:
+            config = {}
+        repos = config.get("repos", {})
+        entry = repos.get("streamtex-patterns")
+        clone_url = (
+            str(entry["url"]) if isinstance(entry, dict) and entry.get("url")
+            else DEFAULT_PATTERNS_REPO_URL
+        )
+        target = Path(ws_root) / "streamtex-patterns"
+        try:
+            clone_patterns_source(clone_url, target)
+            console.print(f"  [green]Cloned[/green] {clone_url} → {target}")
+        except PatternError as exc:
+            console.print(f"  [yellow]Clone failed:[/yellow] {exc}")
+            return
+        _, resolved = trace_source(project_dir, workspace_root=Path(ws_root))
+        if resolved is None:
+            console.print(
+                "  [yellow]Clone succeeded but resolver still does not "
+                "find the source — check `stx patterns source show`.[/yellow]"
+            )
+            return
+
+    # --- Stage 2: optional interactive pick + install --------------------
+    if not click.confirm(
+        "  Pick design patterns to install in this project now (interactive)?",
+        default=False,
+    ):
+        console.print(
+            "  [dim]Skipped. Later, from the project dir: "
+            "`stx patterns install`.[/dim]"
+        )
+        return
+
+    try:
+        catalog = collect_pattern_catalog(resolved.path)
+        if not catalog:
+            console.print(
+                f"  [yellow]No patterns found in {resolved.path}.[/yellow]"
+            )
+            return
+        composite = select_patterns_compositely(catalog, resolved.path)
+    except InteractiveAborted as exc:
+        console.print(f"  [yellow]Picker aborted:[/yellow] {exc}")
+        return
+    except Exception as exc:  # picker uses lazy questionary import
+        console.print(f"  [yellow]Could not open picker:[/yellow] {exc}")
+        return
+
+    target_dir = project_dir / ".claude" / "custom" / "streamtex-patterns"
+    try:
+        resolved_names = resolve_selection(composite, resolved.path)
+        plan = build_install_plan(
+            target=target_dir,
+            source=resolved.path,
+            individual_patterns=tuple(resolved_names),
+            selection_override=composite,
+        )
+        result = execute_install(
+            plan,
+            raw_source=resolved.raw_value or str(resolved.path),
+        )
+        # Persist the composite intent (presets/individuals/excludes) to
+        # the project's stx.toml so `stx patterns sync` rebuilds it on
+        # a fresh clone.
+        write_project_selection(
+            project_dir,
+            composite,
+            source=resolved.raw_value,
+        )
+        console.print(
+            f"  [green]Installed[/green] {len(result.installed)} pattern(s) "
+            f"into {target_dir.relative_to(project_dir)} "
+            f"[dim]({composite.effective_mode} selection)[/dim]"
+        )
+    except PatternError as exc:
+        console.print(f"  [yellow]Install failed:[/yellow] {exc}")

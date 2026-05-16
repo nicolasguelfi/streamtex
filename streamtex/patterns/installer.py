@@ -10,10 +10,11 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
-from . import DriftError, MetaError, PatternError
+from . import DriftError, MetaError, PatternError, __version_schema__
 from .index import regenerate_index
 from .manifest import (
     PatternRecord,
+    PatternSelection,
     PatternsMeta,
     load_meta,
     save_meta,
@@ -43,6 +44,8 @@ class InstallPlan:
     mode: str
     overwrite_existing: bool
     is_initial: bool
+    selection: PatternSelection | None = None
+    """User intent recorded in meta (v2+) so ``sync`` can restore it later."""
 
 
 @dataclass(frozen=True)
@@ -143,11 +146,17 @@ def build_install_plan(
     exclude: tuple[str, ...] = (),
     mode: str = "copy",
     force: bool = False,
+    record_selection: bool = True,
+    selection_override: PatternSelection | None = None,
 ) -> InstallPlan:
     """Compute the list of files to install given the selectors.
 
     Exactly one of ``preset``, ``individual_patterns``, ``install_all`` must
     be truthy.
+
+    When ``record_selection`` is False the resulting plan carries
+    ``selection=None``; callers like ``sync`` use this to install missing
+    files without overwriting the user's recorded intent.
     """
     selectors = sum(
         bool(x) for x in (preset, individual_patterns, install_all)
@@ -181,6 +190,21 @@ def build_install_plan(
 
     is_initial = not (target / ".patterns-meta.json").is_file()
 
+    if selection_override is not None:
+        # Caller built a composite v3 selection (e.g. from the menu picker).
+        # We trust it and persist it verbatim.
+        selection: PatternSelection | None = selection_override
+    elif not record_selection:
+        selection = None
+    elif preset:
+        selection = PatternSelection(presets=(preset,))
+    elif install_all:
+        selection = PatternSelection(all_flag=True)
+    elif individual_patterns:
+        selection = PatternSelection(individuals=tuple(individual_patterns))
+    else:
+        selection = None
+
     return InstallPlan(
         target=target,
         source=source,
@@ -190,6 +214,7 @@ def build_install_plan(
         mode=mode,
         overwrite_existing=force,
         is_initial=is_initial,
+        selection=selection,
     )
 
 
@@ -316,8 +341,15 @@ def execute_install(
 
     new_records.sort(key=lambda r: r.name)
 
+    # Selection precedence: this install's intent wins; otherwise keep
+    # whatever was previously recorded (so a no-op re-install doesn't
+    # erase the user's intent).
+    new_selection = plan.selection or (
+        existing_meta.selection if existing_meta else None
+    )
+
     meta = PatternsMeta(
-        schema_version=1,
+        schema_version=__version_schema__,
         source=raw_source or str(plan.source),
         source_commit=_resolve_source_commit(plan.source),
         preset=plan.preset_name
@@ -325,6 +357,7 @@ def execute_install(
         mode=plan.mode,
         installed_at=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         patterns=new_records,
+        selection=new_selection,
     )
 
     meta_path: Path | None = None
@@ -343,6 +376,118 @@ def execute_install(
         target=plan.target,
         meta_path=meta_path,
     )
+
+
+DEFAULT_PATTERNS_REPO_URL = "https://github.com/nicolasguelfi/streamtex-patterns.git"
+"""Fallback git URL used by :func:`clone_patterns_source` when no other URL
+is supplied (kept here so both ``stx patterns source clone`` and the opt-in
+prompt in ``stx install --project`` resolve to the same default)."""
+
+
+def resolve_selection(
+    selection: PatternSelection, source: Path,
+) -> tuple[str, ...]:
+    """Resolve a v3 selection against *source* into a sorted tuple of names.
+
+    Composition order (per the :class:`PatternSelection` docstring):
+        1. If ``all_flag`` → every pattern in the source.
+        2. Else: union of patterns(p) for p in ``presets`` + ``individuals``.
+        3. Subtract ``excludes`` in both cases.
+
+    Unknown preset names or individual pattern names raise
+    :class:`PatternError` (better to fail loudly than to install a
+    silently truncated set).
+    """
+    source = Path(source).resolve()
+    available: set[str] = {p.stem for p in _all_patterns(source)}
+
+    if selection.all_flag:
+        names = set(available)
+    else:
+        names = set()
+        for preset_name in selection.presets:
+            rp = resolve_preset(source, preset_name)
+            names.update(p.stem for p in rp.pattern_files)
+        for pattern_name in selection.individuals:
+            if pattern_name not in available:
+                raise PatternError(
+                    f"pattern {pattern_name!r} not found in source {source}"
+                )
+            names.add(pattern_name)
+
+    names -= set(selection.excludes)
+    return tuple(sorted(names))
+
+
+def clone_patterns_source(
+    url: str,
+    target: Path,
+    *,
+    branch: str | None = None,
+    force: bool = False,
+    timeout_s: int = 180,
+) -> Path:
+    """Git-clone *url* into *target*; verify it looks like a patterns repo.
+
+    Args:
+        url: Git URL to clone.
+        target: Where to clone (must be empty or absent unless ``force``).
+        branch: Optional branch/tag.
+        force: When True, an existing non-empty target is removed first.
+        timeout_s: Subprocess timeout in seconds.
+
+    Returns:
+        The absolute path of the freshly cloned repo.
+
+    Raises:
+        PatternError: when git is missing, the clone fails, the target is
+            non-empty without ``force``, or the result lacks ``manifest.toml``.
+    """
+    import shutil
+    import subprocess
+
+    target = Path(target).resolve()
+
+    if target.exists():
+        non_empty = target.is_dir() and any(target.iterdir())
+        if non_empty:
+            if not force:
+                raise PatternError(
+                    f"target {target} already exists and is non-empty; "
+                    "pass force=True to remove and re-clone."
+                )
+            shutil.rmtree(target)
+        elif target.is_dir():
+            # empty dir — git clone refuses, remove it first
+            target.rmdir()
+
+    git = shutil.which("git")
+    if git is None:
+        raise PatternError("`git` not found on PATH.")
+
+    cmd = [git, "clone"]
+    if branch:
+        cmd += ["--branch", branch]
+    cmd += [url, str(target)]
+
+    try:
+        result = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=timeout_s,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise PatternError(f"git clone timed out after {timeout_s}s") from exc
+
+    if result.returncode != 0:
+        msg = result.stderr.strip() or result.stdout.strip() or "(no output)"
+        raise PatternError(f"git clone failed: {msg}")
+
+    if not (target / "manifest.toml").is_file():
+        raise PatternError(
+            f"clone succeeded but {target}/manifest.toml is missing — "
+            "is this really a streamtex-patterns repo?"
+        )
+
+    return target
 
 
 def remove_pattern(target: Path, name: str, *, dry_run: bool = False) -> None:

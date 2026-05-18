@@ -47,6 +47,58 @@ def test_generate_blocks_init_has_registry():
     assert "registry" in content
 
 
+def test_generate_blocks_init_passes_parent_directory_not_file():
+    """The generated blocks/__init__.py must pass the parent directory
+    to ProjectBlockRegistry, NOT __file__ directly. Passing __file__ produces
+    an empty manifest (Path.glob on a file silently returns nothing), which
+    causes the loading overlay to hang forever ("Initializing…" loop)."""
+    content = generate_blocks_init()
+    assert "Path(__file__).parent" in content, (
+        "Generated blocks/__init__.py must use Path(__file__).parent — "
+        "passing __file__ directly creates an empty registry."
+    )
+    assert "ProjectBlockRegistry(__file__)" not in content, (
+        "Regression: ProjectBlockRegistry(__file__) yields an empty registry."
+    )
+
+
+def test_generated_blocks_init_executes_and_builds_a_working_registry(tmp_path):
+    """End-to-end: write the generated blocks/__init__.py to disk alongside
+    a real block file, exec the module, and verify the registry has len > 0.
+    This catches the v0.6.41 bug at the integration level."""
+    import importlib.util
+    import sys
+
+    blocks_dir = tmp_path / "blocks"
+    blocks_dir.mkdir()
+    (blocks_dir / "__init__.py").write_text(generate_blocks_init())
+    (blocks_dir / "bck_hello.py").write_text(
+        "def build():\n    return 'hello'\n"
+    )
+
+    sys.path.insert(0, str(tmp_path))
+    try:
+        # Force a fresh import so we hit the generated __init__.py
+        if "blocks" in sys.modules:
+            del sys.modules["blocks"]
+        spec = importlib.util.spec_from_file_location(
+            "blocks", blocks_dir / "__init__.py",
+            submodule_search_locations=[str(blocks_dir)],
+        )
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules["blocks"] = mod
+        spec.loader.exec_module(mod)
+        registry = mod.registry
+        assert len(registry) == 1, (
+            f"Expected 1 block discovered, got {len(registry)}. "
+            f"Generator likely passes __file__ instead of its parent."
+        )
+        assert list(registry)[0].build() == "hello"
+    finally:
+        sys.path.remove(str(tmp_path))
+        sys.modules.pop("blocks", None)
+
+
 def test_generate_block_hello_has_build():
     content = generate_block_hello()
     assert "def build():" in content

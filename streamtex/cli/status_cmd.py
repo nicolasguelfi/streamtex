@@ -209,10 +209,16 @@ def _fetch_pypi_version() -> str | None:
 
 def _get_source_version(ws_root: str, config: dict) -> tuple[str | None, str | None]:
     """Read version from local library source. Returns (version, path) or (None, None)."""
+    from .dev_config import resolve_repo_path
+
     repos = config.get("repos", {})
     for _repo_name, repo_conf in repos.items():
         if repo_conf.get("type") == "library":
-            lib_path = os.path.join(ws_root, repo_conf.get("path", _repo_name))
+            # Honor dev-link first, fallback to workspace clone path.
+            try:
+                lib_path, _is_dev = resolve_repo_path(_repo_name, ws_root, config)
+            except FileNotFoundError:
+                lib_path = os.path.join(ws_root, repo_conf.get("path", _repo_name))
             # Try __init__.py
             init_file = os.path.join(lib_path, "streamtex", "__init__.py")
             if os.path.isfile(init_file):

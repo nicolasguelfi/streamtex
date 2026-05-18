@@ -28,6 +28,76 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     preset" or "I changed my mind, remove nothing") and only get the
     help line, not the retry.
   (`streamtex/patterns/picker.py`)
+- **Invisible JS-bus iframes no longer render as visible light bars.**
+  StreamTeX injects JavaScript into the parent document via
+  `st.iframe(js, height=1)` from 10+ call sites (loading overlay,
+  marker navigation, banner, paginated nav, search refresh, bib
+  hover-preview, Chrome banner, password keyboard capture). Streamlit's
+  default iframe chrome (light background + border) made each 1px host
+  appear as a thin horizontal line — particularly noticeable in dark
+  themes. Added a single CSS rule in `streamtex/static/default.css`
+  that collapses `iframe[height="1"]` to `height: 0` and uses
+  `visibility: hidden` (not `display: none`, which would prevent
+  the JS from loading). (`streamtex/static/default.css`)
+- **`generate_book_py()` no longer passes `title="{name}"` to `st_book`.**
+  That kwarg is not part of `st_book`'s API; under the legacy forwarding
+  it was sent verbatim to every `block.build()` and crashed any block
+  whose signature didn't accept it (i.e. every scaffolded block). The
+  page title is already set via `st.set_page_config(page_title=...)`
+  earlier in the generated file, so this argument was redundant on top
+  of being broken. (`streamtex/cli/project_cmd.py`)
+- **`stx install`: skip cloning repos that are dev-linked.** Step 2
+  ("Clone missing repos") now calls `resolve_repo_path()` to detect
+  repos registered via `stx dev register` and skips `git clone` for
+  them, matching the existing behaviour of `stx update`. Avoids
+  creating redundant `<workspace>/streamtex-claude/` and
+  `<workspace>/streamtex-docs/` clones when a global dev link is
+  active. (`streamtex/cli/install_cmd.py`)
+- **`stx project new --template` / `stx install --template`: honor
+  dev-linked `streamtex-docs`.** `_copy_rich_template()` now resolves
+  the docs repo through `resolve_repo_path()` instead of hardcoding
+  `<workspace>/streamtex-docs/templates/…`, so rich templates work
+  when docs is dev-linked rather than cloned into the workspace.
+  (`streamtex/cli/project_cmd.py`)
+- **`stx install`: don't offer to clone `streamtex-docs` if it is
+  dev-linked.** `_maybe_clone_docs_for_template()` checks
+  `resolve_repo_path()` before testing the workspace path and reports
+  the dev link as satisfying the template requirement.
+  (`streamtex/cli/install_cmd.py`)
+- **`stx status`: read library version from the dev-linked source.**
+  `_get_source_version()` now resolves the library repo through
+  `resolve_repo_path()` so the displayed source version reflects the
+  dev-linked checkout when one is registered.
+  (`streamtex/cli/status_cmd.py`)
+- **Scaffolded `blocks/__init__.py` now passes the parent directory to
+  `ProjectBlockRegistry`, not `__file__`.** Root cause of the "StreamTeX
+  Initializing…" loading loop seen on freshly-scaffolded projects:
+  `ProjectBlockRegistry(__file__)` made `self.blocks_dir` a file path,
+  `Path.glob("bck_*.py")` silently returned empty, the manifest stayed
+  empty, `_paginated_book` early-returned on `total == 0` without
+  removing the loading overlay. Generator now emits
+  `ProjectBlockRegistry(Path(__file__).parent)` (matches the docstring
+  and the `streamtex-docs` template). (`streamtex/cli/project_cmd.py`)
+- **`ProjectBlockRegistry.__init__` now validates that the path is a
+  directory.** Passing a file (or non-existent path) now raises a clear
+  `ValueError` with the correct usage hint, instead of silently
+  producing an empty registry. Catches the bug above at the lib level
+  for any user writing `blocks/__init__.py` by hand. (`streamtex/blocks.py`)
+- **`_paginated_book` removes the loading overlay before the
+  `total == 0` early-return.** Defensive cleanup so a legitimately
+  empty book (or any other path that produces `total == 0`) no longer
+  leaves the "Initializing…" overlay stuck on screen.
+  (`streamtex/book.py`)
+- **`ProjectBlockRegistry` implements the Python sequence protocol
+  (`__len__` / `__iter__` / `__getitem__`).** Fixes `TypeError: object
+  of type 'ProjectBlockRegistry' has no len()` raised by
+  `st_book(registry, ...)` — the form produced by `generate_book_py()`
+  for new projects. Per-block lazy loading is preserved: `__len__`
+  reads the manifest without importing anything, and `__iter__` yields
+  blocks one at a time so `st_book` only imports the blocks it
+  actually renders. Blocks are ordered alphabetically by name (use the
+  convention `bck_NN_xxx.py` for explicit ordering).
+  (`streamtex/blocks.py`)
 
 ### Changed
 - **Composite picker: per-preset 'Customize?' after add + Remove choices
@@ -49,6 +119,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   New helper `_compute_provenance(working, resolved, source)` returns
   the per-pattern provenance label and is reused by both flows.
   (`streamtex/patterns/picker.py`)
+- **`SourceNotFoundError` now points at the new tooling.** The error
+  message includes the per-level R4 trace and ends with a hint listing
+  `stx patterns source clone | link | set | show` so users know how to
+  resolve the situation without grepping the source. The resolver no
+  longer collects ad-hoc strings; it delegates to `trace_source()`.
+  (`streamtex/patterns/resolver.py`)
+- **`stx install --dev`: auto-link the registered streamtex source into a
+  new project's venv.** When creating a project with `--project NAME`,
+  passing `--dev` runs the equivalent of `stx dev link streamtex` inside
+  the freshly-scaffolded project: writes `[tool.uv.sources]` to its
+  `pyproject.toml` and re-syncs uv so the project uses the dev-source
+  immediately, no manual follow-up needed. No-op (with a hint) when
+  `streamtex` is not registered globally via `stx dev register`.
+  (`streamtex/cli/install_cmd.py`)
 
 ### Added
 - **`.patterns-meta.json` schema v3 — composite selection.** The
@@ -203,94 +287,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `streamtex/README.md` with a 4-step quickstart and a link to the
   manual. (4) `streamtex-patterns/README.md` rewritten around the
   interactive picker, the `source` subgroup, and `[patterns.selection]`.
-
-### Changed
-- **`SourceNotFoundError` now points at the new tooling.** The error
-  message includes the per-level R4 trace and ends with a hint listing
-  `stx patterns source clone | link | set | show` so users know how to
-  resolve the situation without grepping the source. The resolver no
-  longer collects ad-hoc strings; it delegates to `trace_source()`.
-  (`streamtex/patterns/resolver.py`)
-- **`stx install --dev`: auto-link the registered streamtex source into a
-  new project's venv.** When creating a project with `--project NAME`,
-  passing `--dev` runs the equivalent of `stx dev link streamtex` inside
-  the freshly-scaffolded project: writes `[tool.uv.sources]` to its
-  `pyproject.toml` and re-syncs uv so the project uses the dev-source
-  immediately, no manual follow-up needed. No-op (with a hint) when
-  `streamtex` is not registered globally via `stx dev register`.
-  (`streamtex/cli/install_cmd.py`)
-
-### Fixed
-- **Invisible JS-bus iframes no longer render as visible light bars.**
-  StreamTeX injects JavaScript into the parent document via
-  `st.iframe(js, height=1)` from 10+ call sites (loading overlay,
-  marker navigation, banner, paginated nav, search refresh, bib
-  hover-preview, Chrome banner, password keyboard capture). Streamlit's
-  default iframe chrome (light background + border) made each 1px host
-  appear as a thin horizontal line — particularly noticeable in dark
-  themes. Added a single CSS rule in `streamtex/static/default.css`
-  that collapses `iframe[height="1"]` to `height: 0` and uses
-  `visibility: hidden` (not `display: none`, which would prevent
-  the JS from loading). (`streamtex/static/default.css`)
-- **`generate_book_py()` no longer passes `title="{name}"` to `st_book`.**
-  That kwarg is not part of `st_book`'s API; under the legacy forwarding
-  it was sent verbatim to every `block.build()` and crashed any block
-  whose signature didn't accept it (i.e. every scaffolded block). The
-  page title is already set via `st.set_page_config(page_title=...)`
-  earlier in the generated file, so this argument was redundant on top
-  of being broken. (`streamtex/cli/project_cmd.py`)
-- **`stx install`: skip cloning repos that are dev-linked.** Step 2
-  ("Clone missing repos") now calls `resolve_repo_path()` to detect
-  repos registered via `stx dev register` and skips `git clone` for
-  them, matching the existing behaviour of `stx update`. Avoids
-  creating redundant `<workspace>/streamtex-claude/` and
-  `<workspace>/streamtex-docs/` clones when a global dev link is
-  active. (`streamtex/cli/install_cmd.py`)
-- **`stx project new --template` / `stx install --template`: honor
-  dev-linked `streamtex-docs`.** `_copy_rich_template()` now resolves
-  the docs repo through `resolve_repo_path()` instead of hardcoding
-  `<workspace>/streamtex-docs/templates/…`, so rich templates work
-  when docs is dev-linked rather than cloned into the workspace.
-  (`streamtex/cli/project_cmd.py`)
-- **`stx install`: don't offer to clone `streamtex-docs` if it is
-  dev-linked.** `_maybe_clone_docs_for_template()` checks
-  `resolve_repo_path()` before testing the workspace path and reports
-  the dev link as satisfying the template requirement.
-  (`streamtex/cli/install_cmd.py`)
-- **`stx status`: read library version from the dev-linked source.**
-  `_get_source_version()` now resolves the library repo through
-  `resolve_repo_path()` so the displayed source version reflects the
-  dev-linked checkout when one is registered.
-  (`streamtex/cli/status_cmd.py`)
-- **Scaffolded `blocks/__init__.py` now passes the parent directory to
-  `ProjectBlockRegistry`, not `__file__`.** Root cause of the "StreamTeX
-  Initializing…" loading loop seen on freshly-scaffolded projects:
-  `ProjectBlockRegistry(__file__)` made `self.blocks_dir` a file path,
-  `Path.glob("bck_*.py")` silently returned empty, the manifest stayed
-  empty, `_paginated_book` early-returned on `total == 0` without
-  removing the loading overlay. Generator now emits
-  `ProjectBlockRegistry(Path(__file__).parent)` (matches the docstring
-  and the `streamtex-docs` template). (`streamtex/cli/project_cmd.py`)
-- **`ProjectBlockRegistry.__init__` now validates that the path is a
-  directory.** Passing a file (or non-existent path) now raises a clear
-  `ValueError` with the correct usage hint, instead of silently
-  producing an empty registry. Catches the bug above at the lib level
-  for any user writing `blocks/__init__.py` by hand. (`streamtex/blocks.py`)
-- **`_paginated_book` removes the loading overlay before the
-  `total == 0` early-return.** Defensive cleanup so a legitimately
-  empty book (or any other path that produces `total == 0`) no longer
-  leaves the "Initializing…" overlay stuck on screen.
-  (`streamtex/book.py`)
-- **`ProjectBlockRegistry` implements the Python sequence protocol
-  (`__len__` / `__iter__` / `__getitem__`).** Fixes `TypeError: object
-  of type 'ProjectBlockRegistry' has no len()` raised by
-  `st_book(registry, ...)` — the form produced by `generate_book_py()`
-  for new projects. Per-block lazy loading is preserved: `__len__`
-  reads the manifest without importing anything, and `__iter__` yields
-  blocks one at a time so `st_book` only imports the blocks it
-  actually renders. Blocks are ordered alphabetically by name (use the
-  convention `bck_NN_xxx.py` for explicit ordering).
-  (`streamtex/blocks.py`)
 
 ## [0.6.41] — 2026-05-14
 

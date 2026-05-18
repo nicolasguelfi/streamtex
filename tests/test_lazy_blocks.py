@@ -5,7 +5,13 @@ import tempfile
 
 import pytest
 
-from streamtex.blocks import LazyBlockRegistry, get_static_sources, resolve_static, set_static_sources
+from streamtex.blocks import (
+    LazyBlockRegistry,
+    ProjectBlockRegistry,
+    get_static_sources,
+    resolve_static,
+    set_static_sources,
+)
 
 
 class TestLazyBlockRegistry:
@@ -322,3 +328,115 @@ class TestIntegration:
         # Resolve shared image
         logo_path = resolve_static("images/logo.png")
         assert os.path.exists(logo_path)
+
+
+class TestProjectBlockRegistrySequenceProtocol:
+    """ProjectBlockRegistry must behave like a sequence so it can be passed
+    directly to ``st_book(registry, ...)`` (the form produced by
+    ``generate_book_py()``)."""
+
+    @pytest.fixture
+    def blocks_dir(self, tmp_path):
+        d = tmp_path / "blocks"
+        d.mkdir()
+        (d / "bck_02_b.py").write_text(
+            "def build():\n    return 'b'\n"
+        )
+        (d / "bck_01_a.py").write_text(
+            "def build():\n    return 'a'\n"
+        )
+        (d / "bck_03_c.py").write_text(
+            "def build():\n    return 'c'\n"
+        )
+        return d
+
+    def test_len_does_not_import_blocks(self, blocks_dir):
+        reg = ProjectBlockRegistry(blocks_dir)
+        assert len(reg) == 3
+        # No block should be loaded by len() alone
+        assert reg.get_stats()["loaded"] == 0
+
+    def test_iter_yields_blocks_in_alphabetical_order(self, blocks_dir):
+        reg = ProjectBlockRegistry(blocks_dir)
+        mods = list(reg)
+        assert len(mods) == 3
+        assert [m.build() for m in mods] == ["a", "b", "c"]
+
+    def test_iter_is_lazy_per_block(self, blocks_dir):
+        """Each yield must trigger import of that block only — useful for
+        st_book which iterates and may stop early."""
+        reg = ProjectBlockRegistry(blocks_dir)
+        it = iter(reg)
+        assert reg.get_stats()["loaded"] == 0
+        next(it)
+        assert reg.get_stats()["loaded"] == 1
+        next(it)
+        assert reg.get_stats()["loaded"] == 2
+
+    def test_getitem_int(self, blocks_dir):
+        reg = ProjectBlockRegistry(blocks_dir)
+        assert reg[0].build() == "a"
+        assert reg[-1].build() == "c"
+
+    def test_getitem_slice(self, blocks_dir):
+        reg = ProjectBlockRegistry(blocks_dir)
+        mods = reg[0:2]
+        assert [m.build() for m in mods] == ["a", "b"]
+
+    def test_empty_registry(self, tmp_path):
+        empty = tmp_path / "empty"
+        empty.mkdir()
+        reg = ProjectBlockRegistry(empty)
+        assert len(reg) == 0
+        assert list(reg) == []
+
+    def test_works_as_module_list_for_len_and_iter(self, blocks_dir):
+        """Smoke check: the patterns used by streamtex.book._paginated_book
+        (len + enumerate) must succeed without TypeError."""
+        reg = ProjectBlockRegistry(blocks_dir)
+        # Mimic _paginated_book's prologue
+        total = len(reg)
+        assert total == 3
+        results = []
+        for i, module in enumerate(reg):
+            results.append((i, module.build()))
+        assert results == [(0, "a"), (1, "b"), (2, "c")]
+
+
+class TestProjectBlockRegistryConstructorValidation:
+    """ProjectBlockRegistry must reject non-directory paths with a clear error,
+    instead of silently producing an empty registry (the silent failure that
+    caused the "Initializing…" loading-overlay loop in v0.6.41 scaffolds)."""
+
+    def test_passing_a_file_path_raises(self, tmp_path):
+        """Passing __file__ (the init.py path) instead of its parent must
+        fail loudly — this was the bug behind the loading-loop regression."""
+        blocks_dir = tmp_path / "blocks"
+        blocks_dir.mkdir()
+        init_file = blocks_dir / "__init__.py"
+        init_file.write_text("")
+
+        with pytest.raises(ValueError, match="expects a directory"):
+            ProjectBlockRegistry(init_file)
+
+    def test_error_message_includes_correct_usage_hint(self, tmp_path):
+        blocks_dir = tmp_path / "blocks"
+        blocks_dir.mkdir()
+        init_file = blocks_dir / "__init__.py"
+        init_file.write_text("")
+
+        with pytest.raises(ValueError) as exc:
+            ProjectBlockRegistry(init_file)
+        msg = str(exc.value)
+        assert "Path(__file__).parent" in msg
+
+    def test_passing_a_missing_path_raises(self, tmp_path):
+        ghost = tmp_path / "does-not-exist"
+        with pytest.raises(ValueError, match="expects a directory"):
+            ProjectBlockRegistry(ghost)
+
+    def test_passing_a_valid_directory_succeeds(self, tmp_path):
+        blocks_dir = tmp_path / "blocks"
+        blocks_dir.mkdir()
+        reg = ProjectBlockRegistry(blocks_dir)
+        assert reg.blocks_dir == blocks_dir

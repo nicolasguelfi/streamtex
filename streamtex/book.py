@@ -522,7 +522,11 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
             presentation_profiles: list[PresentationProfile] | None = None,
             doc_version: str | None = None,
             loading: bool = True,
-            *args, monties_color: str = None, **kwargs):
+            *args,
+            monties_color: str = None,
+            block_args: tuple = (),
+            block_kwargs: dict | None = None,
+            **_legacy_kwargs):
     """Generates a web page e-book from a list of block modules.
 
     :param separator: Optional module with a build() function, rendered between each block.
@@ -546,7 +550,34 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
     :param page_width: Page width as % of browser width (default 90).
     :param zoom: Default zoom level as % (default 100).
     :param loading: If True (default), show a full-screen overlay with progress during loading.
+    :param block_args: Positional args forwarded verbatim to every
+        ``block.build()`` call. Use this instead of relying on st_book's
+        legacy ``*args`` capture.
+    :param block_kwargs: Keyword args forwarded verbatim to every
+        ``block.build()`` call. Use this for any kwarg meant for blocks
+        rather than passing them directly to st_book — passing extra
+        kwargs to st_book is deprecated and will become a ``TypeError``
+        in a future release.
     """
+    # --- Compat shim: capture legacy positional/keyword forwarding ---
+    # Historically st_book transparently forwarded *args/**kwargs to every
+    # block.build().  This made typos (e.g. ``title="X"``) crash deep inside
+    # block code with confusing tracebacks.  The supported path is now
+    # ``block_args=...`` / ``block_kwargs={...}``.  We keep the old path
+    # working with a DeprecationWarning so existing projects don't break.
+    if args or _legacy_kwargs:
+        import warnings as _warnings
+        _warnings.warn(
+            "Passing extra args/kwargs directly to st_book is deprecated "
+            f"(received args={args!r}, kwargs={sorted(_legacy_kwargs)!r}). "
+            "Use block_args=(...) and block_kwargs={...} to forward them "
+            "to each block.build(). Extra kwargs will become a TypeError "
+            "in a future release.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+    _block_args = tuple(args) + tuple(block_args or ())
+    _block_kwargs = {**(_legacy_kwargs or {}), **(block_kwargs or {})}
     # --- Resolve PdfConfig from exports list if not provided directly ---
     if pdf_config is None and exports:
         for _ecfg in exports:
@@ -593,7 +624,9 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
     # --- Headless warmup: build + save cache, then return ---
     if _warmup_mode:
         _warmup_build_cache(module_list, toc_config, marker_config,
-                            separator, *args, **kwargs)
+                            separator,
+                            block_args=_block_args,
+                            block_kwargs=_block_kwargs)
         return
 
     # --- Password gate (env-driven, no-op locally) ---
@@ -771,7 +804,7 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
 
     if st.session_state[_STX_VIEW_MODE_KEY] == "Paginated":
         _paginated_book(module_list, toc_config, marker_config, separator,
-                        export, export_title, banner_config, *args,
+                        export, export_title, banner_config,
                         pdf_config=pdf_config, exports=exports,
                         inspector=inspector,
                         page_width=page_width, zoom=zoom,
@@ -779,7 +812,9 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
                         active_profile=active_name,
                         profile_modified=_profile_modified,
                         all_profiles=all_profiles,
-                        loading=_show_loading, **kwargs)
+                        loading=_show_loading,
+                        block_args=_block_args,
+                        block_kwargs=_block_kwargs)
         return
 
     start_time = time.time()
@@ -871,7 +906,7 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
         _inject_block_horizontal_css(_block_sp)
 
         try:
-            st_include(module, *args, _inspector_config=inspector, **kwargs)
+            st_include(module, *_block_args, _inspector_config=inspector, **_block_kwargs)
         finally:
             # Close any open section wrapper from Phase 3
             from .slide import _close_section_wrapper_if_open
@@ -898,7 +933,7 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
 
         # Separator between blocks (not after the last one)
         if separator and i < len(module_list) - 1:
-            st_include(separator, *args, **kwargs)
+            st_include(separator, *_block_args, **_block_kwargs)
 
         # Block spacing: inject block.bottom after build()
         if _block_sp.bottom is not None:
@@ -1394,10 +1429,12 @@ def _suppress_cache_build_dom():
 
 
 def _build_page_cache(module_list, toc_config, marker_config, separator,
-                      cache_hash, *args, export_config: ExportConfig | None = None,
+                      cache_hash,
+                      export_config: ExportConfig | None = None,
                       progress_callback=None,
                       hidden_container=None,
-                      **kwargs):
+                      block_args: tuple = (),
+                      block_kwargs: dict | None = None):
     """Execute all blocks inside st.empty() to collect TOC/markers, then cache.
 
     When *export_config* is provided the export buffer is active during the
@@ -1409,6 +1446,8 @@ def _build_page_cache(module_list, toc_config, marker_config, separator,
     prevents blocks from rendering inside the sidebar when the rebuild is
     triggered from the export panel.
     """
+    # Normalise block_kwargs so all downstream code can spread it freely.
+    block_kwargs = block_kwargs or {}
     reset_toc_registry(toc_config)
     if marker_config is not None:
         reset_marker_registry(marker_config)
@@ -1449,12 +1488,12 @@ def _build_page_cache(module_list, toc_config, marker_config, separator,
 
                 if _warmup_mode:
                     try:
-                        st_include(module, *args, **kwargs)
+                        st_include(module, *block_args, **block_kwargs)
                     except Exception:
                         name = getattr(module, '__name__', str(module))
                         logger.warning("Warmup: block %s raised — skipping.", name)
                 else:
-                    st_include(module, *args, **kwargs)
+                    st_include(module, *block_args, **block_kwargs)
 
                 # Close any open section wrapper + reset per-block override
                 from .slide import _close_section_wrapper_if_open
@@ -1477,7 +1516,7 @@ def _build_page_cache(module_list, toc_config, marker_config, separator,
                     progress_callback(i + 1, len(module_list), _mod_name)
 
                 if separator and i < len(module_list) - 1:
-                    st_include(separator, *args, **kwargs)
+                    st_include(separator, *block_args, **block_kwargs)
 
                 # Block spacing: inject block.bottom after build()
                 if _block_sp.bottom is not None:
@@ -1532,7 +1571,8 @@ def _build_page_cache(module_list, toc_config, marker_config, separator,
 
 
 def _warmup_build_cache(module_list, toc_config, marker_config, separator,
-                        *args, **kwargs):
+                        block_args: tuple = (),
+                        block_kwargs: dict | None = None):
     """Build and persist the page cache without Streamlit UI (headless).
 
     Called by ``st_book()`` when ``_warmup_mode`` is True.
@@ -1548,12 +1588,16 @@ def _warmup_build_cache(module_list, toc_config, marker_config, separator,
     export_cfg = _warmup_export_config
     if export_cfg is not None:
         _build_page_cache(module_list, toc_config, marker_config,
-                          separator, cache_hash, *args,
-                          export_config=export_cfg, **kwargs)
+                          separator, cache_hash,
+                          export_config=export_cfg,
+                          block_args=block_args,
+                          block_kwargs=block_kwargs)
     else:
         reset_export_buffer(ExportConfig(enabled=False))
         _build_page_cache(module_list, toc_config, marker_config,
-                          separator, cache_hash, *args, **kwargs)
+                          separator, cache_hash,
+                          block_args=block_args,
+                          block_kwargs=block_kwargs)
     cache = st.session_state.get(_STX_CACHE_KEY)
     if cache and cache_path:
         _save_file_cache(cache_path, cache)
@@ -2069,19 +2113,27 @@ def _inject_paginated_nav_js(current_page, total, marker_config,
 
 
 def _paginated_book(module_list, toc_config, marker_config, separator,
-                    export, export_title, banner_config: BannerConfig, *args,
+                    export, export_title, banner_config: BannerConfig,
                     pdf_config=None, exports=None, inspector=None,
                     page_width=100, zoom=100,
                     profile_names=None, active_profile=None,
                     profile_modified=False, all_profiles=None,
                     loading=False,
-                    **kwargs):
+                    block_args: tuple = (),
+                    block_kwargs: dict | None = None):
     """Paginated rendering — only renders one block per rerun."""
     start_time = time.time()
     logger.debug("Starting st_book (paginated)...")
+    # Normalise block_kwargs so all downstream code can spread it freely.
+    block_kwargs = block_kwargs or {}
 
     total = len(module_list)
     if total == 0:
+        # Defensive: ensure the loading overlay (injected by st_book before
+        # delegating to us) doesn't get stuck on screen when the book has
+        # no blocks to render.
+        if loading:
+            remove_loading_overlay()
         return
 
     # --- Common setup ---
@@ -2143,9 +2195,11 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
         # Progress callback for loading overlay
         _progress_cb = update_loading_progress if loading else None
         _build_page_cache(module_list, toc_config, marker_config,
-                          separator, cache_hash, *args,
+                          separator, cache_hash,
                           export_config=_cache_export_cfg,
-                          progress_callback=_progress_cb, **kwargs)
+                          progress_callback=_progress_cb,
+                          block_args=block_args,
+                          block_kwargs=block_kwargs)
         cache = st.session_state[_STX_CACHE_KEY]
         # Persist to disk for future sessions
         if cache_path:
@@ -2168,9 +2222,11 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
                 page_width=effective_pw, zoom=effective_zoom,
             )
             _build_page_cache(module_list, toc_config, marker_config,
-                              separator, cache_hash, *args,
+                              separator, cache_hash,
                               export_config=_ecfg,
-                              hidden_container=_main_placeholder, **kwargs)
+                              hidden_container=_main_placeholder,
+                              block_args=block_args,
+                              block_kwargs=block_kwargs)
         st.session_state["_stx_export_rebuild_fn"] = _rebuild_full_export
 
     # Remove loading overlay (after cache is ready, before page render)
@@ -2250,7 +2306,8 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
     _inject_block_horizontal_css(_pg_block_sp)
 
     try:
-        st_include(module_list[current_page], *args, _inspector_config=inspector, **kwargs)
+        st_include(module_list[current_page], *block_args,
+                   _inspector_config=inspector, **block_kwargs)
     finally:
         from .slide import _close_section_wrapper_if_open
         _close_section_wrapper_if_open()

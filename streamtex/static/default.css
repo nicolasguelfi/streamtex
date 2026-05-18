@@ -345,6 +345,26 @@ li {
     max-width: 100%;
 }
 
+/* --- Invisible JS-bus iframes ---
+ * StreamTeX injects JavaScript into the parent document via
+ * ``st.iframe(js, height=1)`` (see loading.py, marker.py, book.py,
+ * bib_preview.py, browser.py, auth.py). Those iframes only exist to
+ * host a small JS snippet whose code reaches the parent Streamlit DOM.
+ * Streamlit applies a default background + border to iframes, however,
+ * which makes each 1px-tall host appear as a thin light bar — very
+ * noticeable in dark themes.
+ *
+ * Collapse them to height 0 and hide them with ``visibility: hidden``
+ * — NOT ``display: none``, because that may prevent the iframe from
+ * loading in some browsers and the JS would never execute.
+ */
+iframe[height="1"] {
+    border: 0 !important;
+    background: transparent !important;
+    height: 0 !important;
+    visibility: hidden !important;
+}
+
 /* --- Slide break print rules (Ctrl+P / browser print) --- */
 @media print {
     .stx-slide-break-rule { display: none !important; }

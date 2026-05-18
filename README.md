@@ -235,6 +235,22 @@ stx install --preset developer  # full developer setup
 stx install --preset power --project my-project  # all extras with a project
 ```
 
+#### Developer shortcut: `--dev`
+
+When you've already registered a local `streamtex` source via
+`stx dev register streamtex /path/to/streamtex`, add `--dev` to
+`stx install --project NAME` to immediately link that source into the
+new project's venv — equivalent to running `stx dev link streamtex`
+inside the project after creation, but in one command.
+
+```bash
+stx install --project my-project --dev               # auto-link streamtex from global registration
+stx install --preset power --project my-project --dev  # full setup + dev-link in one shot
+```
+
+`--dev` is a no-op (with a hint) when `streamtex` is not registered
+globally, and warns if used without `--project`.
+
 Upgrade an existing workspace to a higher preset:
 
 ```bash
@@ -321,6 +337,42 @@ Install a profile:
 ```bash
 stx claude install project ./my-project
 ```
+
+## Design Patterns (`stx patterns`)
+
+A **pattern** is a reusable graphic recipe — `ptn_callout`, `ptn_stat_hero`,
+`ptn_card_grid` — that Claude reads when generating or editing blocks, so
+new content stays visually consistent with the rest of the project.
+
+Patterns live in a separate repository,
+[**streamtex-patterns**](https://github.com/nicolasguelfi/streamtex-patterns).
+Selection is **subjective and opt-in**: nothing is installed automatically.
+
+```bash
+# Bring the patterns repo into the workspace (one-time)
+stx patterns source clone
+
+# Pick patterns interactively — composite menu-driven TUI:
+#   add preset(s), add individual patterns, remove from selection,
+#   toggle 'all', summary view, done/cancel
+stx patterns install
+
+# Or pick declaratively — fully composable flags
+stx patterns install --preset slides --preset docs           # multi-preset
+stx patterns install --preset slides --exclude ptn_takeaways # preset minus
+stx patterns install --preset slides --pattern ptn_inline_emphasis
+stx patterns install --all --exclude ptn_takeaways           # all minus
+
+# On a fresh clone of the project: rebuild the same set
+stx patterns sync
+```
+
+When you scaffold a project with `stx install --project NAME`, an opt-in
+prompt offers to clone the patterns repo and open the picker (both default
+to NO; skip with `--no-patterns` or run in CI for silent skip).
+
+The full manual is in
+[streamtex-docs / stx_manual_patterns](https://github.com/nicolasguelfi/streamtex-docs/tree/main/manuals/stx_manual_patterns).
 
 ## Features
 

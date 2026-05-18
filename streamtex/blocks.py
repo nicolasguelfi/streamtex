@@ -173,7 +173,15 @@ class ProjectBlockRegistry:
     _instances: List["ProjectBlockRegistry"] = []
 
     def __init__(self, blocks_dir: Path):
-        self.blocks_dir = Path(blocks_dir)
+        p = Path(blocks_dir)
+        if not p.is_dir():
+            raise ValueError(
+                f"ProjectBlockRegistry expects a directory, got: {p}\n"
+                f"Hint: inside blocks/__init__.py, use "
+                f"ProjectBlockRegistry(Path(__file__).parent) — not "
+                f"ProjectBlockRegistry(__file__)."
+            )
+        self.blocks_dir = p
         self._cache: Dict[str, object] = {}
         self._mtimes: Dict[str, float] = {}
         self._manifest: Optional[Dict] = None
@@ -245,6 +253,26 @@ class ProjectBlockRegistry:
             return self.get(name)
         except (BlockNotFoundError, BlockImportError) as e:
             raise AttributeError(str(e)) from e
+
+    def __len__(self) -> int:
+        """Number of blocks discovered in the directory (no import triggered)."""
+        return len(self.manifest)
+
+    def __iter__(self):
+        """Iterate over block modules in alphabetical name order.
+
+        Each block is imported on demand — iteration stays lazy per-block,
+        so ``st_book(registry)`` only imports the blocks it actually renders.
+        """
+        for name in sorted(self.manifest):
+            yield self.get(name)
+
+    def __getitem__(self, index):
+        """Index access (int or slice) over the alphabetically-ordered blocks."""
+        names = sorted(self.manifest)
+        if isinstance(index, slice):
+            return [self.get(n) for n in names[index]]
+        return self.get(names[index])
 
     def load_all(self) -> None:
         for name in sorted(self.manifest.keys()):

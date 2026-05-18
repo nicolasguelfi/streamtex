@@ -9,7 +9,8 @@ from dataclasses import dataclass
 import click
 
 from .console import get_console
-from .workspace_cmd import find_workspace_root
+from .dev_config import resolve_repo_path
+from .workspace_cmd import find_workspace_root, load_stx_toml
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +62,6 @@ marker_config = MarkerConfig(
 
 st_book(
     registry,
-    title="{name}",
     toc_config=toc,
     marker_config=marker_config,
     paginate=True,
@@ -115,9 +115,11 @@ def generate_blocks_init() -> str:
     return """\
 \"\"\"Block registry for this project.\"\"\"
 
+from pathlib import Path
+
 from streamtex.blocks import ProjectBlockRegistry
 
-registry = ProjectBlockRegistry(__file__)
+registry = ProjectBlockRegistry(Path(__file__).parent)
 """
 
 
@@ -554,7 +556,18 @@ def _copy_rich_template(
             "Run: stx install --preset standard"
         )
 
-    src = os.path.join(ws_root, "streamtex-docs", "templates", f"template_{template_name}")
+    # Resolve streamtex-docs via dev-link first, fallback to workspace clone.
+    try:
+        config = load_stx_toml(ws_root)
+        docs_root, _is_dev = resolve_repo_path("streamtex-docs", ws_root, config)
+    except FileNotFoundError:
+        raise click.ClickException(
+            "streamtex-docs not found.\n"
+            "Run: stx install --preset standard\n"
+            "Or:  stx dev register streamtex-docs /path/to/streamtex-docs"
+        ) from None
+
+    src = os.path.join(docs_root, "templates", f"template_{template_name}")
     if not os.path.isdir(src):
         raise click.ClickException(
             f"Template not found: {src}\n"

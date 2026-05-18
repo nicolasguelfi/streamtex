@@ -371,3 +371,187 @@ class TestStInclude:
             result = st_include(mod)
 
         assert result is None
+
+
+# ---------------------------------------------------------------------------
+# _paginated_book — empty module_list early-return must clean up overlay
+# ---------------------------------------------------------------------------
+
+class TestPaginatedBookEmptyListOverlayCleanup:
+    """Regression guard for the v0.6.41 "Initializing…" infinite-loading bug.
+
+    When ``len(module_list) == 0``, ``_paginated_book`` returns early.  Before
+    the fix it returned WITHOUT removing the loading overlay that was injected
+    by ``st_book`` just before delegating to it — so the page stayed stuck on
+    the "Initializing…" overlay forever.
+
+    These tests exercise only the early-return path (no streamlit runtime
+    required), confirming the overlay is always removed when ``loading=True``.
+    """
+
+    def _call_paginated_book(self, module_list, loading):
+        """Minimal call into _paginated_book, exercising only the early-return."""
+        from streamtex.banner import BannerConfig
+        from streamtex.book import _paginated_book
+        _paginated_book(
+            module_list,
+            None,                # toc_config
+            None,                # marker_config
+            None,                # separator
+            False,               # export
+            "",                  # export_title
+            BannerConfig(),      # banner_config
+            loading=loading,
+        )
+
+    def test_empty_list_with_loading_calls_remove_overlay(self):
+        with patch("streamtex.book.remove_loading_overlay") as mock_remove:
+            self._call_paginated_book([], loading=True)
+        mock_remove.assert_called_once()
+
+    def test_empty_list_without_loading_does_not_call_remove(self):
+        with patch("streamtex.book.remove_loading_overlay") as mock_remove:
+            self._call_paginated_book([], loading=False)
+        mock_remove.assert_not_called()
+
+    def test_empty_registry_with_loading_calls_remove_overlay(self, tmp_path):
+        """An empty ProjectBlockRegistry (len == 0) must trigger overlay cleanup
+        too — this is the exact scenario that caused the original bug."""
+        from streamtex.blocks import ProjectBlockRegistry
+        empty_dir = tmp_path / "empty_blocks"
+        empty_dir.mkdir()
+        empty_registry = ProjectBlockRegistry(empty_dir)
+        assert len(empty_registry) == 0  # sanity
+
+        with patch("streamtex.book.remove_loading_overlay") as mock_remove:
+            self._call_paginated_book(empty_registry, loading=True)
+        mock_remove.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# st_book — block_args / block_kwargs API and legacy kwargs deprecation
+# ---------------------------------------------------------------------------
+
+class TestStBookBlockArgsKwargs:
+    """The supported way to forward args to block.build() is via the explicit
+    block_args / block_kwargs parameters. Passing unknown kwargs directly to
+    st_book continues to work for backward compat but emits a
+    DeprecationWarning — this was the design fix for the v0.6.41
+    ``TypeError: build() got an unexpected keyword argument 'title'`` cascade.
+    """
+
+    def _make_module(self, name, build_fn):
+        import types
+        m = types.ModuleType(name)
+        m.__name__ = name
+        m.build = build_fn
+        return m
+
+    def _call_st_book_warmup(self, modules, **kwargs):
+        """Call st_book in headless warmup mode (no streamlit runtime needed).
+
+        Patches the cache-path resolver so the function exits cleanly without
+        writing anything to disk. Returns nothing — assertions are on side
+        effects of the build functions and on warnings.
+        """
+        import streamtex.book as book
+        from streamtex.banner import BannerConfig
+
+        # Force warmup mode so st_book stops after _warmup_build_cache.
+        with patch.object(book, "_warmup_mode", True), \
+             patch.object(book, "_warmup_export_config", None), \
+             patch("streamtex.book._compute_cache_hash", return_value="h"), \
+             patch("streamtex.book._resolve_cache_path", return_value=None), \
+             patch("streamtex.book._save_file_cache"), \
+             patch("streamtex.book.reset_toc_registry"), \
+             patch("streamtex.book.reset_export_buffer"), \
+             patch("streamtex.book.set_cache_building"), \
+             patch("streamtex.book.resolve_block_spacing") as _rbs, \
+             patch("streamtex.book.st"), \
+             patch("streamtex.book.st_include") as mock_include:
+            _rbs.return_value.top = None
+            _rbs.return_value.bottom = None
+            book.st_book(modules, banner=BannerConfig(), **kwargs)
+        return mock_include
+
+    def test_block_kwargs_forwarded_to_st_include(self):
+        called = {}
+        def _build(**kw):
+            called.update(kw)
+        m = self._make_module("test_block", _build)
+        mock_include = self._call_st_book_warmup(
+            [m], block_kwargs={"theme": "dark", "lang": "fr"}
+        )
+        # st_include is called with (module, *block_args, **block_kwargs)
+        # in warmup -> _build_page_cache flow.
+        assert mock_include.called
+        last_call = mock_include.call_args_list[0]
+        assert last_call.kwargs == {"theme": "dark", "lang": "fr"}
+
+    def test_block_args_forwarded_to_st_include(self):
+        m = self._make_module("test", lambda *a, **k: None)
+        mock_include = self._call_st_book_warmup([m], block_args=("hello", 42))
+        last_call = mock_include.call_args_list[0]
+        assert last_call.args[1:] == ("hello", 42)
+
+    def test_legacy_unknown_kwarg_emits_deprecation_warning(self):
+        """The pattern that caused the v0.6.41 crash — st_book(modules, title="X")
+        — should now emit a DeprecationWarning instead of silently corrupting
+        block.build() calls."""
+        import warnings
+
+        m = self._make_module("test", lambda **kw: None)
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            self._call_st_book_warmup([m], title="my-app")
+
+        deprecation = [w for w in caught if issubclass(w.category, DeprecationWarning)
+                       and "extra args/kwargs" in str(w.message)]
+        assert deprecation, f"Expected DeprecationWarning, got: {[str(w.message) for w in caught]}"
+        assert "title" in str(deprecation[0].message)
+
+    def test_no_warning_when_clean_call(self):
+        """Calling st_book with only known params and explicit block_kwargs
+        must NOT emit any deprecation warning."""
+        import warnings
+
+        m = self._make_module("test", lambda **kw: None)
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            self._call_st_book_warmup([m], block_kwargs={"theme": "dark"})
+
+        deprecation = [w for w in caught
+                       if issubclass(w.category, DeprecationWarning)
+                       and "extra args/kwargs" in str(w.message)]
+        assert not deprecation, f"Unexpected deprecation: {[str(w.message) for w in deprecation]}"
+
+    def test_legacy_kwargs_still_forwarded_for_backward_compat(self):
+        """During the deprecation period, legacy kwargs are still forwarded
+        to build() (with a warning). Removed in next major version."""
+        import warnings
+
+        received = {}
+        def _build(**kw):
+            received.update(kw)
+        m = self._make_module("test", _build)
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            mock_include = self._call_st_book_warmup([m], theme="dark")
+
+        last_call = mock_include.call_args_list[0]
+        assert last_call.kwargs == {"theme": "dark"}
+
+    def test_block_kwargs_overrides_legacy_kwargs(self):
+        """When both legacy and explicit are passed, explicit wins (Python
+        dict merge semantics)."""
+        import warnings
+
+        m = self._make_module("test", lambda **kw: None)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            mock_include = self._call_st_book_warmup(
+                [m], theme="light", block_kwargs={"theme": "dark"}
+            )
+        last_call = mock_include.call_args_list[0]
+        assert last_call.kwargs == {"theme": "dark"}

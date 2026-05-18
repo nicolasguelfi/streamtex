@@ -195,6 +195,78 @@ def test_install_with_project(tmp_path):
     assert "ai" in stx_dep
 
 
+def test_install_dev_flag_links_streamtex_into_project(tmp_path, monkeypatch):
+    """--dev links the globally-registered streamtex into the project's
+    pyproject.toml as an editable uv source, mirroring `stx dev link`."""
+    # Build a fake streamtex source repo that satisfies validate_repo_path
+    fake_stx = tmp_path / "fake-streamtex"
+    fake_stx.mkdir()
+    (fake_stx / "pyproject.toml").write_text(
+        '[project]\nname = "streamtex"\nversion = "0.0.0"\n'
+    )
+
+    # Inject a global registration pointing to the fake source
+    from streamtex.cli.dev_config import GlobalDevConfig
+    monkeypatch.setattr(
+        "streamtex.cli.dev_config.GlobalDevConfig.load",
+        staticmethod(lambda: GlobalDevConfig(repos={"streamtex": str(fake_stx)})),
+    )
+
+    target = tmp_path / "ws"
+    target.mkdir()
+
+    patches = _mock_subprocess_and_uv()
+    with patches[0], patches[1], patches[2], patches[3]:
+        runner = CliRunner()
+        os.chdir(target)
+        result = runner.invoke(
+            cli, ["install", "--preset", "standard", "--project", "myapp", "--dev"]
+        )
+
+    assert result.exit_code == 0, result.output
+    pyproject = (target / "projects" / "myapp" / "pyproject.toml").read_text()
+    assert "[tool.uv.sources]" in pyproject
+    assert "streamtex" in pyproject
+    assert str(fake_stx.resolve()) in pyproject
+    # And the step shows up in the progress log
+    assert "Linking dev streamtex" in result.output
+
+
+def test_install_dev_flag_without_global_registration_is_noop(tmp_path):
+    """--dev when no streamtex global registration exists: prints a hint,
+    doesn't fail, doesn't touch pyproject.toml."""
+    target = tmp_path / "ws"
+    target.mkdir()
+
+    patches = _mock_subprocess_and_uv()
+    with patches[0], patches[1], patches[2], patches[3]:
+        runner = CliRunner()
+        os.chdir(target)
+        result = runner.invoke(
+            cli, ["install", "--preset", "standard", "--project", "myapp", "--dev"]
+        )
+
+    assert result.exit_code == 0, result.output
+    assert "not registered globally" in result.output
+    pyproject = (target / "projects" / "myapp" / "pyproject.toml").read_text()
+    assert "[tool.uv.sources]" not in pyproject
+
+
+def test_install_dev_flag_without_project_warns(tmp_path):
+    """--dev without --project should produce a warning and otherwise no-op."""
+    target = tmp_path / "ws"
+    target.mkdir()
+
+    patches = _mock_subprocess_and_uv()
+    with patches[0], patches[1], patches[2], patches[3]:
+        runner = CliRunner()
+        os.chdir(target)
+        result = runner.invoke(cli, ["install", "--preset", "standard", "--dev"])
+
+    assert result.exit_code == 0, result.output
+    assert "no effect without --project" in result.output
+
+
 def test_install_power_with_project(tmp_path):
     """stx install --preset power --project demo includes inspector extra."""
     target = tmp_path / "ws"

@@ -96,6 +96,15 @@ stx dev status                                      # verify
 stx dev unlink streamtex                            # revert to PyPI
 ```
 
+**One-shot project creation with dev-link** — once `stx dev register streamtex ...`
+is done, you can scaffold a fresh project and link it to the dev source in a
+single command using the `--dev` flag on `stx install`:
+```bash
+stx install --project my-app --dev                  # scaffold + auto-link streamtex
+stx install --preset power --project my-app --dev   # full power setup + dev-link
+```
+This replaces the manual `stx project new my-app && cd projects/my-app && stx dev link streamtex` flow.
+
 **NEVER modify files inside `.venv/site-packages/streamtex/`** — they are overwritten by `uv sync`. Always modify the source repo.
 
 ## CHANGELOG (MANDATORY)

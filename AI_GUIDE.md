@@ -29,6 +29,11 @@ stx install                  # default: standard preset (docs + claude)
 stx update                   # clones repos, syncs deps, installs commands globally
 ```
 
+> **Developer shortcut:** if you've registered a local source with
+> `stx dev register streamtex /path/...`, add `--dev` to any
+> `stx install --project NAME` to auto-link the dev source into the
+> new project's venv (skips the manual `stx dev link streamtex` step).
+
 > After cloning, shared commands (like `/stx-guide`) are copied to `~/.claude/commands/`
 > and available globally — even outside any project.
 

@@ -175,6 +175,11 @@ from .browser import st_chrome_banner
 # Block Inspector (opt-in)
 from .inspector import InspectorConfig, FileCategoryRegistry
 
+# Reuse architecture (§5.0 — convention hybride : 3 top-level reexports ;
+# le reste reste accessible via streamtex.core.*)
+from .core.contracts import ComponentMeta, DesignSystemProtocol
+from .core.discovery import ReuseArchitectureError
+
 # Restore stderr after all imports are done
 _sys.stderr = _real_stderr
 del _real_stderr, _io, _sys

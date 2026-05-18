@@ -13,6 +13,7 @@ from .claude_cmd import diff_cmd as claude_diff
 from .claude_cmd import install as claude_install
 from .claude_cmd import list_cmd as claude_list
 from .claude_cmd import update_cmd as claude_update
+from .component_cmd import component as component_group
 from .deploy_cmd import configure_domain_cmd as deploy_configure_domain
 from .deploy_cmd import docker as deploy_docker
 from .deploy_cmd import env_sync_cmd as deploy_env_sync
@@ -42,8 +43,11 @@ from .dev_cmd import (
 from .dev_cmd import (
     unregister_cmd as dev_unregister,
 )
+from .ds_cmd import ds as ds_group
 from .export_cmd import export_html
 from .install_cmd import install as stx_install
+from .kit_cmd import kit as kit_group
+from .pack_cmd import pack as pack_group
 from .patterns_cmd import patterns as patterns_group
 from .project_cmd import new as project_new
 from .project_cmd import validate as project_validate
@@ -53,6 +57,7 @@ from .run_cmd import run as stx_run
 from .shortcuts import run_lint, run_test
 from .status_cmd import status as workspace_status
 from .upgrade_cmd import upgrade as project_upgrade
+from .validate_cmd import validate as stx_validate
 from .workspace_cmd import update as workspace_update
 
 
@@ -175,9 +180,18 @@ def export():
 export.add_command(export_html)
 
 
-# --- Patterns subgroup -----------------------------------------------------
+# --- Patterns subgroup (legacy — removed in MIG-6) ------------------------
 
 cli.add_command(patterns_group, name="patterns")
+
+
+# --- Reuse architecture subgroups (MIG-2) ---------------------------------
+
+cli.add_command(pack_group, name="pack")
+cli.add_command(component_group, name="component")
+cli.add_command(ds_group, name="ds")
+cli.add_command(kit_group, name="kit")
+cli.add_command(stx_validate, name="validate")
 
 
 # --- Dev subgroup ----------------------------------------------------------

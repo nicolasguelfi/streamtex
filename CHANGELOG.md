@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.42] — 2026-05-19 (Wave 1 — reuse architecture foundations)
+
+### Added
+- `streamtex.core.*` — reuse architecture contracts, validation, discovery
+  (MIG-1 per PLAN.md §29.3). Implements `DesignSystemProtocol`,
+  `ComponentMeta`, `KitManifest`, `PackManifest`, `StxTomlPackEntry` plus
+  the bundle Protocols (Colors/Titles/Callouts/StatHero/CardGrid/
+  ComparisonTable/Takeaways/Body/Citation/InlineEmphasis/Lists).
+  Validation API: `validate_component` (CV001-CV011),
+  `validate_design_system` (DV001-DV006), `validate_kit` (KV001-KV005),
+  `validate_pack` (PV001-PV010), `validate_bundles_required` (BV001-BV002).
+  Discovery surfaces the 5 pack lifecycle states (§5.6bis) and includes
+  `get_primary_local_pack` (Q7), `get_bundle_attr` (Q2). Exception
+  hierarchy: `ReuseArchitectureError` + 5 subclasses.
+- Top-level re-exports (PLAN §5.0 convention hybride):
+  `DesignSystemProtocol`, `ComponentMeta`, `ReuseArchitectureError`.
+- New CLI groups (`stx pack/component/ds/kit/validate`) shipped alongside
+  the legacy `stx patterns *` (MIG-2 per §29.4). Includes
+  `stx pack add --dev <path>` (Q17), the four-branch
+  `stx component promote` routing helper (Q12), and
+  `stx pack list --trace`.
+- Shared CLI helpers `streamtex/cli/_toml_helpers.py` and
+  `streamtex/cli/_stx_toml.py`.
+- 62 new tests (31 core + 31 CLI). Full suite: 2205 passed.
+
+### Unchanged (legacy preserved for MIG-6 in Wave 2)
+- `streamtex.patterns.*` (2971 lines) and `streamtex/cli/patterns_cmd.py`
+  (1173 lines) continue to function unchanged. Atomic removal scheduled
+  for Wave 2 MIG-6.
+
 ### Fixed
 - **Composite picker: empty checkbox submission no longer silently
   cancels an add.** The classic questionary trap — pressing ENTER

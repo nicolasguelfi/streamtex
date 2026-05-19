@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.45] — 2026-05-19 (Wave 2 MIG-6 — atomic suppression of legacy patterns)
+
+### BREAKING (removed)
+- `stx patterns *` command group removed in full. Replaced by `stx pack`,
+  `stx component`, `stx ds`, `stx kit`, `stx validate` (introduced in
+  Wave 1 MIG-2). Per PLAN §29.8 / Q9.
+- `streamtex.patterns` Python module deleted (10 files / 2973 lines):
+  `__init__.py`, `index.py`, `installer.py`, `manifest.py`, `picker.py`,
+  `preset.py`, `project_toml.py`, `resolver.py`, `updater.py`,
+  `validator.py`.
+- `streamtex/cli/patterns_cmd.py` (1173 lines) removed.
+- `streamtex/cli/install_cmd.py`: `_maybe_offer_patterns` helper removed.
+  The new replacement `_add_default_design_pack` (MIG-4) is the active
+  code path.
+- 6 test files removed (2201 lines):
+  `tests/test_patterns_smoke.py`, `test_patterns_meta_v3.py`,
+  `test_patterns_picker.py`, `test_patterns_composite.py`,
+  `test_patterns_source_cmd.py`, `test_install_patterns_offer.py`.
+- README.md "Design Patterns (`stx patterns`)" section rewritten as
+  "Reuse architecture (`stx pack`/`component`/`ds`/`kit`)".
+
+### Notes
+- MIG-5 checkpoint SHA: `ccabd695ad0151096eccdf1466a7a0e18f08ffde`.
+- Q14 orphan checks (PLAN §29.8): `grep "patterns-meta"`,
+  `grep "from streamtex.patterns"` both return 0 occurrences across
+  `streamtex/` and `tests/` (verified at MIG-6 commit time).
+- 4 conceptual patterns (exception hierarchy, composite v3 QCM,
+  `extends` mechanism, TraceEntry audit) were extracted and ported to
+  `streamtex/core/*` in Wave 1 MIG-1 before deletion (see PLAN §28).
+- Full suite: 2111 passed (down from 2223 in 0.6.44, −112 patterns tests
+  removed; no production code uncovered).
+
 ### MIG-5 checkpoint
 
 Audit run at SHA `ccabd695ad0151096eccdf1466a7a0e18f08ffde` (post-MIG-4).

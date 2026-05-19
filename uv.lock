@@ -2743,8 +2743,10 @@ dev = [
     { name = "playwright" },
     { name = "pre-commit" },
     { name = "pytest" },
+    { name = "questionary" },
     { name = "rich" },
     { name = "ruff" },
+    { name = "tomlkit" },
     { name = "twine" },
 ]
 
@@ -2791,8 +2793,10 @@ dev = [
     { name = "playwright", specifier = ">=1.58.0" },
     { name = "pre-commit", specifier = ">=3.0" },
     { name = "pytest", specifier = ">=7.0" },
+    { name = "questionary", specifier = ">=2.0" },
     { name = "rich", specifier = ">=13.0" },
     { name = "ruff", specifier = ">=0.4.0" },
+    { name = "tomlkit", specifier = ">=0.13" },
     { name = "twine", specifier = ">=6.2.0" },
 ]
 

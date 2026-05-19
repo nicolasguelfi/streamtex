@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### MIG-5 checkpoint
+
+Audit run at SHA `ccabd695ad0151096eccdf1466a7a0e18f08ffde` (post-MIG-4).
+`grep -rln "from streamtex\.patterns\|import streamtex\.patterns" streamtex/
+tests/` yields **8 files** (PLAN §29.7 expected 7):
+
+- `streamtex/cli/patterns_cmd.py` (multiple imports — to be deleted in MIG-6)
+- `streamtex/cli/install_cmd.py` (**deviation**: dormant `_maybe_offer_patterns`
+  preserved with its inner imports so `test_install_patterns_offer.py` keeps
+  importing cleanly; the install flow no longer calls it. Removed atomically
+  in MIG-6.)
+- `tests/test_patterns_smoke.py`
+- `tests/test_patterns_meta_v3.py`
+- `tests/test_patterns_picker.py`
+- `tests/test_patterns_composite.py`
+- `tests/test_patterns_source_cmd.py`
+- `tests/test_install_patterns_offer.py`
+
+No unexpected consumer was introduced. MIG-5 go.
+
 ## [0.6.44] — 2026-05-19 (Wave 2 MIG-4 — `stx install` switches to design pack)
 
 ### Added

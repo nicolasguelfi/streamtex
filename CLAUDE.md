@@ -96,15 +96,6 @@ stx dev status                                      # verify
 stx dev unlink streamtex                            # revert to PyPI
 ```
 
-**One-shot project creation with dev-link** — once `stx dev register streamtex ...`
-is done, you can scaffold a fresh project and link it to the dev source in a
-single command using the `--dev` flag on `stx install`:
-```bash
-stx install --project my-app --dev                  # scaffold + auto-link streamtex
-stx install --preset power --project my-app --dev   # full power setup + dev-link
-```
-This replaces the manual `stx project new my-app && cd projects/my-app && stx dev link streamtex` flow.
-
 **NEVER modify files inside `.venv/site-packages/streamtex/`** — they are overwritten by `uv sync`. Always modify the source repo.
 
 ## CHANGELOG (MANDATORY)
@@ -115,35 +106,20 @@ This replaces the manual `stx project new my-app && cd projects/my-app && stx de
 - Include CLI command changes, new exports, bug fixes, documentation updates
 - The CHANGELOG is the user-facing record of what changed — if it's worth committing, it's worth documenting
 
-## Reuse artefacts in sandboxes / test projects (packs)
+## Reuse architecture (packs, components, design systems, kits)
 
-If a library-internal sandbox, demo, or regression fixture declares a
-`streamtex.packs` entry point — or installs the reference pack
-`streamtex-design` — the new reuse architecture applies (packs ship
-components, design systems, kits, optionally CLI templates and blueprints).
+The `streamtex 0.7.x` reuse architecture replaces the legacy
+`streamtex-patterns` flow. Library-internal sandboxes / test projects
+should declare the `streamtex-design` pack (or a local `mypack/`) in
+their `stx.toml`. Components are Python modules with a structured
+docstring (§4.1) and a `__component_meta__`. See the
+`reuse-architecture` skill (loaded automatically) and PLAN.md
+§5-§7 for the full mechanism.
 
-**Mandatory rules when generating or modifying a block in such a sandbox**:
-1. **Before generating any block**, read the `reuse-architecture` skill and
-   inspect declared packs (`stx pack list`) and components
-   (`stx component list`).
-2. When a component is named (e.g. *"use callout"*, *"like card_grid"*),
-   read its docstring contract via `stx component show <name>` **before**
-   generating code. The docstring carries `INVARIANTS`, `PARAMS`,
-   `INTERDITS`, `When to use`, `When NOT to use`, `Design system bundles
-   required` — respect them strictly.
-3. To compose a block, import the component directly from the pack:
-   `from streamtex_design.components import callout, card_grid`.
-4. If a needed visual element is missing from installed packs, scaffold a
-   new component via `stx component new <name>` into the sandbox's primary
-   local pack, then promote it with `stx component promote` if it proves
-   reusable.
+**Library testing tip**: a minimal sandbox can declare just one local
+pack (no git pack) — sufficient for testing reuse-architecture
+behaviour inside regression fixtures.
 
-**Component granularity** is a tag (not a constraint): `primitive`,
-`composition`, `block`.
-
-**CLI surface**: `stx pack {list,add,info,sync}` · `stx component
-{list,new,show,validate,promote}` · `stx ds {list,switch,new}` · `stx kit
-{list,install,show,new}` · `stx validate [--strict]`.
-
-The legacy `streamtex-patterns/` folder convention and the `/stx-pattern:*`
-command family are removed in 0.7.x.
+**Commands**: `/stx-pack`, `/stx-component`, `/stx-ds`, `/stx-kit`,
+`/stx-validate`. The legacy `/stx-pattern:*` commands were removed in
+streamtex 0.7.x.

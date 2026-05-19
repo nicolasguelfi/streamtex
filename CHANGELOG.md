@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.44] — 2026-05-19 (Wave 2 MIG-4 — `stx install` switches to design pack)
+
+### Added
+- `stx install` now auto-adds the official `streamtex-design` pack to the
+  project's `stx.toml` after creation, for presets `standard`, `power`,
+  and `developer` (PLAN §29.6 / Q9). New helper
+  `_add_default_design_pack(ws_root, project, preset, console)`.
+- `--no-design-pack` flag on `stx install` to opt out.
+
+### Changed
+- `--no-patterns` is now a deprecated alias for `--no-design-pack`
+  (kept for retro-compat; prints a yellow warning when used). The legacy
+  `_maybe_offer_patterns` is no longer invoked from the install flow but
+  remains in the file (dormant, removed atomically in MIG-6 alongside
+  its dedicated test file).
+- 8 new tests in `tests/test_install_design_pack.py`. Full suite: 2223 passed.
+
 ## [0.6.43] — 2026-05-19 (Wave 2 MIG-3 — `stx project new` modernised)
 
 ### Added

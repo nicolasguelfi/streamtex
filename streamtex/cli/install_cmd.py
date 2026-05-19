@@ -183,14 +183,20 @@ def _maybe_clone_docs_for_template(
          "No-op without --project.",
 )
 @click.option(
+    "--no-design-pack",
+    is_flag=True,
+    default=False,
+    help="Skip the auto-add of the `streamtex-design` pack to the project's "
+         "stx.toml after project creation (cf. PLAN §29.6 — Q9 MIG-4).",
+)
+@click.option(
     "--no-patterns",
     is_flag=True,
     default=False,
-    help="Skip the opt-in 'install design patterns?' prompt after project "
-         "creation. The prompt is also skipped automatically in non-TTY "
-         "contexts (CI, scripts).",
+    hidden=True,
+    help="DEPRECATED alias for --no-design-pack (kept for retro-compat).",
 )
-def install(preset, project, template, dev, no_patterns):
+def install(preset, project, template, dev, no_design_pack, no_patterns):
     """Install or update a StreamTeX workspace, optionally creating a project.
 
     First run:  stx install --preset power --project hello
@@ -409,9 +415,17 @@ def install(preset, project, template, dev, no_patterns):
     else:
         step += 1
 
-    # --- Optional: opt-in design patterns offer (project only) ---
-    if has_project and not no_patterns:
-        _maybe_offer_patterns(ws_root, project, console)
+    # --- Optional: auto-add streamtex-design pack to project (project only) ---
+    # MIG-4 (PLAN §29.6 Q9) : replace the legacy interactive patterns offer with
+    # a non-interactive declarative auto-add of the official design pack to the
+    # project's stx.toml. Honours both --no-design-pack (new) and the legacy
+    # --no-patterns alias.
+    if has_project and not (no_design_pack or no_patterns):
+        _add_default_design_pack(ws_root, project, effective_preset, console)
+    if has_project and no_patterns and not no_design_pack:
+        console.print(
+            "[yellow]--no-patterns is deprecated, use --no-design-pack[/yellow]"
+        )
 
     # --- Done ---
     _clear_state(ws_root)
@@ -640,6 +654,66 @@ def _install_is_interactive() -> bool:
     import sys
 
     return sys.stdin.isatty()
+
+
+_DEFAULT_DESIGN_PACK = {
+    "name": "streamtex-design",
+    "ref": "github.com/nicolasguelfi/streamtex-design",
+    "rev": "v0.1.0",
+}
+
+# Presets that opt in to the streamtex-design pack by default (PLAN §29.6).
+_DESIGN_PACK_PRESETS = {"standard", "power", "developer"}
+
+
+def _add_default_design_pack(
+    ws_root: str, project_name: str, preset: str, console
+) -> None:
+    """Add the official ``streamtex-design`` pack to the project's stx.toml.
+
+    Non-interactive replacement for the legacy ``_maybe_offer_patterns``
+    (MIG-4 per PLAN §29.6). Activated only for presets that opt in
+    (``standard``, ``power``, ``developer``); the ``basic`` and ``user``
+    presets stay minimal. The pack entry is added idempotently via the
+    Wave 1 helper ``_stx_toml.add_pack``.
+    """
+    from pathlib import Path
+
+    if preset not in _DESIGN_PACK_PRESETS:
+        return
+
+    project_dir = Path(ws_root) / "projects" / project_name
+    stx_toml_path = project_dir / "stx.toml"
+    if not stx_toml_path.is_file():
+        # MIG-3 generates stx.toml for newly-created projects. If absent,
+        # the project was bootstrapped outside `stx project new` — skip
+        # silently rather than risk overwriting bespoke layouts.
+        return
+
+    try:
+        from . import _stx_toml as _proj_toml
+
+        existing = {p.get("name") for p in _proj_toml.list_packs(project_dir)}
+        if _DEFAULT_DESIGN_PACK["name"] in existing:
+            return
+
+        _proj_toml.add_pack(
+            project_dir,
+            {
+                "type": "git",
+                "name": _DEFAULT_DESIGN_PACK["name"],
+                "ref": _DEFAULT_DESIGN_PACK["ref"],
+                "rev": _DEFAULT_DESIGN_PACK["rev"],
+            },
+        )
+        console.print(
+            f"[green]streamtex-design:[/green] added to "
+            f"{stx_toml_path.relative_to(ws_root)} "
+            f"(rev={_DEFAULT_DESIGN_PACK['rev']})"
+        )
+    except Exception as exc:
+        # Auto-add is convenience; never break the install flow if it fails.
+        console.print(f"[yellow]streamtex-design auto-add:[/yellow] {exc}")
 
 
 def _maybe_offer_patterns(ws_root: str, project_name: str, console) -> None:

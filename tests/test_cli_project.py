@@ -650,7 +650,7 @@ def test_project_new_help():
 
 
 # ---------------------------------------------------------------------------
-# MIG-3 — Reuse architecture generators + scaffolding (PLAN §7.1.6)
+# Reuse architecture generators + scaffolding
 # ---------------------------------------------------------------------------
 
 

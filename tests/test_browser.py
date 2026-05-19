@@ -52,5 +52,5 @@ def test_st_book_chrome_banner_default_is_false():
     sig = inspect.signature(st_book)
     default = sig.parameters["chrome_banner"].default
     assert default is False, (
-        f"chrome_banner default should be False since 0.6.25, got {default!r}"
+        f"chrome_banner default should be False (opt-in), got {default!r}"
     )

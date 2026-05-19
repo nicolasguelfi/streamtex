@@ -563,7 +563,7 @@ class TestContainerCssStructure:
 
 
 # ===========================================================================
-# Marker emit pattern — the only path since 0.6.16 (legacy :has() removed).
+# Marker emit pattern — the rendering path used by the current marker runtime.
 # ===========================================================================
 
 

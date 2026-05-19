@@ -1,4 +1,4 @@
-"""Tests for `stx component` (MIG-2)."""
+"""Tests for `stx component`."""
 
 from __future__ import annotations
 

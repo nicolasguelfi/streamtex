@@ -1,4 +1,4 @@
-"""Tests for the MIG-4 `_add_default_design_pack` helper (PLAN §29.6)."""
+"""Tests for the `_add_default_design_pack` helper."""
 
 from __future__ import annotations
 

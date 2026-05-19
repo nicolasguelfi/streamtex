@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] — 2026-05-19 (Wave 4 — Reuse architecture milestone)
+
+Consolidation milestone (PLAN Q15 / D15). Bundles the structural changes
+shipped across 0.6.42 → 0.6.45 (Waves 1-2) and signals to consumers that
+the pattern-flow is gone and the pack-based reuse architecture is the
+new contract. Per `feedback_no_minor_bump.md` (now amended): the
+`0.7.x` track was reserved for this consolidation; from `0.7.0` onward
+patch-only releases on the `0.7.x` track until the next consolidation.
+
+### Added (cumulative — see 0.6.42 / 0.6.43 / 0.6.44 / 0.6.45 below)
+- `streamtex.core.*` — contracts (`DesignSystemProtocol`, `ComponentMeta`,
+  `KitManifest`, `PackManifest`, `StxTomlPackEntry`, `ReuseArchitectureError`),
+  validation (CV/DV/KV/PV/BV codes), and discovery
+  (`discover_packs`, `get_primary_local_pack`, `get_bundle_attr`).
+- New CLI groups: `stx pack`, `stx component`, `stx ds`, `stx kit`,
+  `stx validate` (Q9 MIG-2 → MIG-6).
+- `stx project new --kit <pack>:<kit_name>` + `--pack`, `--pack-name`,
+  `--no-mypack` (Q7 / Q8 MIG-3). Generates `stx.toml`, scaffolds the
+  primary local pack `mypack/`, installs it editable.
+- `stx install` auto-adds the `streamtex-design` pack to projects on
+  preset `standard`/`power`/`developer` (Q9 MIG-4); new `--no-design-pack`
+  (`--no-patterns` retained as deprecated alias).
+- Top-level re-exports (PLAN §5.0): `DesignSystemProtocol`,
+  `ComponentMeta`, `ReuseArchitectureError`.
+- `tests/test_integration_multipack.py::test_invariants_1_to_5` — the
+  multi-pack E2E matrix demonstrating D5 (PLAN §11.4).
+
+### BREAKING (0.6.45 — already shipped)
+- `stx patterns *` removed (replaced by `stx pack/component/ds/kit/validate`).
+- `streamtex.patterns` module removed (`streamtex.core.*` is the new
+  contracts layer).
+
+### Notes
+- `streamtex-design` v0.1.0 is the reference pack
+  (`github.com/nicolasguelfi/streamtex-design`).
+- `streamtex-claude` v0.2.0 ships the new `reuse-architecture` skill
+  and the `stx-pack/component/ds/kit/validate/new` shared commands.
+- `streamtex-docs` `docs-patterns.streamtex.org` now serves
+  `stx_manual_reuse` (Wave 3 Phase 6.5 — same Coolify slot, env var
+  `FOLDER` patched).
+- Full suite at this tag: 2113 passing.
+
 ## [0.6.45] — 2026-05-19 (Wave 2 MIG-6 — atomic suppression of legacy patterns)
 
 ### BREAKING (removed)

@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.4] — 2026-05-19 — Pack Engineering availability (docs-only)
+
+Documents the availability of the **Pack Engineering (PE)** module that
+shipped in `streamtex-claude` 0.3.0. No library code changes — this release
+exists so the streamtex library's own `.claude/references/` cheatsheet and
+README stay in sync with the broader ecosystem.
+
+### Changed
+
+- `README.md` — "AI-Powered Features" section updated to reference
+  `stx-pe` (7 commands) alongside `stx-block` and `stx-ce`. New
+  "Pack Engineering (`/stx-pe`)" subsection. `pack-orchestrator` added
+  to the AI Agents table.
+- The local `.claude/references/streamtex_cheatsheet_en.md` and
+  `.claude/references/pe_cheatsheet_en.md` files are synced from the
+  `streamtex-claude` 0.3.0 source via `stx claude update`. They are
+  gitignored by design (`.claude/*` is managed by the profile
+  installer, not by git).
+
+### About the PE module
+
+PE is a Claude-driven orchestrated lifecycle for extracting, forking,
+refining, auditing, adopting, and publishing reuse packs across N
+projects. It drives the deterministic `stx component / pack / kit / validate`
+CLI commands (which already exist in `streamtex 0.7.x`) and adds the
+AI-assisted analysis, design, and retrofit phases that those commands
+cannot perform deterministically.
+
+The module itself ships in **streamtex-claude 0.3.0** as a project-profile
+sub-directory (`profiles/project/pack-engineering/`) and is installed by
+`stx claude install project <target>`. No `streamtex` library changes
+are required to use PE.
+
 ## [0.7.3] — 2026-05-19 (L5 — TOCConfig.numerate_titles removed)
 
 Final piece of the Q10 legacy purge: the `numerate_titles` field on

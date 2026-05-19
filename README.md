@@ -276,9 +276,9 @@ uv add "streamtex[cli]"          # stx CLI (already installed as a global tool a
 
 ## AI-Powered Features
 
-StreamTeX ships with the **stx-block** (15 commands) and **stx-ce** (13 commands)
-slash command groups, **3 specialized agents**, and **4 project templates**
-for AI-assisted development.
+StreamTeX ships with the **stx-block** (15 commands), **stx-ce** (14 commands),
+and **stx-pe** (7 commands) slash command groups, **specialized agents**, and
+**4 project templates** for AI-assisted development.
 
 ### Project Creation & Customization
 
@@ -309,6 +309,20 @@ for AI-assisted development.
 | `/stx-import:html-batch` | Batch conversion of multiple files |
 | `/stx-import:html-audit` | Audit conversion quality |
 
+### Pack Engineering (`/stx-pe`) — orchestrated pack lifecycle
+
+| Command | What it does |
+|---------|-------------|
+| `/stx-pe:go` | Auto-detect sub-mode (bootstrap / specialize / refine / audit / adopt / publish) |
+| `/stx-pe:bootstrap <projects>` | Extract a brand-new pack from N projects |
+| `/stx-pe:specialize <upstream> <projects>` | Fork an upstream pack with domain extensions |
+| `/stx-pe:refine` | Incrementally enrich the active pack with new patterns |
+| `/stx-pe:audit <pack>` | Read-only health audit (unused / duplicates / drift) |
+| `/stx-pe:adopt <pack> <projects>` | Install pack in N projects without extraction |
+| `/stx-pe:publish <pack>` | Release a mature pack (semver + tag + optional PyPI) |
+
+Single user-facing **`pack-orchestrator`** agent delegates to six invisible specialists; 4 validation gates (G1–G4). PE drives the deterministic `stx component / pack / kit` CLI commands and adds AI-assisted analysis, design, and retrofit.
+
 ### AI Agents
 
 | Agent | Role |
@@ -316,6 +330,7 @@ for AI-assisted development.
 | **Project Architect** | Designs project structure from natural language |
 | **Slide Designer** | Creates pedagogically structured, polished slides |
 | **Slide Reviewer** | Reviews and validates completed slides |
+| **Pack Orchestrator** | THE single user-facing PE agent — bootstrap / specialize / refine / audit / adopt / publish |
 | **Presentation Designer** | Specialist for live projection (large fonts, minimal text) |
 
 See the **[AI Guide](https://github.com/nicolasguelfi/streamtex/blob/main/AI_GUIDE.md)** for the complete reference.

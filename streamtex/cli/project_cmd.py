@@ -262,6 +262,223 @@ name = "{name}"
 
 
 # ---------------------------------------------------------------------------
+# Reuse architecture generators (MIG-3 — Q7/Q8)
+# ---------------------------------------------------------------------------
+
+
+def _split_kit_ref(kit_ref: str) -> tuple[str, str]:
+    """Split a kit reference ``<pack>:<kit_name>`` into a 2-tuple.
+
+    Raises:
+        click.ClickException: when the format is not exactly ``pack:name``.
+    """
+    if ":" not in kit_ref or kit_ref.count(":") != 1:
+        raise click.ClickException(
+            f"Invalid kit reference '{kit_ref}'. Expected '<pack>:<kit_name>' "
+            "(e.g. 'streamtex_design:project-default')."
+        )
+    pack, kit_name = kit_ref.split(":", 1)
+    pack = pack.strip()
+    kit_name = kit_name.strip()
+    if not pack or not kit_name:
+        raise click.ClickException(
+            f"Invalid kit reference '{kit_ref}'. Both pack and kit name must be non-empty."
+        )
+    return pack, kit_name
+
+
+def _resolve_kit(kit_ref: str) -> dict:
+    """Resolve a kit reference and return its parsed TOML manifest.
+
+    Locates the kit by importing the pack module via entry-points (Q7
+    discovery) and reading ``<pack>/kits/<kit_name>.toml``. Returns ``{}``
+    if discovery fails so the caller can fall back to a minimal scaffold.
+    """
+    pack_name, kit_name = _split_kit_ref(kit_ref)
+    try:
+        import importlib
+        import tomllib as _tomllib
+        mod = importlib.import_module(pack_name)
+        pack_root = os.path.dirname(mod.__file__ or "")
+        kit_file = os.path.join(pack_root, "kits", f"{kit_name}.toml")
+        if not os.path.isfile(kit_file):
+            raise click.ClickException(
+                f"Kit '{kit_name}' not found in pack '{pack_name}' "
+                f"(expected at {kit_file})."
+            )
+        with open(kit_file, "rb") as f:
+            return _tomllib.load(f)
+    except click.ClickException:
+        raise
+    except ModuleNotFoundError as exc:
+        raise click.ClickException(
+            f"Pack '{pack_name}' is not installed. "
+            f"Run: stx pack add <ref> (or pip install {pack_name})."
+        ) from exc
+    except Exception as exc:
+        logger.debug("Kit resolution failed", exc_info=True)
+        raise click.ClickException(f"Failed to resolve kit '{kit_ref}': {exc}") from exc
+
+
+def generate_stx_toml(
+    name: str,
+    *,
+    pack_name: str | None = "mypack",
+    kit_ref: str | None = None,
+    design_system_ref: str | None = None,
+    additional_packs: list[str] | None = None,
+) -> str:
+    """Generate the project ``stx.toml`` (cf. PLAN §6.1).
+
+    The schema declares the project, the local primary pack (when *pack_name*
+    is non-None), the kit pack (when *kit_ref* is provided), any *additional
+    packs* (as git URLs), the active design system, and a default resolution
+    order.
+    """
+    lines: list[str] = []
+    lines.append("# StreamTeX project configuration (cf. PLAN §6.1)")
+    lines.append("")
+    lines.append("[project]")
+    lines.append(f'name = "{name}"')
+    lines.append('version = "0.1.0"')
+    lines.append("")
+
+    declared_packs: list[str] = []
+
+    if pack_name:
+        lines.append("[[packs]]")
+        lines.append('type = "local"')
+        lines.append(f'name = "{pack_name}"')
+        lines.append(f'path = "./{pack_name}"')
+        lines.append("primary = true")
+        lines.append("")
+        declared_packs.append(pack_name)
+
+    if kit_ref:
+        kit_pack, _kit_name = _split_kit_ref(kit_ref)
+        lines.append("[[packs]]")
+        lines.append('type = "git"')
+        lines.append(f'name = "{kit_pack}"')
+        lines.append(f'ref = "github.com/nicolasguelfi/{kit_pack.replace("_", "-")}"')
+        lines.append('rev = "main"')
+        lines.append("")
+        if kit_pack not in declared_packs:
+            declared_packs.append(kit_pack)
+
+    if additional_packs:
+        for ref in additional_packs:
+            lines.append("[[packs]]")
+            lines.append('type = "git"')
+            short = ref.rstrip("/").rsplit("/", 1)[-1]
+            short = short.replace(".git", "")
+            lines.append(f'name = "{short}"')
+            lines.append(f'ref = "{ref}"')
+            lines.append('rev = "main"')
+            lines.append("")
+            if short not in declared_packs:
+                declared_packs.append(short)
+
+    if design_system_ref:
+        lines.append("[design_system]")
+        lines.append(f'ref = "{design_system_ref}"')
+        lines.append("")
+
+    if kit_ref:
+        lines.append("[kit]")
+        lines.append(f'ref = "{kit_ref}"')
+        lines.append("")
+
+    if declared_packs:
+        lines.append("[resolution]")
+        prefer_list = ", ".join(f'"{p}"' for p in declared_packs)
+        lines.append(f"prefer = [{prefer_list}]")
+        lines.append("")
+
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def generate_mypack_pyproject_toml(pack_name: str) -> str:
+    """Generate the ``pyproject.toml`` for the project's local primary pack."""
+    return f"""\
+[project]
+name = "{pack_name}"
+version = "0.1.0"
+description = "Local primary pack for this StreamTeX project."
+requires-python = ">=3.11"
+dependencies = []
+
+[project.entry-points."streamtex.packs"]
+{pack_name} = "{pack_name}"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["{pack_name}"]
+"""
+
+
+def generate_mypack_manifest(pack_name: str) -> str:
+    """Generate the ``_pack_manifest.toml`` for a project's primary pack."""
+    return f"""\
+# Pack manifest (cf. PLAN §4.6 — manifest format 0.1, mouvant pendant 0.x)
+
+[manifest]
+format = "0.1"
+
+[pack]
+name = "{pack_name}"
+version = "0.1.0"
+streamtex_compat = ">=0.6.42,<1.0"
+"""
+
+
+def scaffold_mypack(target_dir: str, pack_name: str) -> list[str]:
+    """Create the local primary pack scaffold under *target_dir*.
+
+    Layout::
+
+        <target>/<pack_name>/pyproject.toml
+        <target>/<pack_name>/<pack_name>/__init__.py
+        <target>/<pack_name>/<pack_name>/_pack_manifest.toml
+        <target>/<pack_name>/<pack_name>/components/.gitkeep
+        <target>/<pack_name>/<pack_name>/design_systems/.gitkeep
+        <target>/<pack_name>/<pack_name>/cli_templates/.gitkeep
+        <target>/<pack_name>/<pack_name>/kits/.gitkeep
+    """
+    created: list[str] = []
+    pack_root = os.path.join(target_dir, pack_name)
+    pkg_dir = os.path.join(pack_root, pack_name)
+    os.makedirs(pkg_dir, exist_ok=True)
+
+    def _write(rel: str, content: str) -> None:
+        full = os.path.join(target_dir, rel)
+        os.makedirs(os.path.dirname(full), exist_ok=True)
+        with open(full, "w", encoding="utf-8") as f:
+            f.write(content)
+        created.append(rel)
+
+    _write(f"{pack_name}/pyproject.toml", generate_mypack_pyproject_toml(pack_name))
+    _write(f"{pack_name}/{pack_name}/__init__.py", "")
+    _write(
+        f"{pack_name}/{pack_name}/_pack_manifest.toml",
+        generate_mypack_manifest(pack_name),
+    )
+
+    for sub in ("components", "design_systems", "cli_templates", "kits"):
+        sub_dir = os.path.join(pkg_dir, sub)
+        os.makedirs(sub_dir, exist_ok=True)
+        keep = os.path.join(sub_dir, ".gitkeep")
+        if not os.path.exists(keep):
+            with open(keep, "w") as f:
+                f.write("")
+            created.append(f"{pack_name}/{pack_name}/{sub}/.gitkeep")
+
+    return created
+
+
+# ---------------------------------------------------------------------------
 # Scaffold function
 # ---------------------------------------------------------------------------
 
@@ -533,6 +750,89 @@ def validate_project(project_path: str) -> list[ValidationCheck]:
     else:
         checks.append(ValidationCheck("block files", "fail", "blocks/ directory missing"))
 
+    # 11-14. Reuse-architecture checks (NEW — PLAN §7.1.4).
+    stx_toml_path = os.path.join(p, "stx.toml")
+    primary_packs: list[dict] = []
+    if os.path.isfile(stx_toml_path):
+        try:
+            import tomllib as _tomllib
+            with open(stx_toml_path, "rb") as f:
+                stx_data = _tomllib.load(f)
+            checks.append(ValidationCheck("stx.toml", "pass", "Found and parsable"))
+            primary_packs = [
+                pe for pe in stx_data.get("packs", [])
+                if pe.get("type") == "local" and pe.get("primary") is True
+            ]
+        except Exception as exc:
+            stx_data = {}
+            checks.append(
+                ValidationCheck("stx.toml", "fail", f"Parse error: {exc}")
+            )
+    else:
+        stx_data = {}
+        checks.append(ValidationCheck("stx.toml", "warn", "Missing"))
+
+    # 12. <pack_name>/ exists with _pack_manifest.toml.
+    if primary_packs:
+        primary = primary_packs[0]
+        pack_dir = os.path.join(p, primary.get("path", "").lstrip("./"))
+        primary_name = primary.get("name", "mypack")
+        manifest_path = os.path.join(pack_dir, primary_name, "_pack_manifest.toml")
+        if os.path.isdir(pack_dir) and os.path.isfile(manifest_path):
+            checks.append(
+                ValidationCheck("primary pack dir", "pass", f"{primary_name}/ + manifest")
+            )
+        else:
+            checks.append(
+                ValidationCheck(
+                    "primary pack dir", "warn",
+                    f"Missing {primary_name}/ or _pack_manifest.toml",
+                )
+            )
+    else:
+        checks.append(ValidationCheck("primary pack dir", "warn", "No primary local pack declared"))
+
+    # 13. Pack primary importable as editable install.
+    if primary_packs:
+        primary_name = primary_packs[0].get("name", "mypack")
+        try:
+            import importlib.util as _iu
+            spec = _iu.find_spec(primary_name)
+            if spec is not None:
+                checks.append(
+                    ValidationCheck("primary pack importable", "pass", primary_name)
+                )
+            else:
+                checks.append(
+                    ValidationCheck(
+                        "primary pack importable", "warn",
+                        f"{primary_name} not importable — run `uv pip install -e ./{primary_name}`",
+                    )
+                )
+        except Exception as exc:
+            checks.append(
+                ValidationCheck("primary pack importable", "warn", str(exc))
+            )
+
+    # 14. Exactly one [[packs]] type=local primary=true.
+    if stx_data:
+        count = len(primary_packs)
+        if count == 1:
+            checks.append(
+                ValidationCheck("primary pack unique", "pass", "Exactly one")
+            )
+        elif count == 0:
+            checks.append(
+                ValidationCheck("primary pack unique", "warn", "No primary local pack")
+            )
+        else:
+            checks.append(
+                ValidationCheck(
+                    "primary pack unique", "fail",
+                    f"{count} primary local packs (must be 1)",
+                )
+            )
+
     return checks
 
 
@@ -611,7 +911,30 @@ def _copy_rich_template(
     "--template",
     default=None,
     type=click.Choice(["project", "collection", "slides"]),
-    help="Use a rich template from streamtex-docs/templates/.",
+    help="(legacy) Rich template from streamtex-docs/templates/. Prefer --kit.",
+)
+@click.option(
+    "--kit",
+    "kit_ref",
+    default=None,
+    help="Install a kit from a pack: --kit <pack>:<kit_name> (Q8 / PLAN §7.1).",
+)
+@click.option(
+    "--pack",
+    "extra_packs",
+    multiple=True,
+    help="Add an extra pack to stx.toml (git URL). Can be passed multiple times.",
+)
+@click.option(
+    "--pack-name",
+    default="mypack",
+    show_default=True,
+    help="Name of the local primary pack scaffolded inside the project (Q7).",
+)
+@click.option(
+    "--no-mypack",
+    is_flag=True,
+    help="Skip creation of the local primary pack (consumer-only project).",
 )
 @click.option("--no-git", is_flag=True, help="Skip git init.")
 @click.option("--no-sync", is_flag=True, help="Skip uv sync.")
@@ -621,6 +944,10 @@ def new(
     profile: str,
     is_collection: bool,
     template: str | None,
+    kit_ref: str | None,
+    extra_packs: tuple[str, ...],
+    pack_name: str,
+    no_mypack: bool,
     no_git: bool,
     no_sync: bool,
     no_claude: bool,
@@ -645,17 +972,77 @@ def new(
         except Exception:
             logger.debug("Failed to load workspace preset extras", exc_info=True)
 
-    # 2. Scaffold files (rich template or minimal)
-    if template:
+    # 1c. Legacy --template alias resolves to --kit when no explicit --kit given.
+    # PLAN §7.1.1 : --template <X> → --kit streamtex_design:<X>-default (internal).
+    # Special-cases: 'slides' maps to slides-modern-dark (existing kit in v0.1.0).
+    _legacy_kit_alias = {
+        "project": "streamtex_design:project-default",
+        "collection": "streamtex_design:collection-default",
+        "slides": "streamtex_design:slides-modern-dark",
+    }
+    if template and not kit_ref:
+        kit_ref = _legacy_kit_alias[template]
+
+    # 1d. Resolve kit (parses ref + reads manifest; errors if pack missing).
+    kit_manifest: dict = {}
+    kit_design_system: str | None = None
+    if kit_ref:
+        try:
+            kit_manifest = _resolve_kit(kit_ref)
+            kit_design_system = (
+                kit_manifest.get("design_system", {}).get("ref")
+                or None
+            )
+        except click.ClickException as exc:
+            console.print(f"[yellow]kit:[/yellow] {exc.message}")
+            kit_manifest = {}
+            kit_design_system = None
+
+    # 2. Scaffold files (rich template legacy preserved, OR minimal + kit DS).
+    if template and not kit_manifest:
+        # Legacy path: kit alias failed to resolve, fall back to streamtex-docs
+        # rich template. Preserves the pre-MIG-3 behaviour for the 43 tests.
         files = _copy_rich_template(template, target, name, extras=extras)
         console.print(f"[green]Project created from template '{template}':[/green] {target}")
     else:
         files = scaffold_project(target, name, collection=is_collection, extras=extras)
         console.print(f"[green]Project scaffolded:[/green] {target}")
+        if kit_design_system and kit_ref:
+            # Inject the kit's design system into custom/styles.py.
+            pack_module, _ = _split_kit_ref(kit_ref)
+            styles_py = os.path.join(target, "custom", "styles.py")
+            with open(styles_py, "w", encoding="utf-8") as f:
+                f.write(
+                    f'"""Custom styles for this project (kit: {kit_ref})."""\n'
+                    f"# Auto-injected by `stx project new --kit` (PLAN §7.1.3).\n"
+                    f"from {pack_module}.design_systems.{kit_design_system} "
+                    f"import DesignSystem as Styles\n"
+                    f"__all__ = [\"Styles\"]\n"
+                )
     for f in files:
         console.print(f"  {f}")
 
-    # 3. Git init
+    # 4bis. Generate stx.toml at project root (NEW — Q7/Q8 / PLAN §6.1).
+    primary_pack = None if no_mypack else pack_name
+    stx_toml_content = generate_stx_toml(
+        name,
+        pack_name=primary_pack,
+        kit_ref=kit_ref,
+        design_system_ref=kit_design_system,
+        additional_packs=list(extra_packs) if extra_packs else None,
+    )
+    stx_toml_path = os.path.join(target, "stx.toml")
+    with open(stx_toml_path, "w", encoding="utf-8") as f:
+        f.write(stx_toml_content)
+    console.print("[green]stx.toml:[/green] generated")
+
+    # 6bis. Create local primary pack (NEW — Q7 / PLAN §7.1.2 step 6bis).
+    pack_created: list[str] = []
+    if not no_mypack:
+        pack_created = scaffold_mypack(target, pack_name)
+        console.print(f"[green]Local primary pack '{pack_name}':[/green] {len(pack_created)} files")
+
+    # 5. Git init (preserved behaviour — step 5/PLAN renumbered as 5).
     if not no_git:
         result = subprocess.run(
             ["git", "init", target],
@@ -666,7 +1053,7 @@ def new(
         else:
             console.print(f"[yellow]git init:[/yellow] {result.stderr.strip()}")
 
-    # 4. Claude profile (install_profile also creates .claude/custom/)
+    # 7. Claude profile (install_profile also creates .claude/custom/)
     if not no_claude:
         try:
             from .claude_cmd import install_profile
@@ -687,7 +1074,7 @@ def new(
         except click.ClickException as exc:
             console.print(f"[yellow]Claude profile:[/yellow] {exc.message}")
 
-    # 5. uv sync
+    # 8. uv sync
     if not no_sync:
         uv = shutil.which("uv")
         if uv:
@@ -698,6 +1085,25 @@ def new(
             )
             if result.returncode == 0:
                 console.print("[green]uv sync:[/green] ok")
+
+                # 8bis. pip install -e ./<pack_name> (NEW — Q7/Q8).
+                if not no_mypack:
+                    pack_path = os.path.join(target, pack_name)
+                    result_pack = subprocess.run(
+                        [uv, "pip", "install", "-e", pack_path],
+                        cwd=target,
+                        capture_output=True, text=True, timeout=120,
+                    )
+                    if result_pack.returncode == 0:
+                        console.print(
+                            f"[green]pip install -e ./{pack_name}:[/green] ok"
+                        )
+                    else:
+                        console.print(
+                            f"[yellow]pip install -e ./{pack_name}:[/yellow] "
+                            f"{result_pack.stderr.strip()}"
+                        )
+
                 # Install pre-commit hooks
                 result = subprocess.run(
                     [uv, "run", "pre-commit", "install"],
@@ -713,7 +1119,23 @@ def new(
         else:
             console.print("[yellow]uv sync:[/yellow] uv not found — skipped")
 
+    # 10. Final validation (NEW — non-strict).
+    final_checks = validate_project(target)
+    failed = [c for c in final_checks if c.status == "fail"]
+    if failed:
+        console.print(
+            f"[yellow]final validate:[/yellow] {len(failed)} warnings — "
+            "run `stx project validate` for details."
+        )
+    else:
+        console.print("[green]final validate:[/green] all checks pass")
+
     console.print(f"\n[bold green]Done![/bold green] Project '{name}' ready at {target}")
+    if no_mypack:
+        console.print(
+            "[dim]Tip:[/dim] add packs later with `stx pack new <name>` "
+            "or `stx pack add <ref>`."
+        )
 
 
 @click.command()

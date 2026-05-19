@@ -7,6 +7,101 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.45] — 2026-05-19 (Wave 2 MIG-6 — atomic suppression of legacy patterns)
+
+### BREAKING (removed)
+- `stx patterns *` command group removed in full. Replaced by `stx pack`,
+  `stx component`, `stx ds`, `stx kit`, `stx validate` (introduced in
+  Wave 1 MIG-2). Per PLAN §29.8 / Q9.
+- `streamtex.patterns` Python module deleted (10 files / 2973 lines):
+  `__init__.py`, `index.py`, `installer.py`, `manifest.py`, `picker.py`,
+  `preset.py`, `project_toml.py`, `resolver.py`, `updater.py`,
+  `validator.py`.
+- `streamtex/cli/patterns_cmd.py` (1173 lines) removed.
+- `streamtex/cli/install_cmd.py`: `_maybe_offer_patterns` helper removed.
+  The new replacement `_add_default_design_pack` (MIG-4) is the active
+  code path.
+- 6 test files removed (2201 lines):
+  `tests/test_patterns_smoke.py`, `test_patterns_meta_v3.py`,
+  `test_patterns_picker.py`, `test_patterns_composite.py`,
+  `test_patterns_source_cmd.py`, `test_install_patterns_offer.py`.
+- README.md "Design Patterns (`stx patterns`)" section rewritten as
+  "Reuse architecture (`stx pack`/`component`/`ds`/`kit`)".
+
+### Notes
+- MIG-5 checkpoint SHA: `ccabd695ad0151096eccdf1466a7a0e18f08ffde`.
+- Q14 orphan checks (PLAN §29.8): `grep "patterns-meta"`,
+  `grep "from streamtex.patterns"` both return 0 occurrences across
+  `streamtex/` and `tests/` (verified at MIG-6 commit time).
+- 4 conceptual patterns (exception hierarchy, composite v3 QCM,
+  `extends` mechanism, TraceEntry audit) were extracted and ported to
+  `streamtex/core/*` in Wave 1 MIG-1 before deletion (see PLAN §28).
+- Full suite: 2111 passed (down from 2223 in 0.6.44, −112 patterns tests
+  removed; no production code uncovered).
+
+### MIG-5 checkpoint
+
+Audit run at SHA `ccabd695ad0151096eccdf1466a7a0e18f08ffde` (post-MIG-4).
+`grep -rln "from streamtex\.patterns\|import streamtex\.patterns" streamtex/
+tests/` yields **8 files** (PLAN §29.7 expected 7):
+
+- `streamtex/cli/patterns_cmd.py` (multiple imports — to be deleted in MIG-6)
+- `streamtex/cli/install_cmd.py` (**deviation**: dormant `_maybe_offer_patterns`
+  preserved with its inner imports so `test_install_patterns_offer.py` keeps
+  importing cleanly; the install flow no longer calls it. Removed atomically
+  in MIG-6.)
+- `tests/test_patterns_smoke.py`
+- `tests/test_patterns_meta_v3.py`
+- `tests/test_patterns_picker.py`
+- `tests/test_patterns_composite.py`
+- `tests/test_patterns_source_cmd.py`
+- `tests/test_install_patterns_offer.py`
+
+No unexpected consumer was introduced. MIG-5 go.
+
+## [0.6.44] — 2026-05-19 (Wave 2 MIG-4 — `stx install` switches to design pack)
+
+### Added
+- `stx install` now auto-adds the official `streamtex-design` pack to the
+  project's `stx.toml` after creation, for presets `standard`, `power`,
+  and `developer` (PLAN §29.6 / Q9). New helper
+  `_add_default_design_pack(ws_root, project, preset, console)`.
+- `--no-design-pack` flag on `stx install` to opt out.
+
+### Changed
+- `--no-patterns` is now a deprecated alias for `--no-design-pack`
+  (kept for retro-compat; prints a yellow warning when used). The legacy
+  `_maybe_offer_patterns` is no longer invoked from the install flow but
+  remains in the file (dormant, removed atomically in MIG-6 alongside
+  its dedicated test file).
+- 8 new tests in `tests/test_install_design_pack.py`. Full suite: 2223 passed.
+
+## [0.6.43] — 2026-05-19 (Wave 2 MIG-3 — `stx project new` modernised)
+
+### Added
+- `stx project new` accepts the new reuse-architecture flags
+  (PLAN §7.1 / Q7 + Q8): `--kit <pack>:<kit_name>`,
+  `--pack <ref>` (repeatable), `--pack-name <name>` (default `mypack`),
+  `--no-mypack`.
+- `stx project new` now generates `stx.toml` at the project root
+  (PLAN §6.1) and scaffolds the local primary pack (`<pack_name>/`)
+  with its `pyproject.toml`, `_pack_manifest.toml`, and the four
+  subdirectories (`components/`, `design_systems/`, `cli_templates/`,
+  `kits/`). After `uv sync` the pack is installed in editable mode
+  (`uv pip install -e ./<pack_name>`).
+- Project validation: 4 new checks (11-14) — `stx.toml` parsability,
+  primary pack directory + manifest, primary pack importability,
+  exactly-one-primary uniqueness.
+- New helpers in `streamtex/cli/project_cmd.py`:
+  `generate_stx_toml`, `generate_mypack_pyproject_toml`,
+  `generate_mypack_manifest`, `scaffold_mypack`, `_resolve_kit`,
+  `_split_kit_ref`.
+- Legacy `--template <X>` is preserved as an alias to
+  `--kit streamtex_design:<X>-default` (or `slides-modern-dark` for
+  `--template slides`) — falls back to the rich template path when the
+  kit cannot be resolved.
+- 10 new tests in `tests/test_cli_project.py`. Full suite: 2215 passed.
+
 ## [0.6.42] — 2026-05-19 (Wave 1 — reuse architecture foundations)
 
 ### Added

@@ -183,14 +183,20 @@ def _maybe_clone_docs_for_template(
          "No-op without --project.",
 )
 @click.option(
+    "--no-design-pack",
+    is_flag=True,
+    default=False,
+    help="Skip the auto-add of the `streamtex-design` pack to the project's "
+         "stx.toml after project creation (cf. PLAN §29.6 — Q9 MIG-4).",
+)
+@click.option(
     "--no-patterns",
     is_flag=True,
     default=False,
-    help="Skip the opt-in 'install design patterns?' prompt after project "
-         "creation. The prompt is also skipped automatically in non-TTY "
-         "contexts (CI, scripts).",
+    hidden=True,
+    help="DEPRECATED alias for --no-design-pack (kept for retro-compat).",
 )
-def install(preset, project, template, dev, no_patterns):
+def install(preset, project, template, dev, no_design_pack, no_patterns):
     """Install or update a StreamTeX workspace, optionally creating a project.
 
     First run:  stx install --preset power --project hello
@@ -409,9 +415,17 @@ def install(preset, project, template, dev, no_patterns):
     else:
         step += 1
 
-    # --- Optional: opt-in design patterns offer (project only) ---
-    if has_project and not no_patterns:
-        _maybe_offer_patterns(ws_root, project, console)
+    # --- Optional: auto-add streamtex-design pack to project (project only) ---
+    # MIG-4 (PLAN §29.6 Q9) : replace the legacy interactive patterns offer with
+    # a non-interactive declarative auto-add of the official design pack to the
+    # project's stx.toml. Honours both --no-design-pack (new) and the legacy
+    # --no-patterns alias.
+    if has_project and not (no_design_pack or no_patterns):
+        _add_default_design_pack(ws_root, project, effective_preset, console)
+    if has_project and no_patterns and not no_design_pack:
+        console.print(
+            "[yellow]--no-patterns is deprecated, use --no-design-pack[/yellow]"
+        )
 
     # --- Done ---
     _clear_state(ws_root)
@@ -642,134 +656,59 @@ def _install_is_interactive() -> bool:
     return sys.stdin.isatty()
 
 
-def _maybe_offer_patterns(ws_root: str, project_name: str, console) -> None:
-    """Two-stage opt-in: clone patterns repo (if missing) → pick & install.
+_DEFAULT_DESIGN_PACK = {
+    "name": "streamtex-design",
+    "ref": "github.com/nicolasguelfi/streamtex-design",
+    "rev": "v0.1.0",
+}
 
-    Both stages default to NO. The whole helper short-circuits in non-TTY
-    contexts to keep CI runs silent and reproducible. Errors in either
-    stage are converted to warnings — they never break ``stx install``.
+# Presets that opt in to the streamtex-design pack by default (PLAN §29.6).
+_DESIGN_PACK_PRESETS = {"standard", "power", "developer"}
+
+
+def _add_default_design_pack(
+    ws_root: str, project_name: str, preset: str, console
+) -> None:
+    """Add the official ``streamtex-design`` pack to the project's stx.toml.
+
+    Activated only for presets that opt in (``standard``, ``power``,
+    ``developer``); the ``basic`` and ``user`` presets stay minimal. The
+    entry is added idempotently via the Wave 1 helper ``_stx_toml.add_pack``.
     """
     from pathlib import Path
 
-    if not _install_is_interactive():
+    if preset not in _DESIGN_PACK_PRESETS:
         return
-
-    from streamtex.patterns import PatternError
-    from streamtex.patterns.installer import (
-        DEFAULT_PATTERNS_REPO_URL,
-        build_install_plan,
-        clone_patterns_source,
-        execute_install,
-        resolve_selection,
-    )
-    from streamtex.patterns.picker import (
-        InteractiveAborted,
-        collect_pattern_catalog,
-        select_patterns_compositely,
-    )
-    from streamtex.patterns.project_toml import write_project_selection
-    from streamtex.patterns.resolver import trace_source
 
     project_dir = Path(ws_root) / "projects" / project_name
-    if not project_dir.is_dir():
-        return
-
-    console.print("\n[bold cyan]Design patterns (optional)[/bold cyan]")
-    _, resolved = trace_source(project_dir, workspace_root=Path(ws_root))
-
-    # --- Stage 1: clone the patterns repo if no source is reachable ------
-    if resolved is None:
-        console.print(
-            "  No patterns repository detected for this workspace.\n"
-            "  Cloning it lets you reuse curated design recipes "
-            "(callouts, hero stats, grids…) across projects."
-        )
-        if not click.confirm(
-            "  Clone streamtex-patterns into the workspace now?", default=False,
-        ):
-            console.print(
-                "  [dim]Skipped. Later: `stx patterns source clone` or "
-                "`stx patterns source set PATH`.[/dim]"
-            )
-            return
-
-        # URL precedence: workspace [repos.streamtex-patterns].url, else default
-        try:
-            config = load_stx_toml(ws_root)
-        except click.ClickException:
-            config = {}
-        repos = config.get("repos", {})
-        entry = repos.get("streamtex-patterns")
-        clone_url = (
-            str(entry["url"]) if isinstance(entry, dict) and entry.get("url")
-            else DEFAULT_PATTERNS_REPO_URL
-        )
-        target = Path(ws_root) / "streamtex-patterns"
-        try:
-            clone_patterns_source(clone_url, target)
-            console.print(f"  [green]Cloned[/green] {clone_url} → {target}")
-        except PatternError as exc:
-            console.print(f"  [yellow]Clone failed:[/yellow] {exc}")
-            return
-        _, resolved = trace_source(project_dir, workspace_root=Path(ws_root))
-        if resolved is None:
-            console.print(
-                "  [yellow]Clone succeeded but resolver still does not "
-                "find the source — check `stx patterns source show`.[/yellow]"
-            )
-            return
-
-    # --- Stage 2: optional interactive pick + install --------------------
-    if not click.confirm(
-        "  Pick design patterns to install in this project now (interactive)?",
-        default=False,
-    ):
-        console.print(
-            "  [dim]Skipped. Later, from the project dir: "
-            "`stx patterns install`.[/dim]"
-        )
+    stx_toml_path = project_dir / "stx.toml"
+    if not stx_toml_path.is_file():
+        # MIG-3 generates stx.toml for newly-created projects. If absent,
+        # the project was bootstrapped outside `stx project new` — skip
+        # silently rather than risk overwriting bespoke layouts.
         return
 
     try:
-        catalog = collect_pattern_catalog(resolved.path)
-        if not catalog:
-            console.print(
-                f"  [yellow]No patterns found in {resolved.path}.[/yellow]"
-            )
-            return
-        composite = select_patterns_compositely(catalog, resolved.path)
-    except InteractiveAborted as exc:
-        console.print(f"  [yellow]Picker aborted:[/yellow] {exc}")
-        return
-    except Exception as exc:  # picker uses lazy questionary import
-        console.print(f"  [yellow]Could not open picker:[/yellow] {exc}")
-        return
+        from . import _stx_toml as _proj_toml
 
-    target_dir = project_dir / ".claude" / "custom" / "streamtex-patterns"
-    try:
-        resolved_names = resolve_selection(composite, resolved.path)
-        plan = build_install_plan(
-            target=target_dir,
-            source=resolved.path,
-            individual_patterns=tuple(resolved_names),
-            selection_override=composite,
-        )
-        result = execute_install(
-            plan,
-            raw_source=resolved.raw_value or str(resolved.path),
-        )
-        # Persist the composite intent (presets/individuals/excludes) to
-        # the project's stx.toml so `stx patterns sync` rebuilds it on
-        # a fresh clone.
-        write_project_selection(
+        existing = {p.get("name") for p in _proj_toml.list_packs(project_dir)}
+        if _DEFAULT_DESIGN_PACK["name"] in existing:
+            return
+
+        _proj_toml.add_pack(
             project_dir,
-            composite,
-            source=resolved.raw_value,
+            {
+                "type": "git",
+                "name": _DEFAULT_DESIGN_PACK["name"],
+                "ref": _DEFAULT_DESIGN_PACK["ref"],
+                "rev": _DEFAULT_DESIGN_PACK["rev"],
+            },
         )
         console.print(
-            f"  [green]Installed[/green] {len(result.installed)} pattern(s) "
-            f"into {target_dir.relative_to(project_dir)} "
-            f"[dim]({composite.effective_mode} selection)[/dim]"
+            f"[green]streamtex-design:[/green] added to "
+            f"{stx_toml_path.relative_to(ws_root)} "
+            f"(rev={_DEFAULT_DESIGN_PACK['rev']})"
         )
-    except PatternError as exc:
-        console.print(f"  [yellow]Install failed:[/yellow] {exc}")
+    except Exception as exc:
+        # Auto-add is convenience; never break the install flow if it fails.
+        console.print(f"[yellow]streamtex-design auto-add:[/yellow] {exc}")

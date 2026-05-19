@@ -338,41 +338,31 @@ Install a profile:
 stx claude install project ./my-project
 ```
 
-## Design Patterns (`stx patterns`)
+## Reuse architecture (`stx pack` / `stx component` / `stx ds` / `stx kit`)
 
-A **pattern** is a reusable graphic recipe — `ptn_callout`, `ptn_stat_hero`,
-`ptn_card_grid` — that Claude reads when generating or editing blocks, so
-new content stays visually consistent with the rest of the project.
-
-Patterns live in a separate repository,
-[**streamtex-patterns**](https://github.com/nicolasguelfi/streamtex-patterns).
-Selection is **subjective and opt-in**: nothing is installed automatically.
+The legacy `stx patterns *` flow was replaced in v0.6.x by the **reuse
+architecture** — Python packs that ship components, design systems, and
+kits via PEP 621 entry points. The official pack is
+[**streamtex-design**](https://github.com/nicolasguelfi/streamtex-design).
 
 ```bash
-# Bring the patterns repo into the workspace (one-time)
-stx patterns source clone
+# Add a pack to a project (git, local, or PyPI)
+stx pack add github.com/nicolasguelfi/streamtex-design --rev v0.1.0
 
-# Pick patterns interactively — composite menu-driven TUI:
-#   add preset(s), add individual patterns, remove from selection,
-#   toggle 'all', summary view, done/cancel
-stx patterns install
+# List installed packs and components
+stx pack list
+stx component list
 
-# Or pick declaratively — fully composable flags
-stx patterns install --preset slides --preset docs           # multi-preset
-stx patterns install --preset slides --exclude ptn_takeaways # preset minus
-stx patterns install --preset slides --pattern ptn_inline_emphasis
-stx patterns install --all --exclude ptn_takeaways           # all minus
+# Install a kit (design system + curated components + samples)
+stx kit install streamtex_design:project-default
 
-# On a fresh clone of the project: rebuild the same set
-stx patterns sync
+# Validate the project's stx.toml + packs + components + DS + kits
+stx validate
 ```
 
-When you scaffold a project with `stx install --project NAME`, an opt-in
-prompt offers to clone the patterns repo and open the picker (both default
-to NO; skip with `--no-patterns` or run in CI for silent skip).
-
-The full manual is in
-[streamtex-docs / stx_manual_patterns](https://github.com/nicolasguelfi/streamtex-docs/tree/main/manuals/stx_manual_patterns).
+When you scaffold a project with `stx install --preset standard --project NAME`,
+the `streamtex-design` pack is added automatically to the project's
+`stx.toml`; skip with `--no-design-pack` (or in CI for silent skip).
 
 ## Features
 

@@ -187,7 +187,7 @@ def _maybe_clone_docs_for_template(
     is_flag=True,
     default=False,
     help="Skip the auto-add of the `streamtex-design` pack to the project's "
-         "stx.toml after project creation (cf. PLAN §29.6 — Q9 MIG-4).",
+         "stx.toml after project creation.",
 )
 def install(preset, project, template, dev, no_design_pack):
     """Install or update a StreamTeX workspace, optionally creating a project.
@@ -668,7 +668,7 @@ def _add_default_design_pack(
     project_dir = Path(ws_root) / "projects" / project_name
     stx_toml_path = project_dir / "stx.toml"
     if not stx_toml_path.is_file():
-        # MIG-3 generates stx.toml for newly-created projects. If absent,
+        # stx.toml is generated for newly-created projects. If absent,
         # the project was bootstrapped outside `stx project new` — skip
         # silently rather than risk overwriting bespoke layouts.
         return

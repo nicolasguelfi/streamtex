@@ -332,11 +332,10 @@ def promote_cmd(name: str, destination: str, no_commit: bool) -> None:
         return
 
     if dest_class == "git_remote":
-        # v1 hands off to the user — the QCM+PR workflow is documented in
-        # PLAN.md §8.3 but lives outside MIG-2's core surface.
+        # v1 hands off to the user — the QCM+PR workflow is not yet automated.
         console.print(
             "[yellow]git_remote destination: copy the component into a fresh checkout "
             f"of {target_entry.get('ref')!r}, push a feat/promote-{name} branch and open "
-            "a PR. Full automation is queued for a follow-up MIG.[/yellow]"
+            "a PR. Full automation is queued for a follow-up.[/yellow]"
         )
         return

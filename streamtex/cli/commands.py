@@ -175,7 +175,7 @@ def export():
 export.add_command(export_html)
 
 
-# --- Reuse architecture subgroups (MIG-2) ---------------------------------
+# --- Reuse architecture subgroups -----------------------------------------
 
 cli.add_command(pack_group, name="pack")
 cli.add_command(component_group, name="component")

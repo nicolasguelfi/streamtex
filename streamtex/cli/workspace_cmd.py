@@ -1,4 +1,4 @@
-"""Workspace commands: init, update, status, upgrade (+ deprecated clone/link/sync/hooks)."""
+"""Workspace commands: init, update, status, upgrade."""
 
 import logging
 import os
@@ -475,15 +475,6 @@ def _install_global_commands(ws_root: str, config: dict, console) -> None:
         pass  # No claude repo configured/cloned yet — skip silently
 
 
-def _deprecation_warning(old_cmd: str, new_cmd: str) -> None:
-    """Print a deprecation warning directing users to the new command."""
-    console = get_console()
-    console.print(
-        f"\n[yellow]'stx workspace {old_cmd}' is deprecated. "
-        f"Use 'stx {new_cmd}' instead.[/yellow]\n"
-    )
-
-
 def _install_precommit_hooks(ws_root: str, config: dict, console, *, dry_run: bool = False) -> None:
     """Install pre-commit hooks in all workspace repos and projects."""
     uv = _find_uv()
@@ -838,90 +829,6 @@ def _upgrade_cli_tool(
 
 
 # ---------------------------------------------------------------------------
-# clone / link / sync commands (deprecated — kept for backward compat)
-# ---------------------------------------------------------------------------
-
-@click.command(deprecated=True)
-def clone():
-    """Clone all repos declared in stx.toml. [deprecated: use 'stx workspace update']"""
-    _deprecation_warning("clone", "update")
-    ws_root, config = _require_workspace()
-    repos = config.get("repos", {})
-
-    if not repos:
-        console = get_console()
-        console.print("[yellow]No repos configured in stx.toml[/yellow]")
-        return
-
-    console = get_console()
-    cloned = 0
-    skipped = 0
-
-    for repo_name, repo_conf in repos.items():
-        url = repo_conf.get("url", "")
-        rel_path = repo_conf.get("path", repo_name)
-        target_path = os.path.join(ws_root, rel_path)
-
-        if not url:
-            console.print(f"  [yellow]{repo_name}[/yellow]: no url — skipped")
-            skipped += 1
-            continue
-
-        if os.path.isdir(target_path):
-            console.print(f"  [yellow]{repo_name}[/yellow]: already exists — skipped")
-            skipped += 1
-            continue
-
-        # Ensure parent directory exists (e.g. projects/)
-        os.makedirs(os.path.dirname(target_path), exist_ok=True)
-
-        console.print(f"  [cyan]{repo_name}[/cyan]: cloning {url} …")
-        result = subprocess.run(
-            ["git", "clone", url, target_path],
-            capture_output=True,
-            text=True,
-            timeout=120,
-        )
-        if result.returncode == 0:
-            console.print(f"  [green]{repo_name}[/green]: cloned")
-            cloned += 1
-        else:
-            console.print(f"  [red]{repo_name}[/red]: clone failed")
-            if result.stderr:
-                console.print(f"    {result.stderr.strip()}")
-            skipped += 1
-
-    # --- Install shared commands globally (~/.claude/commands/) ---
-    _install_global_commands(ws_root, config, console)
-
-    console.print(f"\n[bold]Done:[/bold] {cloned} cloned, {skipped} skipped")
-
-
-@click.command(deprecated=True)
-def link():
-    """Configure editable installs (uv sync in docs/project repos). [deprecated: use 'stx workspace update']"""
-    _deprecation_warning("link", "update")
-    ws_root, config = _require_workspace()
-    repos = config.get("repos", {})
-
-    console = get_console()
-    console.print("[bold]Linking docs & project repos …[/bold]\n")
-    _run_uv_sync(repos, ws_root, type_filter={"docs", "project"})
-
-
-@click.command(deprecated=True)
-def sync():
-    """Run uv sync in all workspace repos. [deprecated: use 'stx workspace update']"""
-    _deprecation_warning("sync", "update")
-    ws_root, config = _require_workspace()
-    repos = config.get("repos", {})
-
-    console = get_console()
-    console.print("[bold]Syncing all repos …[/bold]\n")
-    _run_uv_sync(repos, ws_root)
-
-
-# ---------------------------------------------------------------------------
 # update command
 # ---------------------------------------------------------------------------
 
@@ -1231,16 +1138,3 @@ def upgrade(preset):
     console.print("\nRun [bold]stx update[/bold] to clone the new repos.")
 
 
-# ---------------------------------------------------------------------------
-# hooks command
-# ---------------------------------------------------------------------------
-
-@click.command(deprecated=True)
-def hooks():
-    """Install pre-commit hooks in all workspace repos and projects. [deprecated: use 'stx workspace update']"""
-    _deprecation_warning("hooks", "update")
-    ws_root, config = _require_workspace()
-    console = get_console()
-
-    console.print("[bold]Installing pre-commit hooks …[/bold]\n")
-    _install_precommit_hooks(ws_root, config, console)

@@ -200,11 +200,8 @@ def _headless_streamlit():
     _saved["tabs"] = st.tabs
     st.tabs = _mock_tabs
 
-    # st.iframe — no-op (since 0.6.19; replaces the legacy
-    # streamlit.components.v1.html monkey-patch).  Both are patched so that
-    # user code that hasn't migrated yet stays neutralised during cache
-    # pre-generation, and so that streamtex internals which switched to
-    # st.iframe are also neutralised.
+    # st.iframe and streamlit.components.v1.html are both neutralised so
+    # that cache pre-generation never executes embedded JS / iframes.
     _iframe_saved = None
     try:
         _iframe_saved = st.iframe

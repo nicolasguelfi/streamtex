@@ -128,7 +128,7 @@ RUN mkdir -p /app/static-html && \\
 # STX_SERVE_MODE controls which services start (set at runtime)
 #   dual           = Nginx (:80) + Streamlit (:8501) — default
 #   static-only    = Nginx (:80) only
-#   streamlit-only = Streamlit (:8501) only — legacy behaviour
+#   streamlit-only = Streamlit (:8501) only — no Nginx layer
 ENV STX_SERVE_MODE="dual"
 
 EXPOSE 80 8501
@@ -249,7 +249,7 @@ def generate_entrypoint() -> str:
 # StreamTeX container entrypoint — supports three serve modes:
 #   dual           (default) Nginx + Streamlit — static fallback on error
 #   static-only    Nginx only — no Streamlit, minimal resources
-#   streamlit-only Streamlit only — legacy behaviour (no Nginx)
+#   streamlit-only Streamlit only — no Nginx layer
 #
 # Env vars:
 #   FOLDER          optional subdirectory to serve (e.g. modules/my_module)
@@ -1551,7 +1551,7 @@ def setup_cmd() -> None:
 @click.option("--uuid", default=None, help="Coolify application UUID (skip creation).")
 @click.option("--serve-mode", type=click.Choice(["dual", "static-only", "streamlit-only"]),
               default="dual",
-              help="Service mode: dual (Nginx+Streamlit, default), static-only (Nginx), or streamlit-only (legacy).")
+              help="Service mode: dual (Nginx+Streamlit, default), static-only (Nginx), or streamlit-only (no Nginx).")
 @click.option("--yes", is_flag=True, help="Skip confirmation prompts.")
 def hetzner_cmd(path: str, subdomain: str | None, uuid: str | None, serve_mode: str, yes: bool) -> None:
     """Deploy a StreamTeX project to Hetzner via Coolify."""

@@ -48,7 +48,7 @@ class AssetMode(Enum):
     """Controls how media assets are stored in HTML exports."""
 
     EMBEDDED = "embedded"
-    """Base64 data URIs inline in the HTML (legacy, single file)."""
+    """Base64 data URIs inline in the HTML (single file)."""
 
     EXTERNAL = "external"
     """Assets saved to a ``data/`` folder, HTML uses relative paths (ZIP download)."""
@@ -60,11 +60,11 @@ class ExportConfig:
 
     Used in two ways:
 
-    1. **Internal buffer config** (legacy) — passed by ``st_book()`` to
+    1. **Internal buffer config** — passed by ``st_book()`` to
        ``reset_export_buffer()``.  Only ``enabled``, ``page_title``,
        ``page_width``, ``page_padding``, and ``zoom`` matter here.
 
-    2. **Auto-export config** (new) — passed via ``st_book(exports=[...])``
+    2. **Auto-export config** — passed via ``st_book(exports=[...])``
        to describe one output file.  The fields ``format``, ``mode``,
        ``output_dir``, ``filename``, ``timestamp``, and ``pdf`` are used.
     """
@@ -568,10 +568,10 @@ def st_html(html: str, *, height: int = 0, light_bg: bool = False,
         diagram / image content renders on a white background even when the
         OS or browser is in dark mode.
     scrolling : bool
-        **Kept for backwards compat; no-op since 0.6.19.**  ``st.iframe``
-        (Streamlit ≥ 1.56) has no explicit ``scrolling`` parameter; the
-        iframe shows native scrollbars when its content overflows the
-        configured *height*.  Pass ``scrolling=True`` or ``scrolling=False``
+        **No-op.**  ``st.iframe`` (Streamlit ≥ 1.56) has no explicit
+        ``scrolling`` parameter; the iframe shows native scrollbars when
+        its content overflows the configured *height*.  Pass
+        ``scrolling=True`` or ``scrolling=False``
         without effect — kept in the signature to avoid breaking callers.
     """
     # Section-level horizontal spacing + zoom: wrap each fragment

@@ -605,8 +605,7 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
     if _show_loading:
         inject_loading_overlay()
     # --- Marker runtime (env-gated; no-op unless STX_USE_MARKER_RUNTIME=1) ---
-    # Injects the global stylesheet + MutationObserver that replace the legacy
-    # per-instance :has() scoping pattern.  Idempotent within a session.
+    # Injects the global stylesheet + MutationObserver. Idempotent within a session.
     inject_marker_runtime()
     # --- Chrome recommendation banner (JS-injected, no block flow impact) ---
     if chrome_banner:
@@ -952,7 +951,7 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
             # Auto-export (mode=ALWAYS) configs
             if exports:
                 _run_auto_exports(exports, full_html, base_name)
-            # Sidebar panel for manual configs (or legacy export=True)
+            # Sidebar panel for manual configs (or export=True)
             _show_manual = exports is None or any(
                 c.mode == ExportMode.MANUAL for c in exports
             )

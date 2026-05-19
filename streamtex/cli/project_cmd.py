@@ -262,7 +262,7 @@ name = "{name}"
 
 
 # ---------------------------------------------------------------------------
-# Reuse architecture generators (MIG-3 — Q7/Q8)
+# Reuse architecture generators
 # ---------------------------------------------------------------------------
 
 
@@ -911,13 +911,13 @@ def _copy_rich_template(
     "--template",
     default=None,
     type=click.Choice(["project", "collection", "slides"]),
-    help="(legacy) Rich template from streamtex-docs/templates/. Prefer --kit.",
+    help="Rich template scaffolding from streamtex-docs/templates/.",
 )
 @click.option(
     "--kit",
     "kit_ref",
     default=None,
-    help="Install a kit from a pack: --kit <pack>:<kit_name> (Q8 / PLAN §7.1).",
+    help="Install a kit from a pack: --kit <pack>:<kit_name>.",
 )
 @click.option(
     "--pack",
@@ -972,18 +972,7 @@ def new(
         except Exception:
             logger.debug("Failed to load workspace preset extras", exc_info=True)
 
-    # 1c. Legacy --template alias resolves to --kit when no explicit --kit given.
-    # PLAN §7.1.1 : --template <X> → --kit streamtex_design:<X>-default (internal).
-    # Special-cases: 'slides' maps to slides-modern-dark (existing kit in v0.1.0).
-    _legacy_kit_alias = {
-        "project": "streamtex_design:project-default",
-        "collection": "streamtex_design:collection-default",
-        "slides": "streamtex_design:slides-modern-dark",
-    }
-    if template and not kit_ref:
-        kit_ref = _legacy_kit_alias[template]
-
-    # 1d. Resolve kit (parses ref + reads manifest; errors if pack missing).
+    # 1c. Resolve kit (parses ref + reads manifest; errors if pack missing).
     kit_manifest: dict = {}
     kit_design_system: str | None = None
     if kit_ref:
@@ -998,10 +987,8 @@ def new(
             kit_manifest = {}
             kit_design_system = None
 
-    # 2. Scaffold files (rich template legacy preserved, OR minimal + kit DS).
+    # 2. Scaffold files. --kit wins over --template when both are passed.
     if template and not kit_manifest:
-        # Legacy path: kit alias failed to resolve, fall back to streamtex-docs
-        # rich template. Preserves the pre-MIG-3 behaviour for the 43 tests.
         files = _copy_rich_template(template, target, name, extras=extras)
         console.print(f"[green]Project created from template '{template}':[/green] {target}")
     else:

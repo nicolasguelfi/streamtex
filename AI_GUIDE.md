@@ -183,8 +183,8 @@ the rest are specialized variations.
 |---------|-------------|
 | `/stx-block:init` | Create a complete project from a natural-language description. The Project Architect agent proposes structure, blocks, colors, and features — generates all files after your approval. Templates: `project` (default), `presentation`, `collection`, `course`. |
 | `/stx-block:update` | Add content, customize theme, migrate HTML, export — covers all post-creation modifications. Sub-flags: `--upgrade`, `--migrate`, `--export`. |
-| `/stx-block:audit` | Validate quality (structure, styles, design rules, presentation compliance). Use `--all` or `--target <name>`. Replaces the legacy `slide-audit`/`style-audit`. |
-| `/stx-block:fix` | Auto-fix violations found by audit. Use `--all` or `--target <name>`. Replaces the legacy `slide-fix`. |
+| `/stx-block:audit` | Validate quality (structure, styles, design rules, presentation compliance). Use `--all` or `--target <name>`. |
+| `/stx-block:fix` | Auto-fix violations found by audit. Use `--all` or `--target <name>`. |
 | `/stx-block:tool <name>` | Run specialized tools (e.g. `survey-convert`). |
 | `/stx-block:slide-new` | Create a new slide following visual design rules. Enforces ~45-char lines, 32pt body text, canonical structure. |
 | `/stx-block:new` | Create a new content block with automatic blueprint matching against 10 block templates. |
@@ -401,9 +401,9 @@ STX_FAL_KEY=fal-...
 
 ### Usage in Blocks
 
-Since streamtex 0.7.x, AI image rendering goes through `st_image()`
-with `prompt=` + `editable=True` (one unified API for local / URL /
-AI-generated images).
+AI image rendering goes through `st_image()` with `prompt=` +
+`editable=True` — one unified API for local / URL / AI-generated
+images.
 
 ```python
 # Declarative AI image — generate and display

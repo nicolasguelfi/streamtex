@@ -460,9 +460,9 @@ _MARKER_NAV_JS = """
     label.textContent = visible[currentIdx].label;
     highlightPopup();
     // The TOC sidebar active indicator is owned by the cross-context
-    // scroll-spy (stx_scroll_spy.js) since 0.6.32 — it tracks ALL TOC
-    // entry anchors (not just markers), so the indicator can land on
-    // any level and not just L1.  Nothing to do here.
+    // scroll-spy (stx_scroll_spy.js) — it tracks ALL TOC entry anchors
+    // (not just markers), so the indicator can land on any level and
+    // not just L1.  Nothing to do here.
   }
 
   function highlightPopup() {

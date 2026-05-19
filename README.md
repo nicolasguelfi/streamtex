@@ -355,9 +355,8 @@ stx claude install project ./my-project
 
 ## Reuse architecture (`stx pack` / `stx component` / `stx ds` / `stx kit`)
 
-The legacy `stx patterns *` flow was replaced in v0.6.x by the **reuse
-architecture** — Python packs that ship components, design systems, and
-kits via PEP 621 entry points. The official pack is
+The **reuse architecture** ships components, design systems, and kits
+as Python packs via PEP 621 entry points. The official pack is
 [**streamtex-design**](https://github.com/nicolasguelfi/streamtex-design).
 
 ```bash

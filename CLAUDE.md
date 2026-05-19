@@ -108,18 +108,16 @@ stx dev unlink streamtex                            # revert to PyPI
 
 ## Reuse architecture (packs, components, design systems, kits)
 
-The `streamtex 0.7.x` reuse architecture replaces the legacy
-`streamtex-patterns` flow. Library-internal sandboxes / test projects
-should declare the `streamtex-design` pack (or a local `mypack/`) in
-their `stx.toml`. Components are Python modules with a structured
-docstring (§4.1) and a `__component_meta__`. See the
-`reuse-architecture` skill (loaded automatically) and PLAN.md
-§5-§7 for the full mechanism.
+The reuse architecture ships every reusable visual artefact as part
+of a Python pack. Library-internal sandboxes / test projects should
+declare the `streamtex-design` pack (or a local `mypack/`) in their
+`stx.toml`. Components are Python modules with a structured docstring
+and a `__component_meta__`. See the `reuse-architecture` skill (loaded
+automatically) for the full mechanism.
 
 **Library testing tip**: a minimal sandbox can declare just one local
 pack (no git pack) — sufficient for testing reuse-architecture
 behaviour inside regression fixtures.
 
 **Commands**: `/stx-pack`, `/stx-component`, `/stx-ds`, `/stx-kit`,
-`/stx-validate`. The legacy `/stx-pattern:*` commands were removed in
-streamtex 0.7.x.
+`/stx-validate`.

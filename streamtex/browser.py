@@ -1,17 +1,9 @@
-"""Browser detection banner — historical helper, off by default since 0.6.25.
+"""Browser detection banner — off by default, opt-in via ``chrome_banner``.
 
-The banner was introduced when streamtex rendered every construct through
-CSS ``:has()`` selectors, which triggered a 3-4 s freeze on Chrome cold
-load and were not supported at all in Firefox until v121 (2023-12).  The
-marker-runtime migration (0.6.11 → 0.6.16) eliminated both issues:
-``:has()`` is no longer used, and the new MutationObserver-based path is
-universally supported.
-
-The only remaining Chrome-specific edge is the non-standard ``zoom`` CSS
-property used by ``st_zoom``, which Firefox added in v126 (2024-05).  At
-this point Chrome no longer offers a meaningful advantage for streamtex
-content, so the banner is off by default in ``st_book(chrome_banner=…)``.
-The function remains exported for users who still want to opt back in.
+The function remains exported for users who want to recommend Chrome to
+their readers, but no construct in the rendering path currently requires
+it. Pass ``chrome_banner=True`` to ``st_book`` (or call this manually
+in ``book.py``) if you need it.
 """
 
 import streamlit as st
@@ -62,9 +54,8 @@ def st_chrome_banner() -> None:
     Does not create a Streamlit component in the block flow, so it
     won't interfere with block numbering or the TOC.
 
-    Disabled by default in ``st_book(chrome_banner=False)`` since 0.6.25
-    — the marker-runtime migration removed the original Chrome-specific
-    advantage.  Call this manually in ``book.py`` if you still want the
-    banner, or pass ``chrome_banner=True`` to ``st_book``.
+    Disabled by default in ``st_book(chrome_banner=False)``. Call this
+    manually in ``book.py`` if you still want the banner, or pass
+    ``chrome_banner=True`` to ``st_book``.
     """
     st.iframe(_CHROME_BANNER_JS, height=1)

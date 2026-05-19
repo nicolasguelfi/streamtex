@@ -50,60 +50,26 @@ def _ensure_gitignore(project_dir: Path) -> None:
 # ---------------------------------------------------------------------------
 
 def _add_uv_source(project_dir: Path, path: str) -> None:
-    """Add [tool.uv.sources] streamtex editable entry to pyproject.toml."""
-    toml_path = project_dir / "pyproject.toml"
-    text = toml_path.read_text(encoding="utf-8")
+    """Add or update the `[tool.uv.sources].streamtex` editable entry.
 
-    source_block = (
-        "\n[tool.uv.sources]\n"
-        f'streamtex = {{ path = "{path}", editable = true }}\n'
-    )
+    Delegates to the tomlkit-based helper (decision D17) so that other
+    entries in `[tool.uv.sources]` (e.g. `mypack`, `streamtex-design`) and
+    surrounding comments are preserved.
+    """
+    from ._toml_helpers import set_uv_source
 
-    if "[tool.uv.sources]" in text:
-        # Replace existing section
-        import re
-        text = re.sub(
-            r"\[tool\.uv\.sources\]\n.*?(?=\n\[|\Z)",
-            source_block.strip() + "\n",
-            text,
-            flags=re.DOTALL,
-        )
-    else:
-        # Append after [tool.uv]
-        if "[tool.uv]" in text:
-            text = text.replace(
-                "[tool.uv]",
-                "[tool.uv]",
-                1,
-            )
-            # Find end of [tool.uv] section to insert after it
-            idx = text.index("[tool.uv]")
-            # Find next section or end
-            next_section = text.find("\n[", idx + 1)
-            if next_section == -1:
-                text += source_block
-            else:
-                text = text[:next_section] + source_block + text[next_section:]
-        else:
-            text += "\n[tool.uv]\n" + source_block
-
-    toml_path.write_text(text, encoding="utf-8")
+    set_uv_source(project_dir, "streamtex", path, editable=True)
 
 
 def _remove_uv_source(project_dir: Path) -> None:
-    """Remove [tool.uv.sources] section from pyproject.toml."""
-    toml_path = project_dir / "pyproject.toml"
-    text = toml_path.read_text(encoding="utf-8")
-    if "[tool.uv.sources]" not in text:
-        return
-    import re
-    text = re.sub(
-        r"\n?\[tool\.uv\.sources\]\n.*?(?=\n\[|\Z)",
-        "",
-        text,
-        flags=re.DOTALL,
-    )
-    toml_path.write_text(text, encoding="utf-8")
+    """Remove the `[tool.uv.sources].streamtex` entry only.
+
+    Other entries in the section (e.g. local packs declared as editable
+    sources) are preserved per decision D17.
+    """
+    from ._toml_helpers import remove_uv_source
+
+    remove_uv_source(project_dir, "streamtex")
 
 
 def _uv_sync(project_dir: Path, console) -> None:

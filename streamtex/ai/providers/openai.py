@@ -64,7 +64,7 @@ class OpenAIProvider(AIImageProvider):
                 "OpenAI API key not found. Set one of:\n"
                 "  - STX_OPENAI_API_KEY environment variable\n"
                 "  - OPENAI_API_KEY environment variable\n"
-                "  - api_key parameter in AIImageConfig or st_ai_image()"
+                "  - api_key parameter in AIImageConfig or st_image()"
             )
 
         client = OpenAI(api_key=key)

@@ -189,14 +189,7 @@ def _maybe_clone_docs_for_template(
     help="Skip the auto-add of the `streamtex-design` pack to the project's "
          "stx.toml after project creation (cf. PLAN §29.6 — Q9 MIG-4).",
 )
-@click.option(
-    "--no-patterns",
-    is_flag=True,
-    default=False,
-    hidden=True,
-    help="DEPRECATED alias for --no-design-pack (kept for retro-compat).",
-)
-def install(preset, project, template, dev, no_design_pack, no_patterns):
+def install(preset, project, template, dev, no_design_pack):
     """Install or update a StreamTeX workspace, optionally creating a project.
 
     First run:  stx install --preset power --project hello
@@ -416,16 +409,8 @@ def install(preset, project, template, dev, no_design_pack, no_patterns):
         step += 1
 
     # --- Optional: auto-add streamtex-design pack to project (project only) ---
-    # MIG-4 (PLAN §29.6 Q9) : replace the legacy interactive patterns offer with
-    # a non-interactive declarative auto-add of the official design pack to the
-    # project's stx.toml. Honours both --no-design-pack (new) and the legacy
-    # --no-patterns alias.
-    if has_project and not (no_design_pack or no_patterns):
+    if has_project and not no_design_pack:
         _add_default_design_pack(ws_root, project, effective_preset, console)
-    if has_project and no_patterns and not no_design_pack:
-        console.print(
-            "[yellow]--no-patterns is deprecated, use --no-design-pack[/yellow]"
-        )
 
     # --- Done ---
     _clear_state(ws_root)

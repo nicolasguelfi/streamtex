@@ -7,6 +7,114 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.3] — 2026-05-19 (L5 — TOCConfig.numerate_titles removed)
+
+Final piece of the Q10 legacy purge: the `numerate_titles` field on
+`TOCConfig` is removed in favour of the `numbering` field
+(`NumberingMode.{BOTH,SIDEBAR_ONLY,MAIN_ONLY,NONE}`). The field had
+been documented as legacy since the `numbering` field was introduced
+but kept for backward compatibility; pre-distribution legacy mandate
+applies. Full test suite still green (2112 passed, 1 skipped).
+
+### Removed
+- `TOCConfig.numerate_titles` field — replaced by `numbering`
+  (`NumberingMode.BOTH` is now the default; `NumberingMode.NONE`
+  replaces the legacy `numerate_titles=False`).
+- The two-branch fallback in `TOCConfig.effective_numbering` is
+  reduced to `return self.numbering`.
+
+### Changed
+- `tests/test_toc.py` — 4 tests migrated from `numerate_titles=` to
+  `numbering=NumberingMode.X`. The class `TestNumberingMode` renames
+  `test_numerate_false_gives_none` → `test_numbering_none` and
+  `test_numbering_overrides_numerate_titles` → `test_numbering_sidebar_only`.
+  `test_defaults` now asserts `numbering == NumberingMode.BOTH`.
+
+## [0.7.2] — 2026-05-19 (Q10 — Library legacy API removal)
+
+Pre-distribution legacy purge: removes deprecated functions, params, and
+flags that had been kept for backward compatibility with versions prior
+to 0.7. All have clear replacements (cited below). Full test suite
+green (2112 passed, 1 skipped).
+
+### Removed
+- **`st_ai_image()` and `st_ai_image_widget()`** — both deprecated
+  since v0.4. Replacement: `st_image(prompt=..., editable=True,
+  name=...)` for declarative AI image rendering and
+  `st_image(editable=True)` with the editor panel's AI tab for
+  interactive generation. The whole `streamtex/ai_image.py` module
+  is deleted along with `tests/test_ai_image.py`. The
+  `streamtex.__init__` no longer re-exports these symbols.
+- **`monties_color` parameter** of `st_book()` — was a deprecated
+  alias for `banner_color`/`banner=`. Removed from the signature and
+  the resolution branch in `book.py`. The `TestBackwardCompatibility`
+  class in `test_banner.py` (carrying the `test_monties_color_*`
+  case) is renamed to `TestBannerColorResolution` and trimmed
+  accordingly.
+- **`*args` and `**_legacy_kwargs` "transparent forwarding"** to
+  `block.build()` in `st_book()`. The signature now accepts only the
+  explicit `block_args=(...)` and `block_kwargs={...}` paths. Passing
+  unknown kwargs directly to `st_book()` now raises `TypeError`
+  immediately (was a `DeprecationWarning` deferred to the next major).
+  `test_book_integration.py::test_legacy_unknown_kwarg_emits_deprecation_warning`
+  is replaced by `test_unknown_kwarg_raises_typeerror`; the two
+  legacy-forwarding tests
+  (`test_legacy_kwargs_still_forwarded_for_backward_compat`,
+  `test_block_kwargs_overrides_legacy_kwargs`) are consolidated into
+  the clean-path `test_block_kwargs_only_path_works`.
+- **`--no-patterns` CLI flag** on `stx install` — was a hidden
+  deprecated alias for `--no-design-pack` with a yellow warning.
+  Removed; the `install_cmd.py` branch that printed the deprecation
+  notice is gone.
+- **Stale "MIG-2 → MIG-5 coexistence" comment** in
+  `streamtex/cli/pack_cmd.py` module docstring — the legacy
+  `stx patterns *` CLI group it referred to was removed entirely in
+  earlier 0.7.x patches.
+
+### Provider error messages updated
+- `streamtex/ai/providers/{google,fal,openai}.py` — API-key error
+  messages no longer mention `st_ai_image()`; now reference
+  `st_image()`.
+
+### Deferred (not in this release)
+- `numerate_titles` field on `TOCConfig` — still used by tests and
+  the `streamtex-quick-reference.md` skill. Removing it requires a
+  caller migration to `numbering=NumberingMode.X` first.
+
+## [0.7.1] — 2026-05-19 (Legacy purge — Render removed)
+
+Pre-distribution cleanup pass: removes the `Render` deployment platform
+that had been replaced by `Hetzner/Coolify` per
+`feedback_hetzner_only.md`. The patches in 0.7.0 had kept Render as a
+co-existing alternative; this release makes the production stance
+explicit and reduces the deploy surface.
+
+### Removed
+- `stx deploy render` CLI command (`render_cmd`) + 6 supporting helpers:
+  `generate_render_service`, `generate_render_yaml`,
+  `parse_render_yaml_services`, `render_service_url`,
+  `check_render_status`, env-sync's `render_yaml` branch.
+- `stx deploy env-sync` CLI command (was Render-API only) and its
+  helpers (`_read_render_cli_config`, `_parse_render_yaml_env_vars`,
+  `_render_api_get/put/post`, `_resolve_render_service_ids`).
+- `stx deploy status render` mode — `PLATFORM` choice now restricted to
+  `huggingface | coolify`.
+- ~20 tests covering the removed Render code paths.
+
+### Migration
+- For deployment, use `stx deploy hetzner` / `stx deploy update` /
+  `stx deploy status coolify` (or `stx deploy huggingface` for
+  HuggingFace Spaces).
+- The mapping is 1:1: `stx deploy render` → `stx deploy hetzner`,
+  `stx deploy env-sync` → manage env vars via Coolify UI / API.
+
+### Rationale
+- The Render code path had been informally deprecated since the
+  Hetzner/Coolify migration but was kept as "co-existing alternative".
+  No StreamTeX project is deployed on Render today, no PyPI release of
+  streamtex was distributed before this consolidation, so this is a
+  clean strict-pruning of unused code.
+
 ## [0.7.0] — 2026-05-19 (Wave 4 — Reuse architecture milestone)
 
 Consolidation milestone (PLAN Q15 / D15). Bundles the structural changes

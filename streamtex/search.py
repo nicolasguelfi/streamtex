@@ -125,7 +125,7 @@ def generate_search_script(block_index: dict[int, str]) -> str:
     }}
 
     /* Try immediately, then retry every 500ms for up to 60s.
-       Covers rehype-raw lazy loading on slow/cold Render deployments. */
+       Covers rehype-raw lazy loading on slow/cold container starts. */
     if (!setup()) {{
         var _warned = false;
         var _iv = setInterval(function() {{

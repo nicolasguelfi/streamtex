@@ -27,7 +27,7 @@ from .space import st_space
 from .styles import Style
 from .write import st_write
 
-load_dotenv()  # loads .env if present (no-op on Render where env vars are set directly)
+load_dotenv()  # loads .env if present (no-op on Coolify where env vars are set directly)
 
 # ── Session-state keys ────────────────────────────────────────────────
 

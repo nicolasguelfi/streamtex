@@ -1,7 +1,6 @@
 """stx pack — add / remove / list / sync / validate packs in a project.
 
-Surface and semantics: PLAN.md §6.2 + §29.4. The legacy `stx patterns *`
-group coexists during MIG-2 → MIG-5 (cf. §29.2).
+Surface and semantics: PLAN.md §6.2 + §29.4.
 """
 
 from __future__ import annotations

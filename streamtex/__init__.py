@@ -161,7 +161,6 @@ from .ai import (
     generate_image, is_cached, list_providers, get_available_models,
     get_model_capabilities, ModelCapabilities,
 )
-from .ai_image import st_ai_image, st_ai_image_widget
 
 # Image management (history, metadata)
 from .ai.history import save_version as save_image_version, get_current as get_current_image

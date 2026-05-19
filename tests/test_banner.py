@@ -129,9 +129,9 @@ class TestPresets:
         assert cfg._resolve() is None
 
 
-class TestBackwardCompatibility:
-    """Verify that the banner_color and monties_color paths in st_book
-    produce correct BannerConfig objects (tested at the resolution level)."""
+class TestBannerColorResolution:
+    """Verify that the banner_color path in st_book produces correct
+    BannerConfig objects (tested at the resolution level)."""
 
     def test_banner_color_string_becomes_config(self):
         """Simulates: st_book(modules, banner_color='blue') → BannerConfig(color='blue')."""
@@ -141,12 +141,6 @@ class TestBackwardCompatibility:
         # Other defaults untouched
         assert cfg.mode == BannerMode.FULL
         assert css["font_size"] == "1.3rem"
-
-    def test_monties_color_becomes_config(self):
-        """Simulates: st_book(modules, monties_color='green') → BannerConfig(color='green')."""
-        cfg = BannerConfig(color="green")
-        css = cfg._resolve()
-        assert css["color"] == "green"
 
     def test_banner_param_overrides_banner_color(self):
         """When banner= is provided, banner_color is ignored."""

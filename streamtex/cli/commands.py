@@ -16,13 +16,11 @@ from .claude_cmd import update_cmd as claude_update
 from .component_cmd import component as component_group
 from .deploy_cmd import configure_domain_cmd as deploy_configure_domain
 from .deploy_cmd import docker as deploy_docker
-from .deploy_cmd import env_sync_cmd as deploy_env_sync
 from .deploy_cmd import hetzner_cmd as deploy_hetzner
 from .deploy_cmd import huggingface_cmd as deploy_huggingface
 from .deploy_cmd import install_coolify_cmd as deploy_install_coolify
 from .deploy_cmd import preflight as deploy_preflight
 from .deploy_cmd import provision_cmd as deploy_provision
-from .deploy_cmd import render_cmd as deploy_render
 from .deploy_cmd import scale_cmd as deploy_scale
 from .deploy_cmd import secure_cmd as deploy_secure
 from .deploy_cmd import setup_cmd as deploy_setup
@@ -134,10 +132,8 @@ def deploy():
 
 deploy.add_command(deploy_preflight)
 deploy.add_command(deploy_docker)
-deploy.add_command(deploy_render)
 deploy.add_command(deploy_huggingface)
 deploy.add_command(deploy_status)
-deploy.add_command(deploy_env_sync)
 deploy.add_command(deploy_setup)
 deploy.add_command(deploy_hetzner)
 deploy.add_command(deploy_update)

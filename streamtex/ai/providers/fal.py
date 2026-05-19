@@ -158,7 +158,7 @@ class FalProvider(AIImageProvider):
                 "fal.ai API key not found. Set one of:\n"
                 "  - STX_FAL_KEY environment variable\n"
                 "  - FAL_KEY environment variable\n"
-                "  - api_key parameter in AIImageConfig or st_ai_image()"
+                "  - api_key parameter in AIImageConfig or st_image()"
             )
 
         # fal-client uses FAL_KEY env var internally

@@ -22,12 +22,9 @@ class TOCConfig:
     Class representing configuration for the Table of Contents.
     """
 
-    numerate_titles: bool = True
-    '''A boolean dictating whether to add numering in the ToC titles.
-    Legacy — kept for backward compatibility. Prefer ``numbering``.'''
-    numbering: str | None = None
-    '''NumberingMode value controlling where numbering appears.
-    When set, overrides ``numerate_titles``.'''
+    numbering: str = NumberingMode.BOTH
+    '''NumberingMode value controlling where numbering appears
+    (sidebar/main/both/none).'''
     toc_position: int = -1
     '''-1 means at the end, 0 at the start, None means no ToC'''
     title_style: Style = s.text.titles.title
@@ -44,10 +41,8 @@ class TOCConfig:
 
     @property
     def effective_numbering(self) -> str:
-        """Resolve the active numbering mode."""
-        if self.numbering is not None:
-            return self.numbering
-        return NumberingMode.BOTH if self.numerate_titles else NumberingMode.NONE
+        """Return the active numbering mode."""
+        return self.numbering
 
 
 class TOCRegistry:

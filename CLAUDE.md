@@ -115,39 +115,35 @@ This replaces the manual `stx project new my-app && cd projects/my-app && stx de
 - Include CLI command changes, new exports, bug fixes, documentation updates
 - The CHANGELOG is the user-facing record of what changed — if it's worth committing, it's worth documenting
 
-## StreamTeX Patterns (graphic design patterns)
+## Reuse artefacts in sandboxes / test projects (packs)
 
-If a library-internal sandbox or test project contains a `streamtex-patterns/`
-folder (default location: `.claude/custom/streamtex-patterns/`), it defines
-reusable graphic design patterns (named grids, callouts, hero stats, slide
-headings, etc.) that can be invoked by name when creating or editing blocks.
+If a library-internal sandbox, demo, or regression fixture declares a
+`streamtex.packs` entry point — or installs the reference pack
+`streamtex-design` — the new reuse architecture applies (packs ship
+components, design systems, kits, optionally CLI templates and blueprints).
 
-For library development, the recommended preset is **`core`** — sufficient
-for testing patterns inside internal blocks (manuals, demos, regression
-fixtures) without pulling in the full project tooling.
+**Mandatory rules when generating or modifying a block in such a sandbox**:
+1. **Before generating any block**, read the `reuse-architecture` skill and
+   inspect declared packs (`stx pack list`) and components
+   (`stx component list`).
+2. When a component is named (e.g. *"use callout"*, *"like card_grid"*),
+   read its docstring contract via `stx component show <name>` **before**
+   generating code. The docstring carries `INVARIANTS`, `PARAMS`,
+   `INTERDITS`, `When to use`, `When NOT to use`, `Design system bundles
+   required` — respect them strictly.
+3. To compose a block, import the component directly from the pack:
+   `from streamtex_design.components import callout, card_grid`.
+4. If a needed visual element is missing from installed packs, scaffold a
+   new component via `stx component new <name>` into the sandbox's primary
+   local pack, then promote it with `stx component promote` if it proves
+   reusable.
 
-**Mandatory rules**:
-1. **Before generating or modifying any StreamTeX block**, read
-   `<patterns-dir>/_pattern_library.md` to know which patterns are available.
-2. When the user names a pattern in any prompt (e.g. *"use grid_boston"*,
-   *"like stat_hero"*), read the full `<patterns-dir>/<name>.md` file
-   **before** generating code.
-3. Strictly respect each pattern's `INVARIANTS` section. Adjust only within
-   `PARAMS`. Refuse anything matching `INTERDITS` and propose a new pattern
-   instead.
-4. The pattern's code skeleton is a **starting point** — adapt it to the
-   sandbox's `custom/styles.py` and palette (or to the library's test
-   fixtures when relevant).
-5. If the user describes something that matches no existing pattern but is
-   reusable, suggest `/stx-pattern:new` to capture it.
+**Component granularity** is a tag (not a constraint): `primitive`,
+`composition`, `block`.
 
-**Difference with blueprints**:
-- A **blueprint** = a complete block type (`title`, `conclusion`, `exercise`).
-- A **pattern** = a reusable composition primitive used inside a block
-  (`grid_boston`, `callout_critical`, `ptn_slide_heading`).
+**CLI surface**: `stx pack {list,add,info,sync}` · `stx component
+{list,new,show,validate,promote}` · `stx ds {list,switch,new}` · `stx kit
+{list,install,show,new}` · `stx validate [--strict]`.
 
-A block can combine: 1 blueprint × N patterns × style conventions.
-
-**Commands**: `/stx-pattern:list` `/stx-pattern:show <name>`
-`/stx-pattern:new` `/stx-pattern:reindex` `/stx-pattern:validate`.
-See the `pattern-library` skill for the full mechanism.
+The legacy `streamtex-patterns/` folder convention and the `/stx-pattern:*`
+command family are removed in 0.7.x.

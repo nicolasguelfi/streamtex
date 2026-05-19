@@ -522,11 +522,8 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
             presentation_profiles: list[PresentationProfile] | None = None,
             doc_version: str | None = None,
             loading: bool = True,
-            *args,
-            monties_color: str = None,
             block_args: tuple = (),
-            block_kwargs: dict | None = None,
-            **_legacy_kwargs):
+            block_kwargs: dict | None = None):
     """Generates a web page e-book from a list of block modules.
 
     :param separator: Optional module with a build() function, rendered between each block.
@@ -551,33 +548,12 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
     :param zoom: Default zoom level as % (default 100).
     :param loading: If True (default), show a full-screen overlay with progress during loading.
     :param block_args: Positional args forwarded verbatim to every
-        ``block.build()`` call. Use this instead of relying on st_book's
-        legacy ``*args`` capture.
+        ``block.build()`` call.
     :param block_kwargs: Keyword args forwarded verbatim to every
-        ``block.build()`` call. Use this for any kwarg meant for blocks
-        rather than passing them directly to st_book — passing extra
-        kwargs to st_book is deprecated and will become a ``TypeError``
-        in a future release.
+        ``block.build()`` call.
     """
-    # --- Compat shim: capture legacy positional/keyword forwarding ---
-    # Historically st_book transparently forwarded *args/**kwargs to every
-    # block.build().  This made typos (e.g. ``title="X"``) crash deep inside
-    # block code with confusing tracebacks.  The supported path is now
-    # ``block_args=...`` / ``block_kwargs={...}``.  We keep the old path
-    # working with a DeprecationWarning so existing projects don't break.
-    if args or _legacy_kwargs:
-        import warnings as _warnings
-        _warnings.warn(
-            "Passing extra args/kwargs directly to st_book is deprecated "
-            f"(received args={args!r}, kwargs={sorted(_legacy_kwargs)!r}). "
-            "Use block_args=(...) and block_kwargs={...} to forward them "
-            "to each block.build(). Extra kwargs will become a TypeError "
-            "in a future release.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-    _block_args = tuple(args) + tuple(block_args or ())
-    _block_kwargs = {**(_legacy_kwargs or {}), **(block_kwargs or {})}
+    _block_args = tuple(block_args or ())
+    _block_kwargs = dict(block_kwargs or {})
     # --- Resolve PdfConfig from exports list if not provided directly ---
     if pdf_config is None and exports:
         for _ecfg in exports:
@@ -602,17 +578,9 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
     )
     if not _allowed_modes:
         raise ValueError("view_modes must contain at least one ViewMode.")
-    # --- Resolve banner configuration (3 levels) ---
+    # --- Resolve banner configuration ---
     if banner is not None:
         banner_config = banner
-    elif monties_color is not None:
-        import warnings
-        warnings.warn(
-            "monties_color is deprecated, use banner= instead",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        banner_config = BannerConfig(color=monties_color)
     else:
         banner_config = BannerConfig(color=banner_color)
     # --- Store version info for export enrichment ---

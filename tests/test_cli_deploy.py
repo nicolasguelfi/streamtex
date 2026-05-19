@@ -1,4 +1,4 @@
-"""Tests for stx deploy preflight/docker/render/huggingface/status commands."""
+"""Tests for stx deploy preflight/docker/hetzner/coolify/huggingface/status commands."""
 
 import json
 import os
@@ -13,9 +13,7 @@ from click.testing import CliRunner
 from streamtex.cli.commands import cli
 from streamtex.cli.deploy_cmd import (
     HF_LFS_PATTERNS,
-    DeployStatus,
     check_hf_status,
-    check_render_status,
     derive_service_name,
     detect_git_remote,
     discover_manuals,
@@ -23,13 +21,9 @@ from streamtex.cli.deploy_cmd import (
     find_docker,
     generate_dockerfile,
     generate_hf_frontmatter,
-    generate_render_service,
-    generate_render_yaml,
     http_probe,
     parse_env_vars,
     parse_hf_remote,
-    parse_render_yaml_services,
-    render_service_url,
     run_preflight,
     setup_hf_remote,
     setup_lfs_tracking,
@@ -66,6 +60,14 @@ def test_generate_dockerfile_has_streamlit():
 def test_generate_dockerfile_has_healthcheck():
     content = generate_dockerfile()
     assert "HEALTHCHECK" in content
+
+
+def test_generate_dockerfile_installs_local_packs():
+    """G4a — Dockerfile invokes the local-pack installer after COPY."""
+    content = generate_dockerfile()
+    assert "streamtex.cli._install_local_packs" in content
+    # Must happen after the project source is copied
+    assert content.index("COPY . .") < content.index("_install_local_packs")
 
 
 # ---------------------------------------------------------------------------
@@ -222,6 +224,37 @@ def test_preflight_skip_lint(tmp_path):
 
     names = [c.name for c in checks]
     assert "lint" not in names
+
+
+def test_preflight_local_packs_pass_with_relative_path(tmp_path):
+    """G4b — relative `path` in [[packs]] type='local' passes preflight."""
+    proj = _make_deploy_project(tmp_path)
+    (proj / "stx.toml").write_text(
+        '[project]\nname = "demo"\n\n'
+        '[[packs]]\ntype = "local"\nname = "mypack"\n'
+        'path = "./mypack"\nprimary = true\n'
+    )
+
+    checks = run_preflight(str(proj), skip_tests=True, skip_lint=True)
+    check = next(c for c in checks if c.name == "local packs")
+    assert check.status == "pass", check.message
+
+
+def test_preflight_local_packs_warn_on_absolute_path(tmp_path):
+    """G4b — absolute `path` raises a preflight warn."""
+    proj = _make_deploy_project(tmp_path)
+    (proj / "stx.toml").write_text(
+        '[project]\nname = "demo"\n\n'
+        '[[packs]]\ntype = "local"\nname = "external_pack"\n'
+        'path = "/Users/dev/external-pack"\n'
+    )
+
+    checks = run_preflight(str(proj), skip_tests=True, skip_lint=True)
+    check = next(c for c in checks if c.name == "local packs")
+    assert check.status == "warn"
+    assert "external_pack" in check.message
+    assert "/Users/dev/external-pack" in check.message
+    assert "promote" in check.message.lower()
 
 
 # ---------------------------------------------------------------------------
@@ -470,7 +503,7 @@ def test_deploy_docker_help():
 
 
 # ---------------------------------------------------------------------------
-# Render: detect_git_remote
+# Deploy helpers: detect_git_remote
 # ---------------------------------------------------------------------------
 
 
@@ -515,7 +548,7 @@ def test_detect_git_remote_none_on_failure(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# Render: discover_manuals
+# Deploy helpers: discover_manuals
 # ---------------------------------------------------------------------------
 
 
@@ -564,7 +597,7 @@ def test_discover_manuals_sorted(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# Render: derive_service_name
+# Deploy helpers: derive_service_name
 # ---------------------------------------------------------------------------
 
 
@@ -581,7 +614,7 @@ def test_derive_name_fallback():
 
 
 # ---------------------------------------------------------------------------
-# Render: parse_env_vars
+# Deploy helpers: parse_env_vars
 # ---------------------------------------------------------------------------
 
 
@@ -599,206 +632,6 @@ def test_parse_env_invalid():
     with pytest.raises(click.BadParameter, match="Invalid format"):
         parse_env_vars(("NOEQUALS",))
 
-
-# ---------------------------------------------------------------------------
-# Render: generate_render_service
-# ---------------------------------------------------------------------------
-
-
-def test_render_service_basic():
-    svc = generate_render_service(
-        name="my-svc",
-        repo="https://github.com/user/repo",
-        branch="main",
-        plan="free",
-        env_vars=[],
-    )
-    assert "name: my-svc" in svc
-    assert "repo: https://github.com/user/repo" in svc
-    assert "branch: main" in svc
-    assert "plan: free" in svc
-    assert "STX_PASSWORD" in svc
-    assert "buildFilter" not in svc
-
-
-def test_render_service_with_folder():
-    svc = generate_render_service(
-        name="my-svc",
-        repo="https://github.com/user/repo",
-        branch="main",
-        plan="free",
-        env_vars=[],
-        folder="manuals/stx_manual_intro",
-    )
-    assert "key: FOLDER" in svc
-    assert "value: manuals/stx_manual_intro" in svc
-
-
-def test_render_service_build_filter():
-    svc = generate_render_service(
-        name="my-svc",
-        repo="https://github.com/user/repo",
-        branch="main",
-        plan="free",
-        env_vars=[],
-        build_filter=True,
-    )
-    assert "buildFilter:" in svc
-    assert "paths:" in svc
-
-
-def test_render_service_custom_env_overrides_password():
-    svc = generate_render_service(
-        name="my-svc",
-        repo="https://github.com/user/repo",
-        branch="main",
-        plan="free",
-        env_vars=[("STX_PASSWORD", "mysecret")],
-    )
-    # Should have exactly one STX_PASSWORD
-    assert svc.count("STX_PASSWORD") == 1
-    assert "mysecret" in svc
-
-
-# ---------------------------------------------------------------------------
-# Render: generate_render_yaml
-# ---------------------------------------------------------------------------
-
-
-def test_render_yaml_structure():
-    svc1 = "  - type: web\n    name: svc1"
-    svc2 = "  - type: web\n    name: svc2"
-    yaml = generate_render_yaml([svc1, svc2])
-    assert yaml.startswith("services:\n")
-    assert "svc1" in yaml
-    assert "svc2" in yaml
-    assert yaml.endswith("\n")
-
-
-# ---------------------------------------------------------------------------
-# Render: Click command
-# ---------------------------------------------------------------------------
-
-
-def _make_git_project(tmp_path):
-    """Create a project with git remote for render tests."""
-    proj = tmp_path / "my-proj"
-    proj.mkdir()
-    scaffold_project(str(proj), "my-proj")
-    return proj
-
-
-def test_render_command_single(tmp_path):
-    proj = _make_git_project(tmp_path)
-
-    runner = CliRunner()
-    with patch(
-        "streamtex.cli.deploy_cmd.detect_git_remote",
-        return_value="https://github.com/user/repo",
-    ):
-        result = runner.invoke(cli, ["deploy", "render", str(proj)])
-
-    assert result.exit_code == 0, result.output
-    assert "render.yaml written" in result.output
-    assert (proj / "render.yaml").is_file()
-
-    content = (proj / "render.yaml").read_text()
-    assert "services:" in content
-    assert "buildFilter:" in content
-    assert "STX_PASSWORD" in content
-
-
-def test_render_command_multi(tmp_path):
-    proj = _make_git_project(tmp_path)
-    manuals = proj / "manuals"
-    manuals.mkdir()
-    (manuals / "stx_manual_intro").mkdir()
-    (manuals / "stx_manual_advanced").mkdir()
-
-    runner = CliRunner()
-    with patch(
-        "streamtex.cli.deploy_cmd.detect_git_remote",
-        return_value="https://github.com/user/repo",
-    ):
-        result = runner.invoke(cli, ["deploy", "render", str(proj), "--multi"])
-
-    assert result.exit_code == 0, result.output
-    assert "render.yaml written" in result.output
-
-    content = (proj / "render.yaml").read_text()
-    assert "streamtex-intro" in content
-    assert "streamtex-advanced" in content
-    assert "FOLDER" in content
-
-
-def test_render_command_multi_no_manuals(tmp_path):
-    proj = _make_git_project(tmp_path)
-
-    runner = CliRunner()
-    with patch(
-        "streamtex.cli.deploy_cmd.detect_git_remote",
-        return_value="https://github.com/user/repo",
-    ):
-        result = runner.invoke(cli, ["deploy", "render", str(proj), "--multi"])
-
-    assert result.exit_code != 0
-    assert "No manuals/" in result.output
-
-
-def test_render_command_no_remote(tmp_path):
-    proj = _make_git_project(tmp_path)
-
-    runner = CliRunner()
-    with patch(
-        "streamtex.cli.deploy_cmd.detect_git_remote",
-        return_value=None,
-    ):
-        result = runner.invoke(cli, ["deploy", "render", str(proj)])
-
-    assert result.exit_code != 0
-    assert "No git remote" in result.output
-
-
-def test_render_command_generates_dockerfile(tmp_path):
-    proj = _make_git_project(tmp_path)
-    # Ensure no Dockerfile
-    df = proj / "Dockerfile"
-    if df.is_file():
-        df.unlink()
-
-    runner = CliRunner()
-    with patch(
-        "streamtex.cli.deploy_cmd.detect_git_remote",
-        return_value="https://github.com/user/repo",
-    ):
-        result = runner.invoke(cli, ["deploy", "render", str(proj)])
-
-    assert result.exit_code == 0, result.output
-    assert "Dockerfile generated" in result.output
-    assert (proj / "Dockerfile").is_file()
-
-
-# ---------------------------------------------------------------------------
-# Render: Infrastructure
-# ---------------------------------------------------------------------------
-
-
-def test_render_command_help():
-    runner = CliRunner()
-    result = runner.invoke(cli, ["deploy", "render", "--help"])
-    assert result.exit_code == 0
-    assert "--name" in result.output
-    assert "--branch" in result.output
-    assert "--plan" in result.output
-    assert "--env" in result.output
-    assert "--multi" in result.output
-
-
-def test_deploy_group_shows_render():
-    runner = CliRunner()
-    result = runner.invoke(cli, ["deploy", "--help"])
-    assert result.exit_code == 0
-    assert "render" in result.output
 
 
 # ---------------------------------------------------------------------------
@@ -1174,48 +1007,6 @@ def test_huggingface_command_custom_title_emoji(tmp_path):
     assert "emoji: \U0001f680" in readme
 
 
-# ---------------------------------------------------------------------------
-# Deploy status: render_service_url
-# ---------------------------------------------------------------------------
-
-
-def test_render_service_url():
-    assert render_service_url("my-app") == "https://my-app.streamtex.org"
-
-
-def test_render_service_url_with_dash():
-    assert render_service_url("streamtex-intro") == "https://docs-intro.streamtex.org"
-
-
-# ---------------------------------------------------------------------------
-# Deploy status: parse_render_yaml_services
-# ---------------------------------------------------------------------------
-
-
-def test_parse_render_yaml_finds_services(tmp_path):
-    yaml_content = """\
-services:
-  - type: web
-    name: streamtex-intro
-    runtime: docker
-  - type: web
-    name: streamtex-advanced
-    runtime: docker
-"""
-    (tmp_path / "render.yaml").write_text(yaml_content)
-    result = parse_render_yaml_services(str(tmp_path))
-    assert result == ["streamtex-advanced", "streamtex-intro"]
-
-
-def test_parse_render_yaml_no_file(tmp_path):
-    result = parse_render_yaml_services(str(tmp_path))
-    assert result == []
-
-
-def test_parse_render_yaml_empty_file(tmp_path):
-    (tmp_path / "render.yaml").write_text("")
-    result = parse_render_yaml_services(str(tmp_path))
-    assert result == []
 
 
 # ---------------------------------------------------------------------------
@@ -1297,42 +1088,6 @@ def test_parse_hf_remote_not_found(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# Deploy status: check_render_status
-# ---------------------------------------------------------------------------
-
-
-def test_check_render_status_single_name():
-    with patch(
-        "streamtex.cli.deploy_cmd.http_probe",
-        return_value=("live", "HTTP 200"),
-    ):
-        results = check_render_status("/tmp", name="my-app")
-    assert len(results) == 1
-    assert results[0].name == "my-app"
-    assert results[0].status == "live"
-    assert "streamtex.org" in results[0].url
-
-
-def test_check_render_status_from_render_yaml(tmp_path):
-    yaml_content = """\
-services:
-  - type: web
-    name: streamtex-intro
-    runtime: docker
-"""
-    (tmp_path / "render.yaml").write_text(yaml_content)
-
-    with patch(
-        "streamtex.cli.deploy_cmd.http_probe",
-        return_value=("sleep", "HTTP 502 — service may be waking up"),
-    ):
-        results = check_render_status(str(tmp_path))
-    assert len(results) == 1
-    assert results[0].name == "streamtex-intro"
-    assert results[0].status == "sleep"
-
-
-# ---------------------------------------------------------------------------
 # Deploy status: check_hf_status
 # ---------------------------------------------------------------------------
 
@@ -1373,35 +1128,12 @@ def test_status_command_help():
     runner = CliRunner()
     result = runner.invoke(cli, ["deploy", "status", "--help"])
     assert result.exit_code == 0
-    assert "render" in result.output
     assert "huggingface" in result.output
+    assert "coolify" in result.output
     assert "--path" in result.output
     assert "--timeout" in result.output
 
 
-def test_status_command_render():
-    runner = CliRunner()
-    with patch(
-        "streamtex.cli.deploy_cmd.check_render_status",
-        return_value=[
-            DeployStatus(name="my-app", status="live", url="https://my-app.streamtex.org", message="HTTP 200"),
-        ],
-    ):
-        result = runner.invoke(cli, ["deploy", "status", "render", "my-app"])
-    assert result.exit_code == 0, result.output
-    assert "my-app" in result.output
-    assert "Live" in result.output
-
-
-def test_status_command_no_services():
-    runner = CliRunner()
-    with patch(
-        "streamtex.cli.deploy_cmd.check_render_status",
-        return_value=[],
-    ):
-        result = runner.invoke(cli, ["deploy", "status", "render"])
-    assert result.exit_code == 0, result.output
-    assert "No services found" in result.output
 
 
 def test_deploy_group_shows_status():

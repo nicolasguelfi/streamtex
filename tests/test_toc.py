@@ -7,7 +7,7 @@ from streamtex.toc import NumberingMode, TOCConfig, TOCRegistry
 class TestTOCConfig:
     def test_defaults(self):
         config = TOCConfig()
-        assert config.numerate_titles is True
+        assert config.numbering == NumberingMode.BOTH
         assert config.toc_position == -1
 
     def test_custom_position(self):
@@ -86,7 +86,7 @@ class TestTOCRegistry:
         assert entries[2]["level"] == 1
 
     def test_no_numeration(self):
-        config = TOCConfig(numerate_titles=False)
+        config = TOCConfig(numbering=NumberingMode.NONE)
         reg = TOCRegistry(config)
         reg.register_entry("Title", "1")
         entries = reg.get_entries()
@@ -115,12 +115,12 @@ class TestNumberingMode:
         config = TOCConfig()
         assert config.effective_numbering == NumberingMode.BOTH
 
-    def test_numerate_false_gives_none(self):
-        config = TOCConfig(numerate_titles=False)
+    def test_numbering_none(self):
+        config = TOCConfig(numbering=NumberingMode.NONE)
         assert config.effective_numbering == NumberingMode.NONE
 
-    def test_numbering_overrides_numerate_titles(self):
-        config = TOCConfig(numerate_titles=True, numbering=NumberingMode.SIDEBAR_ONLY)
+    def test_numbering_sidebar_only(self):
+        config = TOCConfig(numbering=NumberingMode.SIDEBAR_ONLY)
         assert config.effective_numbering == NumberingMode.SIDEBAR_ONLY
 
     def test_sidebar_only_title_has_number_but_return_empty(self):

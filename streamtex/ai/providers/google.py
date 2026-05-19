@@ -54,7 +54,7 @@ class GoogleProvider(AIImageProvider):
                 "Google AI API key not found. Set one of:\n"
                 "  - STX_GOOGLE_AI_KEY environment variable\n"
                 "  - GOOGLE_AI_KEY environment variable\n"
-                "  - api_key parameter in AIImageConfig or st_ai_image()"
+                "  - api_key parameter in AIImageConfig or st_image()"
             )
 
         client = genai.Client(api_key=key)

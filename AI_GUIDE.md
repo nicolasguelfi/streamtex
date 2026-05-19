@@ -391,7 +391,7 @@ set_ai_image_config(AIImageConfig(
 
 ### API Keys
 
-Set in your `.env` file (or as Render env vars for deployment):
+Set in your `.env` file (or as Coolify env vars for deployment):
 
 ```bash
 STX_OPENAI_API_KEY=sk-...
@@ -401,15 +401,22 @@ STX_FAL_KEY=fal-...
 
 ### Usage in Blocks
 
+Since streamtex 0.7.x, AI image rendering goes through `st_image()`
+with `prompt=` + `editable=True` (one unified API for local / URL /
+AI-generated images).
+
 ```python
-# Declarative — generate and display
-st_ai_image("A minimalist illustration of cloud architecture")
+# Declarative AI image — generate and display
+st_image(prompt="A minimalist illustration of cloud architecture",
+         editable=True, name="cloud_arch")
 
-# With provider/size override
-st_ai_image("A futuristic dashboard", provider="google", size="1024x1024")
+# With provider / size override
+st_image(prompt="A futuristic dashboard", editable=True, name="dashboard",
+         provider="google", ai_size="1024x1024")
 
-# Interactive widget — user types prompt in the browser
-st_ai_image_widget(default_prompt="A modern diagram")
+# Interactive editing — same call; clicking the image opens the editor
+# panel (Prompt / AI / Edit / History tabs, with save action).
+st_image(prompt="A modern diagram", editable=True, name="diagram")
 
 # Programmatic — save to file, then display
 from streamtex import generate_image
@@ -510,38 +517,36 @@ Commands are simple markdown files with instructions for the AI assistant.
 
 The `stx-deploy` command group drives the full Hetzner/Coolify deployment pipeline (preflight, provision, secure, install-coolify, configure-domain, deploy, scale, status). For local Docker testing, use `stx deploy docker .` from the CLI directly.
 
-### How does Render auto-deploy work?
+### How does Hetzner/Coolify auto-deploy work?
 
-Render services are automatically redeployed on push to `main` via a GitHub Actions
-workflow (`.github/workflows/render-deploy.yml`). The workflow uses **smart path-based
-filtering** — only services whose files actually changed are redeployed:
+Coolify applications are automatically redeployed on push to `main`
+via a GitHub Actions workflow
+(`.github/workflows/hetzner-deploy.yml`). The workflow uses
+**smart path-based filtering** — only services whose files actually
+changed are redeployed:
 
-- Changes in `manuals/stx_manual_intro/**` → deploy `streamtex-intro` only
-- Changes in shared files (`Dockerfile`, `pyproject.toml`, `shared-blocks/`, `.github/`, `scripts/`) → deploy **ALL** services
+- Changes in `manuals/stx_manual_intro/**` → deploy `docs-intro` only
+- Changes in shared files (`Dockerfile`, `pyproject.toml`, `shared-blocks/`, `.github/`, `scripts/`) → deploy **ALL** services (batched ≤ 4 to avoid server hang)
 - Manual trigger (`workflow_dispatch`) → deploy **ALL** services
 
-The mapping between services and folders is extracted automatically from the `FOLDER`
-env var in `render.yaml`.
+The mapping between services and folders lives in
+`.stx-deploy.json` at the workspace root.
 
 **Setup (one-time per repo):**
 ```bash
-gh secret set RENDER_API_KEY -R nicolasguelfi/<repo> --body "<your-render-api-key>"
+gh secret set COOLIFY_API_TOKEN -R nicolasguelfi/<repo> --body "<your-coolify-token>"
 ```
 
 **Manual trigger (deploys all services):**
 ```bash
-gh workflow run render-deploy.yml -R nicolasguelfi/<repo>
+gh workflow run hetzner-deploy.yml -R nicolasguelfi/<repo>
 ```
 
-> **Note:** Render's built-in GitHub App auto-deploy can silently stop after consecutive
-> build failures. The GitHub Actions workflow bypasses this limitation entirely.
+### How do I manage env vars on Coolify?
 
-### How do I sync env vars to Render after changing render.yaml?
+Env vars are managed per application in the Coolify dashboard
+(https://coolify.streamtex.org). There is **no committed file** that
+mirrors them — by design, to avoid leaking secrets through git.
 
-```bash
-stx deploy env-sync              # Sync all services
-stx deploy env-sync --dry-run    # Preview changes without applying
-stx deploy env-sync --service streamtex-intro  # Sync one service
-```
-
-This reads your `render.yaml` env vars and pushes them to live Render services via the API. Requires `render login` (stores API key in `~/.render/cli.yaml`).
+For the runtime selector (which manual to serve), set `FOLDER` per
+application in the Coolify env-vars panel.

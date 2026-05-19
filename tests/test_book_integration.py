@@ -494,21 +494,14 @@ class TestStBookBlockArgsKwargs:
         last_call = mock_include.call_args_list[0]
         assert last_call.args[1:] == ("hello", 42)
 
-    def test_legacy_unknown_kwarg_emits_deprecation_warning(self):
-        """The pattern that caused the v0.6.41 crash — st_book(modules, title="X")
-        — should now emit a DeprecationWarning instead of silently corrupting
-        block.build() calls."""
-        import warnings
+    def test_unknown_kwarg_raises_typeerror(self):
+        """Passing an unknown kwarg directly to st_book must raise TypeError
+        (the legacy *args/**kwargs compat shim is removed in 0.7.x)."""
+        import pytest
 
         m = self._make_module("test", lambda **kw: None)
-        with warnings.catch_warnings(record=True) as caught:
-            warnings.simplefilter("always")
+        with pytest.raises(TypeError):
             self._call_st_book_warmup([m], title="my-app")
-
-        deprecation = [w for w in caught if issubclass(w.category, DeprecationWarning)
-                       and "extra args/kwargs" in str(w.message)]
-        assert deprecation, f"Expected DeprecationWarning, got: {[str(w.message) for w in caught]}"
-        assert "title" in str(deprecation[0].message)
 
     def test_no_warning_when_clean_call(self):
         """Calling st_book with only known params and explicit block_kwargs
@@ -521,37 +514,18 @@ class TestStBookBlockArgsKwargs:
             self._call_st_book_warmup([m], block_kwargs={"theme": "dark"})
 
         deprecation = [w for w in caught
-                       if issubclass(w.category, DeprecationWarning)
-                       and "extra args/kwargs" in str(w.message)]
+                       if issubclass(w.category, DeprecationWarning)]
         assert not deprecation, f"Unexpected deprecation: {[str(w.message) for w in deprecation]}"
 
-    def test_legacy_kwargs_still_forwarded_for_backward_compat(self):
-        """During the deprecation period, legacy kwargs are still forwarded
-        to build() (with a warning). Removed in next major version."""
-        import warnings
-
+    def test_block_kwargs_only_path_works(self):
+        """Forwarding kwargs to block.build must go through block_kwargs only."""
         received = {}
         def _build(**kw):
             received.update(kw)
         m = self._make_module("test", _build)
 
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            mock_include = self._call_st_book_warmup([m], theme="dark")
-
-        last_call = mock_include.call_args_list[0]
-        assert last_call.kwargs == {"theme": "dark"}
-
-    def test_block_kwargs_overrides_legacy_kwargs(self):
-        """When both legacy and explicit are passed, explicit wins (Python
-        dict merge semantics)."""
-        import warnings
-
-        m = self._make_module("test", lambda **kw: None)
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            mock_include = self._call_st_book_warmup(
-                [m], theme="light", block_kwargs={"theme": "dark"}
-            )
+        mock_include = self._call_st_book_warmup(
+            [m], block_kwargs={"theme": "dark"}
+        )
         last_call = mock_include.call_args_list[0]
         assert last_call.kwargs == {"theme": "dark"}

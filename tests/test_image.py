@@ -280,7 +280,7 @@ class TestStImage:
 # ===================================================================
 
 class TestStImageAutoGenerate:
-    """Tests for the auto_generate fallback ported from st_ai_image()."""
+    """Tests for the auto_generate fallback in st_image(prompt=..., auto_generate=True)."""
 
     def test_cached_prompt_renders_image(self):
         """prompt + cached → image rendered via cache, no API call."""

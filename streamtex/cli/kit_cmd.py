@@ -18,6 +18,44 @@ def _find_project_dir() -> Path:
     raise click.ClickException("No pyproject.toml in current directory.")
 
 
+def _resolve_local_pack_dir(project_dir: Path, pack_name: str | None) -> tuple[str, Path]:
+    """Return (pack_name, filesystem_path) for a writable local pack.
+
+    Refuses non-local packs (git remote / pypi) and packs not declared in stx.toml.
+    Falls back to the primary local pack when ``pack_name`` is None.
+    """
+    from streamtex.core import discovery
+
+    stx_toml = project_dir / "stx.toml"
+    if pack_name is None:
+        primary = discovery.get_primary_local_pack(stx_toml if stx_toml.is_file() else None)
+        if primary is None:
+            raise click.ClickException(
+                "No primary local pack declared in stx.toml. "
+                "Run `stx pack new <name>` then `stx pack set-primary <name>`."
+            )
+        target_name = primary["name"]
+        target_path = Path(primary["path"])
+    else:
+        entries = _stx_toml.list_packs(project_dir)
+        match = next((e for e in entries if e.get("name") == pack_name), None)
+        if match is None:
+            raise click.ClickException(
+                f"Pack '{pack_name}' is not declared in stx.toml. "
+                f"Run `stx pack new {pack_name}` or `stx pack add ...` first."
+            )
+        if match.get("type") != "local":
+            raise click.ClickException(
+                f"Pack '{pack_name}' is type='{match.get('type')}'; scaffolding only "
+                "supported in local packs. Clone the remote pack locally first."
+            )
+        target_name = pack_name
+        target_path = Path(match.get("path") or pack_name)
+    if not target_path.is_absolute():
+        target_path = (project_dir / target_path).resolve()
+    return target_name, target_path
+
+
 def _iter_kits() -> list[tuple[str, str, Path]]:
     """Return (pack_name, kit_name, kit_path) for every kit found."""
     from streamtex.core import discovery
@@ -101,6 +139,46 @@ def validate_cmd(ref: str | None) -> None:
             console.print(f"[green]{pack_name}:{kit_name} OK[/green]")
     if any_error:
         raise click.ClickException("Some kits failed validation.")
+
+
+@kit.command("new")
+@click.argument("name")
+@click.option("--pack", "pack_name", default=None, help="Destination local pack (default: primary local).")
+@click.option("--design-system", "design_system", default="default", help="DS the kit references (default: 'default').")
+def new_cmd(name: str, pack_name: str | None, design_system: str) -> None:
+    """Scaffold a new kit manifest in the chosen (or primary local) pack."""
+    console = get_console()
+    project_dir = _find_project_dir()
+    target_pack, target_path = _resolve_local_pack_dir(project_dir, pack_name)
+
+    kits_dir = target_path / "kits"
+    kits_dir.mkdir(parents=True, exist_ok=True)
+    kit_file = kits_dir / f"{name}.toml"
+    if kit_file.exists():
+        raise click.ClickException(f"{kit_file} already exists.")
+
+    kit_file.write_text(_kit_skeleton(name, design_system), encoding="utf-8")
+    console.print(f"[green]Kit scaffolded: {kit_file}[/green]")
+    console.print(
+        f"Edit the [components] include list, then run `stx kit validate {target_pack}:{name}`."
+    )
+
+
+def _kit_skeleton(name: str, design_system: str) -> str:
+    return f'''# Kit: {name} — TODO short description.
+
+name = "{name}"
+description = "TODO"
+since = "2026-05-19"
+
+[design_system]
+ref = "{design_system}"
+
+[components]
+include = [
+    # "component_name",
+]
+'''
 
 
 @kit.command("install")

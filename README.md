@@ -371,7 +371,7 @@ the `streamtex-design` pack is added automatically to the project's
 - **Block containers** — `st_block` / `st_span` context managers
 - **Lists** — `st_list` with ul/ol, custom bullets, centered alignment
 - **Images** — `st_image` with base64 encoding and MIME detection
-- **AI image generation** — `st_ai_image` / `st_ai_image_widget` with OpenAI, Google Imagen, fal.ai
+- **AI image generation** — `st_image(prompt=..., editable=True, name=...)` with OpenAI, Google Imagen, fal.ai (built-in editor panel)
 - **Code blocks** — `st_code` with Pygments syntax highlighting
 - **Diagrams** — Mermaid, PlantUML, TikZ with pan/zoom
 - **LaTeX** — math formulas and full documents

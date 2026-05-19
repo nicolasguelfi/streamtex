@@ -1,4 +1,4 @@
-"""Deploy commands: preflight, docker, render, huggingface, and status."""
+"""Deploy commands: preflight, docker, hetzner/coolify, huggingface, and status."""
 
 import glob
 import json
@@ -103,6 +103,14 @@ sys.exit(1) if i < r else sys.exit(0)" || \\
 
 # Copy project files
 COPY . .
+
+# Install any [[packs]] type="local" declared in stx.toml with a relative path.
+# Absolute paths are skipped — handle them upstream via `stx deploy preflight`
+# or by promoting the pack to git (`stx component promote`).
+RUN if [ -f stx.toml ]; then \\
+        uv run python -m streamtex.cli._install_local_packs || \\
+        { echo "ERROR: local pack install failed"; exit 1; } ; \\
+    fi
 
 # Nginx configuration for dual-mode (Streamlit + static HTML)
 COPY nginx.conf /etc/nginx/nginx.conf
@@ -413,6 +421,35 @@ def run_preflight(
     else:
         checks.append(PreflightCheck("Dockerfile", "warn", "Missing"))
 
+    # 7bis. stx.toml local packs use relative paths (G4b)
+    stx_toml_path = os.path.join(p, "stx.toml")
+    if os.path.isfile(stx_toml_path):
+        import tomllib
+
+        with open(stx_toml_path, "rb") as f:
+            stx_data = tomllib.load(f)
+        absolute_packs = []
+        for entry in stx_data.get("packs", []):
+            if not isinstance(entry, dict) or entry.get("type") != "local":
+                continue
+            path_raw = entry.get("path") or ""
+            if path_raw and os.path.isabs(path_raw):
+                absolute_packs.append(
+                    f"{entry.get('name', '<unnamed>')} -> {path_raw}"
+                )
+        if absolute_packs:
+            checks.append(
+                PreflightCheck(
+                    "local packs",
+                    "warn",
+                    "Absolute path(s) won't be available in container: "
+                    + "; ".join(absolute_packs)
+                    + ". Move into project or `stx component promote`.",
+                )
+            )
+        else:
+            checks.append(PreflightCheck("local packs", "pass", "All relative or none"))
+
     # 8. Tests pass (skippable)
     if not skip_tests:
         uv = _find_uv()
@@ -455,7 +492,7 @@ def run_preflight(
 
 
 # ---------------------------------------------------------------------------
-# Render helpers
+# Deploy helpers (git remote detection, manual discovery, service naming)
 # ---------------------------------------------------------------------------
 
 
@@ -513,7 +550,7 @@ def discover_manuals(project_path: str) -> list[str]:
 
 
 def derive_service_name(manual_path: str) -> str:
-    """Derive a Render service name from a manual directory path.
+    """Derive a Coolify service name from a manual directory path.
 
     ``manuals/stx_manual_intro`` → ``streamtex-intro``
     ``manuals/stx_manuals_collection`` → ``streamtex-collection``
@@ -542,53 +579,6 @@ def parse_env_vars(env_list: tuple[str, ...]) -> list[tuple[str, str]]:
             )
         result.append((key, value))
     return result
-
-
-def generate_render_service(
-    *,
-    name: str,
-    repo: str,
-    branch: str,
-    plan: str,
-    env_vars: list[tuple[str, str]],
-    folder: str | None = None,
-    build_filter: bool = False,
-) -> str:
-    """Generate a single Render service YAML block."""
-    lines = [
-        "  - type: web",
-        f"    name: {name}",
-        "    runtime: docker",
-        f"    repo: {repo}",
-        f"    branch: {branch}",
-        f"    plan: {plan}",
-    ]
-
-    if build_filter:
-        lines.append("    buildFilter:")
-        lines.append("      paths:")
-        lines.append("        - \"**\"")
-
-    # Collect env vars
-    all_env: list[tuple[str, str]] = list(env_vars)
-    if folder:
-        all_env.append(("FOLDER", folder))
-
-    # Add STX_PASSWORD=changeme unless user already specified it
-    if not any(k == "STX_PASSWORD" for k, _ in all_env):
-        all_env.append(("STX_PASSWORD", "changeme"))
-
-    lines.append("    envVars:")
-    for key, value in all_env:
-        lines.append(f"      - key: {key}")
-        lines.append(f"        value: {value}")
-
-    return "\n".join(lines)
-
-
-def generate_render_yaml(services: list[str]) -> str:
-    """Assemble a complete ``render.yaml`` from service blocks."""
-    return "services:\n" + "\n\n".join(services) + "\n"
 
 
 # ---------------------------------------------------------------------------
@@ -750,57 +740,6 @@ def setup_hf_remote(project_path: str, space_url: str) -> None:
 # ---------------------------------------------------------------------------
 
 
-def render_service_url(name: str, domain: str | None = None) -> str:
-    """Derive the public URL for a deployed service.
-
-    Parameters
-    ----------
-    name : str
-        Service name (e.g. ``streamtex``, ``streamtex-intro``).
-    domain : str, optional
-        Base domain. If not provided, reads from ``.stx-deploy.env``
-        or ``.stx-deploy.json``, falling back to ``onrender.com``
-        for Render services or ``streamtex.org`` for Coolify.
-    """
-    if domain is None:
-        # Try to read from deploy env / state
-        try:
-            env = _read_deploy_env()
-            domain = env.get("DEPLOY_DOMAIN", "")
-        except click.ClickException:
-            domain = ""
-        if not domain:
-            from .coolify import load_deploy_state as _load_state
-            state = _load_state()
-            domain = state.get("infrastructure", {}).get("domain", {}).get("base", "")
-        if not domain:
-            domain = "streamtex.org"
-
-    if name == "streamtex":
-        subdomain = "docs"
-    elif name.startswith("streamtex-"):
-        subdomain = "docs-" + name[len("streamtex-"):]
-    else:
-        subdomain = name
-    return f"https://{subdomain}.{domain}"
-
-
-def parse_render_yaml_services(project_path: str) -> list[str]:
-    """Extract service names from ``render.yaml``.
-
-    Returns a sorted list of service names. Empty list if file is missing.
-    """
-    yaml_path = os.path.join(project_path, "render.yaml")
-    if not os.path.isfile(yaml_path):
-        return []
-
-    with open(yaml_path, encoding="utf-8") as f:
-        content = f.read()
-
-    names = re.findall(r"^\s+name:\s+(.+)$", content, re.MULTILINE)
-    return sorted(n.strip() for n in names)
-
-
 def http_probe(url: str, timeout: int = 10) -> tuple[str, str]:
     """Probe a URL with HTTP HEAD and return ``(status, message)``.
 
@@ -842,35 +781,6 @@ def parse_hf_remote(project_path: str) -> str | None:
 
     m = re.search(r"huggingface\.co/spaces/([^/]+/[^/]+?)(?:\.git)?$", url)
     return m.group(1) if m else None
-
-
-def check_render_status(
-    project_path: str,
-    name: str | None = None,
-    timeout: int = 10,
-) -> list[DeployStatus]:
-    """Check status of Render services.
-
-    If *name* is provided, probe that single service. Otherwise discover
-    services from ``render.yaml`` or ``manuals/``.
-    """
-    if name:
-        url = render_service_url(name)
-        st, msg = http_probe(url, timeout)
-        return [DeployStatus(name=name, status=st, url=url, message=msg)]
-
-    # Discovery: render.yaml first, fallback to manuals
-    services = parse_render_yaml_services(project_path)
-    if not services:
-        manuals = discover_manuals(project_path)
-        services = [derive_service_name(m) for m in manuals]
-
-    results: list[DeployStatus] = []
-    for svc in services:
-        url = render_service_url(svc)
-        st, msg = http_probe(url, timeout)
-        results.append(DeployStatus(name=svc, status=st, url=url, message=msg))
-    return results
 
 
 def check_hf_status(
@@ -1184,93 +1094,6 @@ def docker(path: str, port: int, tag: str | None, build_only: bool) -> None:
         console.print("[bold green]Done![/bold green] (build-only mode)")
 
 
-@click.command("render")
-@click.argument("path", default=".")
-@click.option("--name", default=None, help="Render service name.")
-@click.option("--branch", default="main", help="Git branch.")
-@click.option("--plan", default="free", help="Render plan (free, starter, etc.).")
-@click.option("--env", "env_pairs", multiple=True, help="KEY=VALUE (repeatable).")
-@click.option("--multi", is_flag=True, help="Multi-service mode (one per manual).")
-def render_cmd(
-    path: str,
-    name: str | None,
-    branch: str,
-    plan: str,
-    env_pairs: tuple[str, ...],
-    multi: bool,
-) -> None:
-    """Generate a render.yaml for Render deployment."""
-    console = get_console()
-    p = os.path.abspath(path)
-
-    # 1. Detect git remote
-    repo = detect_git_remote(p)
-    if repo is None:
-        raise click.ClickException(
-            "No git remote 'origin' found. Add one with: git remote add origin <url>"
-        )
-
-    # 2. Parse --env pairs
-    env_vars = parse_env_vars(env_pairs)
-
-    # 3. Generate Dockerfile if absent
-    _ensure_dockerfile(p, console)
-
-    # 4. Generate services
-    services: list[str] = []
-
-    if multi:
-        manuals = discover_manuals(p)
-        if not manuals:
-            raise click.ClickException(
-                "No manuals/ subdirectories found (stx_manual_* or stx_manuals_*)."
-            )
-
-        from rich.table import Table
-
-        table = Table(title="Render services")
-        table.add_column("Service", style="cyan")
-        table.add_column("Folder")
-
-        for manual in manuals:
-            svc_name = derive_service_name(manual)
-            svc = generate_render_service(
-                name=svc_name,
-                repo=repo,
-                branch=branch,
-                plan=plan,
-                env_vars=env_vars,
-                folder=manual,
-            )
-            services.append(svc)
-            table.add_row(svc_name, manual)
-
-        console.print(table)
-    else:
-        svc_name = name or os.path.basename(p).lower().replace(" ", "-")
-        svc = generate_render_service(
-            name=svc_name,
-            repo=repo,
-            branch=branch,
-            plan=plan,
-            env_vars=env_vars,
-            build_filter=True,
-        )
-        services.append(svc)
-
-    # 5. Write render.yaml
-    yaml_content = generate_render_yaml(services)
-    render_path = os.path.join(p, "render.yaml")
-    with open(render_path, "w", encoding="utf-8") as f:
-        f.write(yaml_content)
-
-    console.print(f"[bold green]render.yaml written[/bold green] → {render_path}")
-    console.print("\n[cyan]Next steps:[/cyan]")
-    console.print("  1. Review render.yaml and update STX_PASSWORD")
-    console.print("  2. git add render.yaml Dockerfile && git commit && git push")
-    console.print("  3. Connect your repo on https://dashboard.render.com")
-
-
 @click.command("huggingface")
 @click.argument("path", default=".")
 @click.option(
@@ -1347,7 +1170,7 @@ def huggingface_cmd(
 
 
 @click.command("status")
-@click.argument("platform", type=click.Choice(["render", "huggingface", "coolify"]))
+@click.argument("platform", type=click.Choice(["huggingface", "coolify"]))
 @click.argument("name", required=False, default=None)
 @click.option("--path", default=".", help="Project path (for service discovery).")
 @click.option("--timeout", default=10, type=int, help="HTTP probe timeout in seconds.")
@@ -1357,7 +1180,7 @@ def status_cmd(
     path: str,
     timeout: int,
 ) -> None:
-    """Check deployment status for Render, Hugging Face, or Coolify."""
+    """Check deployment status for Hugging Face or Coolify."""
     console = get_console()
     p = os.path.abspath(path)
 
@@ -1365,16 +1188,12 @@ def status_cmd(
         _status_coolify(console, name)
         return
 
-    if platform == "render":
-        statuses = check_render_status(p, name=name, timeout=timeout)
-    else:
-        statuses = check_hf_status(p, name=name, timeout=timeout)
+    statuses = check_hf_status(p, name=name, timeout=timeout)
 
     if not statuses:
         console.print("[yellow]No services found.[/yellow]")
         console.print(
-            "Hint: provide a service name, add a render.yaml, "
-            "or configure a 'hf' git remote."
+            "Hint: provide a service name or configure a 'hf' git remote."
         )
         return
 
@@ -1501,305 +1320,6 @@ def _status_coolify(console, name: str | None) -> None:
         table.add_row(app.name, status_icon, mode_str, replica_str, deploy_time, app.fqdn)
 
     console.print(table)
-
-
-# ---------------------------------------------------------------------------
-# Env-sync helpers (Render API)
-# ---------------------------------------------------------------------------
-
-
-def _read_render_cli_config() -> dict[str, str]:
-    """Read ``~/.render/cli.yaml`` and return ``{"api_key": ..., "owner_id": ...}``.
-
-    The file is a simple YAML with ``api-key`` and optional ``owner-id`` fields.
-    We parse it with basic string matching (no extra dependency needed).
-
-    Raises:
-        click.ClickException: if the file is missing or the API key is absent.
-    """
-    cli_yaml = os.path.expanduser("~/.render/cli.yaml")
-    if not os.path.isfile(cli_yaml):
-        raise click.ClickException(
-            f"Render CLI config not found: {cli_yaml}\n"
-            "Install the Render CLI and run 'render login' first."
-        )
-
-    with open(cli_yaml, encoding="utf-8") as f:
-        content = f.read()
-
-    api_key: str | None = None
-    owner_id: str | None = None
-    for line in content.splitlines():
-        line = line.strip()
-        if line.startswith("api-key:"):
-            api_key = line.split(":", 1)[1].strip().strip("\"'")
-        elif line.startswith("owner-id:"):
-            owner_id = line.split(":", 1)[1].strip().strip("\"'")
-
-    if not api_key:
-        raise click.ClickException(
-            f"No api-key found in {cli_yaml}. Run 'render login' first."
-        )
-
-    return {"api_key": api_key, "owner_id": owner_id or ""}
-
-
-def _parse_render_yaml_env_vars(
-    project_path: str,
-) -> dict[str, list[tuple[str, str]]]:
-    """Parse ``render.yaml`` and extract env vars per service.
-
-    Returns ``{service_name: [(key, value), ...]}`` for every service
-    that declares ``envVars``.  Uses regex parsing consistent with
-    :func:`parse_render_yaml_services`.
-    """
-    yaml_path = os.path.join(project_path, "render.yaml")
-    if not os.path.isfile(yaml_path):
-        raise click.ClickException(f"render.yaml not found in {project_path}")
-
-    with open(yaml_path, encoding="utf-8") as f:
-        content = f.read()
-
-    # Split into service blocks (each starts with "  - type:")
-    blocks = re.split(r"(?=^\s+-\s+type:)", content, flags=re.MULTILINE)
-
-    result: dict[str, list[tuple[str, str]]] = {}
-    for block in blocks:
-        name_m = re.search(r"^\s+name:\s+(.+)$", block, re.MULTILINE)
-        if not name_m:
-            continue
-        svc_name = name_m.group(1).strip()
-
-        # Extract envVars section
-        env_section = re.search(
-            r"^\s+envVars:\s*\n((?:\s+-.+\n?|\s+\w.+\n?)*)",
-            block,
-            re.MULTILINE,
-        )
-        if not env_section:
-            result[svc_name] = []
-            continue
-
-        env_text = env_section.group(1)
-        keys = re.findall(r"^\s+-\s+key:\s+(.+)$", env_text, re.MULTILINE)
-        values = re.findall(r"^\s+value:\s+(.+)$", env_text, re.MULTILINE)
-
-        result[svc_name] = [
-            (k.strip(), v.strip()) for k, v in zip(keys, values)
-        ]
-
-    return result
-
-
-def _render_api_get(path: str, api_key: str) -> object:
-    """HTTP GET against the Render API v1."""
-    url = f"https://api.render.com/v1/{path}"
-    req = urllib.request.Request(url)
-    req.add_header("Authorization", f"Bearer {api_key}")
-    req.add_header("Accept", "application/json")
-    try:
-        with urllib.request.urlopen(req, timeout=30) as resp:  # noqa: S310
-            return json.loads(resp.read().decode())
-    except urllib.error.HTTPError as e:
-        body = e.read().decode() if e.fp else ""
-        raise click.ClickException(
-            f"Render API error ({e.code}): {body}"
-        ) from e
-    except urllib.error.URLError as e:
-        raise click.ClickException(f"Render API unreachable: {e}") from e
-
-
-def _render_api_put(path: str, api_key: str, body: object) -> object:
-    """HTTP PUT against the Render API v1."""
-    url = f"https://api.render.com/v1/{path}"
-    data = json.dumps(body).encode()
-    req = urllib.request.Request(url, data=data, method="PUT")
-    req.add_header("Authorization", f"Bearer {api_key}")
-    req.add_header("Content-Type", "application/json")
-    req.add_header("Accept", "application/json")
-    try:
-        with urllib.request.urlopen(req, timeout=30) as resp:  # noqa: S310
-            raw = resp.read().decode()
-            return json.loads(raw) if raw else {}
-    except urllib.error.HTTPError as e:
-        body_text = e.read().decode() if e.fp else ""
-        raise click.ClickException(
-            f"Render API error ({e.code}): {body_text}"
-        ) from e
-    except urllib.error.URLError as e:
-        raise click.ClickException(f"Render API unreachable: {e}") from e
-
-
-def _render_api_post(path: str, api_key: str, body: object = None) -> object:
-    """HTTP POST against the Render API v1."""
-    url = f"https://api.render.com/v1/{path}"
-    data = json.dumps(body).encode() if body else b""
-    req = urllib.request.Request(url, data=data, method="POST")
-    req.add_header("Authorization", f"Bearer {api_key}")
-    req.add_header("Content-Type", "application/json")
-    req.add_header("Accept", "application/json")
-    try:
-        with urllib.request.urlopen(req, timeout=30) as resp:  # noqa: S310
-            raw = resp.read().decode()
-            return json.loads(raw) if raw else {}
-    except urllib.error.HTTPError as e:
-        body_text = e.read().decode() if e.fp else ""
-        raise click.ClickException(
-            f"Render API error ({e.code}): {body_text}"
-        ) from e
-    except urllib.error.URLError as e:
-        raise click.ClickException(f"Render API unreachable: {e}") from e
-
-
-def _resolve_render_service_ids(
-    names: list[str],
-    api_key: str,
-    owner_id: str,
-) -> dict[str, str]:
-    """Map service *names* to Render service IDs via the API.
-
-    Calls ``GET /services`` and filters by the names declared in
-    ``render.yaml``.  Returns ``{name: service_id}``.
-    """
-    params = "limit=100"
-    if owner_id:
-        params += f"&ownerId={owner_id}"
-    data = _render_api_get(f"services?{params}", api_key)
-
-    # Response is a list of {"service": {...}} wrappers
-    mapping: dict[str, str] = {}
-    for item in data:
-        svc = item.get("service", item)  # handle both shapes
-        svc_name = svc.get("name", "")
-        svc_id = svc.get("id", "")
-        if svc_name in names:
-            mapping[svc_name] = svc_id
-
-    return mapping
-
-
-# ---------------------------------------------------------------------------
-# env-sync command
-# ---------------------------------------------------------------------------
-
-
-@click.command("env-sync")
-@click.option("--path", default=".", help="Project directory containing render.yaml.")
-@click.option("--dry-run", is_flag=True, help="Show changes without applying.")
-@click.option("--service", default=None, help="Sync a specific service only.")
-def env_sync_cmd(path: str, dry_run: bool, service: str | None) -> None:
-    """Sync env vars from render.yaml to live Render services."""
-    from rich.table import Table
-
-    console = get_console()
-    p = os.path.abspath(path)
-
-    # 1. Parse render.yaml env vars
-    yaml_env = _parse_render_yaml_env_vars(p)
-    if not yaml_env:
-        raise click.ClickException("No services found in render.yaml.")
-
-    # Filter to a single service if requested
-    if service:
-        if service not in yaml_env:
-            raise click.ClickException(
-                f"Service '{service}' not found in render.yaml. "
-                f"Available: {', '.join(sorted(yaml_env))}"
-            )
-        yaml_env = {service: yaml_env[service]}
-
-    # 2. Read Render CLI config
-    config = _read_render_cli_config()
-    api_key = config["api_key"]
-    owner_id = config["owner_id"]
-
-    # 3. Resolve service IDs
-    console.print("[cyan]Resolving Render service IDs…[/cyan]")
-    id_map = _resolve_render_service_ids(list(yaml_env), api_key, owner_id)
-
-    missing = set(yaml_env) - set(id_map)
-    if missing:
-        console.print(
-            f"[yellow]⚠ Services not found on Render: {', '.join(sorted(missing))}[/yellow]"
-        )
-
-    # 4. Compare and sync
-    any_changes = False
-
-    for svc_name, desired_vars in sorted(yaml_env.items()):
-        svc_id = id_map.get(svc_name)
-        if not svc_id:
-            continue
-
-        # Fetch current env vars from Render
-        current_raw = _render_api_get(
-            f"services/{svc_id}/env-vars", api_key
-        )
-        current_map: dict[str, str] = {
-            item["key"]: item["value"]
-            for item in current_raw
-            if "key" in item and "value" in item
-        }
-
-        desired_map = dict(desired_vars)
-
-        # Compute diff
-        changes: list[tuple[str, str, str]] = []  # (key, current, new)
-        for key, new_val in desired_map.items():
-            old_val = current_map.get(key, "")
-            if old_val != new_val:
-                changes.append((key, old_val, new_val))
-
-        if not changes:
-            console.print(f"[green]✓ {svc_name}[/green]: already in sync")
-            continue
-
-        any_changes = True
-
-        # Display diff table
-        table = Table(title=f"Changes for {svc_name}")
-        table.add_column("Key", style="cyan")
-        table.add_column("Current")
-        table.add_column("→")
-        table.add_column("New", style="green")
-
-        for key, old_val, new_val in changes:
-            display_old = old_val if old_val else "[dim](not set)[/dim]"
-            table.add_row(key, display_old, "→", new_val)
-
-        console.print(table)
-
-        # Apply if not dry-run
-        if not dry_run:
-            # Build the full env var list for PUT (bulk replace)
-            put_body = [
-                {"key": k, "value": v} for k, v in desired_map.items()
-            ]
-            _render_api_put(
-                f"services/{svc_id}/env-vars", api_key, put_body
-            )
-            console.print(
-                f"  [bold green]✓ {svc_name}[/bold green]: "
-                f"{len(changes)} env var(s) updated"
-            )
-
-    if dry_run and any_changes:
-        console.print(
-            "\n[yellow]Dry-run mode — no changes applied. "
-            "Remove --dry-run to apply.[/yellow]"
-        )
-    elif not any_changes:
-        console.print("\n[bold green]All services are already in sync.[/bold green]")
-    else:
-        # Propose redeploy
-        console.print()
-        if click.confirm("Trigger a redeploy for updated services?", default=False):
-            for svc_name in sorted(yaml_env):
-                svc_id = id_map.get(svc_name)
-                if svc_id:
-                    _render_api_post(f"services/{svc_id}/deploys", api_key)
-                    console.print(f"  [cyan]↻ {svc_name}[/cyan]: deploy triggered")
-            console.print("[bold green]Redeploy triggered![/bold green]")
 
 
 # ---------------------------------------------------------------------------

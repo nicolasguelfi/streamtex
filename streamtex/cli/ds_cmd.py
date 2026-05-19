@@ -18,6 +18,44 @@ def _find_project_dir() -> Path:
     raise click.ClickException("No pyproject.toml in current directory.")
 
 
+def _resolve_local_pack_dir(project_dir: Path, pack_name: str | None) -> tuple[str, Path]:
+    """Return (pack_name, filesystem_path) for a writable local pack.
+
+    Refuses non-local packs (git remote / pypi) and packs not declared in stx.toml.
+    Falls back to the primary local pack when ``pack_name`` is None.
+    """
+    from streamtex.core import discovery
+
+    stx_toml = project_dir / "stx.toml"
+    if pack_name is None:
+        primary = discovery.get_primary_local_pack(stx_toml if stx_toml.is_file() else None)
+        if primary is None:
+            raise click.ClickException(
+                "No primary local pack declared in stx.toml. "
+                "Run `stx pack new <name>` then `stx pack set-primary <name>`."
+            )
+        target_name = primary["name"]
+        target_path = Path(primary["path"])
+    else:
+        entries = _stx_toml.list_packs(project_dir)
+        match = next((e for e in entries if e.get("name") == pack_name), None)
+        if match is None:
+            raise click.ClickException(
+                f"Pack '{pack_name}' is not declared in stx.toml. "
+                f"Run `stx pack new {pack_name}` or `stx pack add ...` first."
+            )
+        if match.get("type") != "local":
+            raise click.ClickException(
+                f"Pack '{pack_name}' is type='{match.get('type')}'; scaffolding only "
+                "supported in local packs. Clone the remote pack locally first."
+            )
+        target_name = pack_name
+        target_path = Path(match.get("path") or pack_name)
+    if not target_path.is_absolute():
+        target_path = (project_dir / target_path).resolve()
+    return target_name, target_path
+
+
 @click.group()
 def ds():
     """Manage design systems available across installed packs."""
@@ -90,6 +128,62 @@ def switch_cmd(ref: str) -> None:
     project_dir = _find_project_dir()
     _stx_toml.set_design_system(project_dir, ref)
     console.print(f"[green]design_system.use = {ref}[/green]")
+
+
+@ds.command("new")
+@click.argument("name")
+@click.option("--pack", "pack_name", default=None, help="Destination local pack (default: primary local).")
+def new_cmd(name: str, pack_name: str | None) -> None:
+    """Scaffold a new design system in the chosen (or primary local) pack."""
+    console = get_console()
+    project_dir = _find_project_dir()
+    target_pack, target_path = _resolve_local_pack_dir(project_dir, pack_name)
+
+    ds_root = target_path / "design_systems" / name
+    if ds_root.exists():
+        raise click.ClickException(f"{ds_root} already exists.")
+    ds_root.mkdir(parents=True, exist_ok=False)
+
+    init_file = ds_root / "__init__.py"
+    init_file.write_text(_ds_skeleton(name), encoding="utf-8")
+    console.print(f"[green]Design system scaffolded: {init_file}[/green]")
+    console.print(
+        f"Edit the bundles, then run `stx ds validate {target_pack}:{name}` to check Protocol conformance."
+    )
+
+
+def _ds_skeleton(name: str) -> str:
+    return f'''"""{name} — design system (TODO short description).
+
+Bundles exposed: TODO (e.g. colors, titles, callouts, body).
+"""
+
+from streamtex.styles import Style
+
+
+class _Colors:
+    primary = Style("color: #000000;", "primary")
+    bg = Style("background-color: #ffffff;", "bg")
+    text = Style("color: #000000;", "text")
+
+
+class _Titles:
+    section = Style("font-size: 28px; font-weight: 700;", "title_section")
+    body = Style("font-size: 18px;", "title_body")
+
+
+class _Body:
+    paragraph = Style("font-size: 16px; line-height: 1.6;", "body_p")
+
+
+class DesignSystem:
+    """The {name} design system."""
+
+    name = "{name}"
+    colors = _Colors
+    titles = _Titles
+    body = _Body
+'''
 
 
 @ds.command("validate")

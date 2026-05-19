@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.43] — 2026-05-19 (Wave 2 MIG-3 — `stx project new` modernised)
+
+### Added
+- `stx project new` accepts the new reuse-architecture flags
+  (PLAN §7.1 / Q7 + Q8): `--kit <pack>:<kit_name>`,
+  `--pack <ref>` (repeatable), `--pack-name <name>` (default `mypack`),
+  `--no-mypack`.
+- `stx project new` now generates `stx.toml` at the project root
+  (PLAN §6.1) and scaffolds the local primary pack (`<pack_name>/`)
+  with its `pyproject.toml`, `_pack_manifest.toml`, and the four
+  subdirectories (`components/`, `design_systems/`, `cli_templates/`,
+  `kits/`). After `uv sync` the pack is installed in editable mode
+  (`uv pip install -e ./<pack_name>`).
+- Project validation: 4 new checks (11-14) — `stx.toml` parsability,
+  primary pack directory + manifest, primary pack importability,
+  exactly-one-primary uniqueness.
+- New helpers in `streamtex/cli/project_cmd.py`:
+  `generate_stx_toml`, `generate_mypack_pyproject_toml`,
+  `generate_mypack_manifest`, `scaffold_mypack`, `_resolve_kit`,
+  `_split_kit_ref`.
+- Legacy `--template <X>` is preserved as an alias to
+  `--kit streamtex_design:<X>-default` (or `slides-modern-dark` for
+  `--template slides`) — falls back to the rich template path when the
+  kit cannot be resolved.
+- 10 new tests in `tests/test_cli_project.py`. Full suite: 2215 passed.
+
 ## [0.6.42] — 2026-05-19 (Wave 1 — reuse architecture foundations)
 
 ### Added

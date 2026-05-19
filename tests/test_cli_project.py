@@ -644,3 +644,164 @@ def test_project_new_help():
     assert "--no-git" in result.output
     assert "--no-sync" in result.output
     assert "--no-claude" in result.output
+    assert "--kit" in result.output
+    assert "--pack-name" in result.output
+    assert "--no-mypack" in result.output
+
+
+# ---------------------------------------------------------------------------
+# MIG-3 — Reuse architecture generators + scaffolding (PLAN §7.1.6)
+# ---------------------------------------------------------------------------
+
+
+def test_generate_stx_toml_schema():
+    from streamtex.cli.project_cmd import generate_stx_toml
+
+    content = generate_stx_toml(
+        "demo",
+        pack_name="mypack",
+        kit_ref="streamtex_design:project-default",
+        design_system_ref="default",
+    )
+    data = tomllib.loads(content)
+    assert data["project"]["name"] == "demo"
+    packs = data["packs"]
+    primary = [p for p in packs if p.get("primary") is True]
+    assert len(primary) == 1
+    assert primary[0]["type"] == "local"
+    assert primary[0]["name"] == "mypack"
+    assert data["design_system"]["ref"] == "default"
+    assert data["kit"]["ref"] == "streamtex_design:project-default"
+
+
+def test_generate_stx_toml_no_mypack():
+    from streamtex.cli.project_cmd import generate_stx_toml
+
+    content = generate_stx_toml("demo", pack_name=None)
+    data = tomllib.loads(content)
+    assert "packs" not in data or all(
+        p.get("primary") is not True for p in data.get("packs", [])
+    )
+
+
+def test_generate_mypack_pyproject_toml():
+    from streamtex.cli.project_cmd import generate_mypack_pyproject_toml
+
+    content = generate_mypack_pyproject_toml("mypack")
+    data = tomllib.loads(content)
+    assert data["project"]["name"] == "mypack"
+    entry_points = data["project"]["entry-points"]["streamtex.packs"]
+    assert entry_points["mypack"] == "mypack"
+
+
+def test_scaffold_creates_mypack(tmp_path):
+    from streamtex.cli.project_cmd import scaffold_mypack
+
+    created = scaffold_mypack(str(tmp_path), "mypack")
+    assert any(p.endswith("pyproject.toml") for p in created)
+    assert (tmp_path / "mypack" / "mypack" / "_pack_manifest.toml").exists()
+    assert (tmp_path / "mypack" / "mypack" / "components" / ".gitkeep").exists()
+    assert (tmp_path / "mypack" / "mypack" / "design_systems" / ".gitkeep").exists()
+    assert (tmp_path / "mypack" / "mypack" / "kits" / ".gitkeep").exists()
+
+
+def test_new_no_mypack_flag(tmp_path):
+    runner = CliRunner()
+    os.chdir(tmp_path)
+    result = runner.invoke(
+        cli,
+        [
+            "project", "new", "demo",
+            "--no-mypack", "--no-claude", "--no-sync", "--no-git",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    target = tmp_path / "demo"
+    assert (target / "stx.toml").exists()
+    assert not (target / "mypack").exists()
+
+
+def test_new_pack_name_override(tmp_path):
+    runner = CliRunner()
+    os.chdir(tmp_path)
+    result = runner.invoke(
+        cli,
+        [
+            "project", "new", "demo",
+            "--pack-name", "stuff",
+            "--no-claude", "--no-sync", "--no-git",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    target = tmp_path / "demo"
+    assert (target / "stuff" / "stuff" / "_pack_manifest.toml").exists()
+    assert not (target / "mypack").exists()
+    stx_data = tomllib.loads((target / "stx.toml").read_text())
+    primary = [p for p in stx_data["packs"] if p.get("primary") is True]
+    assert primary and primary[0]["name"] == "stuff"
+
+
+def test_new_kit_records_in_stx_toml(tmp_path):
+    """`--kit <ref>` records the kit and (when the pack is importable) the
+    design system in stx.toml. Falls back gracefully when the pack is missing
+    from the test venv (the CLI prints a warning and continues)."""
+    runner = CliRunner()
+    os.chdir(tmp_path)
+    result = runner.invoke(
+        cli,
+        [
+            "project", "new", "demo",
+            "--kit", "streamtex_design:slides-modern-dark",
+            "--no-claude", "--no-sync", "--no-git", "--no-mypack",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    stx_data = tomllib.loads((tmp_path / "demo" / "stx.toml").read_text())
+    assert stx_data["kit"]["ref"] == "streamtex_design:slides-modern-dark"
+
+    try:
+        import streamtex_design  # noqa: F401
+        kit_importable = True
+    except ModuleNotFoundError:
+        kit_importable = False
+
+    if kit_importable:
+        assert stx_data["design_system"]["ref"] == "modern_dark"
+        styles_py = (tmp_path / "demo" / "custom" / "styles.py").read_text()
+        assert "streamtex_design.design_systems.modern_dark" in styles_py
+
+
+def test_validate_check_stx_toml(tmp_path):
+    """Check 11: stx.toml present and parsable."""
+    proj = _make_valid_project(tmp_path)
+    (proj / "stx.toml").write_text("[project]\nname = \"demo\"\n")
+    checks = validate_project(str(proj))
+    stx_checks = [c for c in checks if c.name == "stx.toml"]
+    assert stx_checks and stx_checks[0].status == "pass"
+
+
+def test_validate_check_mypack_dir(tmp_path):
+    """Check 12: primary pack dir + _pack_manifest.toml."""
+    from streamtex.cli.project_cmd import generate_stx_toml, scaffold_mypack
+
+    proj = _make_valid_project(tmp_path)
+    (proj / "stx.toml").write_text(
+        generate_stx_toml("demo", pack_name="mypack")
+    )
+    scaffold_mypack(str(proj), "mypack")
+    checks = validate_project(str(proj))
+    pack_dir = [c for c in checks if c.name == "primary pack dir"]
+    assert pack_dir and pack_dir[0].status == "pass"
+
+
+def test_validate_check_primary_unique_fails_on_duplicates(tmp_path):
+    """Check 14: more than one primary local pack must fail."""
+    proj = _make_valid_project(tmp_path)
+    (proj / "stx.toml").write_text(
+        '[project]\nname="demo"\n\n'
+        '[[packs]]\ntype="local"\nname="a"\npath="./a"\nprimary=true\n\n'
+        '[[packs]]\ntype="local"\nname="b"\npath="./b"\nprimary=true\n'
+    )
+    checks = validate_project(str(proj))
+    unique = [c for c in checks if c.name == "primary pack unique"]
+    assert unique and unique[0].status == "fail"

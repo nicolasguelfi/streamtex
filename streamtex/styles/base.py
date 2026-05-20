@@ -95,22 +95,25 @@ class StxStyles:
     scale = _IndexedScale
 
     # --- Tailwind-style aliases ---
-    # Names map to specific palier indices. If the user picks a different
-    # ScaleCurve at runtime, the index→pt mapping changes but the alias
-    # names stay stable.
-    text_xs    = text.sizes.idx_2    # 10pt desktop (caption)
-    text_sm    = text.sizes.idx_3    # 11pt
-    text_base  = text.sizes.idx_4    # 12pt (body baseline)
-    text_lg    = text.sizes.idx_5    # 14pt
-    text_xl    = text.sizes.idx_6    # 16pt
-    text_2xl   = text.sizes.idx_7    # 18pt
-    text_3xl   = text.sizes.idx_9    # 22pt
-    text_4xl   = text.sizes.idx_10   # 24pt
-    text_5xl   = text.sizes.idx_12   # 32pt
-    text_6xl   = text.sizes.idx_15   # 48pt
-    text_7xl   = text.sizes.idx_16   # 60pt
-    text_8xl   = text.sizes.idx_17   # 72pt
-    text_9xl   = text.sizes.idx_19   # 128pt
+    # Anchored on the BASE palier (idx_7 = base_pt_desktop). text_base is
+    # literally the source-of-truth base. Smaller aliases (text_xs/sm)
+    # render at floor-respecting sizes ≥ 14pt = 18.7px on desktop with
+    # default base_pt_desktop=18. Larger aliases scale up by curve ratios.
+    # The base re-anchors automatically if the user passes
+    # st_book(scale=ScaleConfig(base_pt_desktop=...)).
+    text_xs    = text.sizes.idx_5    # palier 5 = 0.78 × base = 14pt @18
+    text_sm    = text.sizes.idx_6    # palier 6 = 0.89 × base = 16pt @18
+    text_base  = text.sizes.idx_7    # palier 7 = 1.00 × base = 18pt @18 (BASE)
+    text_lg    = text.sizes.idx_8    # palier 8 = 1.11 × base = 20pt @18
+    text_xl    = text.sizes.idx_9    # palier 9 = 1.22 × base = 22pt @18
+    text_2xl   = text.sizes.idx_10   # palier 10 = 1.33 × base = 24pt @18
+    text_3xl   = text.sizes.idx_11   # palier 11 = 1.56 × base = 28pt @18
+    text_4xl   = text.sizes.idx_12   # palier 12 = 1.78 × base = 32pt @18
+    text_5xl   = text.sizes.idx_13   # palier 13 = 2.00 × base = 36pt @18
+    text_6xl   = text.sizes.idx_15   # palier 15 = 2.67 × base = 48pt @18
+    text_7xl   = text.sizes.idx_16   # palier 16 = 3.33 × base = 60pt @18
+    text_8xl   = text.sizes.idx_17   # palier 17 = 4.00 × base = 72pt @18
+    text_9xl   = text.sizes.idx_19   # palier 19 = 7.11 × base = 128pt @18
 
 
 # Backward compatibility alias (deprecated)

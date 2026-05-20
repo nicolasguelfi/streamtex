@@ -522,6 +522,7 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
             presentation_profiles: list[PresentationProfile] | None = None,
             doc_version: str | None = None,
             loading: bool = True,
+            scale=None,
             block_args: tuple = (),
             block_kwargs: dict | None = None):
     """Generates a web page e-book from a list of block modules.
@@ -547,6 +548,10 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
     :param page_width: Page width as % of browser width (default 90).
     :param zoom: Default zoom level as % (default 100).
     :param loading: If True (default), show a full-screen overlay with progress during loading.
+    :param scale: Optional ``ScaleConfig`` to override the indexed responsive
+        font scale for this document only. When provided, an inline ``<style>``
+        block is emitted after the default CSS load, redefining
+        ``--stx-scale-0..N`` for desktop / tablet / mobile breakpoints.
     :param block_args: Positional args forwarded verbatim to every
         ``block.build()`` call.
     :param block_kwargs: Keyword args forwarded verbatim to every
@@ -789,6 +794,14 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
 
     # Load default CSS styles
     load_css("default.css")
+
+    # Inject per-document scale override if a ScaleConfig was provided.
+    if scale is not None:
+        from .styles.scale import emit_scale_css
+        st.markdown(
+            f"<style>\n{emit_scale_css(scale)}\n</style>",
+            unsafe_allow_html=True,
+        )
 
     # Ensure the hover card is ready before any content is rendered.
     inject_link_preview_scaffold()

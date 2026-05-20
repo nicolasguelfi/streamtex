@@ -63,6 +63,55 @@ class StxStyles:
     tiny = text.sizes.tiny_size
     """4pt"""
 
+    # --- Indexed responsive scale (subscript access) ---
+    class _IndexedScale:
+        """Subscript access: ``s.scale[0]`` … ``s.scale[28]``.
+
+        Out-of-range indices are clamped to the valid range (debug-logged).
+        """
+
+        _cache = [getattr(text.sizes, f"idx_{i}") for i in range(29)]
+        _count = 29
+
+        def __class_getitem__(cls, i):
+            if not isinstance(i, int):
+                raise TypeError(
+                    f"scale index must be int, got {type(i).__name__}"
+                )
+            if i < 0:
+                import logging
+                logging.getLogger("streamtex.styles").debug(
+                    "scale[%d] clamped to scale[0]", i
+                )
+                i = 0
+            elif i >= cls._count:
+                import logging
+                logging.getLogger("streamtex.styles").debug(
+                    "scale[%d] clamped to scale[%d]", i, cls._count - 1
+                )
+                i = cls._count - 1
+            return cls._cache[i]
+
+    scale = _IndexedScale
+
+    # --- Tailwind-style aliases ---
+    # Names map to specific palier indices. If the user picks a different
+    # ScaleCurve at runtime, the index→pt mapping changes but the alias
+    # names stay stable.
+    text_xs    = text.sizes.idx_2    # 10pt desktop (caption)
+    text_sm    = text.sizes.idx_3    # 11pt
+    text_base  = text.sizes.idx_4    # 12pt (body baseline)
+    text_lg    = text.sizes.idx_5    # 14pt
+    text_xl    = text.sizes.idx_6    # 16pt
+    text_2xl   = text.sizes.idx_7    # 18pt
+    text_3xl   = text.sizes.idx_9    # 22pt
+    text_4xl   = text.sizes.idx_10   # 24pt
+    text_5xl   = text.sizes.idx_12   # 32pt
+    text_6xl   = text.sizes.idx_15   # 48pt
+    text_7xl   = text.sizes.idx_16   # 60pt
+    text_8xl   = text.sizes.idx_17   # 72pt
+    text_9xl   = text.sizes.idx_19   # 128pt
+
 
 # Backward compatibility alias (deprecated)
 StreamTeX_Styles = StxStyles

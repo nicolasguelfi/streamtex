@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.5] — 2026-05-20 — Indexed responsive font scale
+
+### Added
+
+- Indexed responsive font scale: 29-palier scale with 4 named curves
+  (`word_processor`, `geometric`, `body_centric`, `bell`). Three access
+  modes: attribute (`s.idx_N`), subscript (`s.scale[N]`), Tailwind alias
+  (`s.text_xs` … `s.text_9xl`).
+- New API: `ScaleConfig` dataclass + `ScaleCurve` enum +
+  `compute_scale()` + `emit_scale_css()` exported from `streamtex`.
+- Per-document configuration via `st_book(scale=ScaleConfig(...))` —
+  inline `<style>` block injected after `default.css` load.
+- Data-driven curves stored in `streamtex/styles/scale_curves.toml`;
+  editable without code changes.
+- Out-of-range subscript indices clamped (no exceptions) with debug
+  logging — `s.scale[-5]` → `s.scale[0]`, `s.scale[100]` → `s.scale[28]`.
+
+### Changed
+
+- `default.css` extended with 87 new CSS custom properties
+  (`--stx-scale-0..28` × 3 breakpoints) inside a BEGIN/END marker block
+  generated from `scale_curves.toml`.
+- No existing tokens or CSS variables removed; full backwards compatibility
+  for `s.tiny`/`s.medium`/`s.LARGE`/… and `s.pt4`/`s.pt196` scales.
+
 ## [0.7.4] — 2026-05-19 — Pack Engineering availability (docs-only)
 
 Documents the availability of the **Pack Engineering (PE)** module that

@@ -31,6 +31,9 @@ __version__ = _pkg_version("streamtex")
 # Core style system
 from .styles import Style, ListStyle, StyleGrid, StxStyles, StreamTeX_Styles, theme
 
+# Indexed responsive font scale (Layer 1 API)
+from .styles.scale import ScaleConfig, ScaleCurve, compute_scale, emit_scale_css
+
 # Content rendering
 from .write import st_write
 from .image import st_image, configure_image_path

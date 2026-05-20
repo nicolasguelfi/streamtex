@@ -1,0 +1,39 @@
+# streamtex/styles/scale_curves.toml
+#
+# Source of truth for the indexed responsive font scale.
+# Each curve provides 29 pt values per breakpoint (desktop / tablet / mobile).
+# Editing this file is enough to ship new values — no Python code changes
+# required. After editing, regenerate the static CSS block:
+#
+#   uv run python -m streamtex.styles.scale > /tmp/scale_block.css
+#
+# Then paste the output into streamtex/static/default.css between the
+# BEGIN/END markers in the "Indexed responsive font scale" section.
+
+[metadata]
+schema_version = "0.1"
+default_curve = "word_processor"
+
+[word_processor]
+description = "Classical word-processor scale (Word/Google Docs/LibreOffice lineage). Fine at small sizes, coarser in display range."
+desktop = [8, 9, 10, 11, 12, 14, 16, 18, 20, 22, 24, 28, 32, 36, 40, 48, 60, 72, 96, 128, 156, 168, 180, 188, 192, 194, 195, 196, 200]
+tablet  = [7, 8, 9, 10, 11, 12, 14, 16, 18, 20, 22, 24, 26, 30, 36, 42, 50, 60, 78, 100, 120, 130, 140, 145, 148, 150, 152, 154, 156]
+mobile  = [6, 7, 7, 8, 9, 10, 11, 13, 14, 16, 18, 20, 22, 26, 30, 36, 42, 50, 64, 84, 100, 108, 116, 120, 124, 126, 128, 130, 132]
+
+[geometric]
+description = "Pure geometric progression — equal ratios between paliers (factor ≈ 1.15)."
+desktop = [10, 11, 13, 15, 17, 20, 23, 26, 30, 35, 40, 46, 53, 61, 70, 81, 93, 107, 123, 142, 163, 187, 215, 247, 284, 327, 376, 432, 497]
+tablet  = [8, 9, 10, 12, 14, 16, 18, 21, 24, 28, 32, 37, 43, 49, 56, 65, 75, 86, 99, 114, 131, 150, 173, 199, 228, 263, 302, 347, 399]
+mobile  = [6, 7, 8, 9, 10, 12, 14, 16, 18, 21, 24, 28, 32, 37, 42, 49, 56, 65, 75, 86, 99, 114, 131, 150, 173, 199, 228, 262, 301]
+
+[body_centric]
+description = "Granularity concentrated in the body range (14-32pt). Sparse at extremes."
+desktop = [8, 11, 13, 14, 15, 16, 17, 18, 20, 22, 24, 26, 28, 32, 36, 44, 56, 72, 96, 128, 160, 176, 184, 188, 190, 192, 193, 194, 196]
+tablet  = [7, 9, 11, 12, 13, 14, 15, 16, 17, 19, 21, 23, 25, 28, 32, 38, 46, 56, 72, 96, 120, 132, 138, 141, 143, 144, 145, 146, 147]
+mobile  = [6, 8, 9, 10, 11, 12, 13, 14, 15, 16, 18, 20, 22, 24, 28, 34, 40, 50, 64, 84, 100, 110, 115, 118, 120, 121, 122, 123, 124]
+
+[bell]
+description = "Bell-shaped: sparse at small + large, dense in the middle (typical for presentations with one giant hero + small captions)."
+desktop = [6, 9, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 36, 40, 48, 64, 88, 120, 160, 196, 196, 196, 196, 196, 196, 196, 196, 196]
+tablet  = [5, 7, 10, 12, 14, 15, 16, 17, 18, 20, 22, 24, 26, 30, 34, 40, 52, 72, 96, 128, 156, 156, 156, 156, 156, 156, 156, 156, 156]
+mobile  = [4, 6, 8, 10, 12, 13, 14, 15, 16, 17, 18, 20, 22, 25, 28, 34, 44, 60, 80, 108, 132, 132, 132, 132, 132, 132, 132, 132, 132]

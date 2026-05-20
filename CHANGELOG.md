@@ -7,6 +7,87 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.6] — 2026-05-20 — Indexed font scale: relative architecture
+
+### Changed
+
+- `scale_curves.toml` rewritten to v0.2 **relative** schema: one
+  `base_pt_desktop` value (default 18) + 29 adimensional ratios per
+  curve. Changing the base re-scales every palier, every breakpoint,
+  every curve proportionally. The v0.1 absolute-pt format (87 ints per
+  curve) is gone.
+- `ScaleConfig` gains 4 optional override fields: `base_pt_desktop`,
+  `base_idx`, `tablet_scale`, `mobile_scale`. Per-document fine-tuning
+  no longer requires constructing custom 29-value lists.
+- Tablet/mobile pt values are now derived (`tablet = desktop × 0.85`,
+  `mobile = desktop × 0.70`) instead of hand-tuned per palier. Most
+  tablet/mobile pt values shift by ±1-3pt as a result.
+- All 4 named curves (`word_processor`, `geometric`, `body_centric`,
+  `bell`) now share the SAME base palier (idx_7 = `base_pt_desktop`).
+  Previously each curve had its own absolute scale. `GEOMETRIC` and
+  `BELL` therefore render at smaller default pt values than in 0.7.5
+  — switch via `ScaleConfig(base_pt_desktop=X)` to compensate if you
+  relied on the previous larger geometric scale.
+- Tailwind aliases **rebased on the BASE palier**:
+  `s.text_base = idx_7 = 18pt` (was `idx_4 = 12pt`). Smaller aliases
+  (`text_xs/sm`) now resolve to paliers ≥ 14pt = 18.67px on desktop,
+  respecting the ≥18px content floor automatically. Larger aliases
+  shift by +3 palier indices to keep the visual spread.
+- `default.css` regenerated with the new derivation; desktop palier
+  pt values unchanged from 0.7.5 (round-trip exact), tablet/mobile
+  shift ±1-3pt.
+
+### Migration
+
+- Code using `s.text_xs` / `s.text_sm` / `s.text_base` for body copy
+  now renders at floor-respecting sizes automatically. Blocks that
+  used `s.text_base` expecting 12pt → now get 18pt; verify any layout
+  that depended on the previous smaller size.
+- Code using `s.scale[N]` or `s.idx_N` (direct palier access) is
+  unaffected on the default WORD_PROCESSOR curve (round-trip exact);
+  GEOMETRIC / BELL curves shift due to the harmonized base.
+- Custom curve overrides previously passed `list[int]` of 29 pt
+  values; they now accept `list[float]` of ratios. A backward-
+  compat shim auto-detects integer lists ≥ 6 and treats them as
+  legacy pt-list (deprecation warning logged, auto-normalized to
+  ratios).
+
+### Added
+
+- `streamtex/scripts/migrate_curves_to_relative.py` — one-shot
+  migration helper that converts a v0.1 TOML to v0.2.
+- 9 new tests in `test_scale.py::TestRelativeArchitectureV02`
+  covering base override, breakpoint scale override, alias re-
+  anchoring, curve-base harmonization, ratio validation.
+- `_BASE_PT_DESKTOP_DEFAULT`, `_BASE_IDX_DEFAULT`,
+  `_TABLET_SCALE_DEFAULT`, `_MOBILE_SCALE_DEFAULT` module constants
+  exposed from `streamtex.styles.scale` for introspection.
+
+## [0.7.5] — 2026-05-20 — Indexed responsive font scale
+
+### Added
+
+- Indexed responsive font scale: 29-palier scale with 4 named curves
+  (`word_processor`, `geometric`, `body_centric`, `bell`). Three access
+  modes: attribute (`s.idx_N`), subscript (`s.scale[N]`), Tailwind alias
+  (`s.text_xs` … `s.text_9xl`).
+- New API: `ScaleConfig` dataclass + `ScaleCurve` enum +
+  `compute_scale()` + `emit_scale_css()` exported from `streamtex`.
+- Per-document configuration via `st_book(scale=ScaleConfig(...))` —
+  inline `<style>` block injected after `default.css` load.
+- Data-driven curves stored in `streamtex/styles/scale_curves.toml`;
+  editable without code changes.
+- Out-of-range subscript indices clamped (no exceptions) with debug
+  logging — `s.scale[-5]` → `s.scale[0]`, `s.scale[100]` → `s.scale[28]`.
+
+### Changed
+
+- `default.css` extended with 87 new CSS custom properties
+  (`--stx-scale-0..28` × 3 breakpoints) inside a BEGIN/END marker block
+  generated from `scale_curves.toml`.
+- No existing tokens or CSS variables removed; full backwards compatibility
+  for `s.tiny`/`s.medium`/`s.LARGE`/… and `s.pt4`/`s.pt196` scales.
+
 ## [0.7.4] — 2026-05-19 — Pack Engineering availability (docs-only)
 
 Documents the availability of the **Pack Engineering (PE)** module that

@@ -270,6 +270,44 @@ class Sizes:
     pt160 = Style("font-size: 160pt;", "pt160")
     pt196 = Style("font-size: 196pt;", "pt196")
 
+    # --- Indexed responsive scale (Layer 3 tokens) ---
+    # These resolve to var(--stx-scale-N, fallback); the actual values come
+    # from default.css and from any per-document override emitted by
+    # st_book(scale=...). See streamtex.styles.scale for the generator and
+    # streamtex/styles/scale_curves.toml for the data file.
+    #
+    # Fallbacks match the WORD_PROCESSOR curve desktop values. If the curve
+    # changes in the TOML, the test suite verifies these stay in sync.
+    idx_0  = Style("font-size: var(--stx-scale-0,   8pt);", "scale_0")
+    idx_1  = Style("font-size: var(--stx-scale-1,   9pt);", "scale_1")
+    idx_2  = Style("font-size: var(--stx-scale-2,  10pt);", "scale_2")
+    idx_3  = Style("font-size: var(--stx-scale-3,  11pt);", "scale_3")
+    idx_4  = Style("font-size: var(--stx-scale-4,  12pt);", "scale_4")
+    idx_5  = Style("font-size: var(--stx-scale-5,  14pt);", "scale_5")
+    idx_6  = Style("font-size: var(--stx-scale-6,  16pt);", "scale_6")
+    idx_7  = Style("font-size: var(--stx-scale-7,  18pt);", "scale_7")
+    idx_8  = Style("font-size: var(--stx-scale-8,  20pt);", "scale_8")
+    idx_9  = Style("font-size: var(--stx-scale-9,  22pt);", "scale_9")
+    idx_10 = Style("font-size: var(--stx-scale-10, 24pt);", "scale_10")
+    idx_11 = Style("font-size: var(--stx-scale-11, 28pt);", "scale_11")
+    idx_12 = Style("font-size: var(--stx-scale-12, 32pt);", "scale_12")
+    idx_13 = Style("font-size: var(--stx-scale-13, 36pt);", "scale_13")
+    idx_14 = Style("font-size: var(--stx-scale-14, 40pt);", "scale_14")
+    idx_15 = Style("font-size: var(--stx-scale-15, 48pt);", "scale_15")
+    idx_16 = Style("font-size: var(--stx-scale-16, 60pt);", "scale_16")
+    idx_17 = Style("font-size: var(--stx-scale-17, 72pt);", "scale_17")
+    idx_18 = Style("font-size: var(--stx-scale-18, 96pt);", "scale_18")
+    idx_19 = Style("font-size: var(--stx-scale-19, 128pt);", "scale_19")
+    idx_20 = Style("font-size: var(--stx-scale-20, 156pt);", "scale_20")
+    idx_21 = Style("font-size: var(--stx-scale-21, 168pt);", "scale_21")
+    idx_22 = Style("font-size: var(--stx-scale-22, 180pt);", "scale_22")
+    idx_23 = Style("font-size: var(--stx-scale-23, 188pt);", "scale_23")
+    idx_24 = Style("font-size: var(--stx-scale-24, 192pt);", "scale_24")
+    idx_25 = Style("font-size: var(--stx-scale-25, 194pt);", "scale_25")
+    idx_26 = Style("font-size: var(--stx-scale-26, 195pt);", "scale_26")
+    idx_27 = Style("font-size: var(--stx-scale-27, 196pt);", "scale_27")
+    idx_28 = Style("font-size: var(--stx-scale-28, 200pt);", "scale_28")
+
 
 class Fonts:
     font_arial         = Style("font-family: Arial; font-style: normal;",         "font_arial")

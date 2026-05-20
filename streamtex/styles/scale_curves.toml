@@ -1,0 +1,65 @@
+# streamtex/styles/scale_curves.toml — v0.2 (relative architecture)
+#
+# Single source of truth for the indexed responsive font scale.
+# ALL values derive from base_pt_desktop + ratios:
+#   desktop[i] = round(base_pt_desktop * ratios[i])
+#   tablet[i]  = round(desktop[i] * tablet_scale)
+#   mobile[i]  = round(desktop[i] * mobile_scale)
+#
+# Each curve provides 29 adimensional ratios; position [base_idx]
+# MUST equal 1.0 by construction (the BASE palier).
+#
+# After editing, regenerate the static CSS block:
+#   uv run python -m streamtex.styles.scale > /tmp/scale_block.css
+# Then paste the output into streamtex/static/default.css.
+# Also regenerate the Python idx_N fallbacks:
+#   uv run python -m streamtex.scripts.regenerate_idx_fallbacks
+
+[metadata]
+schema_version = "0.2"
+base_pt_desktop = 18
+base_idx = 7
+tablet_scale = 0.85
+mobile_scale = 0.7
+default_curve = "word_processor"
+
+[word_processor]
+description = "Classical word-processor scale (Word/Google Docs/LibreOffice lineage). Fine at small sizes, coarser in display range."
+ratios = [
+  0.444, 0.500, 0.556, 0.611, 0.667, 0.778, 0.889,
+  1.000, 1.111, 1.222, 1.333, 1.556, 1.778, 2.000,
+  2.222, 2.667, 3.333, 4.000, 5.333, 7.111, 8.667,
+  9.333, 10.000, 10.444, 10.667, 10.778, 10.833, 10.889,
+  11.111,
+]
+
+[geometric]
+description = "Pure geometric progression — equal ratios between paliers (factor ≈ 1.15)."
+ratios = [
+  0.385, 0.423, 0.500, 0.577, 0.654, 0.769, 0.885,
+  1.000, 1.154, 1.346, 1.538, 1.769, 2.038, 2.346,
+  2.692, 3.115, 3.577, 4.115, 4.731, 5.462, 6.269,
+  7.192, 8.269, 9.500, 10.923, 12.577, 14.462, 16.615,
+  19.115,
+]
+
+[body_centric]
+description = "Granularity concentrated in the body range (14-32pt). Sparse at extremes."
+ratios = [
+  0.444, 0.611, 0.722, 0.778, 0.833, 0.889, 0.944,
+  1.000, 1.111, 1.222, 1.333, 1.444, 1.556, 1.778,
+  2.000, 2.444, 3.111, 4.000, 5.333, 7.111, 8.889,
+  9.778, 10.222, 10.444, 10.556, 10.667, 10.722, 10.778,
+  10.889,
+]
+
+[bell]
+description = "Bell-shaped: sparse at small + large, dense in the middle (typical for presentations with one giant hero + small captions)."
+ratios = [
+  0.273, 0.409, 0.545, 0.636, 0.727, 0.818, 0.909,
+  1.000, 1.091, 1.182, 1.273, 1.364, 1.455, 1.636,
+  1.818, 2.182, 2.909, 4.000, 5.455, 7.273, 8.909,
+  8.909, 8.909, 8.909, 8.909, 8.909, 8.909, 8.909,
+  8.909,
+]
+

@@ -247,6 +247,108 @@ a {
     }
 }
 
+/* ─────────────────────────────────────────────────────────────── */
+/* Indexed responsive font scale — generated from scale_curves.toml  */
+/* See streamtex/styles/scale.py for the generator.                  */
+/* To regenerate this block:                                         */
+/*   uv run python -m streamtex.styles.scale > /tmp/scale_block.css  */
+/* Then paste the output between the BEGIN/END markers below.        */
+/* BEGIN scale block ─────────────────────────────────────────────── */
+:root {
+    --stx-scale-0: 8pt;
+    --stx-scale-1: 9pt;
+    --stx-scale-2: 10pt;
+    --stx-scale-3: 11pt;
+    --stx-scale-4: 12pt;
+    --stx-scale-5: 14pt;
+    --stx-scale-6: 16pt;
+    --stx-scale-7: 18pt;
+    --stx-scale-8: 20pt;
+    --stx-scale-9: 22pt;
+    --stx-scale-10: 24pt;
+    --stx-scale-11: 28pt;
+    --stx-scale-12: 32pt;
+    --stx-scale-13: 36pt;
+    --stx-scale-14: 40pt;
+    --stx-scale-15: 48pt;
+    --stx-scale-16: 60pt;
+    --stx-scale-17: 72pt;
+    --stx-scale-18: 96pt;
+    --stx-scale-19: 128pt;
+    --stx-scale-20: 156pt;
+    --stx-scale-21: 168pt;
+    --stx-scale-22: 180pt;
+    --stx-scale-23: 188pt;
+    --stx-scale-24: 192pt;
+    --stx-scale-25: 194pt;
+    --stx-scale-26: 195pt;
+    --stx-scale-27: 196pt;
+    --stx-scale-28: 200pt;
+}
+@media (max-width: 1024px) { :root {
+    --stx-scale-0: 7pt;
+    --stx-scale-1: 8pt;
+    --stx-scale-2: 8pt;
+    --stx-scale-3: 9pt;
+    --stx-scale-4: 10pt;
+    --stx-scale-5: 12pt;
+    --stx-scale-6: 14pt;
+    --stx-scale-7: 15pt;
+    --stx-scale-8: 17pt;
+    --stx-scale-9: 19pt;
+    --stx-scale-10: 20pt;
+    --stx-scale-11: 24pt;
+    --stx-scale-12: 27pt;
+    --stx-scale-13: 31pt;
+    --stx-scale-14: 34pt;
+    --stx-scale-15: 41pt;
+    --stx-scale-16: 51pt;
+    --stx-scale-17: 61pt;
+    --stx-scale-18: 82pt;
+    --stx-scale-19: 109pt;
+    --stx-scale-20: 133pt;
+    --stx-scale-21: 143pt;
+    --stx-scale-22: 153pt;
+    --stx-scale-23: 160pt;
+    --stx-scale-24: 163pt;
+    --stx-scale-25: 165pt;
+    --stx-scale-26: 166pt;
+    --stx-scale-27: 167pt;
+    --stx-scale-28: 170pt;
+} }
+@media (max-width: 480px) { :root {
+    --stx-scale-0: 6pt;
+    --stx-scale-1: 6pt;
+    --stx-scale-2: 7pt;
+    --stx-scale-3: 8pt;
+    --stx-scale-4: 8pt;
+    --stx-scale-5: 10pt;
+    --stx-scale-6: 11pt;
+    --stx-scale-7: 13pt;
+    --stx-scale-8: 14pt;
+    --stx-scale-9: 15pt;
+    --stx-scale-10: 17pt;
+    --stx-scale-11: 20pt;
+    --stx-scale-12: 22pt;
+    --stx-scale-13: 25pt;
+    --stx-scale-14: 28pt;
+    --stx-scale-15: 34pt;
+    --stx-scale-16: 42pt;
+    --stx-scale-17: 50pt;
+    --stx-scale-18: 67pt;
+    --stx-scale-19: 90pt;
+    --stx-scale-20: 109pt;
+    --stx-scale-21: 118pt;
+    --stx-scale-22: 126pt;
+    --stx-scale-23: 132pt;
+    --stx-scale-24: 134pt;
+    --stx-scale-25: 136pt;
+    --stx-scale-26: 136pt;
+    --stx-scale-27: 137pt;
+    --stx-scale-28: 140pt;
+} }
+/* END scale block ───────────────────────────────────────────────── */
+
 /* --- Export list styles --- */
 ol, ul {
     display: block;

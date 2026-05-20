@@ -63,6 +63,58 @@ class StxStyles:
     tiny = text.sizes.tiny_size
     """4pt"""
 
+    # --- Indexed responsive scale (subscript access) ---
+    class _IndexedScale:
+        """Subscript access: ``s.scale[0]`` … ``s.scale[28]``.
+
+        Out-of-range indices are clamped to the valid range (debug-logged).
+        """
+
+        _cache = [getattr(text.sizes, f"idx_{i}") for i in range(29)]
+        _count = 29
+
+        def __class_getitem__(cls, i):
+            if not isinstance(i, int):
+                raise TypeError(
+                    f"scale index must be int, got {type(i).__name__}"
+                )
+            if i < 0:
+                import logging
+                logging.getLogger("streamtex.styles").debug(
+                    "scale[%d] clamped to scale[0]", i
+                )
+                i = 0
+            elif i >= cls._count:
+                import logging
+                logging.getLogger("streamtex.styles").debug(
+                    "scale[%d] clamped to scale[%d]", i, cls._count - 1
+                )
+                i = cls._count - 1
+            return cls._cache[i]
+
+    scale = _IndexedScale
+
+    # --- Tailwind-style aliases ---
+    # Anchored on the BASE palier (idx_7 = base_pt_desktop). text_base is
+    # literally the source-of-truth base. Smaller aliases (text_xs/sm)
+    # render at floor-respecting sizes ≥ 14pt = 18.7px on desktop with
+    # default base_pt_desktop=18. Larger aliases scale up by curve ratios.
+    # The base re-anchors automatically if the user passes
+    # st_book(scale=ScaleConfig(base_pt_desktop=...)).
+    text_xs    = text.sizes.idx_5    # palier 5 = 0.78 × base = 14pt @18
+    text_sm    = text.sizes.idx_6    # palier 6 = 0.89 × base = 16pt @18
+    text_base  = text.sizes.idx_7    # palier 7 = 1.00 × base = 18pt @18 (BASE)
+    text_lg    = text.sizes.idx_8    # palier 8 = 1.11 × base = 20pt @18
+    text_xl    = text.sizes.idx_9    # palier 9 = 1.22 × base = 22pt @18
+    text_2xl   = text.sizes.idx_10   # palier 10 = 1.33 × base = 24pt @18
+    text_3xl   = text.sizes.idx_11   # palier 11 = 1.56 × base = 28pt @18
+    text_4xl   = text.sizes.idx_12   # palier 12 = 1.78 × base = 32pt @18
+    text_5xl   = text.sizes.idx_13   # palier 13 = 2.00 × base = 36pt @18
+    text_6xl   = text.sizes.idx_15   # palier 15 = 2.67 × base = 48pt @18
+    text_7xl   = text.sizes.idx_16   # palier 16 = 3.33 × base = 60pt @18
+    text_8xl   = text.sizes.idx_17   # palier 17 = 4.00 × base = 72pt @18
+    text_9xl   = text.sizes.idx_19   # palier 19 = 7.11 × base = 128pt @18
+
 
 # Backward compatibility alias (deprecated)
 StreamTeX_Styles = StxStyles

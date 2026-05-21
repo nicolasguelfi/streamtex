@@ -95,6 +95,31 @@ class StatusReport:
 # ---------------------------------------------------------------------------
 
 
+def _chromium_installed() -> bool:
+    """True if a Playwright Chromium browser is downloaded (for screenshots/PDF).
+
+    Checks the ms-playwright browser cache without importing or starting
+    Playwright — cheap and cross-platform.
+    """
+    candidates: list[str] = []
+    override = os.environ.get("PLAYWRIGHT_BROWSERS_PATH")
+    if override and override != "0":
+        candidates.append(override)
+    home = os.path.expanduser("~")
+    candidates += [
+        os.path.join(home, "Library", "Caches", "ms-playwright"),   # macOS
+        os.path.join(home, ".cache", "ms-playwright"),               # Linux
+        os.path.join(home, "AppData", "Local", "ms-playwright"),     # Windows
+    ]
+    for d in candidates:
+        try:
+            if os.path.isdir(d) and any(n.startswith("chromium") for n in os.listdir(d)):
+                return True
+        except OSError:
+            continue
+    return False
+
+
 def _get_environment_info(report: StatusReport) -> None:
     """Populate environment fields."""
     report.python_version = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
@@ -537,6 +562,13 @@ def _print_rich(report: StatusReport) -> None:
     else:
         console.print("  uv:        [red]not found[/red]")
     console.print(f"  Platform:  {report.platform_info}")
+    if _chromium_installed():
+        console.print("  Chromium:  [green]installed[/green]  [dim](screenshots + PDF export)[/dim]")
+    else:
+        console.print(
+            "  Chromium:  [yellow]not downloaded[/yellow]  "
+            "[dim](run: uv run playwright install chromium)[/dim]"
+        )
 
     # Venv status
     if report.venv_status == "active":

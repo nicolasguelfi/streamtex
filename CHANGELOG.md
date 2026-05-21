@@ -5,7 +5,69 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.7.8] — 2026-05-21 — Visual-review foundation: `stx screenshot`, `st_hover_tooltip`, auto-Chromium
+
+### Added
+
+- **`st_hover_tooltip`** — new public widget: an inline icon that reveals a
+  panel on CSS `:hover`, enabling the "telegraphic slide + detail-on-hover"
+  technique (keywords on the slide, explanations one hover away). Palette-
+  neutral by design (override colours/background via `*_style` / `bg_color`);
+  routes through `st_html` so it is export/PDF-aware. Supports `position`
+  (`left`/`center`/`right`) and `direction` (`up`/`down`) so the panel always
+  opens on the side opposite the icon and stays on-slide, plus `max_height`
+  with an internal scrollbar. Promoted from the proven ai4se6d/FC presentation
+  widget. New module `streamtex/hover_tooltip.py`; tests in
+  `tests/test_hover_tooltip.py`.
+- **`stx screenshot`** — render a StreamTeX project to PNG images via headless
+  Chromium (Playwright). Captures one PNG per slide (`.stx-block`) plus a
+  full-page render, with a `manifest.json` index, into `docs/_screens/` by
+  default. Intended to feed automated vision review (the CE PROTOTYPE visual
+  gate) so unreadable fonts, content overflow, or empty viewports are caught
+  before asking the user to validate. Requires the `pdf` extra + Chromium
+  (`playwright install chromium`). New module
+  `streamtex/cli/screenshot_cmd.py` exposing the reusable
+  `capture_screenshots()` helper; E2E coverage in
+  `tests/e2e/test_screenshot_cmd.py`.
+
+### Changed
+
+- **`stx install` now downloads Chromium automatically** (final step, all
+  presets) so `stx screenshot` and PDF export work out of the box, instead of
+  only printing a hint. Cross-platform, idempotent, and non-fatal on failure
+  (prints the manual command and continues). Set `STX_SKIP_BROWSER_INSTALL=1`
+  to opt out (CI / offline / hermetic environments).
+- **`stx status`** now reports whether the Chromium browser is downloaded
+  (Environment section), detected from the `ms-playwright` cache.
+
+### Notes (ecosystem)
+
+- The pack ecosystem migrated on 2026-05-20 to a single monorepo
+  `nicolasguelfi/streamtex-packs`. Pip names follow the convention
+  `streamtex-pack-{name}`. Python module names are **preserved**
+  (`streamtex_design`, `streamtex_manuals`) so no impact on the
+  streamtex library — `import streamtex` and all downstream code
+  paths are unchanged. The legacy `nicolasguelfi/streamtex-design`
+  repo is archived. The previously local-only `streamtex-manuals`
+  is now formalized as `streamtex-pack-manuals` in the monorepo.
+  Full migration plan: `streamtex/documentation/maintenance/pack_monorepo/PLAN.md`.
+
+## [0.7.7] — 2026-05-20 — Fix: missing scale_curves.toml in wheel
+
+### Fixed
+
+- **Packaging**: `streamtex/styles/scale_curves.toml` is now included
+  in the wheel (`[tool.setuptools.package-data]` extended with
+  `"streamtex.styles" = ["*.toml"]`). Before this fix every fresh
+  install of 0.7.6 was broken — `import streamtex` raised
+  `FileNotFoundError` at `streamtex/styles/scale.py:48`.
+- **Import diagnostics**: the stderr redirect in
+  `streamtex/__init__.py` (used to silence Streamlit's "No runtime
+  found" warnings during the import cascade) no longer swallows
+  tracebacks. Any exception raised during the redirect window now
+  flushes the buffered stderr to the real stderr before re-raising,
+  instead of failing with a silent `exit 1`. This is what hid the
+  packaging bug above.
 
 ## [0.7.6] — 2026-05-20 — Indexed font scale: relative architecture
 

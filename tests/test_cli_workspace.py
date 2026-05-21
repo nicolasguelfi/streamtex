@@ -311,10 +311,12 @@ def test_install_basic_project_has_pdf_only(tmp_path):
     assert "inspector" not in stx_dep
 
 
-def test_install_shows_playwright_hint(tmp_path):
-    """Install with project should show playwright installation hint."""
+def test_install_shows_playwright_hint(tmp_path, monkeypatch):
+    """Install runs a Chromium step; when skipped it shows the manual command."""
     target = tmp_path / "ws"
     target.mkdir()
+    # Keep the test hermetic — never trigger a real ~150 MB browser download.
+    monkeypatch.setenv("STX_SKIP_BROWSER_INSTALL", "1")
 
     patches = _mock_subprocess_and_uv()
     with patches[0], patches[1], patches[2], patches[3]:
@@ -322,6 +324,8 @@ def test_install_shows_playwright_hint(tmp_path):
         os.chdir(target)
         result = runner.invoke(cli, ["install", "--preset", "basic", "--project", "hello"])
 
+    assert result.exit_code == 0, result.output
+    assert "Installing Chromium" in result.output
     assert "playwright install chromium" in result.output
 
 

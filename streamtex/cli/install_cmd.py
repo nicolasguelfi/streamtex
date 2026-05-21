@@ -74,6 +74,38 @@ def _mark_step(ws_root: str, state: dict, step: str, status: str = "done") -> No
     _save_state(ws_root, state)
 
 
+def _install_chromium(run_dir: str, console) -> bool:
+    """Download the Chromium browser used by ``stx screenshot`` and PDF export.
+
+    Cross-platform (Playwright handles macOS/Linux/Windows) and idempotent —
+    the browser is cached per user, not per venv, so re-running is cheap.
+    **Non-fatal**: on any failure the manual command is printed and the
+    install continues. Returns True on success.
+    """
+    manual = f"    Run later: cd {run_dir} && uv run playwright install chromium"
+    # Escape hatch for CI / offline / hermetic test environments.
+    if os.environ.get("STX_SKIP_BROWSER_INSTALL"):
+        console.print("  [yellow]Skipping Chromium download (STX_SKIP_BROWSER_INSTALL set).[/yellow]")
+        console.print(manual)
+        return False
+    console.print("  Downloading Chromium (~150 MB, up to a few minutes) ...")
+    try:
+        result = subprocess.run(
+            ["uv", "run", "playwright", "install", "chromium"],
+            cwd=run_dir, capture_output=True, text=True, timeout=600,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        console.print(f"  [yellow]Chromium install skipped:[/yellow] {exc}")
+        console.print(manual)
+        return False
+    if result.returncode == 0:
+        console.print("  [green]Chromium ready (screenshots + PDF export).[/green]")
+        return True
+    console.print("  [yellow]Chromium install did not complete.[/yellow]")
+    console.print(manual)
+    return False
+
+
 # ---------------------------------------------------------------------------
 # Template availability check
 # ---------------------------------------------------------------------------
@@ -252,7 +284,7 @@ def install(preset, project, template, dev, no_design_pack):
         )
 
     # Count total steps
-    total_steps = 6  # init, clone, sync, global_commands, profiles, hooks
+    total_steps = 7  # init, clone, sync, global_commands, profiles, hooks, chromium
     has_project = project is not None
     if has_project:
         total_steps += 1  # project creation
@@ -412,6 +444,19 @@ def install(preset, project, template, dev, no_design_pack):
     if has_project and not no_design_pack:
         _add_default_design_pack(ws_root, project, effective_preset, console)
 
+    # --- Step: install Chromium (powers `stx screenshot` + PDF export) ---
+    # Playwright ships in every preset via the `pdf` extra; the browser binary
+    # is downloaded here so visual capture and PDF export work out of the box.
+    if not _step_done(state, "chromium"):
+        _step("Installing Chromium (screenshots + PDF export) ...")
+        chromium_dir = (
+            os.path.join(ws_root, "projects", project) if has_project else ws_root
+        )
+        _install_chromium(chromium_dir, console)
+        _mark_step(ws_root, state, "chromium")
+    else:
+        step += 1  # count the skipped step
+
     # --- Done ---
     _clear_state(ws_root)
     console.print("\n[bold green]Installation complete![/bold green]")
@@ -420,8 +465,8 @@ def install(preset, project, template, dev, no_design_pack):
         proj_path = os.path.join("projects", project)
         console.print("\n  To run your project:")
         console.print(f"    cd {proj_path} && stx run")
-        console.print("\n  To enable PDF export, install Playwright (~150 MB, up to 5 min):")
-        console.print(f"    cd {proj_path} && uv run playwright install chromium")
+        console.print("\n  To capture slide screenshots for review:")
+        console.print(f"    cd {proj_path} && stx screenshot")
 
 
 # ---------------------------------------------------------------------------

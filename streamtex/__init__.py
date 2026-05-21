@@ -19,169 +19,187 @@ if _sys.version_info < (3, 11):
 # Streamlit app (e.g. from the stx CLI).  Streamlit creates per-module loggers
 # with their own StreamHandler(stderr) at import time, so we must redirect
 # stderr during the initial import cascade.
+#
+# If anything during that cascade raises, the buffered stderr is flushed to
+# the real stderr before re-raising — otherwise tracebacks would be silently
+# discarded, leading to mysterious "exit 1, no output" failures.
 import io as _io
 
 _real_stderr = _sys.stderr
-_sys.stderr = _io.StringIO()
+_buffered_stderr = _io.StringIO()
+_sys.stderr = _buffered_stderr
 
-from importlib.metadata import version as _pkg_version
+try:
+    from importlib.metadata import version as _pkg_version
 
-__version__ = _pkg_version("streamtex")
+    __version__ = _pkg_version("streamtex")
 
-# Core style system
-from .styles import Style, ListStyle, StyleGrid, StxStyles, StreamTeX_Styles, theme
+    # Core style system
+    from .styles import Style, ListStyle, StyleGrid, StxStyles, StreamTeX_Styles, theme
 
-# Indexed responsive font scale (Layer 1 API)
-from .styles.scale import ScaleConfig, ScaleCurve, compute_scale, emit_scale_css
+    # Indexed responsive font scale (Layer 1 API)
+    from .styles.scale import ScaleConfig, ScaleCurve, compute_scale, emit_scale_css
 
-# Content rendering
-from .write import st_write
-from .image import st_image, configure_image_path
-from .code import st_code, add_wrap_all_option
-from .markdown import st_markdown
-from .container import st_block, st_span
-from .space import st_space, st_br
-from .grid import st_grid, responsive_cols
-from .list import st_list
-from .overlay import st_overlay
+    # Content rendering
+    from .write import st_write
+    from .image import st_image, configure_image_path
+    from .code import st_code, add_wrap_all_option
+    from .markdown import st_markdown
+    from .container import st_block, st_span
+    from .space import st_space, st_br
+    from .grid import st_grid, responsive_cols
+    from .list import st_list
+    from .overlay import st_overlay
 
-# Banner configuration
-from .banner import BannerConfig, BannerMode
+    # Banner configuration
+    from .banner import BannerConfig, BannerMode
 
-# Book orchestration
-from .book import st_book, st_include, st_toc, load_css
+    # Book orchestration
+    from .book import st_book, st_include, st_toc, load_css
 
-# Table of Contents
-from .toc import reset_toc_registry, toc_entries, TOCConfig, NumberingMode
+    # Table of Contents
+    from .toc import reset_toc_registry, toc_entries, TOCConfig, NumberingMode
 
-# Marker Navigation
-from .marker import st_marker, MarkerConfig
+    # Marker Navigation
+    from .marker import st_marker, MarkerConfig
 
-# Section spacing
-from .spacing import (
-    Spacing, SpacingConfig,
-    set_spacing, get_spacing,
-    set_block_spacing, get_block_spacing,
-)
+    # Section spacing
+    from .spacing import (
+        Spacing, SpacingConfig,
+        set_spacing, get_spacing,
+        set_block_spacing, get_block_spacing,
+    )
 
-# Slide break (presentation mode)
-from .slide import (
-    st_slide_break, SlideBreakConfig, SlideBreakMode,
-    set_slide_break_config, get_slide_break_config,
-    add_slide_break_options,
-)
+    # Slide break (presentation mode)
+    from .slide import (
+        st_slide_break, SlideBreakConfig, SlideBreakMode,
+        set_slide_break_config, get_slide_break_config,
+        add_slide_break_options,
+    )
 
-# Presentation profiles (display configurations)
-from .presentation_profile import (
-    PresentationProfile,
-    PageLayout,
-    ViewMode,
-    SlideBreakDisplayConfig,
-    ProfileConfig,
-)
+    # Presentation profiles (display configurations)
+    from .presentation_profile import (
+        PresentationProfile,
+        PageLayout,
+        ViewMode,
+        SlideBreakDisplayConfig,
+        ProfileConfig,
+    )
 
-# Presentation mode (fullscreen 16/9)
-from .presentation import (
-    PresentationConfig,
-    set_presentation_config, get_presentation_config,
-    st_presentation_footer, add_presentation_options,
-)
+    # Presentation mode (fullscreen 16/9)
+    from .presentation import (
+        PresentationConfig,
+        set_presentation_config, get_presentation_config,
+        st_presentation_footer, add_presentation_options,
+    )
 
-# Enums
-from .enums import Tags
+    # Enums
+    from .enums import Tags
 
-# Zoom
-from .zoom import add_zoom_options, inject_zoom_logic, reset_zoom, set_zoom, st_zoom
+    # Zoom
+    from .zoom import add_zoom_options, inject_zoom_logic, reset_zoom, set_zoom, st_zoom
 
-# Export
-from .export import AssetMode, ExportConfig, ExportMode, st_export, st_html
+    # Export
+    from .export import AssetMode, ExportConfig, ExportMode, st_export, st_html
 
-# PDF Export (requires optional 'pdf' extra)
-from .pdf_export import PdfConfig, PdfMode, export_pdf
+    # Hover tooltip (telegraphic slide + detail-on-hover)
+    from .hover_tooltip import st_hover_tooltip
 
-# Export-aware widget wrappers
-from .export_widgets import (
-    st_dataframe, st_table, st_metric, st_json, st_graphviz,
-    st_line_chart, st_bar_chart, st_area_chart, st_scatter_chart,
-    st_audio, st_video,
-)
+    # PDF Export (requires optional 'pdf' extra)
+    from .pdf_export import PdfConfig, PdfMode, export_pdf
 
-# Diagram rendering
-from .mermaid import st_mermaid
-from .plantuml import st_plantuml
-from .tikz import st_tikz
+    # Export-aware widget wrappers
+    from .export_widgets import (
+        st_dataframe, st_table, st_metric, st_json, st_graphviz,
+        st_line_chart, st_bar_chart, st_area_chart, st_scatter_chart,
+        st_audio, st_video,
+    )
 
-# LaTeX rendering
-from .latex import st_latex, st_latex_doc
-from .latex_utils import extract_tikz, extract_math, extract_frames
+    # Diagram rendering
+    from .mermaid import st_mermaid
+    from .plantuml import st_plantuml
+    from .tikz import st_tikz
 
-# Utilities
-from .utils import exec_static, inject_link_preview_scaffold, resolve_content
+    # LaTeX rendering
+    from .latex import st_latex, st_latex_doc
+    from .latex_utils import extract_tikz, extract_math, extract_frames
 
-# Multi-source block registry and static resolution
-from .blocks import (
-    LazyBlockRegistry, ProjectBlockRegistry,
-    BlockNotFoundError, BlockImportError,
-    load_atomic_block,
-    set_static_sources, get_static_sources, resolve_static
-)
+    # Utilities
+    from .utils import exec_static, inject_link_preview_scaffold, resolve_content
 
-# Block helpers (3 usage modes: functions, config injection, OOP inheritance)
-from .block_helpers import (
-    BlockHelperConfig, BlockHelper,
-    show_code, show_code_inline, show_explanation, show_details,
-    set_block_helper_config, get_block_helper_config
-)
+    # Multi-source block registry and static resolution
+    from .blocks import (
+        LazyBlockRegistry, ProjectBlockRegistry,
+        BlockNotFoundError, BlockImportError,
+        load_atomic_block,
+        set_static_sources, get_static_sources, resolve_static
+    )
 
-# Collection system
-from .collection import st_collection, CollectionConfig, ProjectMeta
+    # Block helpers (3 usage modes: functions, config injection, OOP inheritance)
+    from .block_helpers import (
+        BlockHelperConfig, BlockHelper,
+        show_code, show_code_inline, show_explanation, show_details,
+        set_block_helper_config, get_block_helper_config
+    )
 
-# Google Sheets import
-from .gsheet import (
-    GSheetConfig, GSheetSource, GSheetError, AuthMode,
-    set_gsheet_config, get_gsheet_config,
-    load_gsheet, load_gsheet_df,
-)
+    # Collection system
+    from .collection import st_collection, CollectionConfig, ProjectMeta
 
-# Bibliography system
-from .bib import (
-    BibEntry, BibConfig, BibFormat, CitationStyle, BibParseError,
-    BibRegistry, set_bib_config, get_bib_config,
-    get_bib_registry, reset_bib_registry,
-    load_bib, load_bibtex, load_bib_json, load_bib_ris, load_bib_csl_json,
-    register_bib_parser, parse_bibtex_string, parse_ris_string,
-    cite, st_cite, st_bibliography, format_entry, export_bibtex,
-    st_refs, BibRefs, generate_bib_stubs,
-)
+    # Google Sheets import
+    from .gsheet import (
+        GSheetConfig, GSheetSource, GSheetError, AuthMode,
+        set_gsheet_config, get_gsheet_config,
+        load_gsheet, load_gsheet_df,
+    )
 
-# Link behavior configuration
-from .link_config import LinkConfig, set_link_config, get_link_config
+    # Bibliography system
+    from .bib import (
+        BibEntry, BibConfig, BibFormat, CitationStyle, BibParseError,
+        BibRegistry, set_bib_config, get_bib_config,
+        get_bib_registry, reset_bib_registry,
+        load_bib, load_bibtex, load_bib_json, load_bib_ris, load_bib_csl_json,
+        register_bib_parser, parse_bibtex_string, parse_ris_string,
+        cite, st_cite, st_bibliography, format_entry, export_bibtex,
+        st_refs, BibRefs, generate_bib_stubs,
+    )
 
-# AI image generation
-from .ai import (
-    AIImageConfig, AIImageError, AIImageResult,
-    set_ai_image_config, get_ai_image_config,
-    generate_image, is_cached, list_providers, get_available_models,
-    get_model_capabilities, ModelCapabilities,
-)
+    # Link behavior configuration
+    from .link_config import LinkConfig, set_link_config, get_link_config
 
-# Image management (history, metadata)
-from .ai.history import save_version as save_image_version, get_current as get_current_image
-from .ai.history import list_versions as list_image_versions, rollback as rollback_image
-from .ai.history import rename_image
-from .ai.metadata import ImageMetadata
+    # AI image generation
+    from .ai import (
+        AIImageConfig, AIImageError, AIImageResult,
+        set_ai_image_config, get_ai_image_config,
+        generate_image, is_cached, list_providers, get_available_models,
+        get_model_capabilities, ModelCapabilities,
+    )
 
-# Browser recommendation banner
-from .browser import st_chrome_banner
+    # Image management (history, metadata)
+    from .ai.history import save_version as save_image_version, get_current as get_current_image
+    from .ai.history import list_versions as list_image_versions, rollback as rollback_image
+    from .ai.history import rename_image
+    from .ai.metadata import ImageMetadata
 
-# Block Inspector (opt-in)
-from .inspector import InspectorConfig, FileCategoryRegistry
+    # Browser recommendation banner
+    from .browser import st_chrome_banner
 
-# Reuse architecture (§5.0 — convention hybride : 3 top-level reexports ;
-# le reste reste accessible via streamtex.core.*)
-from .core.contracts import ComponentMeta, DesignSystemProtocol
-from .core.discovery import ReuseArchitectureError
+    # Block Inspector (opt-in)
+    from .inspector import InspectorConfig, FileCategoryRegistry
 
-# Restore stderr after all imports are done
-_sys.stderr = _real_stderr
-del _real_stderr, _io, _sys
+    # Reuse architecture (§5.0 — convention hybride : 3 top-level reexports ;
+    # le reste reste accessible via streamtex.core.*)
+    from .core.contracts import ComponentMeta, DesignSystemProtocol
+    from .core.discovery import ReuseArchitectureError
+
+except BaseException:
+    # An import failed — flush the captured stderr to the real stderr so any
+    # warnings (or partial traceback already printed) are not lost, then
+    # restore stderr so the propagating traceback is visible.
+    _sys.stderr = _real_stderr
+    _real_stderr.write(_buffered_stderr.getvalue())
+    _real_stderr.flush()
+    raise
+finally:
+    # Restore stderr in the happy path (and idempotently after the except).
+    _sys.stderr = _real_stderr
+    del _real_stderr, _buffered_stderr, _io, _sys

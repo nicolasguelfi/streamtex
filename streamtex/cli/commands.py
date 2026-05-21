@@ -51,6 +51,7 @@ from .project_cmd import validate as project_validate
 from .publish_cmd import check_cmd as publish_check
 from .publish_cmd import pypi_cmd as publish_pypi
 from .run_cmd import run as stx_run
+from .screenshot_cmd import screenshot as stx_screenshot
 from .shortcuts import run_lint, run_test
 from .status_cmd import status as workspace_status
 from .upgrade_cmd import upgrade as project_upgrade
@@ -68,6 +69,7 @@ def cli():
 
 cli.add_command(stx_install)
 cli.add_command(stx_run)
+cli.add_command(stx_screenshot)
 cli.add_command(workspace_update, name="update")
 cli.add_command(workspace_status, name="status")
 

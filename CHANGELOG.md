@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.11] — 2026-05-21 — Navigation refactor Phase 4a: single active sidebar entry
+
+### Fixed
+
+- **Sidebar group-highlight** (paginated mode): a page with multiple
+  headings (H1 + H2…) or multiple markers used to light **every**
+  same-page entry in the TOC / Markers sidebar simultaneously, because the
+  builder applied `color:var(--stx-link-active-color)` to all entries whose
+  `page_idx == current_page` (companion issue 6.13 — the central UX
+  complaint behind the 0.6.36→0.6.41 series). `_build_paginated_sidebar`
+  now applies the active colour to **only the first** current-page entry in
+  each tab; the remaining same-page entries keep their in-page anchor link
+  without the active colour. Tactical, server-side only — no scroll-spy
+  changes, so it cannot reintroduce the reverted frozen-highlight bug.
+  Verified by the real-browser harness (scenario S6 flipped to passing).
+
 ## [0.7.10] — 2026-05-21 — Navigation refactor Phase 2: coalesce dropped page navigations
 
 ### Fixed

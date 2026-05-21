@@ -194,7 +194,6 @@ def test_s4_double_click_next_arrow(deck_url: str) -> None:
 # emits three entries (H1 + two H2).  At 0.7.8 all three receive the inline
 # active color (companion §6.13).
 # --------------------------------------------------------------------------
-@pytest.mark.xfail(strict=True, reason="group-highlight: all same-page entries lit — fixed in Phase 4")
 def test_s6_multi_heading_single_highlight(deck_url: str) -> None:
     from playwright.sync_api import sync_playwright
 

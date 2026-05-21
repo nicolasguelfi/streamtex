@@ -1625,6 +1625,12 @@ def _build_paginated_sidebar(cache, current_page, total, toc_config, marker_conf
 
         toc_parts = []
 
+        # Highlight only the FIRST entry of the current page, not every
+        # same-page entry. A page with multiple headings (H1 + H2…) used to
+        # light its whole group simultaneously (issue 6.13, the user-reported
+        # group-highlight bug). Subsequent same-page entries still link to
+        # their in-page anchor — they just don't carry the active colour.
+        toc_active_done = False
         for entry in cached_toc:
             if effective_max_level is not None and entry["level"] > effective_max_level:
                 continue
@@ -1637,10 +1643,12 @@ def _build_paginated_sidebar(cache, current_page, total, toc_config, marker_conf
             page_idx = entry.get("page_idx", 0)
             title_esc = entry["title"]
             if page_idx == current_page:
-                link = (
-                    f'<a href="#{entry["key_anchor"]}" '
-                    f'style="color:var(--stx-link-active-color);">{title_esc}</a>'
+                active_style = (
+                    ' style="color:var(--stx-link-active-color);"'
+                    if not toc_active_done else ''
                 )
+                toc_active_done = True
+                link = f'<a href="#{entry["key_anchor"]}"{active_style}>{title_esc}</a>'
             else:
                 link = (
                     f'<a href="#stx-goto-{page_idx}" class="stx-page-link">'
@@ -1663,15 +1671,23 @@ def _build_paginated_sidebar(cache, current_page, total, toc_config, marker_conf
         # --- Markers ---
         if tab_markers is not None:
             marker_parts = []
+            # Same single-highlight rule as the TOC tab (issue 6.13): only the
+            # first marker on the current page carries the active colour.
+            marker_active_done = False
             for entry in cache.get("markers", []):
                 if entry.get("hidden"):
                     continue
                 marker_num = entry["index"] + 1
                 page_idx = entry.get("page_idx", 0)
                 if page_idx == current_page:
+                    active_style = (
+                        ' style="color:var(--stx-link-active-color);"'
+                        if not marker_active_done else ''
+                    )
+                    marker_active_done = True
                     link = (
-                        f'<a href="#{entry["anchor"]}" '
-                        f'style="color:var(--stx-link-active-color);">{marker_num}. {entry["label"]}</a>'
+                        f'<a href="#{entry["anchor"]}"{active_style}>'
+                        f'{marker_num}. {entry["label"]}</a>'
                     )
                 else:
                     link = (

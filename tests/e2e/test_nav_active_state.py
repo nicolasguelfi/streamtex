@@ -27,6 +27,7 @@ import pytest
 playwright = pytest.importorskip("playwright.sync_api")
 
 from ._nav_harness import (  # noqa: E402
+    REPO_ROOT,
     check_active_matches_page,
     check_counter_parity,
     check_single_active,
@@ -241,11 +242,78 @@ def test_s7_cross_tab_active_consistency(deck_url: str) -> None:
             browser.close()
 
 
-# Follow-ons within Phase 0 (lower priority, not acceptance-critical):
+# --------------------------------------------------------------------------
+# S9 — Phase 4b — scroll-spy geometry: the active sidebar entry must be the
+# one whose target is CLOSEST to the reading line, not the last one above it.
+#
+# Reproduces the export / window-scroll off-by-one (companion §6.3/§6.9, the
+# user's reported lag): the floating widget parks the MARKER at its scroll
+# offset, but the sidebar tracks HEADING anchors that sit just below — landing
+# just past TOP_OFFSET (120). The old "largest top <= TOP_OFFSET" rule then
+# selects the PREVIOUS entry. Proposition C ("closest to the line") picks the
+# right one.
+#
+# Self-contained: injects the REAL stx_scroll_spy.js into a controlled DOM with
+# fixed-position targets, so the assertion is deterministic (no deck, no
+# scroll-container quirks). h2 sits at top=124 (just below the line) — exactly
+# the post-navigation geometry of the real export.
+#
+# NOTE on contexts: this exercises the window-scroll path (export / static
+# HTML). In LIVE Streamlit the scroll container is `.stMain`, not `window`, so
+# scroll-spy's `window`-scroll listener does not fire there at all (a SEPARATE
+# issue, §6.15 scroll-container resolver — out of scope for this fix).
+# --------------------------------------------------------------------------
+_SCROLLSPY_JS = REPO_ROOT / "streamtex" / "static" / "js" / "stx_scroll_spy.js"
+
+_S9_DOM = """
+<nav>
+  <div class="stx-toc-entry" data-stx-block="0"><a href="#h0">e0</a></div>
+  <div class="stx-toc-entry" data-stx-block="1"><a href="#h1">e1</a></div>
+  <div class="stx-toc-entry" data-stx-block="2"><a href="#h2">e2</a></div>
+  <div class="stx-toc-entry" data-stx-block="3"><a href="#h3">e3</a></div>
+  <div class="stx-toc-entry" data-stx-block="4"><a href="#h4">e4</a></div>
+</nav>
+<!-- Fixed viewport positions: getBoundingClientRect().top is the `top` value,
+     stable regardless of scroll, so the heuristic is tested deterministically.
+     TOP_OFFSET in scroll-spy is 120. -->
+<div id="h0" style="position:fixed;top:-200px;height:4px"></div>
+<div id="h1" style="position:fixed;top:60px;height:4px"></div>
+<div id="h2" style="position:fixed;top:124px;height:4px"></div>
+<div id="h3" style="position:fixed;top:400px;height:4px"></div>
+<div id="h4" style="position:fixed;top:900px;height:4px"></div>
+"""
+
+_ACTIVE_IDX_JS = """
+() => [...document.querySelectorAll('[data-stx-block]')]
+        .findIndex(e => e.classList.contains('stx-nav-active'))
+"""
+
+
+def test_s9_scrollspy_picks_closest_not_previous() -> None:
+    from playwright.sync_api import sync_playwright
+
+    assert _SCROLLSPY_JS.is_file(), f"scroll-spy not found: {_SCROLLSPY_JS}"
+    with sync_playwright() as p:
+        browser = launch_browser(p)
+        page = browser.new_context(viewport={"width": 1280, "height": 1000}).new_page()
+        try:
+            page.set_content(_S9_DOM)
+            page.add_script_tag(path=str(_SCROLLSPY_JS))
+            # scroll-spy's initial pass: setTimeout(onScroll,50) + 80ms debounce.
+            page.wait_for_timeout(500)
+            active = page.evaluate(_ACTIVE_IDX_JS)
+            print(f"\nS9: active entry = {active} (expect 2; old 'largest-top<=120' rule gives 1)")
+            # h2 (top=124) is closest to the 120 line → entry 2.
+            # The pre-fix rule ("largest top <= 120") would pick h1 (top=60) → entry 1.
+            assert active == 2, (
+                f"scroll-spy selected entry {active}, expected 2 (closest-to-line). "
+                f"entry 1 means the old largest-top<=TOP_OFFSET rule (the −1 lag)."
+            )
+        finally:
+            browser.close()
+
+
+# Follow-on (lower priority, not acceptance-critical):
 #   * S5 — mouse-wheel / synthetic-touch at the bottom boundary.  Deferred:
 #     trackpad-inertia cooldown logic (COOLDOWN_*) makes a deterministic
-#     headless assertion brittle; revisit under STX_E2E_HEADED with a tuned
-#     wheel-event sequence.
-#   * S9 — static-HTML export scroll-spy parity.  Deferred: needs an export
-#     build step (stx-export:html) + file:// load; add once Phase 4b makes
-#     the .stx-nav-active class the single active cue in both contexts.
+#     headless assertion brittle; revisit under STX_E2E_HEADED.

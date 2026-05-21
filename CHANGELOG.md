@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.12] — 2026-05-21 — Navigation refactor Phase 4b: scroll-spy closest-to-line
+
+### Fixed
+
+- **Sidebar highlight lagged one entry behind in the static HTML export**
+  (and any window-scroll context). The cross-context scroll-spy
+  (`stx_scroll_spy.js`) chose the active entry as *"the heading with the
+  largest top still ≤ TOP_OFFSET"* (the most recently scrolled-past
+  heading). But the floating widget parks the **marker** at its scroll
+  offset while the sidebar tracks **heading** anchors that sit just below
+  their marker — landing just past the 120 px line — so the rule selected
+  the **previous** heading (companion issues 6.3 / 6.9). `findClosestAnchor`
+  now picks the heading **closest** to the reading line, which tracks the
+  displayed section without the off-by-one. Trade-off: while free-scrolling
+  a tall section the highlight may advance to the next heading slightly
+  early. Validated by a new deterministic e2e scenario (S9) that injects the
+  real scroll-spy into a controlled DOM and asserts closest-to-line
+  selection.
+
+### Known (separate issue, not addressed here)
+
+- In **live** Streamlit the scroll container is `.stMain`, but scroll-spy
+  listens on `window` scroll — so its recompute does not fire there, leaving
+  the live continuous-mode sidebar highlight static. This is the
+  scroll-container resolver gap (companion §6.15) and is tracked separately.
+
 ## [0.7.11] — 2026-05-21 — Navigation refactor Phase 4a: single active sidebar entry
 
 ### Fixed

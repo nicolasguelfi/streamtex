@@ -73,13 +73,22 @@
   }
 
   function findClosestAnchor() {
-    // Best = the anchor with the largest rect.top that is still <= TOP_OFFSET
-    // (the most recently scrolled-past heading).
+    // Active = the anchor whose target is CLOSEST to the reading line
+    // (TOP_OFFSET), above or below.
+    //
+    // The previous rule ("largest rect.top still <= TOP_OFFSET", i.e. the
+    // most recently scrolled-past heading) lagged one entry behind after a
+    // programmatic scroll: the floating widget parks the MARKER at its
+    // scroll offset, but the sidebar tracks HEADING anchors that sit just
+    // BELOW their marker — landing just past TOP_OFFSET — so "largest top
+    // <= TOP_OFFSET" selected the PREVIOUS heading (companion §6.3/§6.9,
+    // the user-reported −1 lag in continuous + export). Picking the nearest
+    // anchor instead tracks the displayed section without that off-by-one.
+    // (Trade-off: while free-scrolling a tall section it may switch to the
+    // next heading slightly early — accepted.)
     var entries = getEntries();
-    var bestBelow = null;
-    var bestBelowTop = Infinity;
-    var bestAbove = null;
-    var bestAboveTop = -Infinity;
+    var best = null;
+    var bestDist = Infinity;
     var seen = {};
     for (var i = 0; i < entries.length; i++) {
       var a = anchorOf(entries[i]);
@@ -87,20 +96,13 @@
       seen[a] = true;
       var target = hostDoc.getElementById(a);
       if (!target) continue;
-      var top = target.getBoundingClientRect().top;
-      if (top <= TOP_OFFSET) {
-        if (top > bestAboveTop) {
-          bestAboveTop = top;
-          bestAbove = a;
-        }
-      } else {
-        if (top < bestBelowTop) {
-          bestBelowTop = top;
-          bestBelow = a;
-        }
+      var dist = Math.abs(target.getBoundingClientRect().top - TOP_OFFSET);
+      if (dist < bestDist) {
+        bestDist = dist;
+        best = a;
       }
     }
-    return bestAbove || bestBelow;
+    return best;
   }
 
   // Click handler — instantaneous active update, plus a short

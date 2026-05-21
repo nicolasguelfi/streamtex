@@ -136,7 +136,6 @@ def test_s2_single_pagedown(deck_url: str) -> None:
 # is silently DROPPED — the deck advances only one page while the widget's
 # currentIdx has already moved to +2 (companion §5.3 / §6.2 / §6.10).
 # --------------------------------------------------------------------------
-@pytest.mark.xfail(strict=True, reason="re-entry guard drops 2nd nav — fixed in Phase 2")
 def test_s3_double_pagedown_advances_two(deck_url: str) -> None:
     from playwright.sync_api import sync_playwright
 
@@ -159,7 +158,6 @@ def test_s3_double_pagedown_advances_two(deck_url: str) -> None:
 # --------------------------------------------------------------------------
 # S4 — ACCEPTANCE — double-click the floating ▶ arrow (same root cause).
 # --------------------------------------------------------------------------
-@pytest.mark.xfail(strict=True, reason="re-entry guard drops 2nd ▶ click — fixed in Phase 2")
 def test_s4_double_click_next_arrow(deck_url: str) -> None:
     from playwright.sync_api import sync_playwright
 

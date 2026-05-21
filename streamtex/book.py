@@ -1746,9 +1746,17 @@ def _inject_paginated_nav_js(current_page, total, marker_config,
     /* --- Navigate to a specific page by clicking the hidden button --- */
     var navigating = false;
     function navigateToPage(targetPage) {
-        if (navigating) return;
-        if (targetPage < 0 || targetPage >= totalPages
-            || targetPage === currentPage) return;
+        if (targetPage < 0 || targetPage >= totalPages) return;
+        if (navigating) {
+            /* A rerun is already in flight.  Instead of silently dropping
+               this request (the old `if (navigating) return;` — issue 6.2,
+               the double-click / double-PageDown "stuck" bug), COALESCE it:
+               remember the latest requested page and apply it once the
+               rerun lands (see the pending-nav block in init below).      */
+            if (targetPage !== currentPage) hostWin._stxPendingPage = targetPage;
+            return;
+        }
+        if (targetPage === currentPage) return;
         navigating = true;          /* block further signals */
         hostWin._stxScrollReset = true;
         findNavButtons();
@@ -2041,6 +2049,22 @@ def _inject_paginated_nav_js(current_page, total, marker_config,
     if (hostWin._stxMarkerStartIdx == null) {
         var fm = pageFirstMarker[currentPage];
         if (fm !== undefined) hostWin._stxMarkerStartIdx = fm;
+    }
+
+    /* --- Apply a coalesced pending navigation (issue 6.2) ---
+       If a second navigation arrived while the previous rerun was in
+       flight, navigateToPage stored the latest requested page here rather
+       than dropping it.  Now that we have landed, apply it so a rapid
+       double-press advances correctly (and the widget lands on the right
+       marker) instead of getting stuck one page short.                  */
+    if (hostWin._stxPendingPage != null) {
+        var pend = hostWin._stxPendingPage;
+        hostWin._stxPendingPage = null;
+        if (pend !== currentPage && pend >= 0 && pend < totalPages) {
+            hostWin._stxMarkerStartIdx =
+                pageFirstMarker[pend] !== undefined ? pageFirstMarker[pend] : 0;
+            navigateToPage(pend);
+        }
     }
 
     /* --- Sidebar link interception (st.markdown = direct DOM) --- */

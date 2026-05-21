@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.10] — 2026-05-21 — Navigation refactor Phase 2: coalesce dropped page navigations
+
+### Fixed
+
+- **Double-press / double-click navigation no longer gets stuck one page
+  short** (paginated mode). The paginated `navigateToPage` re-entry guard
+  used to *silently drop* any navigation that arrived while a Streamlit
+  rerun was already in flight (`if (navigating) return;` — companion issue
+  6.2). A fast double `PageDown`/`ArrowRight` or a double-click on the
+  floating ▶ arrow therefore advanced only one page while the widget
+  counter had already moved to +2. The guard now **coalesces** the surplus
+  request (`_stxPendingPage`) and applies it once the rerun lands, so a
+  rapid double-press advances two pages and the counter stays consistent
+  with the rendered page. Verified by the Phase-0 real-browser harness
+  (scenarios S3/S4 flipped from `xfail` to passing). No public API change.
+
 ## [0.7.9] — 2026-05-21 — Navigation refactor Phase 0: real-browser regression harness
 
 ### Added

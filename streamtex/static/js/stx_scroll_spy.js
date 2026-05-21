@@ -129,7 +129,13 @@
       if (anchor && anchor !== currentActiveAnchor) setActive(anchor);
     }, 80);
   }
-  hostWin.addEventListener('scroll', onScroll, { passive: true });
+  // Listen in the CAPTURE phase so we hear scroll from ANY container, not
+  // just window. In live Streamlit the scroll happens inside `.stMain`
+  // (a scrollable <section>), whose scroll events do not reach a plain
+  // window listener — leaving the sidebar highlight frozen (companion
+  // §6.15). Capture-phase listeners receive scroll from descendant
+  // scrollers, covering window (export) and .stMain (live) uniformly.
+  hostWin.addEventListener('scroll', onScroll, { capture: true, passive: true });
 
   // Initial pass — fire once after the DOM settles.
   if (hostDoc.readyState === 'complete' || hostDoc.readyState === 'interactive') {

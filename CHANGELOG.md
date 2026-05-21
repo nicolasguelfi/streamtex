@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.13] — 2026-05-21 — Navigation refactor Phase 4c: scroll-spy hears the real scroll container
+
+### Fixed
+
+- **Sidebar highlight was frozen in live continuous mode.** The
+  cross-context scroll-spy (`stx_scroll_spy.js`) installed a plain `window`
+  scroll listener, but in live Streamlit the page scrolls inside `.stMain`
+  (a scrollable `<section>`), whose scroll events never reach a `window`
+  listener — so the highlight never updated while scrolling (companion
+  §6.15, the scroll-container gap, found alongside the export off-by-one).
+  The listener now runs in the **capture phase**, which receives scroll
+  events from any descendant scroller — covering `window` (static export)
+  and `.stMain` (live) uniformly. Validated by a new deterministic e2e
+  scenario (S10): scrolling a nested `overflow:auto` container now moves the
+  active entry (frozen before the fix).
+
 ## [0.7.12] — 2026-05-21 — Navigation refactor Phase 4b: scroll-spy closest-to-line
 
 ### Fixed

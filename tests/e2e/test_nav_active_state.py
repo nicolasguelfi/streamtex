@@ -313,6 +313,65 @@ def test_s9_scrollspy_picks_closest_not_previous() -> None:
             browser.close()
 
 
+# --------------------------------------------------------------------------
+# S10 — Phase 4c (§6.15) — scroll-spy must respond to scrolling that happens
+# inside a nested container, not only on `window`.
+#
+# In live Streamlit the page scrolls inside `.stMain` (a scrollable
+# <section>), whose scroll events never reach a plain `window` scroll
+# listener — so the sidebar highlight froze in live continuous mode (the
+# separate bug found alongside the export −1). The fix listens in the CAPTURE
+# phase, which receives scroll from any descendant scroller.
+#
+# Self-contained & deterministic: a nested overflow:auto div (mimicking
+# `.stMain`) holds the targets; scrolling THAT div must move the highlight.
+# Pre-fix (window listener, no capture) the highlight is frozen.
+# --------------------------------------------------------------------------
+_S10_DOM = """
+<div id="scroller" style="position:fixed;top:0;left:0;width:100%;height:300px;overflow-y:auto">
+  <div style="position:relative;height:2200px">
+    <div id="h0" style="position:absolute;top:0px;height:4px"></div>
+    <div id="h1" style="position:absolute;top:400px;height:4px"></div>
+    <div id="h2" style="position:absolute;top:800px;height:4px"></div>
+    <div id="h3" style="position:absolute;top:1200px;height:4px"></div>
+    <div id="h4" style="position:absolute;top:1600px;height:4px"></div>
+  </div>
+</div>
+<nav style="position:fixed;bottom:0;left:0">
+  <div class="stx-toc-entry" data-stx-block="0"><a href="#h0">e0</a></div>
+  <div class="stx-toc-entry" data-stx-block="1"><a href="#h1">e1</a></div>
+  <div class="stx-toc-entry" data-stx-block="2"><a href="#h2">e2</a></div>
+  <div class="stx-toc-entry" data-stx-block="3"><a href="#h3">e3</a></div>
+  <div class="stx-toc-entry" data-stx-block="4"><a href="#h4">e4</a></div>
+</nav>
+"""
+
+
+def test_s10_scrollspy_responds_to_container_scroll() -> None:
+    from playwright.sync_api import sync_playwright
+
+    assert _SCROLLSPY_JS.is_file()
+    with sync_playwright() as p:
+        browser = launch_browser(p)
+        page = browser.new_context(viewport={"width": 1280, "height": 1000}).new_page()
+        try:
+            page.set_content(_S10_DOM)
+            page.add_script_tag(path=str(_SCROLLSPY_JS))
+            page.wait_for_timeout(400)
+            initial = page.evaluate(_ACTIVE_IDX_JS)        # h0 nearest the line → 0
+            # Scroll ONLY the inner container so h2 lands on the 120 line.
+            page.evaluate("() => { document.getElementById('scroller').scrollTop = 680; }")
+            page.wait_for_timeout(400)
+            after = page.evaluate(_ACTIVE_IDX_JS)
+            print(f"\nS10: initial active={initial}, after container scroll active={after} (expect 2)")
+            assert after == 2, (
+                f"scroll-spy did not follow inner-container scroll (active={after}, "
+                f"expected 2). A frozen value == the §6.15 window-only-listener bug."
+            )
+        finally:
+            browser.close()
+
+
 # Follow-on (lower priority, not acceptance-critical):
 #   * S5 — mouse-wheel / synthetic-touch at the bottom boundary.  Deferred:
 #     trackpad-inertia cooldown logic (COOLDOWN_*) makes a deterministic

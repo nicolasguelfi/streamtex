@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.9] — 2026-05-21 — Navigation refactor Phase 0: real-browser regression harness
+
+### Added
+
+- **Real-browser navigation e2e harness** (`tests/e2e/test_nav_active_state.py`,
+  `tests/e2e/_nav_harness.py`, fixture `tests/e2e/fixtures/nav_active_app/`).
+  Phase 0 of the navigation-subsystem refactor
+  (`documentation/maintenance/navigation_system/navigation-refactor-plan-v01.md`).
+  Drives Chromium against a paginated, search-enabled deck and asserts on
+  DOM/CSS state (the five invariants in the plan), since the reverted
+  0.6.36→0.6.40 series proved headless probes do not reproduce the
+  frozen-highlight / counter-desync bugs. Test-only; no library code changed.
+- Three acceptance scenarios reproduce the open bugs as `xfail(strict=True)`
+  so they flip to hard failures the moment a later phase fixes them:
+  S3 (double PageDown drops the 2nd nav + counter desync),
+  S4 (double-click ▶ same), S6 (multi-heading page lights the whole group).
+  Scenarios S1/S2/S7 + a smoke check guard the consistent baseline.
+- Harness runs headless by default (fast smoke) and headed under
+  `STX_E2E_HEADED=1` (the real gate); `STX_NAV_E2E_DECK=/abs/deck` points it
+  at an external deck (e.g. the draft bench) for manual verification. Requires
+  `STX_USE_MARKER_RUNTIME=1` (set automatically by the launcher).
+
 ## [0.7.8] — 2026-05-21 — Visual-review foundation: `stx screenshot`, `st_hover_tooltip`, auto-Chromium
 
 ### Added

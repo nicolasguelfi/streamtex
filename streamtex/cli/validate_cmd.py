@@ -14,14 +14,8 @@ from pathlib import Path
 
 import click
 
+from ._shared import _find_project_dir
 from .console import get_console
-
-
-def _find_project_dir() -> Path:
-    cwd = Path.cwd()
-    if (cwd / "pyproject.toml").is_file():
-        return cwd
-    raise click.ClickException("No pyproject.toml in current directory.")
 
 
 def _print_issues(console, label: str, issues) -> tuple[int, int]:

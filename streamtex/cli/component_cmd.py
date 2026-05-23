@@ -13,18 +13,10 @@ from typing import Literal
 import click
 
 from . import _stx_toml
+from ._shared import _find_project_dir
 from .console import get_console
 
 DestinationClass = Literal["primary_local", "secondary_local_with_git", "git_remote", "pypi"]
-
-
-def _find_project_dir() -> Path:
-    cwd = Path.cwd()
-    if (cwd / "pyproject.toml").is_file():
-        return cwd
-    raise click.ClickException(
-        "No pyproject.toml in current directory. Run from a StreamTeX project root."
-    )
 
 
 def _classify_destination(entry: dict) -> DestinationClass:

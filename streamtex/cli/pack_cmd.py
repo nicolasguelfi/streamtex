@@ -14,21 +14,13 @@ from typing import Any
 import click
 
 from . import _stx_toml
+from ._shared import _find_project_dir
 from ._toml_helpers import get_uv_sources, remove_uv_source, set_uv_source
 from .console import get_console
 
 REF_GIT_RE = re.compile(r"^git:(?P<url>[^@\s]+)(?:@(?P<rev>[^\s]+))?$")
 REF_LOCAL_RE = re.compile(r"^local:(?P<path>.+)$")
 REF_PYPI_RE = re.compile(r"^pypi:(?P<name>[A-Za-z0-9_\-]+)(?:@(?P<constraint>.+))?$")
-
-
-def _find_project_dir() -> Path:
-    cwd = Path.cwd()
-    if (cwd / "pyproject.toml").is_file():
-        return cwd
-    raise click.ClickException(
-        "No pyproject.toml in current directory. Run from a StreamTeX project root."
-    )
 
 
 def _parse_ref(ref: str) -> dict[str, Any]:

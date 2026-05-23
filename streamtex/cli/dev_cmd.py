@@ -7,6 +7,7 @@ from pathlib import Path
 
 import click
 
+from ._shared import _find_project_dir
 from .console import get_console
 from .dev_config import (
     REPOS,
@@ -16,17 +17,6 @@ from .dev_config import (
     validate_repo_name,
     validate_repo_path,
 )
-
-
-def _find_project_dir() -> Path:
-    """Return the project directory (cwd must contain pyproject.toml)."""
-    cwd = Path.cwd()
-    if (cwd / "pyproject.toml").is_file():
-        return cwd
-    raise click.ClickException(
-        "No pyproject.toml in current directory. "
-        "Run this command from a StreamTeX project root."
-    )
 
 
 def _ensure_gitignore(project_dir: Path) -> None:

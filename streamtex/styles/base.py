@@ -114,7 +114,3 @@ class StxStyles:
     text_7xl   = text.sizes.idx_16   # palier 16 = 3.33 × base = 60pt @18
     text_8xl   = text.sizes.idx_17   # palier 17 = 4.00 × base = 72pt @18
     text_9xl   = text.sizes.idx_19   # palier 19 = 7.11 × base = 128pt @18
-
-
-# Backward compatibility alias (deprecated)
-StreamTeX_Styles = StxStyles

@@ -35,7 +35,7 @@ try:
     __version__ = _pkg_version("streamtex")
 
     # Core style system
-    from .styles import Style, ListStyle, StyleGrid, StxStyles, StreamTeX_Styles, theme
+    from .styles import Style, ListStyle, StyleGrid, StxStyles, theme
 
     # Indexed responsive font scale (Layer 1 API)
     from .styles.scale import ScaleConfig, ScaleCurve, compute_scale, emit_scale_css

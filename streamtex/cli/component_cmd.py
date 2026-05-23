@@ -165,7 +165,12 @@ def find_cmd(query: str) -> None:
 @component.command("new")
 @click.argument("name")
 @click.option("--pack", "pack_name", default=None, help="Destination pack (default: primary local).")
-@click.option("--granularity", default="primitive", type=click.Choice(["primitive", "composition", "block"]))
+@click.option(
+    "--granularity",
+    default="primitive",
+    type=click.Choice(["primitive", "composition", "block"]),
+    help="Component granularity (default: primitive).",
+)
 def new_cmd(name: str, pack_name: str | None, granularity: str) -> None:
     """Scaffold a new component in the chosen (or primary local) pack."""
     from streamtex.core import discovery

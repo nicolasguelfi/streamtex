@@ -9,7 +9,7 @@ Two layers of discovery cooperate:
   `[resolution].prefer`).
 
 The five lifecycle states (§5.6bis) — Nominal, Drift install, Indirect,
-Manifest cassé, Collision — are surfaced via the PR002/PR003/PR004 error
+Manifest broken, Collision — are surfaced via the PR002/PR003/PR004 error
 codes raised here.
 """
 

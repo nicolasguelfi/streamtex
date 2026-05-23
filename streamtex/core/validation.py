@@ -221,6 +221,9 @@ def validate_component(mod: ModuleType) -> list[ValidationIssue]:
                     )
                     break
         except (TypeError, ValueError):
+            # inspect.signature() raises TypeError on some builtins / C-extensions
+            # and ValueError if the signature is malformed. Both are acceptable —
+            # we simply skip the CV007 keyword-only check for that callable.
             pass
 
         # CV011 — public function has its own docstring (info)

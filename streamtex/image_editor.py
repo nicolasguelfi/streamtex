@@ -492,10 +492,11 @@ def _load_display_from_metadata(name: str, prefix: str) -> None:
                 st.session_state.setdefault(f"{prefix}_height", meta.display_height)
             if meta.display_keep_ratio is not None:
                 st.session_state.setdefault(f"{prefix}_keep_ratio", meta.display_keep_ratio)
-        # else:
-        #     logger.warning("[DIAG:LOAD] '%s' get_current_metadata returned None — no metadata file found", name)
     except Exception:
-        # logger.warning("[DIAG:LOAD] '%s' EXCEPTION — zoom NOT loaded, flag set", name, exc_info=True)
+        # Best-effort load: if no metadata file exists yet, or it is unreadable,
+        # the image renders with its default display settings (no zoom/width
+        # restoration). Not surfaced to the user — saved settings are an
+        # enhancement, not a correctness requirement.
         pass
 
 

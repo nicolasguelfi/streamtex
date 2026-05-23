@@ -345,7 +345,10 @@ def _offer_export_downloads(html: str, base_name: str,
                                 count=1,
                             )
                     except Exception:
-                        pass  # fallback to raw HTML
+                        # Title-enrichment is cosmetic: if the regex substitution
+                        # raises (malformed HTML, encoding issue), keep the
+                        # original html_download untouched and continue.
+                        pass
 
                 collector = get_asset_collector()
                 if collector:

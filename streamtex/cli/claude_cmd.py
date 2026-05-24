@@ -748,10 +748,11 @@ def _update_single_target(
     target: str,
     force: bool,
     console,
+    prune: bool = False,
 ) -> int:
     """Update a single target from its profile source.
 
-    Returns the number of files updated.
+    Returns the number of files updated (additions/modifications + prunes).
     """
     diffs = compare_profile(claude_repo, profile, target)
     source_files = collect_source_files(claude_repo, profile)
@@ -775,11 +776,36 @@ def _update_single_target(
 
     updated: list[str] = []
     skipped: list[str] = []
+    pruned: list[str] = []
+
+    # Paths that must NEVER be pruned even when --prune is set.
+    # .backup/ holds prior overwrite backups; .stx-profile is the
+    # profile marker (already filtered out by compare_profile, kept
+    # here as defense in depth).
+    backup_prefix = os.path.join(".claude", ".backup")
 
     for d in diffs:
         if d.status == "identical":
             continue
         if d.status == "extra":
+            if not prune:
+                continue
+            # Skip protected paths even under --prune.
+            if d.path.startswith(backup_prefix + os.sep) or d.path == backup_prefix:
+                continue
+            if d.path == os.path.join(".claude", ".stx-profile"):
+                continue
+            abs_path = os.path.join(target, d.path)
+            try:
+                # Make writable in case it was set 0o444 by a prior install
+                if os.path.isfile(abs_path):
+                    os.chmod(abs_path, 0o644)
+                os.remove(abs_path)
+                pruned.append(d.path)
+            except OSError as exc:
+                console.print(
+                    f"  [yellow]⚠[/yellow] Could not prune {d.path}: {exc}"
+                )
             continue
 
         # Preserve locally modified files unless --force
@@ -841,7 +867,16 @@ def _update_single_target(
         for f in skipped:
             console.print(f"  [yellow]\u25cb[/yellow] {f}")
 
-    return len(updated)
+    if pruned:
+        console.print(
+            f"\n[cyan]Pruned {len(pruned)} orphan file(s).[/cyan]\n"
+            "  These files were installed by a prior profile version but are "
+            "no longer declared in any manifest."
+        )
+        for f in pruned:
+            console.print(f"  [cyan]\u2212[/cyan] {f}")
+
+    return len(updated) + len(pruned)
 
 
 # ---------------------------------------------------------------------------
@@ -884,7 +919,14 @@ def diff_cmd(path: str) -> None:
     "--all", "update_all", is_flag=True,
     help="Update all projects in the workspace.",
 )
-def update_cmd(path: str, force: bool, update_all: bool) -> None:
+@click.option(
+    "--prune", is_flag=True,
+    help=(
+        "Remove orphan files in .claude/ that no manifest declares anymore. "
+        "Skips .claude/custom/, .claude/.backup/, and .claude/.stx-profile."
+    ),
+)
+def update_cmd(path: str, force: bool, update_all: bool, prune: bool) -> None:
     """Update an installed Claude profile from the source repo."""
     console = get_console()
 
@@ -907,7 +949,7 @@ def update_cmd(path: str, force: bool, update_all: bool) -> None:
             rel = os.path.relpath(target_path, ws_root)
             console.print(f"\n[bold cyan]\u2500\u2500 {rel} [/bold cyan]([cyan]{profile}[/cyan])")
             total_updated += _update_single_target(
-                claude_repo, profile, target_path, force, console,
+                claude_repo, profile, target_path, force, console, prune=prune,
             )
 
         separator = "\u2500" * 40
@@ -926,7 +968,7 @@ def update_cmd(path: str, force: bool, update_all: bool) -> None:
     # Single target mode
     _ws_root, claude_repo, profile, target = _resolve_profile_context(path)
     console.print(f"[cyan]Profile:[/cyan] {profile}")
-    _update_single_target(claude_repo, profile, target, force, console)
+    _update_single_target(claude_repo, profile, target, force, console, prune=prune)
 
 
 @click.command("check")

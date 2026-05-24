@@ -1068,3 +1068,115 @@ def test_ensure_claude_gitignore_skips_commit_if_staged(tmp_path):
         cwd=str(proj), capture_output=True, text=True, timeout=10,
     )
     assert result.stdout.strip() == "init"
+
+
+# ---------------------------------------------------------------------------
+# --prune
+# ---------------------------------------------------------------------------
+
+
+def test_update_without_prune_keeps_orphan_files(tmp_path):
+    """Without --prune, files that no longer exist in the source remain."""
+    ws = _make_workspace(tmp_path)
+    target = tmp_path / "my-project"
+    target.mkdir()
+
+    install_profile(str(ws / "streamtex-claude"), "project", str(target))
+
+    # Simulate an orphan file from a previous profile version that no longer
+    # exists in the source — drop a file in the installed .claude/ tree.
+    orphan_dir = target / ".claude" / "commands" / "stx-old"
+    orphan_dir.mkdir(parents=True)
+    orphan = orphan_dir / "obsolete.md"
+    orphan.write_text("Obsolete command file\n")
+
+    runner = CliRunner()
+    os.chdir(ws)
+    result = runner.invoke(cli, ["claude", "update", str(target)])
+
+    assert result.exit_code == 0, result.output
+    assert orphan.is_file(), "Orphan should remain when --prune is not passed"
+
+
+def test_update_with_prune_removes_orphan_files(tmp_path):
+    """--prune removes installed files that no source manifest declares."""
+    ws = _make_workspace(tmp_path)
+    target = tmp_path / "my-project"
+    target.mkdir()
+
+    install_profile(str(ws / "streamtex-claude"), "project", str(target))
+
+    orphan_dir = target / ".claude" / "commands" / "stx-old"
+    orphan_dir.mkdir(parents=True)
+    orphan = orphan_dir / "obsolete.md"
+    orphan.write_text("Obsolete command file\n")
+
+    runner = CliRunner()
+    os.chdir(ws)
+    result = runner.invoke(cli, ["claude", "update", "--prune", str(target)])
+
+    assert result.exit_code == 0, result.output
+    assert "Pruned" in result.output, result.output
+    assert "obsolete.md" in result.output
+    assert not orphan.exists(), "Orphan should be removed when --prune is passed"
+
+
+def test_update_with_prune_preserves_custom_files(tmp_path):
+    """--prune must never touch .claude/custom/ — user-owned files."""
+    ws = _make_workspace(tmp_path)
+    target = tmp_path / "my-project"
+    target.mkdir()
+
+    install_profile(str(ws / "streamtex-claude"), "project", str(target))
+
+    custom_dir = target / ".claude" / "custom" / "references"
+    custom_dir.mkdir(parents=True)
+    user_file = custom_dir / "my_rules.md"
+    user_file.write_text("# My personal rules\n")
+
+    runner = CliRunner()
+    os.chdir(ws)
+    result = runner.invoke(cli, ["claude", "update", "--prune", str(target)])
+
+    assert result.exit_code == 0, result.output
+    assert user_file.is_file(), "custom/ files must survive --prune"
+
+
+def test_update_with_prune_preserves_backup_directory(tmp_path):
+    """--prune must never touch .claude/.backup/ — overwrite history."""
+    ws = _make_workspace(tmp_path)
+    target = tmp_path / "my-project"
+    target.mkdir()
+
+    install_profile(str(ws / "streamtex-claude"), "project", str(target))
+
+    backup_dir = target / ".claude" / ".backup" / "20260524-120000"
+    backup_dir.mkdir(parents=True)
+    backup_file = backup_dir / "preserved.md"
+    backup_file.write_text("Saved from a prior --force\n")
+
+    runner = CliRunner()
+    os.chdir(ws)
+    result = runner.invoke(cli, ["claude", "update", "--prune", str(target)])
+
+    assert result.exit_code == 0, result.output
+    assert backup_file.is_file(), ".backup/ files must survive --prune"
+
+
+def test_update_with_prune_preserves_stx_profile_marker(tmp_path):
+    """--prune must never touch .claude/.stx-profile."""
+    ws = _make_workspace(tmp_path)
+    target = tmp_path / "my-project"
+    target.mkdir()
+
+    install_profile(str(ws / "streamtex-claude"), "project", str(target))
+
+    marker = target / ".claude" / ".stx-profile"
+    assert marker.is_file(), "Profile marker should exist after install"
+
+    runner = CliRunner()
+    os.chdir(ws)
+    result = runner.invoke(cli, ["claude", "update", "--prune", str(target)])
+
+    assert result.exit_code == 0, result.output
+    assert marker.is_file(), ".stx-profile marker must survive --prune"

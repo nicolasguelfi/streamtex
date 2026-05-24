@@ -490,7 +490,7 @@ def test_update_command_updates_modified_with_force(tmp_path):
 
     runner = CliRunner()
     os.chdir(ws)
-    result = runner.invoke(cli, ["claude", "update", "--force", str(target)])
+    result = runner.invoke(cli, ["claude", "update", "--force", "--yes", str(target)])
     assert result.exit_code == 0, result.output
     assert "Updated" in result.output
     assert "test-run.md" in result.output
@@ -513,7 +513,7 @@ def test_update_command_creates_backup_on_force(tmp_path):
 
     runner = CliRunner()
     os.chdir(ws)
-    result = runner.invoke(cli, ["claude", "update", "--force", str(target)])
+    result = runner.invoke(cli, ["claude", "update", "--force", "--yes", str(target)])
     assert result.exit_code == 0, result.output
     assert "Backup saved to" in result.output
 
@@ -559,7 +559,7 @@ def test_update_command_force_overwrites_claude_md(tmp_path):
 
     runner = CliRunner()
     os.chdir(ws)
-    result = runner.invoke(cli, ["claude", "update", str(target), "--force"])
+    result = runner.invoke(cli, ["claude", "update", str(target), "--force", "--yes"])
     assert result.exit_code == 0, result.output
     assert "Updated" in result.output
 
@@ -738,8 +738,8 @@ def test_update_all_flag(tmp_path):
 
     runner = CliRunner()
     os.chdir(ws)
-    # --force required to overwrite modified files
-    result = runner.invoke(cli, ["claude", "update", "--all", "--force"])
+    # --force required to overwrite modified files, --yes to skip the prompt
+    result = runner.invoke(cli, ["claude", "update", "--all", "--force", "--yes"])
     assert result.exit_code == 0, result.output
     assert "Updated" in result.output
 
@@ -877,7 +877,7 @@ def test_update_rerenders_claude_md(tmp_path):
 
     runner = CliRunner()
     os.chdir(ws)
-    result = runner.invoke(cli, ["claude", "update", "--force", str(target)])
+    result = runner.invoke(cli, ["claude", "update", "--force", "--yes", str(target)])
     assert result.exit_code == 0, result.output
 
     # CLAUDE.md should be re-rendered with new content
@@ -1071,12 +1071,12 @@ def test_ensure_claude_gitignore_skips_commit_if_staged(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# --prune
+# stx claude update — sync behaviour (default prune, confirmation, --yes, --force)
 # ---------------------------------------------------------------------------
 
 
-def test_update_without_prune_keeps_orphan_files(tmp_path):
-    """Without --prune, files that no longer exist in the source remain."""
+def test_update_removes_orphan_files(tmp_path):
+    """Orphans are removed by default (with --yes to skip the confirmation)."""
     ws = _make_workspace(tmp_path)
     target = tmp_path / "my-project"
     target.mkdir()
@@ -1092,37 +1092,14 @@ def test_update_without_prune_keeps_orphan_files(tmp_path):
 
     runner = CliRunner()
     os.chdir(ws)
-    result = runner.invoke(cli, ["claude", "update", str(target)])
+    result = runner.invoke(cli, ["claude", "update", "--yes", str(target)])
 
     assert result.exit_code == 0, result.output
-    assert orphan.is_file(), "Orphan should remain when --prune is not passed"
+    assert not orphan.exists(), "Orphan should be removed by default"
 
 
-def test_update_with_prune_removes_orphan_files(tmp_path):
-    """--prune removes installed files that no source manifest declares."""
-    ws = _make_workspace(tmp_path)
-    target = tmp_path / "my-project"
-    target.mkdir()
-
-    install_profile(str(ws / "streamtex-claude"), "project", str(target))
-
-    orphan_dir = target / ".claude" / "commands" / "stx-old"
-    orphan_dir.mkdir(parents=True)
-    orphan = orphan_dir / "obsolete.md"
-    orphan.write_text("Obsolete command file\n")
-
-    runner = CliRunner()
-    os.chdir(ws)
-    result = runner.invoke(cli, ["claude", "update", "--prune", str(target)])
-
-    assert result.exit_code == 0, result.output
-    assert "Pruned" in result.output, result.output
-    assert "obsolete.md" in result.output
-    assert not orphan.exists(), "Orphan should be removed when --prune is passed"
-
-
-def test_update_with_prune_preserves_custom_files(tmp_path):
-    """--prune must never touch .claude/custom/ — user-owned files."""
+def test_update_preserves_custom_files(tmp_path):
+    """Files in .claude/custom/ are never touched, even on full sync."""
     ws = _make_workspace(tmp_path)
     target = tmp_path / "my-project"
     target.mkdir()
@@ -1136,14 +1113,14 @@ def test_update_with_prune_preserves_custom_files(tmp_path):
 
     runner = CliRunner()
     os.chdir(ws)
-    result = runner.invoke(cli, ["claude", "update", "--prune", str(target)])
+    result = runner.invoke(cli, ["claude", "update", "--yes", str(target)])
 
     assert result.exit_code == 0, result.output
-    assert user_file.is_file(), "custom/ files must survive --prune"
+    assert user_file.is_file(), "custom/ files must survive sync"
 
 
-def test_update_with_prune_preserves_backup_directory(tmp_path):
-    """--prune must never touch .claude/.backup/ — overwrite history."""
+def test_update_preserves_backup_directory(tmp_path):
+    """Files in .claude/.backup/ are never touched."""
     ws = _make_workspace(tmp_path)
     target = tmp_path / "my-project"
     target.mkdir()
@@ -1157,14 +1134,14 @@ def test_update_with_prune_preserves_backup_directory(tmp_path):
 
     runner = CliRunner()
     os.chdir(ws)
-    result = runner.invoke(cli, ["claude", "update", "--prune", str(target)])
+    result = runner.invoke(cli, ["claude", "update", "--yes", str(target)])
 
     assert result.exit_code == 0, result.output
-    assert backup_file.is_file(), ".backup/ files must survive --prune"
+    assert backup_file.is_file(), ".backup/ files must survive sync"
 
 
-def test_update_with_prune_preserves_stx_profile_marker(tmp_path):
-    """--prune must never touch .claude/.stx-profile."""
+def test_update_preserves_stx_profile_marker(tmp_path):
+    """The .claude/.stx-profile marker is never removed."""
     ws = _make_workspace(tmp_path)
     target = tmp_path / "my-project"
     target.mkdir()
@@ -1176,7 +1153,167 @@ def test_update_with_prune_preserves_stx_profile_marker(tmp_path):
 
     runner = CliRunner()
     os.chdir(ws)
-    result = runner.invoke(cli, ["claude", "update", "--prune", str(target)])
+    result = runner.invoke(cli, ["claude", "update", "--yes", str(target)])
 
     assert result.exit_code == 0, result.output
-    assert marker.is_file(), ".stx-profile marker must survive --prune"
+    assert marker.is_file(), ".stx-profile marker must survive sync"
+
+
+def test_update_prompts_before_destructive_action(tmp_path):
+    """Without --yes, a destructive action triggers a confirmation prompt."""
+    ws = _make_workspace(tmp_path)
+    target = tmp_path / "my-project"
+    target.mkdir()
+
+    install_profile(str(ws / "streamtex-claude"), "project", str(target))
+
+    orphan_dir = target / ".claude" / "commands" / "stx-old"
+    orphan_dir.mkdir(parents=True)
+    orphan = orphan_dir / "obsolete.md"
+    orphan.write_text("Obsolete command file\n")
+
+    runner = CliRunner()
+    os.chdir(ws)
+    # Send "n\n" to refuse — orphan should remain.
+    result = runner.invoke(
+        cli, ["claude", "update", str(target)], input="n\n"
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "Proceed?" in result.output
+    assert "Aborted" in result.output
+    assert orphan.exists(), "Orphan must remain after user refused confirmation"
+
+
+def test_update_yes_flag_skips_prompt(tmp_path):
+    """--yes bypasses the confirmation prompt entirely."""
+    ws = _make_workspace(tmp_path)
+    target = tmp_path / "my-project"
+    target.mkdir()
+
+    install_profile(str(ws / "streamtex-claude"), "project", str(target))
+
+    orphan = target / ".claude" / "commands" / "stx-old" / "obsolete.md"
+    orphan.parent.mkdir(parents=True)
+    orphan.write_text("orphan\n")
+
+    runner = CliRunner()
+    os.chdir(ws)
+    # No input provided. Should succeed because --yes skips the prompt.
+    result = runner.invoke(cli, ["claude", "update", "--yes", str(target)])
+
+    assert result.exit_code == 0, result.output
+    assert "Proceed?" not in result.output, (
+        "No prompt should appear when --yes is passed"
+    )
+    assert not orphan.exists()
+
+
+def test_update_no_prompt_when_no_destructive_ops(tmp_path):
+    """If only missing files need installing, no prompt is shown."""
+    ws = _make_workspace(tmp_path)
+    target = tmp_path / "my-project"
+    target.mkdir()
+
+    install_profile(str(ws / "streamtex-claude"), "project", str(target))
+
+    # Add a brand-new command file to the source that the target lacks.
+    new_cmd_dir = (
+        ws / "streamtex-claude" / "profiles" / "project" / "commands" / "developer"
+    )
+    new_file = new_cmd_dir / "new-command.md"
+    new_file.write_text("# New command\n")
+
+    runner = CliRunner()
+    os.chdir(ws)
+    # No --yes, no input — but no destructive op, so no prompt.
+    result = runner.invoke(cli, ["claude", "update", str(target)])
+
+    assert result.exit_code == 0, result.output
+    assert "Proceed?" not in result.output
+    assert (
+        target / ".claude" / "commands" / "developer" / "new-command.md"
+    ).is_file()
+
+
+def test_update_removes_empty_parent_dirs(tmp_path):
+    """After pruning every file in a directory, the directory itself is removed."""
+    ws = _make_workspace(tmp_path)
+    target = tmp_path / "my-project"
+    target.mkdir()
+
+    install_profile(str(ws / "streamtex-claude"), "project", str(target))
+
+    orphan_dir = target / ".claude" / "commands" / "stx-old"
+    orphan_dir.mkdir(parents=True)
+    (orphan_dir / "obsolete1.md").write_text("a\n")
+    (orphan_dir / "obsolete2.md").write_text("b\n")
+
+    runner = CliRunner()
+    os.chdir(ws)
+    result = runner.invoke(cli, ["claude", "update", "--yes", str(target)])
+
+    assert result.exit_code == 0, result.output
+    assert not orphan_dir.exists(), (
+        "Directory should be removed once it becomes empty after prune"
+    )
+    # The .claude/ root itself must NEVER be removed.
+    assert (target / ".claude").is_dir()
+
+
+def test_update_force_yes_overwrites_modified_with_backup(tmp_path):
+    """--force --yes overwrites locally-modified files and saves a backup."""
+    ws = _make_workspace(tmp_path)
+    target = tmp_path / "my-project"
+    target.mkdir()
+
+    install_profile(str(ws / "streamtex-claude"), "project", str(target))
+
+    # Modify source so the target file becomes 'modified'.
+    src = (
+        ws / "streamtex-claude" / "profiles" / "project"
+        / "commands" / "developer" / "test-run.md"
+    )
+    src.write_text("Run tests v2\n")
+
+    runner = CliRunner()
+    os.chdir(ws)
+    result = runner.invoke(
+        cli, ["claude", "update", "--force", "--yes", str(target)]
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "Backup saved to" in result.output
+    # File was overwritten with the new content.
+    installed = (
+        target / ".claude" / "commands" / "developer" / "test-run.md"
+    ).read_text()
+    assert "v2" in installed
+    # Backup directory was created.
+    backup_root = target / ".claude" / ".backup"
+    assert backup_root.is_dir()
+    assert any(p.is_dir() for p in backup_root.iterdir())
+
+
+def test_update_recap_lists_orphans_with_paths(tmp_path):
+    """The recap output includes the exact path of each orphan."""
+    ws = _make_workspace(tmp_path)
+    target = tmp_path / "my-project"
+    target.mkdir()
+
+    install_profile(str(ws / "streamtex-claude"), "project", str(target))
+
+    orphan = target / ".claude" / "commands" / "stx-old" / "obsolete.md"
+    orphan.parent.mkdir(parents=True)
+    orphan.write_text("orphan\n")
+
+    runner = CliRunner()
+    os.chdir(ws)
+    result = runner.invoke(
+        cli, ["claude", "update", str(target)], input="n\n"
+    )
+
+    assert result.exit_code == 0, result.output
+    # The recap should list the orphan path so the user can spot user-added
+    # files they may want to keep.
+    assert "stx-old/obsolete.md" in result.output

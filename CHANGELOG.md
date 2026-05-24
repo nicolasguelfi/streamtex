@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.14] — 2026-05-24 — `stx claude update` redesign
+
+### Changed
+
+- **`stx claude update` now removes orphan files by default.** Files
+  installed previously but no longer declared by any `streamtex-claude`
+  manifest are removed automatically. Empty parent directories left
+  behind are cleaned up too.
+- **A confirmation prompt is shown** before any destructive action
+  (orphan removal, modified-file overwrite). The recap lists every
+  affected path so user-added files in `.claude/commands/` can be spotted
+  and the operation cancelled if needed.
+- **`--force` semantics unchanged**: still required to overwrite
+  locally-modified files (with auto-backup to `.claude/.backup/`).
+  Without `--force`, modified files are preserved.
+- Protected paths (NEVER touched, even at `--force --yes`):
+  `.claude/custom/`, `.claude/.backup/`, `.claude/.stx-profile`.
+
+### Added
+
+- **`-y` / `--yes` flag** to bypass the confirmation prompt (for CI /
+  scripted updates). Combine with `--force` for full auto mode:
+  `stx claude update --force --yes`.
+
+### Removed
+
+- **`--prune` flag**. Pruning is now the default behaviour; the flag was
+  opt-in for one local release cycle and never reached PyPI, so no
+  external script depends on it.
+
 ## [0.7.13] — 2026-05-21 — Navigation refactor Phase 4c: scroll-spy hears the real scroll container
 
 ### Fixed

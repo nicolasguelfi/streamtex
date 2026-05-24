@@ -742,17 +742,127 @@ def _ensure_claude_gitignore(target: str, console) -> None:
             )
 
 
+_BACKUP_PREFIX = os.path.join(".claude", ".backup")
+_STX_PROFILE_PATH = os.path.join(".claude", ".stx-profile")
+_RECAP_TRUNCATE_AT = 20  # show at most this many paths per category
+
+
+def _is_protected_path(rel_path: str) -> bool:
+    """Return True if rel_path must NEVER be removed, even under prune."""
+    if rel_path == _BACKUP_PREFIX or rel_path.startswith(_BACKUP_PREFIX + os.sep):
+        return True
+    if rel_path == _STX_PROFILE_PATH:
+        return True
+    # .claude/custom/ is already filtered by compare_profile(); this is
+    # defence in depth in case the filter ever regresses.
+    custom_prefix = os.path.join(".claude", "custom")
+    return rel_path == custom_prefix or rel_path.startswith(custom_prefix + os.sep)
+
+
+def _print_recap(
+    to_install: list,
+    to_overwrite: list,
+    to_preserve: list,
+    to_prune: list,
+    target: str,
+    console,
+) -> None:
+    """Print a human-readable summary of pending changes before confirmation."""
+    console.print(f"\nThe following changes will be applied to [cyan]{target}/.claude/[/cyan]:")
+    console.print()
+    if to_install:
+        console.print(f"  [green]+[/green]  {len(to_install)} file(s) to install (missing in target)")
+    if to_overwrite:
+        console.print(
+            f"  [yellow]~[/yellow]  {len(to_overwrite)} file(s) to overwrite "
+            "(locally modified — backup saved)"
+        )
+    if to_preserve:
+        console.print(
+            f"  [yellow]○[/yellow]  {len(to_preserve)} file(s) locally modified — will be "
+            "[bold]PRESERVED[/bold] (run with --force to overwrite)"
+        )
+    if to_prune:
+        console.print(
+            f"  [cyan]−[/cyan]  {len(to_prune)} file(s) to remove (orphans — no longer "
+            "declared by streamtex-claude)"
+        )
+
+    def _list_paths(label: str, items: list, marker: str, color: str) -> None:
+        if not items:
+            return
+        console.print(f"\n[bold]{label}:[/bold]")
+        for d in items[:_RECAP_TRUNCATE_AT]:
+            console.print(f"  [{color}]{marker}[/{color}] {d.path}")
+        if len(items) > _RECAP_TRUNCATE_AT:
+            console.print(f"  [dim]... and {len(items) - _RECAP_TRUNCATE_AT} more[/dim]")
+
+    _list_paths("Files to be removed", to_prune, "−", "cyan")
+    _list_paths("Files to be overwritten", to_overwrite, "~", "yellow")
+    console.print()
+
+
+def _remove_empty_dirs(target: str, paths_removed: list[str]) -> None:
+    """Walk up from each removed file path; rmdir any now-empty parents.
+
+    Stops at .claude/ (never removes it) and never touches protected
+    paths (custom/, .backup/).
+    """
+    claude_root = os.path.join(target, ".claude")
+    seen: set[str] = set()
+    for rel_path in paths_removed:
+        # Start from the parent of the deleted file
+        abs_dir = os.path.dirname(os.path.join(target, rel_path))
+        while abs_dir and abs_dir not in seen:
+            seen.add(abs_dir)
+            # Stop at .claude/ itself (never remove it)
+            if os.path.normpath(abs_dir) == os.path.normpath(claude_root):
+                break
+            # Stop if we've climbed above .claude/
+            try:
+                rel = os.path.relpath(abs_dir, target)
+            except ValueError:
+                break
+            if not rel.startswith(".claude"):
+                break
+            # Never touch protected paths even when they look empty
+            if _is_protected_path(rel):
+                break
+            if not os.path.isdir(abs_dir):
+                break
+            try:
+                # rmdir succeeds only if the directory is empty
+                os.rmdir(abs_dir)
+            except OSError:
+                # Not empty or permission issue — stop climbing this branch
+                break
+            abs_dir = os.path.dirname(abs_dir)
+
+
 def _update_single_target(
     claude_repo: str,
     profile: str,
     target: str,
     force: bool,
     console,
-    prune: bool = False,
+    yes: bool = False,
 ) -> int:
     """Update a single target from its profile source.
 
-    Returns the number of files updated (additions/modifications + prunes).
+    Behaviour:
+    - Files missing in target           → installed
+    - Files locally modified            → preserved (or overwritten if force=True,
+                                          always with a backup to .claude/.backup/)
+    - Files extra in target (orphans)   → removed (always — this is the only way
+                                          to keep target aligned with the source
+                                          of truth). Protected paths
+                                          (.claude/custom/, .claude/.backup/,
+                                          .claude/.stx-profile) are never touched.
+
+    Before any destructive operation (overwrite or removal), a recap is shown
+    and an interactive confirmation prompt is required, unless yes=True.
+
+    Returns the number of files updated (installs + overwrites + prunes).
     """
     diffs = compare_profile(claude_repo, profile, target)
     source_files = collect_source_files(claude_repo, profile)
@@ -768,6 +878,21 @@ def _update_single_target(
     # Migrate: ensure .claude/ is gitignored and untracked
     _ensure_claude_gitignore(target, console)
 
+    # Categorise diffs before showing the recap.
+    to_install = [d for d in diffs if d.status == "missing"]
+    modified = [d for d in diffs if d.status == "modified"]
+    to_overwrite = modified if force else []
+    to_preserve = [] if force else modified
+    to_prune = [d for d in diffs if d.status == "extra" and not _is_protected_path(d.path)]
+
+    # Confirmation prompt — only if there is something destructive to do.
+    destructive = bool(to_overwrite) or bool(to_prune)
+    if destructive and not yes:
+        _print_recap(to_install, to_overwrite, to_preserve, to_prune, target, console)
+        if not click.confirm("Proceed?", default=False):
+            console.print("[yellow]Aborted. No changes applied.[/yellow]")
+            return 0
+
     # Back up modified files before overwriting
     backup_dir = _backup_modified_files(target, diffs, source_files)
     if backup_dir:
@@ -778,22 +903,11 @@ def _update_single_target(
     skipped: list[str] = []
     pruned: list[str] = []
 
-    # Paths that must NEVER be pruned even when --prune is set.
-    # .backup/ holds prior overwrite backups; .stx-profile is the
-    # profile marker (already filtered out by compare_profile, kept
-    # here as defense in depth).
-    backup_prefix = os.path.join(".claude", ".backup")
-
     for d in diffs:
         if d.status == "identical":
             continue
         if d.status == "extra":
-            if not prune:
-                continue
-            # Skip protected paths even under --prune.
-            if d.path.startswith(backup_prefix + os.sep) or d.path == backup_prefix:
-                continue
-            if d.path == os.path.join(".claude", ".stx-profile"):
+            if _is_protected_path(d.path):
                 continue
             abs_path = os.path.join(target, d.path)
             try:
@@ -804,7 +918,7 @@ def _update_single_target(
                 pruned.append(d.path)
             except OSError as exc:
                 console.print(
-                    f"  [yellow]⚠[/yellow] Could not prune {d.path}: {exc}"
+                    f"  [yellow]⚠[/yellow] Could not remove {d.path}: {exc}"
                 )
             continue
 
@@ -828,6 +942,10 @@ def _update_single_target(
         if d.path.startswith(".claude"):
             os.chmod(dst_path, 0o444)
         updated.append(d.path)
+
+    # Clean up parent directories left empty by the prune step.
+    if pruned:
+        _remove_empty_dirs(target, pruned)
 
     # Re-render CLAUDE.md from .j2 template after any file update
     # (also renders if CLAUDE.md is missing or .j2 was updated)
@@ -913,21 +1031,30 @@ def diff_cmd(path: str) -> None:
 @click.argument("path", default=".")
 @click.option(
     "--force", is_flag=True,
-    help="Overwrite all files including CLAUDE.md.",
+    help="Overwrite locally-modified files (with auto-backup to .claude/.backup/).",
 )
 @click.option(
     "--all", "update_all", is_flag=True,
     help="Update all projects in the workspace.",
 )
 @click.option(
-    "--prune", is_flag=True,
-    help=(
-        "Remove orphan files in .claude/ that no manifest declares anymore. "
-        "Skips .claude/custom/, .claude/.backup/, and .claude/.stx-profile."
-    ),
+    "-y", "--yes", is_flag=True,
+    help="Skip the confirmation prompt before applying destructive changes.",
 )
-def update_cmd(path: str, force: bool, update_all: bool, prune: bool) -> None:
-    """Update an installed Claude profile from the source repo."""
+def update_cmd(path: str, force: bool, update_all: bool, yes: bool) -> None:
+    """Update an installed Claude profile from the source repo.
+
+    Aligns the installed .claude/ tree with the current streamtex-claude
+    source: missing files are installed, orphans (no longer declared by
+    any manifest) are removed, and locally-modified files are preserved
+    unless --force is passed (which overwrites them with an auto-backup).
+
+    Before any destructive operation (overwrite or removal), a recap is
+    shown and confirmation is required, unless --yes is passed.
+
+    Protected paths (NEVER touched): .claude/custom/, .claude/.backup/,
+    .claude/.stx-profile.
+    """
     console = get_console()
 
     if update_all:
@@ -949,7 +1076,7 @@ def update_cmd(path: str, force: bool, update_all: bool, prune: bool) -> None:
             rel = os.path.relpath(target_path, ws_root)
             console.print(f"\n[bold cyan]\u2500\u2500 {rel} [/bold cyan]([cyan]{profile}[/cyan])")
             total_updated += _update_single_target(
-                claude_repo, profile, target_path, force, console, prune=prune,
+                claude_repo, profile, target_path, force, console, yes=yes,
             )
 
         separator = "\u2500" * 40
@@ -968,7 +1095,7 @@ def update_cmd(path: str, force: bool, update_all: bool, prune: bool) -> None:
     # Single target mode
     _ws_root, claude_repo, profile, target = _resolve_profile_context(path)
     console.print(f"[cyan]Profile:[/cyan] {profile}")
-    _update_single_target(claude_repo, profile, target, force, console, prune=prune)
+    _update_single_target(claude_repo, profile, target, force, console, yes=yes)
 
 
 @click.command("check")

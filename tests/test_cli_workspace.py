@@ -664,6 +664,18 @@ def test_update_upgrade_deps_drops_locked(tmp_path):
     assert upgrade_pkg_calls, "--upgrade-deps should run uv lock --upgrade-package streamtex"
 
 
+def test_cli_help_shows_quickstart():
+    """stx --help shows the quick-start header + streamtex.org link."""
+    runner = CliRunner()
+    result = runner.invoke(cli, ["--help"])
+    assert result.exit_code == 0
+    assert "https://streamtex.org" in result.output
+    assert "Quick start" in result.output
+    assert "stx install ." in result.output
+    assert "stx project new" in result.output
+    assert "/stx-guide" in result.output
+
+
 def test_update_dry_run_announces_locked(tmp_path):
     """--dry-run output mentions --locked in default mode."""
     ws = _create_workspace_with_repos(tmp_path, preset="standard")

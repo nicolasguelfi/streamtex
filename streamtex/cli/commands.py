@@ -63,7 +63,18 @@ from .workspace_cmd import update as workspace_update
 @click.group()
 @click.version_option(version=__version__, prog_name="stx")
 def cli():
-    """StreamTeX CLI — manage workspaces, run tests, and more."""
+    """StreamTeX CLI — content framework for Streamlit (https://streamtex.org).
+
+    \b
+    Quick start (new user):
+      stx install .                    Set up a workspace in the current dir
+      stx project new my-project       Create your first project
+      cd projects/my-project && stx run  Launch it
+
+    \b
+    After install, the slash command /stx-guide (in Claude Code) gives the
+    full guide. Run stx <command> --help for any individual command.
+    """
 
 
 # --- Top-level commands ----------------------------------------------------

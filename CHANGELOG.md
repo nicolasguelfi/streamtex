@@ -21,6 +21,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Optional-bundles docstring next to `REQUIRED_BUNDLES` updated to mention
   `fonts` in the optional set.
 
+### Changed
+
+- **`stx --help` shows a quick-start header** — the top-level CLI docstring
+  now surfaces the streamtex.org link, the three commands a new user needs
+  (`stx install .`, `stx project new <name>`, `stx run`), and a pointer to
+  the `/stx-guide` slash command in Claude Code. Replaces the previous
+  one-liner that gave no entry point for first-time users. Test:
+  `test_cli_help_shows_quickstart`.
+
 ## [0.7.15] — 2026-05-25 — `stx sync` + deterministic `stx update --locked`
 
 ### Added

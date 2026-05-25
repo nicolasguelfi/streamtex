@@ -83,6 +83,23 @@ class BodyBundle(Protocol):
 
 
 @runtime_checkable
+class FontsBundle(Protocol):
+    """Font family declarations exposed by a design system.
+
+    OPTIONAL bundle (not in REQUIRED_BUNDLES). A design system MAY provide
+    fonts to let downstream documents pin typography via composable Style
+    objects instead of hardcoding font-family strings in their own
+    custom/styles.py. The three slots are intentionally kept distinct so a
+    document can diverge heading vs body vs code typography without touching
+    the pack.
+    """
+
+    body_family: ClassVar[Style]
+    heading_family: ClassVar[Style]
+    code_family: ClassVar[Style]
+
+
+@runtime_checkable
 class CitationBundle(Protocol):
     source: ClassVar[Style]
     author: ClassVar[Style]
@@ -109,9 +126,9 @@ REQUIRED_BUNDLES: tuple[str, ...] = (
 """Bundles that every conforming design system MUST provide.
 
 Optional bundles (stat_hero, card_grid, comparison_table, takeaways, citation,
-inline_emphasis, lists) can be added by design systems but are not mandatory.
-Components requesting an optional bundle they don't find raise BV001 at
-install-time (cf. validation.validate_bundles_required).
+inline_emphasis, lists, fonts) can be added by design systems but are not
+mandatory. Components requesting an optional bundle they don't find raise
+BV001 at install-time (cf. validation.validate_bundles_required).
 """
 
 
@@ -269,6 +286,7 @@ __all__ = [
     "ComparisonTableBundle",
     "TakeawaysBundle",
     "BodyBundle",
+    "FontsBundle",
     "CitationBundle",
     "InlineEmphasisBundle",
     "ListsBundle",

@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **`FontsBundle` Protocol** in `streamtex.core.contracts` — declares the
+  shape a design system MAY expose for typography (`body_family`,
+  `heading_family`, `code_family` as composable `Style` objects). Kept as
+  an **optional** bundle (not in `REQUIRED_BUNDLES`) so existing third-party
+  design systems remain conforming without modification. The three slots are
+  intentionally kept distinct (body vs heading vs code) so downstream
+  documents can diverge typography per role without touching the pack.
+  Referenced by `streamtex-pack-design 0.3.0` which adds a `_Fonts` bundle
+  on all three of its design systems.
+- Optional-bundles docstring next to `REQUIRED_BUNDLES` updated to mention
+  `fonts` in the optional set.
+
 ## [0.7.15] — 2026-05-25 — `stx sync` + deterministic `stx update --locked`
 
 ### Added

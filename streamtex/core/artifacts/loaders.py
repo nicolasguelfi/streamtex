@@ -51,6 +51,30 @@ def load_artifact(
         from streamtex.core.artifacts.ai_prompt import load_ai_prompt_from_path
 
         return load_ai_prompt_from_path(discovered.path, pack=discovered.pack)
+    if kind == ArtifactKind.ARCHETYPE:
+        from streamtex.core.artifacts.archetype import load_archetype_from_path
+
+        return load_archetype_from_path(discovered.path, pack=discovered.pack)
+    if kind == ArtifactKind.GUIDELINE:
+        from streamtex.core.artifacts.guideline import load_guideline_from_path
+
+        return load_guideline_from_path(discovered.path, pack=discovered.pack)
+    if kind == ArtifactKind.SKILL:
+        from streamtex.core.artifacts.skill import load_skill_from_path
+
+        return load_skill_from_path(discovered.path, pack=discovered.pack)
+    if kind == ArtifactKind.AGENT:
+        from streamtex.core.artifacts.agent import load_agent_from_path
+
+        return load_agent_from_path(discovered.path, pack=discovered.pack)
+    if kind == ArtifactKind.ASSET:
+        from streamtex.core.artifacts.asset import load_asset_bundle_from_path
+
+        return load_asset_bundle_from_path(discovered.path, pack=discovered.pack)
+    if kind == ArtifactKind.INTEGRATION:
+        from streamtex.core.artifacts.integration import load_integration_from_path
+
+        return load_integration_from_path(discovered.path, pack=discovered.pack)
     raise NotImplementedError(
         f"load_artifact does not yet support kind={kind.value!r}; "
         "the per-category loader has not been registered."

@@ -28,7 +28,28 @@ def validate_artifact(path: Path, kind: ArtifactKind) -> list[ValidationIssue]:
         from streamtex.core.artifacts.ai_prompt import validate_ai_prompt
 
         return validate_ai_prompt(path)
-    # Other kinds will be added in subsequent phases (archetype, guideline,
-    # skill, agent, asset, integration). For now return empty — the file
-    # exists check is done at discovery time.
+    if kind == ArtifactKind.ARCHETYPE:
+        from streamtex.core.artifacts.archetype import validate_archetype
+
+        return validate_archetype(path)
+    if kind == ArtifactKind.GUIDELINE:
+        from streamtex.core.artifacts.guideline import validate_guideline
+
+        return validate_guideline(path)
+    if kind == ArtifactKind.SKILL:
+        from streamtex.core.artifacts.skill import validate_skill
+
+        return validate_skill(path)
+    if kind == ArtifactKind.AGENT:
+        from streamtex.core.artifacts.agent import validate_agent
+
+        return validate_agent(path)
+    if kind == ArtifactKind.ASSET:
+        from streamtex.core.artifacts.asset import validate_asset
+
+        return validate_asset(path)
+    if kind == ArtifactKind.INTEGRATION:
+        from streamtex.core.artifacts.integration import validate_integration
+
+        return validate_integration(path)
     return []

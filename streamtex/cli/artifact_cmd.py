@@ -10,15 +10,19 @@ See `streamtex.core.artifacts` for the engine API and the RFC at
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import click
 
 from streamtex.core.artifacts import (
     ArtifactKind,
     discover_artifacts,
+    install_claude_artifact,
     resolve_artifact,
     validate_artifact,
 )
 
+from ._shared import _find_project_dir
 from .console import get_console
 
 _KIND_CHOICES = [k.value for k in ArtifactKind]
@@ -101,6 +105,12 @@ def show_cmd(name: str, kind_str: str, pack_filter: str | None) -> None:
         _render_palette(discovered, console)
     elif kind == ArtifactKind.AI_PROMPT:
         _render_ai_prompt(discovered, console)
+    elif kind == ArtifactKind.ARCHETYPE:
+        _render_archetype(discovered, console)
+    elif kind == ArtifactKind.GUIDELINE:
+        _render_guideline(discovered, console)
+    elif kind in (ArtifactKind.SKILL, ArtifactKind.AGENT):
+        _render_skill_or_agent(discovered, console, kind)
     else:
         # Fallback: dump path + first lines for categories not yet rendered.
         try:
@@ -159,6 +169,71 @@ def validate_cmd(name: str | None, kind_str: str | None, pack_filter: str | None
         )
 
 
+@artifact.command("install")
+@click.argument("name")
+@click.option(
+    "--kind",
+    "kind_str",
+    type=click.Choice(["skill", "agent"]),
+    required=True,
+    help="Only skills and agents are installable to .claude/custom/.",
+)
+@click.option("--pack", "pack_filter", default=None, help="Disambiguate by pack name.")
+@click.option("--yes", "auto_yes", is_flag=True, help="Skip confirmation prompt.")
+@click.option(
+    "--overwrite", is_flag=True, help="Overwrite an existing installed file."
+)
+def install_cmd(
+    name: str,
+    kind_str: str,
+    pack_filter: str | None,
+    auto_yes: bool,
+    overwrite: bool,
+) -> None:
+    """Install a pack-shipped skill or agent into .claude/custom/.
+
+    Lifecycle decision EAR-4: confirmation by default, ``--yes`` to skip.
+    Files are namespaced as ``<pack_slug>__<name>.md`` to avoid collisions.
+    """
+    console = get_console()
+    kind = ArtifactKind(kind_str)
+    try:
+        discovered = resolve_artifact(
+            name, kind, prefer=[pack_filter] if pack_filter else None
+        )
+    except Exception as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    project_dir = _find_project_dir() or Path.cwd()
+    target_dir = project_dir / ".claude" / "custom" / (
+        "skills" if kind == ArtifactKind.SKILL else "agents"
+    )
+    pack_slug = discovered.pack.replace("streamtex-pack-", "").replace("-", "_")
+    target = target_dir / f"{pack_slug}__{discovered.name}.md"
+
+    console.print(
+        f"Install {discovered.pack}:{discovered.name} ({kind.value}) "
+        f"\n  from: {discovered.path}"
+        f"\n  to:   {target}"
+    )
+
+    if not auto_yes:
+        if not click.confirm("Proceed?", default=True):
+            console.print("[yellow]Cancelled.[/yellow]")
+            return
+
+    report = install_claude_artifact(
+        name, kind, project_dir, pack=pack_filter, overwrite=overwrite
+    )
+    if report.action == "skipped":
+        console.print(
+            "[yellow]Skipped[/yellow] — destination already exists. Use "
+            "--overwrite to replace."
+        )
+    else:
+        console.print(f"[green]{report.action}[/green] → {report.destination}")
+
+
 # ---------------------------------------------------------------------------
 # Per-kind renderers
 # ---------------------------------------------------------------------------
@@ -192,3 +267,57 @@ def _render_ai_prompt(discovered, console) -> None:
         console.print(f"[bold]suffix-{orient}[/bold]:")
         console.print(prompt.suffixes[orient])
         console.print()
+
+
+def _render_archetype(discovered, console) -> None:
+    from streamtex.core.artifacts.archetype import load_archetype_from_path
+
+    arch = load_archetype_from_path(discovered.path, pack=discovered.pack)
+    console.print(f"description: {arch.description}")
+    console.print(
+        f"orientation: {arch.orientation}  •  status: {arch.status}  •  since: {arch.since}"
+    )
+    if arch.tags:
+        console.print(f"tags: {', '.join(arch.tags)}")
+    if arch.palette_refs:
+        console.print(f"palette refs: {', '.join(arch.palette_refs)}")
+    console.print(f"extrapolable: {arch.extrapolable}")
+    console.print()
+    body = arch.body.lstrip()
+    console.print(body[:1500])
+    if len(body) > 1500:
+        console.print("[dim]… (truncated)[/dim]")
+
+
+def _render_guideline(discovered, console) -> None:
+    from streamtex.core.artifacts.guideline import load_guideline_from_path
+
+    gl = load_guideline_from_path(discovered.path, pack=discovered.pack)
+    console.print(f"description: {gl.description}")
+    console.print(f"since: {gl.since}")
+    if gl.rules:
+        console.print(f"rules: {', '.join(gl.rules)}")
+    if gl.applies_to:
+        console.print(f"applies to: {', '.join(gl.applies_to)}")
+    console.print()
+    body = gl.body.lstrip()
+    console.print(body[:1500])
+    if len(body) > 1500:
+        console.print("[dim]… (truncated)[/dim]")
+
+
+def _render_skill_or_agent(discovered, console, kind: ArtifactKind) -> None:
+    if kind == ArtifactKind.SKILL:
+        from streamtex.core.artifacts.skill import load_skill_from_path
+        loaded = load_skill_from_path(discovered.path, pack=discovered.pack)
+    else:
+        from streamtex.core.artifacts.agent import load_agent_from_path
+        loaded = load_agent_from_path(discovered.path, pack=discovered.pack)
+    console.print(f"description: {loaded.description}")
+    console.print(f"namespace: {loaded.namespaced_name}")
+    console.print(f"install filename: {loaded.install_filename}")
+    console.print()
+    body = loaded.body.lstrip()
+    console.print(body[:1500])
+    if len(body) > 1500:
+        console.print("[dim]… (truncated)[/dim]")

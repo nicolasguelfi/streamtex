@@ -37,13 +37,23 @@ from streamtex.core.artifacts.discovery import (
 )
 from streamtex.core.artifacts.validation import validate_artifact
 from streamtex.core.artifacts.loaders import load_artifact
+from streamtex.core.artifacts.install import (
+    InstallReport,
+    install_claude_artifact,
+    list_claude_artifacts_for_pack,
+    uninstall_claude_artifact,
+)
 
 __all__ = [
     "ArtifactKind",
     "ArtifactSpec",
     "DiscoveredArtifact",
+    "InstallReport",
     "discover_artifacts",
     "resolve_artifact",
     "validate_artifact",
     "load_artifact",
+    "install_claude_artifact",
+    "list_claude_artifacts_for_pack",
+    "uninstall_claude_artifact",
 ]

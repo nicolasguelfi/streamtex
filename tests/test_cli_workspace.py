@@ -605,6 +605,86 @@ def test_update_repair_finds_missing_init(tmp_path):
     assert (custom_dir / "__init__.py").is_file()
 
 
+def test_update_uses_locked_by_default(tmp_path):
+    """stx update (default) passes --locked to uv sync."""
+    ws = _create_workspace_with_repos(tmp_path, preset="standard")
+    for repo_dir in [ws / "streamtex-docs", ws / "streamtex-claude"]:
+        (repo_dir / ".git").mkdir()
+
+    with (
+        patch("streamtex.cli.workspace_cmd.subprocess.run") as mock_run,
+        patch("streamtex.cli.workspace_cmd.shutil.which", return_value="/usr/bin/uv"),
+    ):
+        mock_run.return_value.returncode = 0
+        mock_run.return_value.stdout = "Already up to date."
+        mock_run.return_value.stderr = ""
+        runner = CliRunner()
+        os.chdir(ws)
+        result = runner.invoke(cli, ["update"])
+
+    assert result.exit_code == 0
+    sync_calls = [c for c in mock_run.call_args_list if c.args and isinstance(c.args[0], list) and "sync" in c.args[0]]
+    assert sync_calls, "expected at least one uv sync call"
+    for c in sync_calls:
+        cmd = c.args[0]
+        assert "--locked" in cmd, f"uv sync should use --locked by default: {cmd}"
+    upgrade_pkg_calls = [c for c in mock_run.call_args_list if c.args and isinstance(c.args[0], list) and "--upgrade-package" in c.args[0]]
+    assert not upgrade_pkg_calls, "default mode must not run uv lock --upgrade-package"
+
+
+def test_update_upgrade_deps_drops_locked(tmp_path):
+    """stx update --upgrade-deps allows lock refresh: no --locked, restores upgrade-package."""
+    ws = _create_workspace_with_repos(tmp_path, preset="standard")
+    for repo_dir in [ws / "streamtex-docs", ws / "streamtex-claude"]:
+        (repo_dir / ".git").mkdir()
+    # Add a streamtex dependency to make uv lock --upgrade-package fire
+    docs_pyproject = ws / "streamtex-docs" / "pyproject.toml"
+    docs_pyproject.write_text(
+        '[project]\nname = "streamtex-docs"\ndependencies = ["streamtex>=0.7"]\n'
+    )
+
+    with (
+        patch("streamtex.cli.workspace_cmd.subprocess.run") as mock_run,
+        patch("streamtex.cli.workspace_cmd.shutil.which", return_value="/usr/bin/uv"),
+    ):
+        mock_run.return_value.returncode = 0
+        mock_run.return_value.stdout = "Already up to date."
+        mock_run.return_value.stderr = ""
+        runner = CliRunner()
+        os.chdir(ws)
+        result = runner.invoke(cli, ["update", "--upgrade-deps"])
+
+    assert result.exit_code == 0
+    sync_calls = [c for c in mock_run.call_args_list if c.args and isinstance(c.args[0], list) and "sync" in c.args[0]]
+    assert sync_calls, "expected at least one uv sync call"
+    for c in sync_calls:
+        cmd = c.args[0]
+        assert "--locked" not in cmd, f"--upgrade-deps must remove --locked: {cmd}"
+    upgrade_pkg_calls = [c for c in mock_run.call_args_list if c.args and isinstance(c.args[0], list) and "--upgrade-package" in c.args[0]]
+    assert upgrade_pkg_calls, "--upgrade-deps should run uv lock --upgrade-package streamtex"
+
+
+def test_update_dry_run_announces_locked(tmp_path):
+    """--dry-run output mentions --locked in default mode."""
+    ws = _create_workspace_with_repos(tmp_path, preset="standard")
+    for repo_dir in [ws / "streamtex-docs", ws / "streamtex-claude"]:
+        (repo_dir / ".git").mkdir()
+
+    with (
+        patch("streamtex.cli.workspace_cmd.subprocess.run") as mock_run,
+        patch("streamtex.cli.workspace_cmd.shutil.which", return_value="/usr/bin/uv"),
+    ):
+        mock_run.return_value.returncode = 0
+        mock_run.return_value.stdout = ""
+        mock_run.return_value.stderr = ""
+        runner = CliRunner()
+        os.chdir(ws)
+        result = runner.invoke(cli, ["update", "--dry-run"])
+
+    assert result.exit_code == 0
+    assert "would uv sync --locked" in result.output
+
+
 # ---------------------------------------------------------------------------
 # Preset-specific generation tests
 # ---------------------------------------------------------------------------

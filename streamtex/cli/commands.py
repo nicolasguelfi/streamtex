@@ -54,6 +54,7 @@ from .run_cmd import run as stx_run
 from .screenshot_cmd import screenshot as stx_screenshot
 from .shortcuts import run_lint, run_test
 from .status_cmd import status as workspace_status
+from .sync_cmd import sync as stx_sync
 from .upgrade_cmd import upgrade as project_upgrade
 from .validate_cmd import validate as stx_validate
 from .workspace_cmd import update as workspace_update
@@ -70,6 +71,7 @@ def cli():
 cli.add_command(stx_install)
 cli.add_command(stx_run)
 cli.add_command(stx_screenshot)
+cli.add_command(stx_sync, name="sync")
 cli.add_command(workspace_update, name="update")
 cli.add_command(workspace_status, name="status")
 

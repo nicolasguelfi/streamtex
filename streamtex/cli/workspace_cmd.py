@@ -355,6 +355,8 @@ def _run_uv_sync(
     repos: dict,
     ws_root: str,
     type_filter: set[str] | None = None,
+    *,
+    upgrade_deps: bool = False,
 ) -> None:
     """Run ``uv sync`` in selected repos and projects.
 
@@ -366,11 +368,18 @@ def _run_uv_sync(
         Absolute path to the workspace root.
     type_filter:
         If provided, only sync repos whose *type* is in this set.
+    upgrade_deps:
+        When True, actively upgrade ``streamtex`` in the lock (legacy
+        behaviour). When False (default), pass ``--locked`` to ``uv sync``
+        so the lock is never modified — deterministic sync to the committed
+        state. The ``--no-sources`` fallback always drops ``--locked``
+        because it intentionally rewrites the lock to PyPI mode.
     """
     uv = _find_uv()
     console = get_console()
     synced = 0
     skipped = 0
+    needs_upgrade_hint = False
 
     targets = _collect_sync_targets(repos, ws_root, type_filter)
 
@@ -379,8 +388,7 @@ def _run_uv_sync(
         return
 
     for target_name, target_path in targets:
-        # Upgrade streamtex in the lock file first (skip for the library itself)
-        if _depends_on_streamtex(target_path):
+        if upgrade_deps and _depends_on_streamtex(target_path):
             no_src = _has_missing_local_sources(target_path)
             lock_cmd = [uv, "lock", "--upgrade-package", "streamtex"]
             if no_src:
@@ -399,13 +407,17 @@ def _run_uv_sync(
                 skipped += 1
                 continue
 
-        # If local editable sources are missing, fall back to PyPI
+        no_sources = _has_missing_local_sources(target_path)
         cmd = [uv, "sync"]
-        if _has_missing_local_sources(target_path):
+        if no_sources:
             cmd.append("--no-sources")
             console.print(f"  [cyan]{target_name}[/cyan]: running uv sync --no-sources (editable source not found) …")
+        elif upgrade_deps:
+            console.print(f"  [cyan]{target_name}[/cyan]: running uv sync (upgrade-deps) …")
         else:
-            console.print(f"  [cyan]{target_name}[/cyan]: running uv sync …")
+            cmd.append("--locked")
+            console.print(f"  [cyan]{target_name}[/cyan]: running uv sync --locked …")
+
         result = subprocess.run(
             cmd,
             cwd=target_path,
@@ -416,17 +428,28 @@ def _run_uv_sync(
         if result.returncode == 0:
             console.print(f"  [green]{target_name}[/green]: ok")
             synced += 1
-            # --no-sources rewrites uv.lock (local paths → PyPI).
-            # Restore the committed version so the repo stays clean.
-            if "--no-sources" in cmd:
+            if no_sources:
                 _restore_uv_lock_if_only_dirty(target_path)
         else:
-            console.print(f"  [red]{target_name}[/red]: failed")
-            if result.stderr:
-                console.print(f"    {result.stderr.strip()}")
+            stderr_text = (result.stderr or "").strip()
+            if "--locked" in cmd and ("lock" in stderr_text.lower() or "out of date" in stderr_text.lower()):
+                console.print(
+                    f"  [yellow]{target_name}[/yellow]: lock out of date "
+                    "— re-run with `stx update --upgrade-deps`"
+                )
+                needs_upgrade_hint = True
+            else:
+                console.print(f"  [red]{target_name}[/red]: failed")
+                if stderr_text:
+                    console.print(f"    {stderr_text}")
             skipped += 1
 
     console.print(f"\n[bold]Done:[/bold] {synced} synced, {skipped} skipped")
+    if needs_upgrade_hint:
+        console.print(
+            "[dim]Hint: `stx update --upgrade-deps` refreshes the lock when "
+            "pyproject.toml has new constraints or new streamtex versions exist.[/dim]"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -838,7 +861,13 @@ def _upgrade_cli_tool(
 @click.option("--dry-run", is_flag=True, help="Show steps without executing.")
 @click.option("--repair", is_flag=True, help="Run repair checks (broken venv, missing __init__.py).")
 @click.option("--force", is_flag=True, help="Overwrite locally modified profile files (backup in .claude/.backup/).")
-def update(skip_sync, skip_profiles, dry_run, repair, force):
+@click.option(
+    "--upgrade-deps",
+    is_flag=True,
+    help="Allow uv to refresh uv.lock (upgrade streamtex + apply pyproject changes). "
+    "Default is --locked: deterministic sync to the committed lock state.",
+)
+def update(skip_sync, skip_profiles, dry_run, repair, force, upgrade_deps):
     """Pull repos, clone missing, sync deps, install hooks, update profiles."""
     ws_root, config = _require_workspace()
     repos = config.get("repos", {})
@@ -995,10 +1024,13 @@ def update(skip_sync, skip_profiles, dry_run, repair, force):
         _step("Syncing dependencies …")
         if dry_run:
             for target_name, target_path in _collect_sync_targets(repos, ws_root):
-                upgrade = " (+ upgrade streamtex)" if _depends_on_streamtex(target_path) else ""
-                console.print(f"  [cyan]{target_name}[/cyan]: would uv sync{upgrade}")
+                if upgrade_deps:
+                    upgrade = " (+ upgrade streamtex)" if _depends_on_streamtex(target_path) else ""
+                    console.print(f"  [cyan]{target_name}[/cyan]: would uv sync{upgrade}")
+                else:
+                    console.print(f"  [cyan]{target_name}[/cyan]: would uv sync --locked")
         else:
-            _run_uv_sync(repos, ws_root)
+            _run_uv_sync(repos, ws_root, upgrade_deps=upgrade_deps)
 
     # --- project migrations ---
     if not skip_sync:

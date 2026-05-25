@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.15] — 2026-05-25 — `stx sync` + deterministic `stx update --locked`
+
+### Added
+
+- **New top-level command `stx sync`** — project-level dependency sync.
+  Wraps `uv sync --locked` (deterministic, idempotent) for any directory
+  containing a `pyproject.toml`. Walks up from the cwd to find the
+  project root; `stx sync <path>` targets a specific directory.
+- **`stx sync --upgrade-deps`** removes `--locked` so `uv sync` may
+  refresh `uv.lock` from `pyproject.toml`. Use when pyproject changes
+  intentionally.
+- **`stx update --upgrade-deps`** flag: opt back into the legacy
+  behaviour (`uv lock --upgrade-package streamtex` + plain `uv sync`).
+  Required when bumping streamtex after a new PyPI release.
+
+### Changed
+
+- **`stx update` now uses `uv sync --locked` by default.** Routine
+  updates no longer rewrite `uv.lock` — they fail loudly when the lock
+  diverges from `pyproject.toml`, with a hint pointing to
+  `--upgrade-deps`. Eliminates silent lock flip-flop between editable
+  and PyPI modes.
+- The `--no-sources` fallback (used when a local editable source is
+  missing) still rewrites the lock; `_restore_uv_lock_if_only_dirty`
+  brings it back to the committed state after sync.
+
 ## [0.7.14] — 2026-05-24 — `stx claude update` redesign
 
 ### Changed

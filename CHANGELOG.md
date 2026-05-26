@@ -5,6 +5,43 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.17] — 2026-05-26 — generic artifact engine (manifest 0.2)
+
+### Added
+
+- **`streamtex.core.artifacts` subpackage** — generic engine for extended
+  pack artifacts under the additive `[pack.data]` section of manifest
+  format **0.2**. Eight categories supported:
+  - `palette` — JSON canonical, Python view at import (composable Style atoms)
+  - `ai_prompt` — prefix + per-orientation suffixes for AI image generation
+  - `archetype` — markdown + YAML frontmatter, reusable visual scene patterns
+  - `guideline` — markdown + YAML frontmatter, opposable R-rules
+  - `skill` / `agent` — pack-scoped Claude Code skill/agent (install hook
+    to `.claude/custom/<subdir>/<pack_slug>__<name>.md`)
+  - `asset` — `_manifest.toml` + binary files with license tracking
+  - `integration` — open-contract recipe per third-party framework
+- Per-category modules (`palette.py`, `ai_prompt.py`, …) each ship a
+  TypedDict / dataclass view, a dedicated validator (`PAV*` / `APV*` /
+  `ARV*` / `GLV*` / `SKV*` / `AGV*` / `ASV*` / `INV*` codes), and a
+  typed loader.
+- `streamtex/cli/artifact_cmd.py` — new CLI surface
+  `stx artifact list|show|validate|install [--kind <k>] [--pack <p>]`.
+- Lifecycle hook for skills/agents: `install_claude_artifact()` copies
+  pack-shipped Claude artifacts into `<project>/.claude/custom/` with a
+  namespaced filename. Confirmation prompt by default at the CLI;
+  `--yes` to skip.
+- `contracts.PackManifest` gains optional `PackDataSection` (TypedDict).
+- Reference example: `streamtex-pack-gse v2.0.0` ships 17 artifacts
+  across 6 of the 8 categories.
+
+### Notes
+
+- Format **0.2** is additive. Existing format-0.1 packs (pack-design
+  v0.3.0, pack-manuals v0.2.0) work unchanged. A 0.2 pack with no
+  `[pack.data]` section is identical to a 0.1 pack.
+- Supersedes the now-removed `streamtex-shared/graphic-designs/gse/`
+  legacy file-copy system.
+
 ## [0.7.16] — 2026-05-25 — optional `FontsBundle` Protocol + `stx --help` quick-start
 
 ### Added

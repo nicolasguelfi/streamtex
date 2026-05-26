@@ -240,11 +240,33 @@ class PackInfo(TypedDict):
     streamtex_compat: str
 
 
+class PackDataSection(TypedDict, total=False):
+    """Optional `[pack.data]` table (manifest 0.2+).
+
+    Each key lists the artifact names of a given category that the pack ships.
+    The list is the source-of-truth for discovery: an unlisted file on disk is
+    not enumerated. Categories absent from this dict mean the pack does not
+    provide that artifact kind.
+
+    Cross-references: `streamtex.core.artifacts.spec.ArtifactKind`.
+    """
+
+    palettes: list[str]
+    ai_prompts: list[str]
+    archetypes: list[str]
+    guidelines: list[str]
+    skills: list[str]
+    agents: list[str]
+    assets: list[str]
+    integrations: list[str]
+
+
 class PackManifest(TypedDict):
     manifest: ManifestFormat
     pack: PackInfo
     entrypoint: PackEntrypoint
     scopes: NotRequired[dict]
+    data: NotRequired[PackDataSection]  # manifest 0.2+, optional
 
 
 # ---------------------------------------------------------------------------
@@ -299,6 +321,7 @@ __all__ = [
     "KitSpec",
     "KitManifest",
     "ManifestFormat",
+    "PackDataSection",
     "PackEntrypoint",
     "PackInfo",
     "PackManifest",

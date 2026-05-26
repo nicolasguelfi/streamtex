@@ -6,6 +6,7 @@ import click
 
 __version__ = version("streamtex")
 
+from .artifact_cmd import artifact as artifact_group
 from .bib_cmd import generate_stubs
 from .cache_cmd import warmup as cache_warmup
 from .claude_cmd import check_cmd as claude_check
@@ -196,6 +197,7 @@ cli.add_command(pack_group, name="pack")
 cli.add_command(component_group, name="component")
 cli.add_command(ds_group, name="ds")
 cli.add_command(kit_group, name="kit")
+cli.add_command(artifact_group, name="artifact")
 cli.add_command(stx_validate, name="validate")
 
 

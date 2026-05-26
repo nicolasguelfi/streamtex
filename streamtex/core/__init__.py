@@ -16,6 +16,6 @@ remaining infrastructure stays under `streamtex.core.*` per the convention in
 §5.0 of the plan.
 """
 
-from streamtex.core import contracts, validation, discovery
+from streamtex.core import artifacts, contracts, discovery, validation
 
-__all__ = ["contracts", "validation", "discovery"]
+__all__ = ["artifacts", "contracts", "validation", "discovery"]

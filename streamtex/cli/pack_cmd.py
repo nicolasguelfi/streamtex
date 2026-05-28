@@ -6,8 +6,6 @@ Surface and semantics: PLAN.md §6.2 + §29.4.
 from __future__ import annotations
 
 import re
-import subprocess
-import sys
 from pathlib import Path
 from typing import Any
 
@@ -15,10 +13,29 @@ import click
 
 from . import _stx_toml
 from ._shared import _find_project_dir
-from ._toml_helpers import get_uv_sources, remove_uv_source, set_uv_source
+from ._toml_helpers import (
+    ensure_pypi_dependency,
+    get_uv_sources,
+    remove_uv_source,
+    set_uv_source,
+    set_uv_source_git,
+)
 from .console import get_console
 
-REF_GIT_RE = re.compile(r"^git:(?P<url>[^@\s]+)(?:@(?P<rev>[^\s]+))?$")
+# git:[<scheme>://]<host>/<owner>/<repo>[.git][@<rev>][#subdirectory=<dir>]
+# - scheme (http/https) is tolerated but stripped — the canonical form stored
+#   in stx.toml is ``host/owner/repo`` (without scheme, without .git).
+# - the ``#subdirectory=`` fragment lets the user point at a sub-package inside
+#   a monorepo (e.g. ``streamtex-packs/streamtex-pack-design``).
+REF_GIT_RE = re.compile(
+    r"^git:"
+    r"(?:https?://)?"
+    r"(?P<url>[^@#\s]+?)"
+    r"(?:\.git)?"
+    r"(?:@(?P<rev>[^#\s]+))?"
+    r"(?:\#subdirectory=(?P<subdir>\S+))?"
+    r"$"
+)
 REF_LOCAL_RE = re.compile(r"^local:(?P<path>.+)$")
 REF_PYPI_RE = re.compile(r"^pypi:(?P<name>[A-Za-z0-9_\-]+)(?:@(?P<constraint>.+))?$")
 
@@ -28,11 +45,16 @@ def _parse_ref(ref: str) -> dict[str, Any]:
     if m:
         url = m.group("url")
         rev = m.group("rev")
+        subdir = m.group("subdir")
         entry: dict[str, Any] = {"type": "git", "ref": url}
         if rev:
             entry["rev"] = rev
-        name = url.rstrip("/").split("/")[-1]
-        entry["name"] = name
+        if subdir:
+            entry["subdirectory"] = subdir
+            # Sub-package basename is the meaningful pack identity in a monorepo.
+            entry["name"] = subdir.rstrip("/").split("/")[-1]
+        else:
+            entry["name"] = url.rstrip("/").split("/")[-1]
         return entry
     m = REF_LOCAL_RE.match(ref)
     if m:
@@ -46,7 +68,8 @@ def _parse_ref(ref: str) -> dict[str, Any]:
         return entry
     raise click.ClickException(
         f"Unsupported pack reference: {ref!r}. "
-        "Use git:<url>[@rev], local:<path>, or pypi:<name>[@constraint]."
+        "Use git:<url>[@rev][#subdirectory=<dir>], local:<path>, "
+        "or pypi:<name>[@constraint]."
     )
 
 
@@ -91,7 +114,9 @@ def add_cmd(ref: str, dev: bool) -> None:
 
     REF can be:
 
-      * `git:<url>[@rev]`   — Git repository
+      * `git:<url>[@rev][#subdirectory=<dir>]` — Git repository (the
+        ``#subdirectory=`` fragment is required for monorepos like
+        ``streamtex-packs/streamtex-pack-design``)
       * `local:<path>`      — local path (use `--dev` for editable)
       * `pypi:<name>[@spec]` — PyPI release
       * a plain path        — same as `local:<path>` when --dev is passed
@@ -178,6 +203,9 @@ def remove_cmd(name: str) -> None:
 @click.option("--trace", is_flag=True, help="Show lifecycle transitions (§5.6bis).")
 def list_cmd(trace: bool) -> None:
     """List packs declared in stx.toml and their lifecycle state."""
+    from ._divergence import maybe_warn_divergence
+
+    maybe_warn_divergence("pack list")
     from streamtex.core import discovery
 
     console = get_console()
@@ -237,13 +265,29 @@ def sync_cmd() -> None:
                 )
                 console.print(f"  uv sources updated for {name} → {path}")
             elif t == "git":
-                ref = entry.get("ref")
+                ref = entry.get("ref") or ""
                 rev = entry.get("rev")
-                spec = f"git+https://{ref}" + (f"@{rev}" if rev else "")
-                subprocess.run([sys.executable, "-m", "pip", "install", "--upgrade", spec], check=False)
+                subdir = entry.get("subdirectory")
+                # Tolerate legacy entries that stored an explicit scheme.
+                canonical = re.sub(r"^https?://", "", ref).rstrip("/")
+                canonical = re.sub(r"\.git$", "", canonical)
+                url = f"https://{canonical}"
+                set_uv_source_git(
+                    project_dir, name, url, rev=rev, subdirectory=subdir
+                )
+                bits = [f"git+{url}"]
+                if rev:
+                    bits.append(f"@{rev}")
+                if subdir:
+                    bits.append(f"#subdirectory={subdir}")
+                console.print(f"  uv sources updated for {name} → {''.join(bits)}")
             elif t == "pypi":
+                # PyPI entries are honored by uv via [project].dependencies; no
+                # uv.sources mapping needed. We just make sure the constraint
+                # is reflected as a dependency so `uv sync` resolves it.
                 spec = name + (entry.get("constraint") or "")
-                subprocess.run([sys.executable, "-m", "pip", "install", "--upgrade", spec], check=False)
+                ensure_pypi_dependency(project_dir, spec)
+                console.print(f"  pyproject dependency ensured for {spec}")
         except Exception as exc:  # noqa: BLE001 — surface but don't crash sync
             console.print(f"[red]sync error on {name}: {exc}[/red]")
     console.print("[green]Sync complete (run `uv sync` to apply [tool.uv.sources] changes).[/green]")
@@ -277,6 +321,9 @@ def info_cmd(name: str) -> None:
 @click.argument("name", required=False)
 def validate_cmd(name: str | None) -> None:
     """Validate one (or all) installed packs against the manifest schema."""
+    from ._divergence import maybe_warn_divergence
+
+    maybe_warn_divergence("pack validate")
     from streamtex.core import discovery, validation
 
     console = get_console()

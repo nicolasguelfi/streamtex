@@ -487,6 +487,7 @@ def _create_project(
         _copy_rich_template,
         generate_pyproject_toml,
         scaffold_project,
+        scaffold_project_metadata,
     )
 
     projects_dir = os.path.join(ws_root, "projects")
@@ -521,6 +522,11 @@ def _create_project(
         scaffold_project(target, name, extras=extras)
         console.print(f"  Project scaffolded: projects/{name}/")
 
+    # stx.toml + local primary pack (parity with `stx project new`, shared
+    # helper so the reuse architecture works for install-created projects too).
+    scaffold_project_metadata(target, name)
+    console.print("  [green]stx.toml + mypack:[/green] generated")
+
     # Git init
     result = subprocess.run(
         ["git", "init", target],
@@ -546,8 +552,40 @@ def _create_project(
         )
         if result.returncode == 0:
             console.print("  [green]uv sync:[/green] ok")
+
+            # Editable install of the local primary pack (parity with new()).
+            pack_path = os.path.join(target, "mypack")
+            if os.path.isdir(pack_path):
+                res_pack = subprocess.run(
+                    [uv, "pip", "install", "-e", pack_path], cwd=target,
+                    capture_output=True, text=True, timeout=120,
+                )
+                if res_pack.returncode == 0:
+                    console.print("  [green]pip install -e ./mypack:[/green] ok")
+                else:
+                    console.print(
+                        f"  [yellow]pip install -e ./mypack:[/yellow] {res_pack.stderr.strip()}"
+                    )
+
+            # Install pre-commit hooks (parity with new()).
+            res_pc = subprocess.run(
+                [uv, "run", "pre-commit", "install"], cwd=target,
+                capture_output=True, text=True, timeout=60,
+            )
+            if res_pc.returncode == 0:
+                console.print("  [green]pre-commit install:[/green] ok")
         else:
             console.print(f"  [yellow]uv sync:[/yellow] {result.stderr.strip()}")
+
+    # Final non-strict validation (parity with new()).
+    from .project_cmd import validate_project
+
+    failed = [c for c in validate_project(target) if c.status == "fail"]
+    if failed:
+        console.print(
+            f"  [yellow]validate:[/yellow] {len(failed)} warnings — "
+            "run `stx project validate` for details."
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -636,16 +674,15 @@ def _do_upgrade(
 def _apply_dev_link_to_project(ws_root: str, project_name: str, console) -> None:
     """Link the globally-registered streamtex source into a project's venv.
 
-    Mirrors the effect of running `stx dev link streamtex` inside the project:
-    writes `[tool.uv.sources]` to pyproject.toml and re-syncs uv so that the
-    project's .venv uses the dev source instead of the PyPI release.
+    Mirrors the effect of running `stx dev link streamtex` inside the project.
+    Delegates to the single shared implementation in dev_cmd so the link logic
+    (uv.sources + uv sync + .gitignore) lives in exactly one place.
 
     No-op when streamtex is not registered globally (prints a hint).
     """
     from pathlib import Path
 
-    from .dev_cmd import _add_uv_source, _ensure_gitignore, _uv_sync
-    from .dev_config import GlobalDevConfig, validate_repo_path
+    from .dev_cmd import auto_link_streamtex_if_registered
 
     project_dir = Path(ws_root) / "projects" / project_name
     if not project_dir.is_dir():
@@ -654,25 +691,11 @@ def _apply_dev_link_to_project(ws_root: str, project_name: str, console) -> None
         )
         return
 
-    gcfg = GlobalDevConfig.load()
-    streamtex_path = gcfg.repos.get("streamtex")
-    if not streamtex_path:
+    if not auto_link_streamtex_if_registered(project_dir, console):
         console.print(
             "  [yellow]streamtex is not registered globally — nothing to link.[/yellow]\n"
             "  [dim]Run: stx dev register streamtex /path/to/streamtex[/dim]"
         )
-        return
-
-    try:
-        resolved = validate_repo_path("streamtex", streamtex_path)
-    except ValueError as e:
-        console.print(f"  [red]Invalid registered path:[/red] {e}")
-        return
-
-    console.print(f"  [cyan]streamtex[/cyan] → {resolved}")
-    _add_uv_source(project_dir, str(resolved))
-    _uv_sync(project_dir, console)
-    _ensure_gitignore(project_dir)
 
 
 # ---------------------------------------------------------------------------

@@ -57,6 +57,45 @@ uv run ruff check streamtex/
 uv run ruff check streamtex/ --fix  # auto-fix
 ```
 
+## Conventions
+
+### Environment variables
+
+Environment variables are reserved for four purposes only:
+
+1. **Secrets** — API keys, passwords, tokens (`STX_PASSWORD`,
+   `STX_OPENAI_API_KEY`, `COOLIFY_API_TOKEN`, …). Prefer a project-local
+   `.env` file (loaded via `python-dotenv`) over exporting in the shell.
+2. **System integration** — values the OS or another tool owns and we only
+   read (`PATH`, `VIRTUAL_ENV`, `LIBGS`, `PLAYWRIGHT_BROWSERS_PATH`, …). This
+   also covers *environment capability* facts consumed at install/build time,
+   e.g. `STX_SKIP_BROWSER_INSTALL` (the browser is already cached / cannot be
+   installed here) — set once in CI/Docker, not a per-project choice.
+3. **Subprocess IPC** — values we set to pass to a child process that reads
+   its own environment (`HCLOUD_TOKEN` for `hcloud`, `UV_NO_SOURCES` for
+   `uv`, …).
+4. **Deployment- / runtime-varying config** — values that legitimately differ
+   per deployment environment and must be injectable without editing committed
+   files (12-factor). Examples: `STX_URL_<PROJECT>` (per-environment URL
+   override in a collection hub), `STX_GATE` (local preview of the auth gate,
+   the mirror of how production toggles it via env). These are read at runtime
+   by `book.py` / Streamlit, where no CLI flag can attach, and are often paired
+   with a secret (`STX_GATE` ↔ `STX_PASSWORD`) — splitting them would fragment
+   coupled settings.
+
+**Do not** introduce an environment variable to toggle *project behaviour* or
+silence a warning — that is the one thing env vars must never do. Use a CLI
+flag or a key in the project's `stx.toml` instead. Context-dependent behaviour
+(e.g. "are we running in the project venv?") must be derived in-process
+(inspect `sys.executable`, read a file), never signalled by an env flag.
+Removed examples of this anti-pattern: `STX_NO_DIVERGENCE_CHECK`,
+`STX_DELEGATED`.
+
+Rationale: shell-level env vars are invisible, machine-specific, and leak
+across projects — fine for secrets, system facts, IPC, and deploy-varying
+config (categories 1–4), but wrong for behaviour switches, which belong in CLI
+flags or `stx.toml` so they are explicit, discoverable, and committed.
+
 ## Pull Request Guidelines
 
 - One feature or fix per PR

@@ -54,6 +54,9 @@ def component():
 @click.option("--pack", "pack_filter", default=None, help="Only list components from <pack>.")
 def list_cmd(pack_filter: str | None) -> None:
     """List components from every installed pack."""
+    from ._divergence import maybe_warn_divergence
+
+    maybe_warn_divergence("component list")
     from streamtex.core import discovery
 
     console = get_console()
@@ -103,6 +106,9 @@ def show_cmd(name: str) -> None:
 @click.argument("name", required=False)
 def validate_cmd(name: str | None) -> None:
     """Validate one (or every) component module."""
+    from ._divergence import maybe_warn_divergence
+
+    maybe_warn_divergence("component validate")
     from streamtex.core import discovery, validation
 
     console = get_console()

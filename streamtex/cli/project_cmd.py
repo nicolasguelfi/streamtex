@@ -5,6 +5,7 @@ import os
 import shutil
 import subprocess
 from dataclasses import dataclass
+from pathlib import Path
 
 import click
 
@@ -475,6 +476,41 @@ def scaffold_mypack(target_dir: str, pack_name: str) -> list[str]:
                 f.write("")
             created.append(f"{pack_name}/{pack_name}/{sub}/.gitkeep")
 
+    return created
+
+
+def scaffold_project_metadata(
+    target_dir: str,
+    name: str,
+    *,
+    pack_name: str = "mypack",
+    no_mypack: bool = False,
+    kit_ref: str | None = None,
+    design_system_ref: str | None = None,
+    additional_packs: list[str] | None = None,
+) -> list[str]:
+    """Write the project ``stx.toml`` and scaffold the local primary pack.
+
+    These are the reuse-architecture pieces that ``scaffold_project`` and
+    ``_copy_rich_template`` deliberately omit. Both ``stx project new`` and
+    ``stx install --project`` must add them, so the logic lives here as the
+    single source of truth (idempotent: safe to re-run on an install resume).
+    """
+    created: list[str] = []
+    stx_toml_path = os.path.join(target_dir, "stx.toml")
+    with open(stx_toml_path, "w", encoding="utf-8") as f:
+        f.write(
+            generate_stx_toml(
+                name,
+                pack_name=None if no_mypack else pack_name,
+                kit_ref=kit_ref,
+                design_system_ref=design_system_ref,
+                additional_packs=additional_packs,
+            )
+        )
+    created.append("stx.toml")
+    if not no_mypack:
+        created += scaffold_mypack(target_dir, pack_name)
     return created
 
 
@@ -1009,25 +1045,21 @@ def new(
     for f in files:
         console.print(f"  {f}")
 
-    # 4bis. Generate stx.toml at project root (NEW — Q7/Q8 / PLAN §6.1).
-    primary_pack = None if no_mypack else pack_name
-    stx_toml_content = generate_stx_toml(
+    # 4bis. Generate stx.toml + local primary pack (shared with stx install,
+    # cf. Q7/Q8 / PLAN §6.1 / §7.1.2 step 6bis).
+    meta_created = scaffold_project_metadata(
+        target,
         name,
-        pack_name=primary_pack,
+        pack_name=pack_name,
+        no_mypack=no_mypack,
         kit_ref=kit_ref,
         design_system_ref=kit_design_system,
         additional_packs=list(extra_packs) if extra_packs else None,
     )
-    stx_toml_path = os.path.join(target, "stx.toml")
-    with open(stx_toml_path, "w", encoding="utf-8") as f:
-        f.write(stx_toml_content)
     console.print("[green]stx.toml:[/green] generated")
-
-    # 6bis. Create local primary pack (NEW — Q7 / PLAN §7.1.2 step 6bis).
-    pack_created: list[str] = []
     if not no_mypack:
-        pack_created = scaffold_mypack(target, pack_name)
-        console.print(f"[green]Local primary pack '{pack_name}':[/green] {len(pack_created)} files")
+        n_pack = sum(1 for p in meta_created if p != "stx.toml")
+        console.print(f"[green]Local primary pack '{pack_name}':[/green] {n_pack} files")
 
     # 5. Git init (preserved behaviour — step 5/PLAN renumbered as 5).
     if not no_git:
@@ -1105,6 +1137,31 @@ def new(
                 console.print(f"[yellow]uv sync:[/yellow] {result.stderr.strip()}")
         else:
             console.print("[yellow]uv sync:[/yellow] uv not found — skipped")
+
+    # 9. Auto-link streamtex when preset == developer AND a dev source is registered.
+    if not no_sync and ws_root is not None:
+        try:
+            ws_config = load_stx_toml(ws_root)
+            ws_preset = ws_config.get("workspace", {}).get("preset") or ws_config.get(
+                "preset", "standard"
+            )
+        except Exception:
+            ws_preset = None
+        if ws_preset == "developer":
+            from .dev_cmd import auto_link_streamtex_if_registered
+
+            linked = auto_link_streamtex_if_registered(Path(target), console)
+            if linked:
+                console.print(
+                    "[green]dev link:[/green] streamtex linked to local clone "
+                    "(preset=developer)"
+                )
+            else:
+                console.print(
+                    "[dim]dev link:[/dim] preset=developer but no streamtex "
+                    "registered — run `stx dev register streamtex <path>` then "
+                    "`stx dev link streamtex` to align this project."
+                )
 
     # 10. Final validation (NEW — non-strict).
     final_checks = validate_project(target)

@@ -21,6 +21,8 @@ tokens.md
 html_exports/
 test.html
 .stx_cache/
+.coverage
+.coverage.*
 
 # === Maintenance (internal notes, not published) ===
 documentation/maintenance/

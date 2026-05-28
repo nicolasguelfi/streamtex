@@ -43,6 +43,9 @@ def kit():
 @kit.command("list")
 def list_cmd() -> None:
     """List every kit across installed packs."""
+    from ._divergence import maybe_warn_divergence
+
+    maybe_warn_divergence("kit list")
     console = get_console()
     kits = _iter_kits()
     if not kits:
@@ -73,6 +76,9 @@ def show_cmd(ref: str) -> None:
 @click.argument("ref", required=False)
 def validate_cmd(ref: str | None) -> None:
     """Validate one or every kit TOML file."""
+    from ._divergence import maybe_warn_divergence
+
+    maybe_warn_divergence("kit validate")
     from streamtex.core import validation
 
     console = get_console()

@@ -62,6 +62,28 @@ def _remove_uv_source(project_dir: Path) -> None:
     remove_uv_source(project_dir, "streamtex")
 
 
+def auto_link_streamtex_if_registered(project_dir: Path, console) -> bool:
+    """Link the project to the registered streamtex dev source, if any.
+
+    Used by ``stx project new`` when the workspace preset is ``developer`` so
+    that newly scaffolded projects align on the developer's local clone rather
+    than the PyPI release. Returns True when a link was created.
+    """
+    gcfg = GlobalDevConfig.load()
+    path = gcfg.repos.get("streamtex")
+    if not path:
+        return False
+    try:
+        validate_repo_path("streamtex", path)
+    except ValueError as exc:
+        console.print(f"[yellow]auto-link streamtex:[/yellow] {exc}")
+        return False
+    _add_uv_source(project_dir, path)
+    _uv_sync(project_dir, console)
+    _ensure_gitignore(project_dir)
+    return True
+
+
 def _uv_sync(project_dir: Path, console) -> None:
     """Run uv sync --reinstall-package streamtex with friendly output."""
     # Check if already editable-installed at the right path

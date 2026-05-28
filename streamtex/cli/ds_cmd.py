@@ -20,6 +20,9 @@ def ds():
 @ds.command("list")
 def list_cmd() -> None:
     """List every design_systems/<name>/ across installed packs."""
+    from ._divergence import maybe_warn_divergence
+
+    maybe_warn_divergence("ds list")
     from streamtex.core import discovery
 
     console = get_console()
@@ -146,6 +149,9 @@ class DesignSystem:
 @click.argument("ref", required=False)
 def validate_cmd(ref: str | None) -> None:
     """Validate one or every installed design system."""
+    from ._divergence import maybe_warn_divergence
+
+    maybe_warn_divergence("ds validate")
     from streamtex.core import discovery, validation
 
     console = get_console()

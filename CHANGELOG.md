@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.20] — 2026-06-29
+
+### Added
+
+- **`BibConfig` citation / hover-card styling** — four optional fields let a deck
+  restyle citations without hand-written CSS against private class names:
+  - `cite_color` — in-text citation colour (`None` = inherit surrounding text,
+    the previous behaviour).
+  - `card_width` — hover-card width (`None` = library default 420px).
+  - `card_font_scale` — multiplier on every card text size (1.0 = default; 2.0
+    doubles them). The card is `position:fixed`, so this is independent of slide
+    zoom.
+  - `card_css` — raw CSS appended last as an escape hatch for any property not
+    covered above (e.g. `#stx-bib-card{max-height:70vh;overflow-y:auto;}`).
+
+  All four default to a no-op, so existing decks render identically. The scaffold
+  emits a second `<style>` only when at least one field is set.
+
 ## [0.7.19] — 2026-06-29
 
 ### Fixed

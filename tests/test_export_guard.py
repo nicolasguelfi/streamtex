@@ -21,7 +21,7 @@ EXPECTED_ST_HTML_COUNTS = {
     "zoom.py": 2,           # 1 CSS injection (inject_zoom_logic) + 1 marker (st_zoom)
     "presentation.py": 1,  # CSS injection (presentation mode)
     "link_preview.py": 2,   # CSS + JS scaffold
-    "bib_preview.py": 1,    # CSS only (JS via components.html)
+    "bib_preview.py": 2,    # 1 base CSS scaffold + 1 config-driven style override (JS via components.html)
     "book.py": 4,           # 1 load_css + 1 populate_toc (no-search branch) + 1 populate_markers + 1 block horizontal CSS
     "inspector.py": 3,      # 1 global CSS + 1 sidebar width CSS + 1 hidden marker (edit button)
     "block_helpers.py": 1,  # 1 fused CSS+marker call (_render_md_body)

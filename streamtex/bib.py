@@ -168,6 +168,19 @@ class BibConfig:
         hover_show_abstract: Include abstract in hover card
         sort_by: "author" | "year" | "key" | "citation_order"
         locale: Language for connector words ("en" or "fr")
+        cite_color: In-text citation colour (any CSS colour). None (default)
+            keeps the library default: the citation inherits the surrounding
+            text colour.
+        card_width: Hover-card width (any CSS length, e.g. "780px"). None
+            (default) keeps the library default (420px).
+        card_font_scale: Multiplier applied to every hover-card text size
+            (title, authors, venue, DOI, abstract, buttons). 1.0 (default)
+            is the library default; 2.0 doubles them. The card is
+            position:fixed, so this is independent of any slide zoom.
+        card_css: Raw CSS appended last (escape hatch) — lets you tweak any
+            card/citation property not covered by the fields above, e.g.
+            "#stx-bib-card{max-height:70vh;overflow-y:auto;}". "" (default)
+            adds nothing.
     """
     format: BibFormat = BibFormat.APA
     citation_style: CitationStyle = CitationStyle.AUTHOR_YEAR
@@ -175,6 +188,11 @@ class BibConfig:
     hover_show_abstract: bool = False
     sort_by: str = "author"
     locale: str = "en"
+    # --- Styling (None / 1.0 / "" all reproduce the library default) ---------
+    cite_color: Optional[str] = None
+    card_width: Optional[str] = None
+    card_font_scale: float = 1.0
+    card_css: str = ""
 
 
 _bib_config: BibConfig = BibConfig()

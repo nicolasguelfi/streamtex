@@ -65,3 +65,45 @@ class TestInjectBibPreviewScaffold:
         js_output = mock_iframe.call_args[0][0]
         assert "MutationObserver" in js_output
         assert "attachBibListeners" in js_output
+
+
+class TestBibStyleOverrides:
+    """BibConfig styling fields (cite_color / card_width / card_font_scale / card_css)."""
+
+    def test_default_config_emits_only_base_css(self, mock_streamlit):
+        """With default BibConfig, no override <style> is emitted (single st.html)."""
+        from streamtex.bib import BibConfig, set_bib_config
+        from streamtex.bib_preview import inject_bib_preview_scaffold
+
+        set_bib_config(BibConfig())
+        try:
+            with patch("streamlit.iframe"):
+                inject_bib_preview_scaffold()
+            assert mock_streamlit["html"].call_count == 1
+        finally:
+            set_bib_config(BibConfig())
+
+    def test_styling_fields_emit_override(self, mock_streamlit):
+        """Styled BibConfig emits a second <style> with the configured rules."""
+        from streamtex.bib import BibConfig, set_bib_config
+        from streamtex.bib_preview import inject_bib_preview_scaffold
+
+        set_bib_config(BibConfig(
+            cite_color="#aab2c0",
+            card_width="780px",
+            card_font_scale=2.0,
+            card_css="#stx-bib-card{max-height:70vh;overflow-y:auto;}",
+        ))
+        try:
+            with patch("streamlit.iframe"):
+                inject_bib_preview_scaffold()
+
+            assert mock_streamlit["html"].call_count == 2
+            override = mock_streamlit["html"].call_args_list[1][0][0]
+            assert ".stx-cite{color:#aab2c0;}" in override
+            assert "width:780px" in override
+            # card_font_scale=2.0 -> title 14px*2 = 28px
+            assert "font-size:28px" in override
+            assert "max-height:70vh" in override  # raw card_css escape hatch
+        finally:
+            set_bib_config(BibConfig())

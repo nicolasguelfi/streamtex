@@ -12,6 +12,46 @@ clicks on the Copy and Open buttons.
 import streamlit as st
 
 
+def _inject_bib_style_overrides():
+    """Emit a <style> override built from the active BibConfig styling fields.
+
+    Reads cite_color / card_width / card_font_scale / card_css at render time.
+    Emits nothing when they all match the library defaults (None / 1.0 / "") so
+    the base scaffold's appearance is preserved.
+    """
+    from .bib import get_bib_config
+
+    cfg = get_bib_config()
+    rules = []
+
+    if cfg.cite_color:
+        rules.append(f".stx-cite{{color:{cfg.cite_color};}}")
+
+    if cfg.card_width:
+        rules.append(f"#stx-bib-card{{width:{cfg.card_width};max-width:94vw;}}")
+
+    scale = cfg.card_font_scale
+    if scale and scale != 1.0:
+        def _px(base):  # library px size → scaled px
+            return f"{round(base * scale)}px"
+        # Long author lists wrap (instead of clipping) once enlarged.
+        rules.append(f".stx-bib-title{{font-size:{_px(14)};-webkit-line-clamp:4;}}")
+        rules.append(
+            f".stx-bib-authors{{font-size:{_px(12)};white-space:normal;"
+            "overflow:visible;text-overflow:clip;}"
+        )
+        rules.append(f".stx-bib-venue{{font-size:{_px(11)};}}")
+        rules.append(f".stx-bib-doi{{font-size:{_px(10)};}}")
+        rules.append(f".stx-bib-abstract{{font-size:{_px(11)};-webkit-line-clamp:6;}}")
+        rules.append(f".stx-bib-btn{{font-size:{_px(11)};}}")
+
+    if cfg.card_css:
+        rules.append(cfg.card_css)
+
+    if rules:
+        st.html("<style>" + "".join(rules) + "</style>")
+
+
 def inject_bib_preview_scaffold():
     """Inject the bibliography hover card and JS event listeners.
 
@@ -142,6 +182,12 @@ def inject_bib_preview_scaffold():
     </style>
     """
     st.html(css)
+
+    # Config-driven style overrides (BibConfig). Emitted as a SECOND <style>
+    # AFTER the base block so equal-specificity rules win without !important.
+    # Nothing is emitted when the config matches the library defaults, so the
+    # base appearance — and the single-st.html() contract — is unchanged.
+    _inject_bib_style_overrides()
 
     # SVG icons (inline, no external deps)
     ICON_COPY = '<svg viewBox="0 0 16 16"><path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 010 1.5h-1.5a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-1.5a.75.75 0 011.5 0v1.5A1.75 1.75 0 019.25 16h-7.5A1.75 1.75 0 010 14.25zM5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0114.25 11h-7.5A1.75 1.75 0 015 9.25zm1.75-.25a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-7.5a.25.25 0 00-.25-.25z"/></svg>'

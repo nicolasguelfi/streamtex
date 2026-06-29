@@ -529,3 +529,64 @@ class TestStBookBlockArgsKwargs:
         )
         last_call = mock_include.call_args_list[0]
         assert last_call.kwargs == {"theme": "dark"}
+
+
+# ---------------------------------------------------------------------------
+# _snapshot_widget_keys / _restore_widget_keys (Streamlit version agnostic)
+# ---------------------------------------------------------------------------
+
+class _FakeThreadSafeSet:
+    """Mimics Streamlit >=1.58 ThreadSafeSet: snapshot / clear / check_and_add,
+    and crucially NO .copy() / .update() / .add()."""
+
+    def __init__(self, initial=()):
+        self._items = set(initial)
+
+    def snapshot(self):
+        return frozenset(self._items)
+
+    def clear(self):
+        self._items.clear()
+
+    def check_and_add(self, key):
+        new = key not in self._items
+        self._items.add(key)
+        return new
+
+
+class TestWidgetKeyIsolationHelpers:
+    """book._snapshot_widget_keys / _restore_widget_keys must work for both the
+    pre-1.58 plain ``set`` and the 1.58+ ``ThreadSafeSet`` (regression: the old
+    code called ``.copy()``, which ThreadSafeSet does not provide)."""
+
+    def test_threadsafeset_snapshot_and_restore(self):
+        from streamtex.book import _restore_widget_keys, _snapshot_widget_keys
+
+        tss = _FakeThreadSafeSet({"a", "b"})
+        saved = _snapshot_widget_keys(tss)
+        assert set(saved) == {"a", "b"}
+        # Cache build registers a new key...
+        tss.check_and_add("c")
+        assert set(tss.snapshot()) == {"a", "b", "c"}
+        # ...and the real render pass is restored to the pre-build state.
+        _restore_widget_keys(tss, saved)
+        assert set(tss.snapshot()) == {"a", "b"}
+
+    def test_plain_set_snapshot_and_restore(self):
+        from streamtex.book import _restore_widget_keys, _snapshot_widget_keys
+
+        s = {"x", "y"}
+        saved = _snapshot_widget_keys(s)
+        s.add("z")
+        _restore_widget_keys(s, saved)
+        assert s == {"x", "y"}
+
+    def test_restore_preserves_container_identity(self):
+        """Restore must mutate in place, never swap a plain set into a slot that
+        expects the thread-safe container."""
+        from streamtex.book import _restore_widget_keys, _snapshot_widget_keys
+
+        tss = _FakeThreadSafeSet({"k"})
+        saved = _snapshot_widget_keys(tss)
+        _restore_widget_keys(tss, saved)
+        assert isinstance(tss, _FakeThreadSafeSet)

@@ -1323,6 +1323,34 @@ def _preseed_toc_registry(cached_toc, current_page):
         registry.register_entry(entry["_reg_label"], entry["_reg_level"])
 
 
+def _snapshot_widget_keys(keys):
+    """Snapshot a widget-key collection, independent of Streamlit version.
+
+    Streamlit <1.58 stores ``widget_user_keys_this_run`` / ``widget_ids_this_run``
+    as a plain ``set`` (``.copy()`` works); >=1.58 uses a ``ThreadSafeSet`` that
+    has no ``.copy()`` but exposes ``.snapshot()``. Returns a detached copy of
+    the current contents in both cases.
+    """
+    snap = getattr(keys, "snapshot", None)
+    return snap() if callable(snap) else set(keys)
+
+
+def _restore_widget_keys(target, saved):
+    """Restore a widget-key collection in place, preserving its container type.
+
+    Mutates ``target`` rather than reassigning it, so a plain ``set`` is never
+    swapped into a slot that Streamlit >=1.58 expects to be a ``ThreadSafeSet``.
+    Re-populates via ``.check_and_add`` (ThreadSafeSet) or ``.update`` (set).
+    """
+    target.clear()
+    check_and_add = getattr(target, "check_and_add", None)
+    if callable(check_and_add):
+        for key in saved:
+            check_and_add(key)
+    else:
+        target.update(saved)
+
+
 @contextlib.contextmanager
 def _isolate_widget_keys():
     """Isolate widget key registration during cache build.
@@ -1337,13 +1365,13 @@ def _isolate_widget_keys():
     if ctx is None:
         yield
         return
-    saved_user_keys = ctx.widget_user_keys_this_run.copy()
-    saved_ids = ctx.widget_ids_this_run.copy()
+    saved_user_keys = _snapshot_widget_keys(ctx.widget_user_keys_this_run)
+    saved_ids = _snapshot_widget_keys(ctx.widget_ids_this_run)
     try:
         yield
     finally:
-        ctx.widget_user_keys_this_run = saved_user_keys
-        ctx.widget_ids_this_run = saved_ids
+        _restore_widget_keys(ctx.widget_user_keys_this_run, saved_user_keys)
+        _restore_widget_keys(ctx.widget_ids_this_run, saved_ids)
 
 
 _STX_FULL_EXPORT_HTML_KEY = "_stx_full_export_html"

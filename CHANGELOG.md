@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.19] — 2026-06-29
+
+### Fixed
+
+- **`st_book` cache build crash on Streamlit ≥ 1.58** — `_isolate_widget_keys`
+  called `.copy()` on `ScriptRunContext.widget_user_keys_this_run` /
+  `widget_ids_this_run`, which Streamlit 1.58 changed from a plain `set` to a
+  `ThreadSafeSet` (no `.copy()`), raising `AttributeError: 'ThreadSafeSet'
+  object has no attribute 'copy'` on every paginated render. Snapshot/restore
+  is now version-agnostic (`_snapshot_widget_keys` / `_restore_widget_keys`):
+  it uses `.snapshot()` on a `ThreadSafeSet`, `set()` on a plain set, and
+  restores in place (`.check_and_add` / `.update`) so the thread-safe
+  container type is preserved. Verified end-to-end against Streamlit 1.58.
+
 ## [0.7.18] — 2026-06-29
 
 ### Fixed

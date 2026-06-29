@@ -127,6 +127,51 @@ def test_pack_add_dev_local_with_manifest(tmp_path: Path):
     assert "editable = true" in stx_toml
 
 
+def _read_pack_path(project: Path, name: str) -> str | None:
+    """Return the recorded filesystem path for a declared local pack."""
+    import tomllib
+
+    with (project / "stx.toml").open("rb") as fh:
+        data = tomllib.load(fh)
+    for entry in data.get("packs", []):
+        if entry.get("name") == name:
+            return entry.get("path")
+    return None
+
+
+def test_pack_add_dev_monorepo_root_records_buildable_source(tmp_path: Path):
+    """Regression: `pack add --dev <repo-root>` must succeed when the manifest
+    lives in the inner package module (monorepo layout, e.g. streamtex-pack-
+    design), and the recorded editable source must be the buildable root that
+    `uv` can install — not the inner module dir without a pyproject.toml."""
+    project = _make_project(tmp_path)
+    _run(["pack", "new", "auxpack"], project)
+    (project / "auxpack" / "auxpack" / "components" / "stub.py").write_text("# stub\n")
+    _run(["pack", "remove", "auxpack"], project)
+    # Point at the OUTER distribution root (pyproject.toml), manifest is inside.
+    result = _run(["pack", "add", "--dev", str(project / "auxpack")], project)
+    assert result.exit_code == 0, result.output
+    recorded = _read_pack_path(project, "auxpack")
+    assert recorded is not None
+    # The invariant the bug violated: the editable source must be buildable.
+    assert (Path(recorded) / "pyproject.toml").is_file(), recorded
+
+
+def test_pack_add_dev_inner_module_resolves_to_buildable_root(tmp_path: Path):
+    """Pointing --dev at the inner package module (where _pack_manifest.toml
+    lives) must still record the buildable outer root as the editable source."""
+    project = _make_project(tmp_path)
+    _run(["pack", "new", "auxpack"], project)
+    (project / "auxpack" / "auxpack" / "components" / "stub.py").write_text("# stub\n")
+    _run(["pack", "remove", "auxpack"], project)
+    # Point at the INNER module dir; resolver must climb to the buildable root.
+    result = _run(["pack", "add", "--dev", str(project / "auxpack" / "auxpack")], project)
+    assert result.exit_code == 0, result.output
+    recorded = _read_pack_path(project, "auxpack")
+    assert recorded is not None
+    assert (Path(recorded) / "pyproject.toml").is_file(), recorded
+
+
 def test_pack_add_dev_missing_path_fails(tmp_path: Path):
     project = _make_project(tmp_path)
     result = _run(["pack", "add", "--dev", "/does/not/exist"], project)

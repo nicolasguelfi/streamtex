@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.18] — 2026-06-29
+
+### Fixed
+
+- **`stx pack add --dev` for monorepo packs** — the command conflated a
+  local pack's *manifest directory* (`_pack_manifest.toml`, in the inner
+  package module) with its *distribution root* (`pyproject.toml` /
+  `setup.py`, what `uv` installs). Pointing at the repo root failed
+  manifest validation (`PV001`), while pointing at the package module
+  recorded a uv source `uv sync` could not build. `add` now resolves both
+  anchors independently (`_resolve_local_pack_layout`): it validates the
+  manifest wherever it lives and always records the buildable distribution
+  root as the editable source. Either input path (repo root or package
+  module) now yields a working editable install. Regression tests added.
+
 ## [0.7.17] — 2026-05-26 — generic artifact engine (manifest 0.2)
 
 ### Added

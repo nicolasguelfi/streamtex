@@ -96,6 +96,49 @@ def _read_pack_manifest_name(pack_root: Path) -> str | None:
     return None
 
 
+def _resolve_local_pack_layout(path: Path) -> tuple[Path, Path]:
+    """Resolve ``(dist_root, manifest_dir)`` for a local pack path.
+
+    A local pack has two anchors that live in different directories for
+    monorepo-style packs:
+
+    * the **distribution root** — the directory containing ``pyproject.toml``
+      / ``setup.py``; this is what ``uv`` builds and installs, so it is what
+      must be recorded as the editable source.
+    * the **manifest directory** — the directory containing
+      ``_pack_manifest.toml``; this drives validation and the pack name.
+
+    For ``streamtex-pack-design`` the distribution root is the repo root while
+    the manifest lives inside the inner ``streamtex_design`` package module.
+    Accepts either anchor as input and returns both resolved, so that a user
+    pointing at the repo root (what ``uv`` needs) no longer trips the manifest
+    check, and one pointing at the package module no longer yields a uv source
+    that fails to build.
+    """
+
+    def _is_dist_root(p: Path) -> bool:
+        return (p / "pyproject.toml").is_file() or (p / "setup.py").is_file()
+
+    # Locate the manifest: at the given path, or in an immediate subdirectory.
+    manifest_dir = path
+    if not (path / "_pack_manifest.toml").is_file():
+        for sub in sorted(p for p in path.iterdir() if p.is_dir()):
+            if (sub / "_pack_manifest.toml").is_file():
+                manifest_dir = sub
+                break
+
+    # Locate the buildable distribution root for uv: the path itself when it
+    # builds, otherwise its parent (the input was the inner package module).
+    if _is_dist_root(path):
+        dist_root = path
+    elif manifest_dir == path and _is_dist_root(path.parent):
+        dist_root = path.parent
+    else:
+        dist_root = path
+
+    return dist_root, manifest_dir
+
+
 # ---------------------------------------------------------------------------
 # CLI surface
 # ---------------------------------------------------------------------------
@@ -133,20 +176,25 @@ def add_cmd(ref: str, dev: bool) -> None:
         if not pack_root.is_dir():
             raise click.ClickException(f"--dev path does not exist: {pack_root}")
 
+        # A monorepo pack's buildable distribution root (what uv installs) and
+        # its manifest directory may differ — resolve both so validation uses
+        # the manifest while the editable source points at the buildable root.
+        dist_root, manifest_dir = _resolve_local_pack_layout(pack_root)
+
         # Validate manifest
         from streamtex.core import validation
 
-        issues = validation.validate_pack(pack_root)
+        issues = validation.validate_pack(manifest_dir)
         errors = [i for i in issues if i.is_error()]
         if errors:
-            console.print(f"[red]Pack at {pack_root} failed validation:[/red]")
+            console.print(f"[red]Pack at {manifest_dir} failed validation:[/red]")
             for issue in errors:
                 console.print(f"  [{issue.code}] {issue.message}")
             raise click.ClickException("Pack validation failed; see above.")
 
-        pack_name = _read_pack_manifest_name(pack_root) or pack_root.name
+        pack_name = _read_pack_manifest_name(manifest_dir) or dist_root.name
         try:
-            set_uv_source(project_dir, pack_name, str(pack_root), editable=True)
+            set_uv_source(project_dir, pack_name, str(dist_root), editable=True)
         except FileNotFoundError as exc:
             raise click.ClickException(str(exc)) from exc
         try:
@@ -155,7 +203,7 @@ def add_cmd(ref: str, dev: bool) -> None:
                 {
                     "type": "local",
                     "name": pack_name,
-                    "path": str(pack_root),
+                    "path": str(dist_root),
                     "editable": True,
                     "primary": False,
                 },

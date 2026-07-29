@@ -590,3 +590,74 @@ class TestWidgetKeyIsolationHelpers:
         saved = _snapshot_widget_keys(tss)
         _restore_widget_keys(tss, saved)
         assert isinstance(tss, _FakeThreadSafeSet)
+
+
+class TestWidgetKeyHolder:
+    """book._widget_key_holder must find the key sets on the ScriptRunContext
+    (<1.60), on ``ctx.shared`` (1.60 SharedRunState), and degrade to ``None``
+    on any future layout (regression: 1.60 removed the ctx attributes and the
+    direct access raised AttributeError on every paginated render)."""
+
+    def test_pre_160_ctx_carries_the_sets(self):
+        from streamtex.book import _widget_key_holder
+
+        class Ctx:
+            widget_user_keys_this_run = {"a"}
+            widget_ids_this_run = {"b"}
+
+        assert _widget_key_holder(Ctx()) is not None
+        assert isinstance(_widget_key_holder(Ctx()), Ctx)
+
+    def test_160_shared_run_state_carries_the_sets(self):
+        from streamtex.book import _widget_key_holder
+
+        class Shared:
+            widget_user_keys_this_run = _FakeThreadSafeSet({"a"})
+            widget_ids_this_run = _FakeThreadSafeSet({"b"})
+
+        class Ctx:
+            shared = Shared()
+
+        holder = _widget_key_holder(Ctx())
+        assert isinstance(holder, Shared)
+
+    def test_unknown_layout_returns_none(self):
+        from streamtex.book import _widget_key_holder
+
+        class Ctx:
+            pass
+
+        assert _widget_key_holder(Ctx()) is None
+
+
+class TestOpenAIBaseImageWrapping:
+    """openai._as_named_image_file must wrap raw bytes in a NAMED file-like
+    object (regression: bare bytes reach the API as application/octet-stream
+    and images.edit rejects them with unsupported_file_mimetype)."""
+
+    def test_png_bytes_get_png_name(self):
+        from streamtex.ai.providers.openai import _as_named_image_file
+
+        f = _as_named_image_file(b"\x89PNG\r\n\x1a\nrest")
+        assert f.name.endswith(".png") and f.read(4) == b"\x89PNG"
+
+    def test_jpeg_bytes_get_jpg_name(self):
+        from streamtex.ai.providers.openai import _as_named_image_file
+
+        f = _as_named_image_file(b"\xff\xd8\xffrest")
+        assert f.name.endswith(".jpg")
+
+    def test_webp_bytes_get_webp_name(self):
+        from streamtex.ai.providers.openai import _as_named_image_file
+
+        f = _as_named_image_file(b"RIFF\x00\x00\x00\x00WEBPrest")
+        assert f.name.endswith(".webp")
+
+    def test_file_like_passes_through(self):
+        import io
+
+        from streamtex.ai.providers.openai import _as_named_image_file
+
+        buf = io.BytesIO(b"data")
+        buf.name = "photo.jpg"
+        assert _as_named_image_file(buf) is buf

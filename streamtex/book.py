@@ -1351,6 +1351,23 @@ def _restore_widget_keys(target, saved):
         target.update(saved)
 
 
+def _widget_key_holder(ctx):
+    """Locate the object carrying the per-run widget key sets.
+
+    Streamlit <1.60 stores ``widget_user_keys_this_run`` / ``widget_ids_this_run``
+    directly on ``ScriptRunContext``; 1.60 moved them to the ``SharedRunState``
+    exposed as ``ctx.shared``. Returns the carrying object, or ``None`` when
+    neither location exists (future Streamlit — isolation is then skipped
+    rather than crashing the whole cache build).
+    """
+    if hasattr(ctx, "widget_user_keys_this_run"):
+        return ctx
+    shared = getattr(ctx, "shared", None)
+    if shared is not None and hasattr(shared, "widget_user_keys_this_run"):
+        return shared
+    return None
+
+
 @contextlib.contextmanager
 def _isolate_widget_keys():
     """Isolate widget key registration during cache build.
@@ -1362,16 +1379,17 @@ def _isolate_widget_keys():
     hardcoded widget keys.
     """
     ctx = get_script_run_ctx()
-    if ctx is None:
+    holder = _widget_key_holder(ctx) if ctx is not None else None
+    if holder is None:
         yield
         return
-    saved_user_keys = _snapshot_widget_keys(ctx.widget_user_keys_this_run)
-    saved_ids = _snapshot_widget_keys(ctx.widget_ids_this_run)
+    saved_user_keys = _snapshot_widget_keys(holder.widget_user_keys_this_run)
+    saved_ids = _snapshot_widget_keys(holder.widget_ids_this_run)
     try:
         yield
     finally:
-        _restore_widget_keys(ctx.widget_user_keys_this_run, saved_user_keys)
-        _restore_widget_keys(ctx.widget_ids_this_run, saved_ids)
+        _restore_widget_keys(holder.widget_user_keys_this_run, saved_user_keys)
+        _restore_widget_keys(holder.widget_ids_this_run, saved_ids)
 
 
 _STX_FULL_EXPORT_HTML_KEY = "_stx_full_export_html"

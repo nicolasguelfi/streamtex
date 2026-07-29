@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import io
 import logging
 import os
 from typing import Optional
@@ -10,6 +11,32 @@ from typing import Optional
 from .base import AIImageProvider, AIImageResult, ModelCapabilities
 
 logger = logging.getLogger(__name__)
+
+
+def _as_named_image_file(base_image):
+    """Wrap raw image bytes in a named file-like object for the OpenAI SDK.
+
+    ``client.images.edit`` sends multipart data; bare ``bytes`` reach the API
+    as ``application/octet-stream`` and are rejected with
+    ``unsupported_file_mimetype``. A file-like object with a ``.name`` lets
+    the SDK derive the correct mimetype. The extension is sniffed from the
+    magic bytes (PNG / JPEG / WebP — the formats the API accepts).
+    File-like inputs are passed through untouched.
+    """
+    if not isinstance(base_image, (bytes, bytearray)):
+        return base_image
+    data = bytes(base_image)
+    if data.startswith(b"\x89PNG"):
+        ext = "png"
+    elif data.startswith(b"\xff\xd8"):
+        ext = "jpg"
+    elif data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        ext = "webp"
+    else:
+        ext = "png"  # default; the API will validate the actual content
+    buf = io.BytesIO(data)
+    buf.name = f"base_image.{ext}"
+    return buf
 
 
 class OpenAIProvider(AIImageProvider):
@@ -76,10 +103,11 @@ class OpenAIProvider(AIImageProvider):
         resolved_quality = quality_map.get(quality, quality)
 
         if base_image:
-            # Image-to-image editing
+            # Image-to-image editing — bytes must be wrapped in a named
+            # file-like object or the API rejects the multipart mimetype.
             response = client.images.edit(
                 model=model_id,
-                image=base_image,
+                image=_as_named_image_file(base_image),
                 prompt=prompt,
                 size=size,
                 n=1,

@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.21] — 2026-07-29
+
+### Fixed
+
+- **`st_book` cache build crash on Streamlit ≥ 1.60** — Streamlit 1.60 removed
+  `widget_user_keys_this_run` / `widget_ids_this_run` from `ScriptRunContext`
+  and moved them to the new `SharedRunState` exposed as `ctx.shared`, so
+  `_isolate_widget_keys` raised `AttributeError: 'ScriptRunContext' object has
+  no attribute 'widget_user_keys_this_run'` on every paginated render (the
+  0.7.19 fix only covered the 1.58 `ThreadSafeSet` change). A new
+  `_widget_key_holder` resolver finds the key sets on the context (<1.60) or
+  on `ctx.shared` (≥1.60), and skips isolation gracefully on any future
+  layout instead of crashing the cache build.
+- **`generate_image(base_image=...)` rejected by OpenAI** — raw `bytes` reached
+  `client.images.edit` without a filename, so the multipart part was sent as
+  `application/octet-stream` and the API answered
+  `unsupported_file_mimetype`. Bytes are now wrapped in a named file-like
+  object (`_as_named_image_file`), with the extension sniffed from the magic
+  bytes (PNG / JPEG / WebP); file-like inputs pass through unchanged.
+
 ## [0.7.20] — 2026-06-29
 
 ### Added

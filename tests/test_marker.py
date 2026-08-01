@@ -347,3 +347,59 @@ class TestMarkerDraggableCollapsible:
         js_output = mock_html.call_args[0][0]
         assert "__DRAGGABLE__" not in js_output
         assert "__COLLAPSIBLE__" not in js_output
+
+
+class TestScrollOffset:
+    """`MarkerConfig.scroll_offset` — how far below the top a marker lands.
+
+    Was hard-coded to 80 px in three places (the JS scroll and both
+    ``scroll-margin-top`` rules), so a full-height slide reached by
+    scrolling never fitted the viewport.  The JS constant and the CSS
+    anchor offset must always agree, otherwise a keyboard jump and an
+    anchor jump land at different positions.
+    """
+
+    def setup_method(self):
+        marker_mod._registry = None
+
+    def test_default_is_80(self):
+        assert MarkerConfig().scroll_offset == 80
+
+    @patch("streamtex.marker._render")
+    def test_invisible_marker_uses_configured_offset(self, mock_render):
+        reset_marker_registry(MarkerConfig(scroll_offset=0))
+        st_marker("Slide")
+        assert "scroll-margin-top: 0px;" in mock_render.call_args[0][0]
+
+    @patch("streamtex.marker._render")
+    def test_visible_marker_uses_configured_offset(self, mock_render):
+        reset_marker_registry(MarkerConfig(scroll_offset=24))
+        st_marker("Slide", visible=True)
+        assert "scroll-margin-top: 24px;" in mock_render.call_args[0][0]
+
+    @patch("streamtex.marker._render")
+    def test_default_offset_still_rendered(self, mock_render):
+        reset_marker_registry(MarkerConfig())
+        st_marker("Slide")
+        assert "scroll-margin-top: 80px;" in mock_render.call_args[0][0]
+
+    @patch("streamtex.marker.st.iframe")
+    def test_js_offset_follows_config(self, mock_html):
+        from streamtex.marker import inject_marker_navigation
+        reset_marker_registry(MarkerConfig(scroll_offset=0))
+        register_marker("A", "a-1")
+        inject_marker_navigation()
+        js_output = mock_html.call_args[0][0]
+        assert "var OFFSET = 0;" in js_output
+        assert "__OFFSET__" not in js_output
+
+    @patch("streamtex.marker.st.iframe")
+    @patch("streamtex.marker._render")
+    def test_css_and_js_offsets_agree(self, mock_render, mock_html):
+        """The anchor offset and the scripted-scroll offset must match."""
+        from streamtex.marker import inject_marker_navigation
+        reset_marker_registry(MarkerConfig(scroll_offset=42))
+        st_marker("A")
+        inject_marker_navigation()
+        assert "scroll-margin-top: 42px;" in mock_render.call_args[0][0]
+        assert "var OFFSET = 42;" in mock_html.call_args[0][0]

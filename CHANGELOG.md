@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **`MarkerConfig.scroll_offset`** — the gap left above a marker when
+  navigation scrolls to it is now configurable (default `80`, unchanged
+  behaviour). It was hard-coded in three places: the JS `OFFSET` used by
+  `scrollToTarget()` and the two `scroll-margin-top: 80px` rules of the
+  marker anchors, with no way to override it.
+
+  The 80 px leave room for a header, but they break full-height slides:
+  a section reached **by scrolling** — that is, every `st_slide_break`
+  section after the first one of a block — starts 80 px lower, so a slide
+  sized to fill the viewport no longer fits and its bottom is cut off. The
+  first section of a block is unaffected, because a page change resets the
+  scroll to 0 — hence the puzzling asymmetry between the first slide of a
+  block and the next ones. Presentation decks can now set
+  `MarkerConfig(scroll_offset=0)` once in `book.py` instead of
+  compensating with negative spacing at every slide break.
+
+  The CSS anchor offset and the JS scroll offset are derived from the same
+  field, so a keyboard jump and an anchor jump always land at the same
+  position (covered by a test).
+
 ## [0.7.21] — 2026-07-29
 
 ### Fixed

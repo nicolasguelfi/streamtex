@@ -60,6 +60,20 @@ class MarkerConfig:
     """Show a ⋮ button to collapse/expand the nav widget.
     When collapsed, a drag grip handle replaces the hidden elements."""
 
+    scroll_offset: int = 80
+    """Pixels left above a marker when navigation scrolls to it.
+
+    Navigating to a marker parks it *this far below* the top of the scroll
+    container, leaving room for a header or a floating toolbar.  The same
+    value is used for the CSS ``scroll-margin-top`` of marker anchors.
+
+    Set to ``0`` for presentation decks where a slide must fill the
+    viewport: with the default 80 px, every slide reached by scrolling —
+    i.e. every ``st_slide_break`` section after the first of a block — is
+    pushed down by that much and a full-height slide no longer fits, while
+    the first section of a block (reached by a page change, which resets
+    the scroll to 0) is unaffected.  The asymmetry is the visible symptom."""
+
 
 class MarkerRegistry:
     """Registry that collects markers during a book render pass."""
@@ -163,15 +177,19 @@ def st_marker(label: str = "", visible: bool = False, hidden: bool = False) -> N
 
     _registry.register(label, anchor, hidden=hidden)
 
+    # Same offset as the JS scroll (MarkerConfig.scroll_offset): anchor jumps
+    # and scripted navigation must land at the identical position.
+    offset = _registry.config.scroll_offset
+
     if visible:
         style = (
             "border-top: 1px dashed rgba(128,128,128,0.4); "
             "font-size: 10px; color: rgba(128,128,128,0.6); "
-            "padding: 2px 6px; scroll-margin-top: 80px;"
+            f"padding: 2px 6px; scroll-margin-top: {offset}px;"
         )
         html = f'<div id="{anchor}" class="streamtex-marker" data-marker-index="{idx}" style="{style}">{label}</div>'
     else:
-        style = "height: 0; overflow: hidden; scroll-margin-top: 80px;"
+        style = f"height: 0; overflow: hidden; scroll-margin-top: {offset}px;"
         html = f'<div id="{anchor}" class="streamtex-marker" data-marker-index="{idx}" style="{style}"></div>'
 
     _render(html)
@@ -214,7 +232,7 @@ def inject_marker_navigation(
     import streamlit as _st
     _show = _st.session_state.get("_stx_show_nav_ui", config.show_nav_ui)
     show_ui = "block" if _show else "none"
-    scroll_offset = 80
+    scroll_offset = config.scroll_offset
     logo_b64 = _LOGO_B64
 
     js_body = """

@@ -81,12 +81,27 @@ def run_publish_checks(
     if version and os.path.isfile(init_path):
         try:
             init_version = None
+            dynamic_version = False
             with open(init_path, encoding="utf-8") as f:
                 for line in f:
-                    if line.startswith("__version__"):
-                        init_version = line.split("=", 1)[1].strip().strip("\"'")
+                    stripped = line.strip()
+                    if stripped.startswith("__version__"):
+                        value = stripped.split("=", 1)[1].strip()
+                        # Dynamic resolution via importlib.metadata — always
+                        # matches pyproject.toml by construction.
+                        if "version(" in value:
+                            dynamic_version = True
+                        else:
+                            init_version = value.strip("\"'")
                         break
-            if init_version == version:
+            if dynamic_version:
+                checks.append(
+                    PublishCheck(
+                        "__version__", "pass",
+                        "Dynamic (importlib.metadata)",
+                    )
+                )
+            elif init_version == version:
                 checks.append(PublishCheck("__version__", "pass", f"Matches ({version})"))
             elif init_version is None:
                 checks.append(

@@ -137,6 +137,25 @@ def test_publish_check_version_mismatch(tmp_path):
     assert "Mismatch" in check.message
 
 
+def test_publish_check_dynamic_version_passes(tmp_path):
+    """__version__ resolved via importlib.metadata (indented or not) passes."""
+    proj = _make_publish_project(tmp_path)
+    (proj / "streamtex" / "__init__.py").write_text(
+        "from importlib.metadata import version as _pkg_version\n"
+        "try:\n"
+        '    __version__ = _pkg_version("streamtex")\n'
+        "except Exception:\n"
+        '    __version__ = "0.0.0"\n'
+    )
+
+    with patch("streamtex.cli.publish_cmd._find_uv", return_value=None):
+        checks = run_publish_checks(str(proj), skip_tests=True, skip_lint=True)
+
+    check = next(c for c in checks if c.name == "__version__")
+    assert check.status == "pass"
+    assert "Dynamic" in check.message
+
+
 def test_publish_check_dev_deps_in_dependencies(tmp_path):
     proj = _make_publish_project(tmp_path)
     (proj / "pyproject.toml").write_text(

@@ -43,6 +43,7 @@ try:
     # Content rendering
     from .write import st_write
     from .image import st_image, configure_image_path
+    from .media_overlay import MediaOverlay
     from .code import st_code, add_wrap_all_option
     from .markdown import st_markdown
     from .container import st_block, st_span

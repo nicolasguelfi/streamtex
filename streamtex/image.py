@@ -6,6 +6,7 @@ from typing import Optional
 
 from .blocks import get_static_sources
 from .export import _render
+from .media_overlay import MediaOverlay, wrap_media_overlay
 from .styles import StxStyles, Style
 from .utils import (
     __get_base64_encoded_image,
@@ -46,6 +47,7 @@ def st_image(
     model: Optional[str] = None,
     ai_size: Optional[str] = None,
     quality: str = "standard",
+    overlay: Optional[MediaOverlay] = None,
 ) -> Optional[str]:
     """
     Generates an HTML `img` tag based on the image URI, with optional styles, link wrapping, and hover effects.
@@ -61,6 +63,9 @@ def st_image(
     :param alt: The alternative text for the image, used for accessibility or when the image cannot be displayed.
     :param link: An optional hyperlink to wrap around the image. Defaults to an empty string (no link).
     :param hover: If True, enables hover functionality for the image link. Defaults to True.
+    :param overlay: Optional `MediaOverlay` badge rendered inside the image's
+        final display box (e.g. an AI-transparency mark). `None` (default)
+        keeps the emitted HTML strictly identical to previous versions.
     :return: A string containing the HTML `img` tag, optionally wrapped in a hyperlink.
 
     Notes:
@@ -164,7 +169,21 @@ def st_image(
     css_style = f"{str(style)} width: {width}; height: {height};"
 
     # 5. Construct the HTML
-    html_content = f'<img src="{img_src}" alt="{alt}" style="{css_style}">'
+    if overlay is None:
+        # Legacy emission — MUST stay byte-identical to pre-overlay versions
+        # (guarded by the non-regression test in tests/test_image.py).
+        html_content = f'<img src="{img_src}" alt="{alt}" style="{css_style}">'
+    else:
+        # Native overlay slot: the wrapper carries the resolved display
+        # width (known at this point — zoom / display_width applied in
+        # step 1c), the img fills it, and the badge anchors inside the
+        # box.  In editor mode the wrapper encloses ONLY the <img> — the
+        # "Edit Image" panel is rendered separately below.
+        img_css = f"{str(style)} width: 100%; height: {height};"
+        img_tag = f'<img src="{img_src}" alt="{alt}" style="{img_css}">'
+        html_content = wrap_media_overlay(
+            img_tag, overlay, width=width, caller_css=str(style),
+        )
 
     # 6. Handle Link Wrapping
     html_content = contain_link(html_content, link, False, hover)

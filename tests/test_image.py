@@ -358,3 +358,151 @@ class TestStImageAutoGenerate:
             st_image(uri="missing.png")
         assert len(captured) == 1
         assert "Image not found" in captured[0]
+
+
+# ===================================================================
+# st_image — native overlay slot (MediaOverlay)
+# ===================================================================
+
+class TestStImageOverlay:
+    """Tests for st_image(overlay=MediaOverlay(...)) — plan P-C §6."""
+
+    URL = "https://example.com/img.png"
+
+    # --- 1. Non-regression: overlay=None → HTML identical to 0.7.22 ---
+
+    def test_no_overlay_html_identical_to_0722_default(self):
+        """Without overlay, the emitted HTML is byte-identical to 0.7.22."""
+        from streamtex.image import st_image
+        captured = []
+        with patch("streamtex.image._render", side_effect=_capture_render(captured)):
+            st_image(uri=self.URL, alt="Ref")
+        # Reference string frozen from the 0.7.22 emission — do NOT reformat.
+        assert captured[0] == (
+            f'<img src="{self.URL}" alt="Ref" style=" width: 100%; height: auto;">'
+        )
+
+    def test_no_overlay_html_identical_to_0722_styled_sized(self):
+        """Styled + sized reference case, frozen from 0.7.22."""
+        from streamtex.image import st_image
+        from streamtex.styles import Style
+        captured = []
+        style = Style("border-radius:8px;", "overlay_ref_style")
+        with patch("streamtex.image._render", side_effect=_capture_render(captured)):
+            st_image(style, uri=self.URL, width="80%", height=150)
+        assert captured[0] == (
+            f'<img src="{self.URL}" alt="" '
+            f'style="border-radius:8px; width: 80%; height: 150px;">'
+        )
+
+    # --- 2. Structure with overlay ---
+
+    def test_overlay_img_and_badge_in_same_media_box(self):
+        from streamtex import MediaOverlay
+        from streamtex.image import st_image
+        captured = []
+        with patch("streamtex.image._render", side_effect=_capture_render(captured)):
+            st_image(uri=self.URL, overlay=MediaOverlay(text="✦ AI"))
+        html = captured[0]
+        assert html.startswith('<span class="stx-media-box"')
+        assert html.endswith("</span>")
+        assert html.count('class="stx-media-box"') == 1
+        # img first, badge second, both inside the same wrapper
+        assert html.index("<img") < html.index('class="stx-media-overlay"')
+        assert "✦ AI" in html
+        assert 'role="note"' in html
+
+    def test_overlay_wrapper_carries_width_img_fills_it(self):
+        """The wrapper carries the resolved width; the img fills the wrapper."""
+        from streamtex import MediaOverlay
+        from streamtex.image import st_image
+        captured = []
+        with patch("streamtex.image._render", side_effect=_capture_render(captured)):
+            st_image(uri=self.URL, width="50%", overlay=MediaOverlay(text="✦ AI"))
+        html = captured[0]
+        assert "width:50%;" in html.split("<img")[0]      # wrapper side
+        assert "width: 100%;" in html.split("<img")[1]    # img side
+
+    def test_overlay_text_escaped(self):
+        from streamtex import MediaOverlay
+        from streamtex.image import st_image
+        captured = []
+        with patch("streamtex.image._render", side_effect=_capture_render(captured)):
+            st_image(
+                uri=self.URL,
+                overlay=MediaOverlay(text="<script>x</script>", aria_label='a "b"'),
+            )
+        html = captured[0]
+        assert "<script>" not in html
+        assert "&lt;script&gt;" in html
+        assert 'aria-label="a &quot;b&quot;"' in html
+
+    def test_overlay_position_translated(self):
+        from streamtex import MediaOverlay
+        from streamtex.image import st_image
+        captured = []
+        with patch("streamtex.image._render", side_effect=_capture_render(captured)):
+            st_image(uri=self.URL, overlay=MediaOverlay(text="x", position="top-left"))
+        assert "left:8px; top:8px;" in captured[0]
+
+    # --- 3. display_zoom (managed sidecar) ---
+
+    def test_display_zoom_80_percent_on_wrapper(self):
+        """Sidecar zoom 80% → wrapper carries width:80%, img stays at 100%."""
+        from types import SimpleNamespace
+
+        from streamtex import MediaOverlay
+        from streamtex.image import st_image
+        captured = []
+        fake_st = SimpleNamespace(session_state={
+            "stx_img_display_hero_initialized": True,
+            "stx_img_display_hero_zoom": 80,
+        })
+        with patch("streamtex.image._st", fake_st), \
+             patch("streamtex.ai.history.get_current", return_value=""), \
+             patch("streamtex.image._render", side_effect=_capture_render(captured)):
+            st_image(uri=self.URL, name="hero", overlay=MediaOverlay(text="✦ AI"))
+        html = captured[0]
+        wrapper_style = html.split("<img")[0]
+        img_style = html.split("<img")[1].split(">")[0]
+        assert "width:80%;" in wrapper_style
+        assert "width: 100%;" in img_style
+        assert "width: 80%" not in img_style
+
+    # --- 4. link: anchor wraps the whole box, badge lets clicks through ---
+
+    def test_link_wraps_media_box_and_badge_has_pointer_events_none(self):
+        from streamtex import MediaOverlay
+        from streamtex.image import st_image
+        captured = []
+        with patch("streamtex.image._render", side_effect=_capture_render(captured)):
+            st_image(
+                uri=self.URL, link="https://example.com",
+                overlay=MediaOverlay(text="✦ AI"),
+            )
+        html = captured[0]
+        assert html.startswith("<a ")
+        assert html.index("<a ") < html.index('class="stx-media-box"')
+        # hover survives the wrapper: the hover class sits on the anchor
+        assert 'class="streamtex-link"' in html
+        badge = html.split('class="stx-media-overlay"')[1]
+        assert "pointer-events:none" in badge
+
+    # --- 5. export: the badge travels inside the image element ---
+
+    def test_export_buffer_contains_badge_inside_image_fragment(self):
+        import streamtex.export as export_mod
+        from streamtex import MediaOverlay
+        from streamtex.export import ExportConfig, reset_export_buffer
+        from streamtex.image import st_image
+        reset_export_buffer(ExportConfig(enabled=True))
+        try:
+            with patch("streamtex.export.st", MagicMock()):
+                st_image(uri=self.URL, overlay=MediaOverlay(text="✦ AI"))
+            body = export_mod._buffer.get_body_html()
+            # One export fragment holds BOTH the img and the badge
+            fragment = next(f for f in body.split('<div class="stx-el"') if "<img" in f)
+            assert 'class="stx-media-overlay"' in fragment
+            assert "✦ AI" in fragment
+        finally:
+            reset_export_buffer(None)

@@ -6,6 +6,7 @@ from typing import Optional
 
 from .blocks import get_static_sources
 from .export import _render
+from .image_crop import CropConfig, build_crop_html, get_natural_size, normalize_crop
 from .media_overlay import MediaOverlay, wrap_media_overlay
 from .styles import StxStyles, Style
 from .utils import (
@@ -48,6 +49,8 @@ def st_image(
     ai_size: Optional[str] = None,
     quality: str = "standard",
     overlay: Optional[MediaOverlay] = None,
+    crop: CropConfig | tuple | list | None = None,
+    natural_size: Optional[tuple[float, float]] = None,
 ) -> Optional[str]:
     """
     Generates an HTML `img` tag based on the image URI, with optional styles, link wrapping, and hover effects.
@@ -66,6 +69,17 @@ def st_image(
     :param overlay: Optional `MediaOverlay` badge rendered inside the image's
         final display box (e.g. an AI-transparency mark). `None` (default)
         keeps the emitted HTML strictly identical to previous versions.
+    :param crop: Optional edge crop — a `CropConfig` or a 4-value tuple of
+        percentages in CSS inset order `(top, right, bottom, left)`, each
+        the percentage of the natural dimension removed from that edge.
+        `width` then designates the *visible* zone (the crop result), and
+        `height` must stay `"auto"` (the crop fixes it via aspect-ratio).
+        `None` (default) keeps the emitted HTML strictly identical to
+        previous versions.
+    :param natural_size: Optional `(W, H)` natural pixel dimensions of the
+        source image, used with `crop` when the library cannot read them
+        (mandatory for http(s) URIs in this version).  Refused without
+        `crop`, and refused when the `CropConfig` already carries one.
     :return: A string containing the HTML `img` tag, optionally wrapped in a hyperlink.
 
     Notes:
@@ -74,6 +88,14 @@ def st_image(
     - If the URI cannot be resolved or is unsupported, the `src` attribute is left empty.
     - The function wraps the image tag in a link if `link` is provided, using the `contain_link` function.
     """
+    # 0. Crop parameters — validate before any work.
+    if natural_size is not None and crop is None:
+        raise ValueError(
+            "natural_size= requires crop= — an orphan natural_size is "
+            "almost always an editing mistake"
+        )
+    crop_cfg = normalize_crop(crop, natural_size) if crop is not None else None
+
     # 1. Convert integer sizes to pixel-based strings
     if isinstance(width, int):
         width = f"{width}px"
@@ -168,21 +190,53 @@ def st_image(
     # 4. Construct the CSS style string
     css_style = f"{str(style)} width: {width}; height: {height};"
 
+    # 4b. Crop pre-checks — the height conflict is tested after step 1c
+    #     so an editor-panel display_height is refused too, and the
+    #     natural size is read on the *resolved* uri (managed / AI
+    #     versions included).
+    if crop_cfg is not None:
+        if height != "auto":
+            raise ValueError(
+                "crop= is incompatible with an explicit height= in this "
+                "version — the crop fixes the height via aspect-ratio; "
+                f"remove height (got {height!r})"
+            )
+        natural_w, natural_h = get_natural_size(uri, crop_cfg)
+
     # 5. Construct the HTML
     if overlay is None:
-        # Legacy emission — MUST stay byte-identical to pre-overlay versions
-        # (guarded by the non-regression test in tests/test_image.py).
-        html_content = f'<img src="{img_src}" alt="{alt}" style="{css_style}">'
+        if crop_cfg is None:
+            # Legacy emission — MUST stay byte-identical to pre-overlay
+            # versions (guarded by the non-regression test in
+            # tests/test_image.py).
+            html_content = f'<img src="{img_src}" alt="{alt}" style="{css_style}">'
+        else:
+            # The caller style lives on the crop container (the visible
+            # zone), never on the inner <img>, never duplicated.
+            html_content = build_crop_html(
+                img_src, alt, crop_cfg, natural_w, natural_h,
+                width=width, caller_css=str(style),
+            )
     else:
         # Native overlay slot: the wrapper carries the resolved display
         # width (known at this point — zoom / display_width applied in
         # step 1c), the img fills it, and the badge anchors inside the
         # box.  In editor mode the wrapper encloses ONLY the <img> — the
         # "Edit Image" panel is rendered separately below.
-        img_css = f"{str(style)} width: 100%; height: {height};"
-        img_tag = f'<img src="{img_src}" alt="{alt}" style="{img_css}">'
+        if crop_cfg is None:
+            img_css = f"{str(style)} width: 100%; height: {height};"
+            inner = f'<img src="{img_src}" alt="{alt}" style="{img_css}">'
+        else:
+            # The overlay wrapper encloses the crop container (the badge
+            # anchors on the visible zone, never on the cropped-away
+            # bands); the container fills the wrapper, which carries the
+            # resolved width.
+            inner = build_crop_html(
+                img_src, alt, crop_cfg, natural_w, natural_h,
+                width=width, caller_css=str(style), inside_overlay=True,
+            )
         html_content = wrap_media_overlay(
-            img_tag, overlay, width=width, caller_css=str(style),
+            inner, overlay, width=width, caller_css=str(style),
         )
 
     # 6. Handle Link Wrapping

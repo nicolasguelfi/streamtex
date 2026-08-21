@@ -5,6 +5,63 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.24] — 2026-08-21
+
+### Added
+
+- **Edge cropping in `st_image` — `crop=`** — cut a percentage of each
+  edge of an image at display time (status bar, banner, margin of a
+  screenshot) without producing a cropped derivative at the source:
+
+  ```python
+  # % cut from each edge, CSS inset order: (top, right, bottom, left)
+  st_image(width="44vw", uri="captures/x.png", crop=(4, 0, 10, 6))
+
+  # Remote URI: pass the natural dimensions explicitly
+  st_image(uri="https://cdn.example/x.png", crop=(4, 0, 10, 6),
+           natural_size=(2560, 1800))
+  ```
+
+  - `crop=` accepts a 4-value tuple in CSS inset order (same convention
+    as `clip-path: inset(...)`, `margin`, `padding`) or a `CropConfig`
+    dataclass (new module `streamtex/image_crop.py`, exported from the
+    package root). Values are percentages of the *natural* dimensions,
+    floats allowed. `width` designates the **visible zone** (the crop
+    result); `height` must stay `"auto"` in this version.
+  - Pure-CSS implementation, no JavaScript: an `overflow:hidden`
+    container with the visible zone's `aspect-ratio`, the img enlarged
+    to `100% / (1 - left - right)` and shifted with
+    `transform: translate(-left%, -top%)` — percentage translations
+    refer to the img's own box, so the cropped edges align exactly.
+    Passes through the HTML export untouched.
+  - Natural dimensions resolved in priority order: `natural_size=`
+    (as-is, no read), local file bytes (Pillow for bitmaps, SVG
+    `width`/`height`/`viewBox` parsing — cached by `(path, mtime)` like
+    the base64 encoding), http(s) URIs (explicit `natural_size=`
+    required in this version; automatic header sniffing is planned).
+  - Noisy validation, never a silently empty or distorted rendering:
+    values outside `[0, 100)`, `top+bottom >= 100`, `left+right >= 100`,
+    explicit `height=` with `crop=`, `natural_size=` without `crop=`,
+    unreadable dimensions — each raises an explicit `ValueError`.
+  - Interactions covered by tests: `overlay=` (the `MediaOverlay` badge
+    anchors on the visible zone, never on the cropped-away bands),
+    managed images (`display_width`/`display_zoom` apply to the crop
+    container; the editor panel shows the full source), `link=`/`hover`
+    (wrap the container), `st_zoom` (CSS zoom multiplies correctly),
+    HTML export (same fragment as the live app).
+  - E2E pixel-measurement suite in headless Chromium
+    (`tests/e2e/test_crop_geometry.py`): visible-zone box, landmark
+    pixel alignment, zoom multiplication, badge position, export parity.
+  - `crop=None` (default) keeps the emitted HTML byte-identical to
+    previous versions (guarded by non-regression tests).
+
+### Changed
+
+- **Pillow promoted to a core dependency** (`Pillow>=10.0`) — required
+  by the crop feature to read local image dimensions. It was already
+  installed transitively via matplotlib, so the effective installation
+  footprint is unchanged.
+
 ## [0.7.23] — 2026-08-13
 
 ### Added

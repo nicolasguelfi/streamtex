@@ -19,7 +19,12 @@ Natural dimensions are resolved in priority order:
 2. Local files — bitmap sizes read via Pillow, SVG sizes parsed from the
    ``width``/``height`` attributes or the ``viewBox``.  Cached by
    ``(path, mtime)`` like the base64 encoding.
-3. http(s) URIs — **not auto-detected in this version**: pass
+3. Served URIs (the ``configure_image_path`` "served, never inlined"
+   pattern) — the bytes are located on disk via the explicit ``fs_root``
+   or Streamlit's ``app/static`` serving convention, then read like any
+   local file.  The URL-vs-base64 decision of ``get_image_src`` is
+   untouched.
+4. http(s) URIs — **not auto-detected in this version**: pass
    ``natural_size=(W, H)`` explicitly (a clear error says so).
 
 Used by :func:`streamtex.image.st_image` via its ``crop=`` parameter.
@@ -38,6 +43,14 @@ import streamlit as st
 
 from .blocks import get_static_sources
 from .image_utils import _is_absolute_path, _is_relative_path, _is_url
+
+try:
+    # Same import path as book.py — guarded against Streamlit version drift.
+    from streamlit.runtime.scriptrunner_utils.script_run_context import (
+        get_script_run_ctx,
+    )
+except ImportError:  # pragma: no cover — future Streamlit relocation
+    get_script_run_ctx = None
 
 logger = logging.getLogger(__name__)
 
@@ -176,6 +189,62 @@ def _find_local_file(uri: str) -> str:
     return ""
 
 
+def _app_static_dir() -> str:
+    """Best-effort filesystem path of Streamlit's ``app/static`` directory.
+
+    Streamlit serves ``<main script dir>/static`` under the ``app/static``
+    URL prefix.  The main script path comes from the ScriptRunContext when
+    a runtime is active; without one (headless CLI export, which chdirs to
+    the project dir before exec'ing book.py) the cwd is the anchor.  Every
+    caller guards the result with a file-existence check, so a wrong
+    anchor can only fall through to the explicit error, never mis-measure.
+    """
+    main_script_path = None
+    if get_script_run_ctx is not None:
+        try:
+            ctx = get_script_run_ctx(suppress_warning=True)
+            main_script_path = getattr(ctx, "main_script_path", None)
+        except Exception:  # pragma: no cover — Streamlit version drift
+            main_script_path = None
+    if main_script_path:
+        try:
+            from streamlit import file_util
+            return file_util.get_app_static_dir(main_script_path)
+        except Exception:  # pragma: no cover — Streamlit version drift
+            return os.path.join(os.path.dirname(main_script_path), "static")
+    return os.path.join(os.getcwd(), "static")
+
+
+def _find_served_file(uri: str) -> str:
+    """Locate the bytes behind a ``configure_image_path``-served *uri*.
+
+    These URIs are deliberately NOT found by the static sources (that is
+    what makes ``get_image_src`` emit a served URL instead of inlining
+    base64), but the bytes live on the server's disk.  Resolution:
+
+    1. the explicit ``fs_root`` given to ``configure_image_path``;
+    2. Streamlit's ``app/static`` serving convention — a base path
+       ``app/static[/rest]`` maps to ``<app static dir>/rest``.
+
+    Returns ``""`` when neither yields an existing file — the caller
+    then raises the same explicit error as before.
+    """
+    from .image import _static_image_base, _static_image_fs_root
+
+    if _static_image_fs_root:
+        path = os.path.join(_static_image_fs_root, uri)
+        if os.path.isfile(path):
+            return path
+    prefix = _static_image_base
+    if prefix == "app/static" or prefix.startswith("app/static/"):
+        rest = prefix[len("app/static"):].lstrip("/")
+        base = _app_static_dir()
+        path = os.path.join(base, rest, uri) if rest else os.path.join(base, uri)
+        if os.path.isfile(path):
+            return path
+    return ""
+
+
 def _parse_svg_size(svg_text: str) -> Optional[tuple[float, float]]:
     """Extract (W, H) from an SVG document, or ``None``.
 
@@ -236,7 +305,7 @@ def get_natural_size(uri: str, config: CropConfig) -> tuple[float, float]:
             f"crop on a remote URI requires explicit dimensions: "
             f"{_NATURAL_SIZE_HINT} (uri: {uri!r})"
         )
-    file_path = _find_local_file(uri)
+    file_path = _find_local_file(uri) or _find_served_file(uri)
     if not file_path:
         raise ValueError(
             f"crop: cannot locate local image {uri!r} to read its "

@@ -185,6 +185,141 @@ class TestGetNaturalSize:
             get_natural_size(str(svg), CropConfig(1, 1, 1, 1))
 
 
+class TestServedImageResolution:
+    """Images served via configure_image_path (the "served, never inlined"
+    pattern): the URI is deliberately NOT found by the static sources, but
+    crop must locate the bytes on disk to read their dimensions."""
+
+    @pytest.fixture(autouse=True)
+    def _reset_image_path_config(self):
+        import streamtex.image as img_mod
+        yield
+        img_mod.configure_image_path("app/static/images")
+
+    def _make_served_tree(self, tmp_path, w=200, h=100):
+        """Repro tree: <app>/book.py + <app>/static/media/captures/x.png."""
+        captures = tmp_path / "static" / "media" / "captures"
+        captures.mkdir(parents=True)
+        _make_png(str(captures / "shot.png"), w, h)
+        (tmp_path / "book.py").write_text("# main script")
+        return "captures/shot.png"
+
+    def _fake_ctx(self, tmp_path):
+        from types import SimpleNamespace
+        return SimpleNamespace(main_script_path=str(tmp_path / "book.py"))
+
+    def test_served_uri_resolved_via_streamlit_ctx(self, tmp_path):
+        from streamtex.image import configure_image_path
+        configure_image_path("app/static/media")
+        uri = self._make_served_tree(tmp_path)
+        with patch("streamtex.image_crop.get_script_run_ctx",
+                   return_value=self._fake_ctx(tmp_path)):
+            assert get_natural_size(uri, CropConfig(1, 1, 1, 1)) == (200.0, 100.0)
+
+    def test_served_uri_resolved_with_foreign_cwd(self, tmp_path, monkeypatch):
+        """The real trap: launcher started from the repo root, not the
+        module dir — the ctx anchor must win over the cwd."""
+        from streamtex.image import configure_image_path
+        configure_image_path("app/static/media")
+        uri = self._make_served_tree(tmp_path)
+        elsewhere = tmp_path / "elsewhere"
+        elsewhere.mkdir()
+        monkeypatch.chdir(elsewhere)
+        with patch("streamtex.image_crop.get_script_run_ctx",
+                   return_value=self._fake_ctx(tmp_path)):
+            assert get_natural_size(uri, CropConfig(1, 1, 1, 1)) == (200.0, 100.0)
+
+    def test_served_uri_resolved_headless_via_cwd(self, tmp_path, monkeypatch):
+        """No ScriptRunContext (headless CLI export, which chdirs to the
+        project dir before exec'ing book.py): the cwd anchor applies."""
+        from streamtex.image import configure_image_path
+        configure_image_path("app/static/media")
+        uri = self._make_served_tree(tmp_path)
+        monkeypatch.chdir(tmp_path)
+        with patch("streamtex.image_crop.get_script_run_ctx", return_value=None):
+            assert get_natural_size(uri, CropConfig(1, 1, 1, 1)) == (200.0, 100.0)
+
+    def test_missing_served_file_keeps_current_error(self, tmp_path, monkeypatch):
+        from streamtex.image import configure_image_path
+        configure_image_path("app/static/media")
+        self._make_served_tree(tmp_path)
+        monkeypatch.chdir(tmp_path)
+        with patch("streamtex.image_crop.get_script_run_ctx", return_value=None), \
+             pytest.raises(ValueError, match="cannot locate local image"):
+            get_natural_size("captures/absent.png", CropConfig(1, 1, 1, 1))
+
+    def test_natural_size_still_short_circuits_served_lookup(self, tmp_path):
+        from streamtex.image import configure_image_path
+        configure_image_path("app/static/media")
+        cfg = CropConfig(1, 1, 1, 1, natural_size=(1134, 8796))
+        with patch("streamtex.image_crop._find_local_file") as find_local, \
+             patch("streamtex.image_crop._find_served_file") as find_served, \
+             patch("streamtex.image_crop._read_local_image_size") as read:
+            assert get_natural_size("captures/shot.png", cfg) == (1134.0, 8796.0)
+        find_local.assert_not_called()
+        find_served.assert_not_called()
+        read.assert_not_called()
+
+    def test_explicit_fs_root_wins_and_covers_custom_prefixes(self, tmp_path):
+        """fs_root works even for a prefix outside app/static (CDN,
+        reverse proxy) where the automatic derivation cannot help."""
+        from streamtex.image import configure_image_path
+        media = tmp_path / "mirror"
+        media.mkdir()
+        _make_png(str(media / "x.png"), 64, 32)
+        configure_image_path("cdn/media", fs_root=media)
+        with patch("streamtex.image_crop.get_script_run_ctx", return_value=None):
+            assert get_natural_size("x.png", CropConfig(1, 1, 1, 1)) == (64.0, 32.0)
+
+    def test_fs_root_has_priority_over_derivation(self, tmp_path):
+        from streamtex.image import configure_image_path
+        uri = self._make_served_tree(tmp_path, 200, 100)
+        mirror = tmp_path / "mirror" / "captures"
+        mirror.mkdir(parents=True)
+        _make_png(str(mirror / "shot.png"), 400, 50)
+        configure_image_path("app/static/media", fs_root=tmp_path / "mirror")
+        with patch("streamtex.image_crop.get_script_run_ctx",
+                   return_value=self._fake_ctx(tmp_path)):
+            assert get_natural_size(uri, CropConfig(1, 1, 1, 1)) == (400.0, 50.0)
+
+    def test_non_app_static_prefix_without_fs_root_keeps_error(self, tmp_path):
+        from streamtex.image import configure_image_path
+        configure_image_path("cdn/media")
+        with patch("streamtex.image_crop.get_script_run_ctx", return_value=None), \
+             pytest.raises(ValueError, match="cannot locate local image"):
+            get_natural_size("x.png", CropConfig(1, 1, 1, 1))
+
+    def test_ctx_without_main_script_path_degrades_cleanly(self, tmp_path, monkeypatch):
+        """Streamlit version drift (ctx lacking main_script_path) must
+        degrade to the other anchors, never crash."""
+        from types import SimpleNamespace
+
+        from streamtex.image import configure_image_path
+        configure_image_path("app/static/media")
+        uri = self._make_served_tree(tmp_path)
+        monkeypatch.chdir(tmp_path)
+        with patch("streamtex.image_crop.get_script_run_ctx",
+                   return_value=SimpleNamespace()):
+            assert get_natural_size(uri, CropConfig(1, 1, 1, 1)) == (200.0, 100.0)
+
+    def test_st_image_served_crop_end_to_end(self, tmp_path):
+        """Full repro of the downstream ticket: served URI + crop → the
+        emitted src stays a served URL (never inlined base64) AND the
+        aspect-ratio comes from the measured dimensions."""
+        from streamtex.image import configure_image_path, st_image
+        configure_image_path("app/static/media")
+        uri = self._make_served_tree(tmp_path, 1134, 8796)
+        captured = []
+        with patch("streamtex.image_crop.get_script_run_ctx",
+                   return_value=self._fake_ctx(tmp_path)), \
+             patch("streamtex.image._render", side_effect=_capture_render(captured)):
+            st_image(uri=uri, width="min(22vw, 29vh)", crop=(0, 0, 72, 0))
+        html = captured[0]
+        assert 'src="app/static/media/captures/shot.png"' in html
+        assert "base64" not in html
+        assert 'aspect-ratio:1134 / 2462.88;' in html
+
+
 class TestBuildCropHtml:
     """Reference geometry: 1000x600 source, crop=(5, 20, 15, 10) —
     visible zone 700x480, img enlarged to 1000/700, shifted by (10%, 5%)."""

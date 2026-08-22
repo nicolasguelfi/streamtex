@@ -26,12 +26,25 @@ except ImportError:
     _st = None
 
 _static_image_base = "app/static/images"
+_static_image_fs_root: Optional[str] = None
 
 
-def configure_image_path(base_path: str):
-    """Configure the base path used to resolve static image URIs."""
-    global _static_image_base
+def configure_image_path(base_path: str, fs_root=None):
+    """Configure the base path used to resolve static image URIs.
+
+    :param base_path: URL prefix emitted for URIs not found in the
+        static sources (the "served, never inlined" pattern) — e.g.
+        ``"app/static/media"``, served by Streamlit's static serving.
+    :param fs_root: Optional filesystem directory holding the bytes
+        behind *base_path* (e.g. ``Path(__file__).parent / "static/media"``).
+        Only used by ``crop=`` to read natural image dimensions — the
+        URL-vs-base64 decision of ``get_image_src`` is unaffected.  When
+        omitted, ``crop=`` derives the directory from Streamlit's
+        ``app/static`` serving convention when possible.
+    """
+    global _static_image_base, _static_image_fs_root
     _static_image_base = base_path
+    _static_image_fs_root = str(fs_root) if fs_root is not None else None
 
 def st_image(
     style: Style = StxStyles.none,

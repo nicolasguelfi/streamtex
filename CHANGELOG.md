@@ -5,6 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.25] — 2026-08-22
+
+### Fixed
+
+- **`crop=` now measures images served via `configure_image_path`** —
+  the "served, never inlined" pattern deliberately keeps the URI out of
+  the static sources so `get_image_src` emits a served URL instead of
+  inlining base64; `crop=` used to fail there with
+  `ValueError: cannot locate local image` even though the bytes are on
+  the server's disk. `get_natural_size()` now locates them, in priority
+  order, before falling back to the unchanged explicit error:
+
+  1. the new explicit `fs_root=` (see below);
+  2. Streamlit's `app/static` serving convention — a base path
+     `app/static[/rest]` maps to `<main script dir>/static/rest`, with
+     the main script resolved from the ScriptRunContext (never from the
+     cwd when a runtime is active), and a cwd anchor only in headless
+     contexts (CLI export, which chdirs to the project dir). Every
+     anchor is guarded by a file-existence check — a wrong anchor falls
+     through to the explicit error, never a mis-measurement.
+
+  The URL-vs-base64 decision of `get_image_src` is untouched, and
+  `natural_size=` remains prioritary with zero disk access.
+
+### Added
+
+- **`configure_image_path(base_path, fs_root=None)`** — optional
+  filesystem directory holding the bytes behind the served prefix
+  (e.g. `fs_root=Path(__file__).parent / "static/media"`). Only used by
+  `crop=` to read natural dimensions; also covers prefixes outside
+  `app/static` (CDN or reverse-proxy setups with a local mirror) where
+  the automatic derivation cannot help.
+
 ## [0.7.24] — 2026-08-21
 
 ### Added

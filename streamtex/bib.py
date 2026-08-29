@@ -140,7 +140,8 @@ class BibEntry:
         if len(self.authors) == 1:
             return _last(self.authors[0])
         if len(self.authors) == 2:
-            return f"{_last(self.authors[0])} & {_last(self.authors[1])}"
+            amp = _words()["amp"]
+            return f"{_last(self.authors[0])} {amp} {_last(self.authors[1])}"
         return f"{_last(self.authors[0])} et al."
 
     def get_field(self, name: str, default: str = "") -> str:
@@ -151,6 +152,43 @@ class BibEntry:
                 return val or default
             return default
         return self.extra.get(name, default)
+
+
+# ---------------------------------------------------------------------------
+# Locale — connector words used by the formatters
+# ---------------------------------------------------------------------------
+
+#: Connector words per locale. Keys: ``amp`` (author-year short form and APA
+#: last-author separator), ``and`` (IEEE), ``in`` / ``in_lower`` (book part),
+#: ``pp`` (pages), ``vol`` (volume), ``no`` (issue number).
+_LOCALE_WORDS: Dict[str, Dict[str, str]] = {
+    "en": {"amp": "&", "and": "and", "in": "In", "in_lower": "in",
+           "pp": "pp.", "vol": "vol.", "no": "no."},
+    "fr": {"amp": "et", "and": "et", "in": "Dans", "in_lower": "dans",
+           "pp": "p.", "vol": "vol.", "no": "n°"},
+}
+
+_warned_locales: set = set()
+
+
+def _words(locale: Optional[str] = None) -> Dict[str, str]:
+    """Connector words for *locale* (default: the active ``BibConfig.locale``).
+
+    Unknown locales fall back to English — a reference list must never fail
+    to render because of a typo in a config field. The warning is emitted once
+    per unknown value.
+    """
+    loc = (locale or _bib_config.locale or "en").lower()
+    words = _LOCALE_WORDS.get(loc)
+    if words is None:
+        base = loc.split("-")[0]
+        words = _LOCALE_WORDS.get(base)
+    if words is None:
+        if loc not in _warned_locales:
+            _warned_locales.add(loc)
+            logger.warning(f"BibConfig.locale={loc!r} unknown — falling back to 'en'")
+        words = _LOCALE_WORDS["en"]
+    return words
 
 
 # ---------------------------------------------------------------------------
@@ -167,7 +205,10 @@ class BibConfig:
         hover_enabled: Show hover preview card on citations
         hover_show_abstract: Include abstract in hover card
         sort_by: "author" | "year" | "key" | "citation_order"
-        locale: Language for connector words ("en" or "fr")
+        locale: Language for connector words in formatted references and
+            author-year citations: "en" (default) or "fr". Drives "&"/"et",
+            "and"/"et", "In"/"Dans", "pp."/"p.", "no."/"n°" (see _LOCALE_WORDS).
+            An unknown value falls back to "en" with a warning.
         cite_color: In-text citation colour (any CSS colour). None (default)
             keeps the library default: the citation inherits the surrounding
             text colour.
@@ -937,12 +978,13 @@ def format_entry(entry: BibEntry, fmt: BibFormat, number: int = 0) -> str:
 
 def _format_apa(entry: BibEntry) -> str:
     """APA 7th edition: Author, A. A., & Author, B. B. (Year). Title. Journal, Vol(No), Pages. DOI"""
+    w = _words()
     parts = []
 
     if entry.authors:
         auth = ", ".join(entry.authors[:-1])
         if len(entry.authors) > 1:
-            auth += f", & {entry.authors[-1]}"
+            auth += f", {w['amp']} {entry.authors[-1]}"
         else:
             auth = entry.authors[0]
         parts.append(auth)
@@ -969,7 +1011,7 @@ def _format_apa(entry: BibEntry) -> str:
         venue += "."
         parts.append(venue)
     elif entry.booktitle:
-        parts.append(f"In <i>{entry.booktitle}</i>.")
+        parts.append(f"{w['in']} <i>{entry.booktitle}</i>.")
 
     if entry.publisher and entry.entry_type in ("book", "incollection"):
         parts.append(f"{entry.publisher}.")
@@ -988,6 +1030,7 @@ def _format_apa(entry: BibEntry) -> str:
 
 def _format_mla(entry: BibEntry) -> str:
     """MLA 9th edition."""
+    w = _words()
     parts = []
 
     if entry.authors:
@@ -1002,13 +1045,13 @@ def _format_mla(entry: BibEntry) -> str:
     if entry.journal:
         venue = f"<i>{entry.journal}</i>"
         if entry.volume:
-            venue += f", vol. {entry.volume}"
+            venue += f", {w['vol']} {entry.volume}"
         if entry.number:
-            venue += f", no. {entry.number}"
+            venue += f", {w['no']} {entry.number}"
         if entry.year:
             venue += f", {entry.year}"
         if entry.pages:
-            venue += f", pp. {entry.pages}"
+            venue += f", {w['pp']} {entry.pages}"
         parts.append(venue + ".")
 
     return " ".join(parts)
@@ -1016,6 +1059,7 @@ def _format_mla(entry: BibEntry) -> str:
 
 def _format_ieee(entry: BibEntry, number: int = 0) -> str:
     """IEEE style: [N] A. Author, "Title," Journal, vol. X, pp. Y, Year."""
+    w = _words()
     parts = [f"[{number}]"] if number else []
 
     if entry.authors:
@@ -1028,9 +1072,9 @@ def _format_ieee(entry: BibEntry, number: int = 0) -> str:
             else:
                 ieee_authors.append(author)
         if len(ieee_authors) <= 2:
-            parts.append(" and ".join(ieee_authors) + ",")
+            parts.append(f" {w['and']} ".join(ieee_authors) + ",")
         else:
-            parts.append(", ".join(ieee_authors[:-1]) + ", and " + ieee_authors[-1] + ",")
+            parts.append(", ".join(ieee_authors[:-1]) + f", {w['and']} " + ieee_authors[-1] + ",")
 
     if entry.title:
         parts.append(f'&ldquo;{entry.title},&rdquo;')
@@ -1038,14 +1082,14 @@ def _format_ieee(entry: BibEntry, number: int = 0) -> str:
     if entry.journal:
         venue = f"<i>{entry.journal}</i>"
         if entry.volume:
-            venue += f", vol. {entry.volume}"
+            venue += f", {w['vol']} {entry.volume}"
         if entry.number:
-            venue += f", no. {entry.number}"
+            venue += f", {w['no']} {entry.number}"
         if entry.pages:
-            venue += f", pp. {entry.pages}"
+            venue += f", {w['pp']} {entry.pages}"
         parts.append(venue + ",")
     elif entry.booktitle:
-        parts.append(f"in <i>{entry.booktitle}</i>,")
+        parts.append(f"{w['in_lower']} <i>{entry.booktitle}</i>,")
 
     if entry.year:
         parts.append(f"{entry.year}.")
@@ -1064,6 +1108,7 @@ def _format_ieee(entry: BibEntry, number: int = 0) -> str:
 
 def _format_chicago(entry: BibEntry) -> str:
     """Chicago author-date style."""
+    w = _words()
     parts = []
 
     if entry.authors:
@@ -1080,7 +1125,7 @@ def _format_chicago(entry: BibEntry) -> str:
         if entry.volume:
             venue += f" {entry.volume}"
             if entry.number:
-                venue += f", no. {entry.number}"
+                venue += f", {w['no']} {entry.number}"
         if entry.pages:
             venue += f": {entry.pages}"
         parts.append(venue + ".")
@@ -1090,6 +1135,7 @@ def _format_chicago(entry: BibEntry) -> str:
 
 def _format_harvard(entry: BibEntry) -> str:
     """Harvard referencing style."""
+    w = _words()
     parts = []
 
     if entry.authors:
@@ -1107,9 +1153,9 @@ def _format_harvard(entry: BibEntry) -> str:
     if entry.journal:
         parts.append(f"<i>{entry.journal}</i>,")
         if entry.volume:
-            parts.append(f"vol. {entry.volume},")
+            parts.append(f"{w['vol']} {entry.volume},")
         if entry.pages:
-            parts.append(f"pp. {entry.pages}.")
+            parts.append(f"{w['pp']} {entry.pages}.")
 
     return " ".join(parts)
 

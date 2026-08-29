@@ -1,5 +1,6 @@
 """stx cache warmup — pre-warm the page cache for deployment."""
 
+import glob
 import os
 import sys
 import time
@@ -285,14 +286,18 @@ def warmup(path):
 
     elapsed = time.time() - t0
 
-    # Check if the cache file was created.
-    cache_file = os.path.join(project_dir, ".stx_cache", "page_cache.json")
-    if os.path.isfile(cache_file):
-        size_kb = os.path.getsize(cache_file) / 1024
-        console.print(
-            f"[green]Done[/] in {elapsed:.1f}s — "
-            f"cache saved to [cyan].stx_cache/page_cache.json[/] ({size_kb:.0f} KB)"
-        )
+    # Check if a cache file was created (page_cache.json, or
+    # page_cache-<fp>.json when book.py forwards block_kwargs — one per variant).
+    cache_files = sorted(glob.glob(os.path.join(project_dir, ".stx_cache", "page_cache*.json")),
+                         key=os.path.getmtime)
+    fresh = [f for f in cache_files if os.path.getmtime(f) >= t0]
+    if fresh:
+        for cache_file in fresh:
+            size_kb = os.path.getsize(cache_file) / 1024
+            console.print(
+                f"[green]Done[/] in {elapsed:.1f}s — "
+                f"cache saved to [cyan].stx_cache/{os.path.basename(cache_file)}[/] ({size_kb:.0f} KB)"
+            )
     else:
         console.print(
             f"[yellow]Warning:[/] warmup completed in {elapsed:.1f}s "

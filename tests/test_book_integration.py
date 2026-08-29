@@ -7,6 +7,7 @@ runtime and are excluded from unit testing.
 """
 
 import hashlib
+import os
 import types
 from unittest.mock import patch
 
@@ -74,6 +75,33 @@ class TestComputeCacheHash:
         assert isinstance(result, str)
         # MD5 hex digest is always 32 characters
         assert len(result) == 32
+
+    def test_block_kwargs_change_hash(self):
+        """Same modules, different forwarded kwargs → different cache key."""
+        from streamtex.book import _compute_cache_hash
+        m = self._make_module("block_a")
+        h_en = _compute_cache_hash([m], block_kwargs={"lang": "en"})
+        h_fr = _compute_cache_hash([m], block_kwargs={"lang": "fr"})
+        assert h_en != h_fr
+        assert h_en == _compute_cache_hash([m], block_kwargs={"lang": "en"})
+
+    def test_empty_kwargs_same_as_omitted(self):
+        """No forwarded args → hash identical to the legacy signature."""
+        from streamtex.book import _compute_cache_hash
+        m = self._make_module("block_a")
+        assert _compute_cache_hash([m]) == _compute_cache_hash([m], (), {})
+        assert _compute_cache_hash([m]) == _compute_cache_hash([m], (), None)
+
+    def test_block_args_change_hash(self):
+        from streamtex.book import _compute_cache_hash
+        m = self._make_module("block_a")
+        assert _compute_cache_hash([m], ("x",)) != _compute_cache_hash([m], ("y",))
+
+    def test_kwargs_fingerprint_is_order_independent(self):
+        from streamtex.book import _compute_cache_hash
+        m = self._make_module("block_a")
+        assert (_compute_cache_hash([m], block_kwargs={"a": 1, "b": 2})
+                == _compute_cache_hash([m], block_kwargs={"b": 2, "a": 1}))
 
     def test_object_without_name_uses_str(self):
         """Objects lacking __name__ fall back to str() representation."""
@@ -178,6 +206,22 @@ class TestFileCache:
         deep = tmp_path / "a" / "b" / "cache.json"
         _save_file_cache(str(deep), self._sample_cache())
         assert deep.exists()
+
+    def test_resolve_cache_path_kwargs_suffix(self, tmp_path):
+        """Forwarded kwargs give a per-variant file; none keeps page_cache.json."""
+        from streamtex.book import _resolve_cache_path
+        blocks_dir = tmp_path / "blocks"
+        blocks_dir.mkdir()
+        m = types.ModuleType("bck_x")
+        m.__file__ = str(blocks_dir / "bck_x.py")
+        plain = _resolve_cache_path([m])
+        en = _resolve_cache_path([m], block_kwargs={"lang": "en"})
+        fr = _resolve_cache_path([m], block_kwargs={"lang": "fr"})
+        assert plain.endswith(os.path.join(".stx_cache", "page_cache.json"))
+        assert en != fr and en != plain
+        assert os.path.basename(en).startswith("page_cache-") and en.endswith(".json")
+        assert len(os.path.basename(en)) == len("page_cache-") + 8 + len(".json")
+        assert _resolve_cache_path([m], (), {}) == plain
 
     def test_resolve_cache_path(self, tmp_path):
         from streamtex.book import _resolve_cache_path

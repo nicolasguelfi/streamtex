@@ -171,6 +171,27 @@ class TestHtmlExportBuffer:
         html = buf.generate_full_html()
         assert "zoom:" not in html
 
+    def test_generate_full_html_lang_default_en(self):
+        buf = self._make_buffer()
+        html = buf.generate_full_html()
+        assert '<html lang="en">' in html
+
+    def test_generate_full_html_lang_from_config(self):
+        buf = HtmlExportBuffer(ExportConfig(enabled=True, lang="fr"))
+        html = buf.generate_full_html()
+        assert '<html lang="fr">' in html
+        assert '<html lang="en">' not in html
+
+    def test_generate_full_html_lang_region_tag(self):
+        buf = HtmlExportBuffer(ExportConfig(enabled=True, lang="de-CH"))
+        assert '<html lang="de-CH">' in buf.generate_full_html()
+
+    def test_generate_full_html_lang_invalid_falls_back_to_en(self):
+        buf = HtmlExportBuffer(ExportConfig(enabled=True, lang='fr"><script>'))
+        html = buf.generate_full_html()
+        assert '<html lang="en">' in html
+        assert "<script>" not in html.split("<head>")[0]
+
 
 # ---------------------------------------------------------------------------
 # Global functions

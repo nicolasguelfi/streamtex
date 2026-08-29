@@ -108,6 +108,12 @@ class ExportConfig:
     theme_primary: str | None = None
     """Override link/primary color for the exported HTML."""
 
+    lang: str = "en"
+    """BCP 47 language tag written to the ``<html lang>`` attribute of the
+    exported document (``"en"``, ``"fr"``, ``"de-CH"``...). One static export
+    per language passes its own value here — the CLI resolves it from
+    ``stx export html --lang`` or the ``STX_LANG`` environment variable."""
+
 
 # ---------------------------------------------------------------------------
 # Asset collector — extracts and deduplicates media from HTML
@@ -359,7 +365,7 @@ class HtmlExportBuffer:
         zoom_css = f"  zoom: {c.zoom};\n" if c.zoom != 1.0 else ""
         return (
             "<!DOCTYPE html>\n"
-            f"<html lang=\"en\">\n<head>\n"
+            f"<html lang=\"{_escape_lang(c.lang)}\">\n<head>\n"
             f"<meta charset=\"UTF-8\">\n"
             f"<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n"
             f"<title>{c.page_title}</title>\n"
@@ -390,6 +396,18 @@ class HtmlExportBuffer:
 # ---------------------------------------------------------------------------
 # Internal helper
 # ---------------------------------------------------------------------------
+
+def _escape_lang(lang: str | None) -> str:
+    """Return a safe ``<html lang>`` value — a BCP 47-looking tag or ``"en"``.
+
+    Anything that is not letters/digits/hyphens (an injection attempt, an
+    empty string, ``None``) falls back to ``"en"`` rather than breaking the
+    document head.
+    """
+    if isinstance(lang, str) and re.fullmatch(r"[A-Za-z]{2,8}(-[A-Za-z0-9]{1,8})*", lang):
+        return lang
+    return "en"
+
 
 def _get_theme_color(option: str, fallback: str) -> str:
     """Read a Streamlit theme color from config, with fallback.

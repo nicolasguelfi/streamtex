@@ -61,6 +61,21 @@ def _read_streamlit_theme(project_dir: str) -> dict[str, str]:
     }
 
 
+#: Environment variable read when ``--lang`` is not given. It is the same
+#: variable a ``book.py`` typically reads to choose the language of its blocks
+#: (``st_book(block_kwargs={"lang": os.environ.get("STX_LANG", "en")})``), so a
+#: single ``STX_LANG=fr`` drives both the content and the ``<html lang>``.
+LANG_ENV_VAR = "STX_LANG"
+
+
+def resolve_export_lang(lang_option: str | None) -> str:
+    """Resolve the export language: ``--lang`` > ``$STX_LANG`` > ``"en"``."""
+    if lang_option:
+        return lang_option.strip()
+    env = os.environ.get(LANG_ENV_VAR, "").strip()
+    return env or "en"
+
+
 @click.command("html")
 @click.argument("path", default=".", type=click.Path(exists=True))
 @click.option("--output", "-o", default="./static-html",
@@ -77,7 +92,14 @@ def _read_streamlit_theme(project_dir: str) -> dict[str, str]:
               help="Theme for the export: 'auto' reads .streamlit/config.toml, 'dark'/'light' forces a preset.")
 @click.option("--theme-bg", default=None, help="Override background color (e.g. '#0e1117').")
 @click.option("--theme-text", default=None, help="Override text color (e.g. '#fafafa').")
-def export_html(path, output, asset_mode, title, no_nav, theme_mode, theme_bg, theme_text):
+@click.option("--lang", default=None,
+              help="Language tag for the <html lang> attribute (e.g. 'fr'). "
+                   "Defaults to $STX_LANG, then 'en'.")
+@click.option("--suffix", default="",
+              help="Suffix appended to the output basename (e.g. '-fr' gives "
+                   "<project>-fr.html) so one directory can hold several languages.")
+def export_html(path, output, asset_mode, title, no_nav, theme_mode, theme_bg, theme_text,
+                lang, suffix):
     """Generate static HTML from a StreamTeX project without a Streamlit server.
 
     Exports a fully navigable HTML document with sidebar TOC, floating
@@ -90,8 +112,12 @@ def export_html(path, output, asset_mode, title, no_nav, theme_mode, theme_bg, t
         stx export html --output /app/static-html/ ./manuals/stx_manual_intro
         stx export html --asset-mode embedded .
         stx export html --no-nav .
+        STX_LANG=fr stx export html --suffix -fr .     # <html lang="fr">, deck-fr.html
+        stx export html --lang fr --output ./out/fr .
     """
     from ..export import AssetCollector, AssetMode, ExportConfig
+
+    resolved_lang = resolve_export_lang(lang)
 
     console = get_console()
     project_dir = os.path.abspath(path)
@@ -137,7 +163,9 @@ def export_html(path, output, asset_mode, title, no_nav, theme_mode, theme_bg, t
         theme_bg=resolved_bg,
         theme_text=resolved_text,
         theme_primary=resolved_primary,
+        lang=resolved_lang,
     )
+    console.print(f"[green]\u2713 Language:[/] <html lang=\"{resolved_lang}\">")
 
     # Add project dir to sys.path so ``import setup`` / ``import blocks`` work.
     if project_dir not in sys.path:
@@ -209,7 +237,7 @@ def export_html(path, output, asset_mode, title, no_nav, theme_mode, theme_bg, t
             console.print(f"[green]\u2713 Navigation:[/] {', '.join(features)}")
 
     # Derive the base name from the project directory
-    base_name = os.path.basename(project_dir).replace("stx_manual_", "")
+    base_name = os.path.basename(project_dir).replace("stx_manual_", "") + suffix
     output_dir = os.path.abspath(output)
 
     # Write to disk — create a fresh AssetCollector to extract data URIs

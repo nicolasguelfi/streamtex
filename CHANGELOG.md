@@ -5,6 +5,64 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+Multilingual documents — three library gaps found by the POSTAIR / AI Day
+2026 bilingual decks (EN/FR on 0.7.25, `st_book(block_kwargs={"lang": …})`),
+closed here so that the project no longer needs local workarounds.
+Issues #37–#41.
+
+### Added
+
+- **`stx export html --lang CODE` and `ExportConfig.lang`** (#38) — the
+  `<html lang>` attribute of the exported document is no longer hard-coded
+  to `"en"`. Resolution order: `--lang` > `$STX_LANG` > `"en"`. Reading
+  `STX_LANG` means the one variable a `book.py` already reads to pick the
+  language of its blocks also sets the document language — a single
+  `STX_LANG=fr stx export html .` does both. The value is validated as a
+  BCP 47-looking tag (`fr`, `de-CH`); anything else falls back to `"en"`
+  rather than breaking the `<head>`. (`streamtex/export.py`,
+  `streamtex/cli/export_cmd.py`)
+- **`stx export html --suffix TEXT`** (#38) — appended to the output
+  basename (`--suffix -fr` → `<project>-fr.html` + `<project>-fr/` assets)
+  so one output directory can hold every language of a document.
+- **Pagination cache keyed by `block_kwargs`** (#40) —
+  `_compute_cache_hash()` now folds a deterministic fingerprint of the
+  forwarded `block_args` / `block_kwargs` into the cache key, and the
+  persistent file becomes `.stx_cache/page_cache-<fp8>.json` when they are
+  non-empty. A deck opened with `?lang=fr` after an EN warmup rebuilds its
+  TOC / markers / page titles in French instead of reusing the English
+  sidebar, and the EN and FR caches coexist on disk instead of overwriting
+  each other at every switch. Projects that forward nothing keep the exact
+  same hash and file name. Keep forwarded kwargs to plain data (str / int /
+  bool / lists / dicts): an object whose `repr` embeds a memory address
+  would invalidate the cache on every run. `stx cache warmup` reports every
+  `page_cache*.json` it wrote. (`streamtex/book.py`,
+  `streamtex/cli/cache_cmd.py`)
+
+### Fixed
+
+- **`BibConfig.locale` is now read by the formatters** (#39) — the field
+  was declared and documented ("en" or "fr" for connector words) but never
+  used. A `_LOCALE_WORDS` table now drives `authors_short` ("Vaswani &
+  Shazeer" → "Vaswani et Shazeer"), APA (", & " → ", et ", "In" → "Dans"),
+  IEEE (" and " → " et ", "in" → "dans"), and the `pp.` / `vol.` / `no.`
+  abbreviations of MLA, IEEE, Chicago and Harvard (`p.`, `vol.`, `n°` in
+  French). `locale="en"` output is byte-identical to before; an unknown
+  locale falls back to English with a single warning, a region tag
+  (`fr-BE`) falls back to its base language. (`streamtex/bib.py`)
+
+### Documentation
+
+- `st_book(block_args=, block_kwargs=)` documented outside the CHANGELOG
+  (#37): cheatsheet "st_book — Full Signature" and a new section of the
+  advanced manual, with the reference example "a language passed to every
+  `build(lang)`".
+- New advanced-manual chapter **Multilingual Documents** (#41): leaves
+  `{"en": …, "fr": …}` + `T()` / `TF()`, language in the address
+  (`STX_LANG` > `?lang=` > default), double export, i18n quality gate —
+  POSTAIR (`sumvadis-streamtex`) as the reference implementation.
+
 ## [0.7.25] — 2026-08-22
 
 ### Fixed

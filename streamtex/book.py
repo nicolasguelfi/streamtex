@@ -558,7 +558,9 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
     :param block_args: Positional args forwarded verbatim to every
         ``block.build()`` call.
     :param block_kwargs: Keyword args forwarded verbatim to every
-        ``block.build()`` call.
+        ``block.build()`` call. Both are part of the pagination cache key
+        (one cache per variant — e.g. ``{"lang": "fr"}`` gets its own
+        TOC / markers / page titles); keep the values to plain data.
     """
     _block_args = tuple(block_args or ())
     _block_kwargs = dict(block_kwargs or {})
@@ -1176,7 +1178,26 @@ _STX_THEME_BG_KEY = "_stx_theme_bg"
 _STX_THEME_TEXT_KEY = "_stx_theme_text"
 
 
-def _compute_cache_hash(module_list):
+def _block_kwargs_fingerprint(block_args: tuple = (),
+                              block_kwargs: dict | None = None) -> str:
+    """Return a short, deterministic fingerprint of the args forwarded to
+    every ``block.build()`` — ``""`` when nothing is forwarded.
+
+    The values are serialised with ``json.dumps(sort_keys=True, default=repr)``
+    so plain data (str / int / bool / lists / dicts) gives a stable key across
+    processes. An object whose ``repr`` embeds a memory address would change
+    on every run and defeat the cache: keep forwarded kwargs to plain data.
+    """
+    if not block_args and not block_kwargs:
+        return ""
+    payload = json.dumps({"args": list(block_args or ()),
+                          "kwargs": dict(block_kwargs or {})},
+                         sort_keys=True, ensure_ascii=False, default=repr)
+    return hashlib.md5(payload.encode()).hexdigest()[:8]
+
+
+def _compute_cache_hash(module_list, block_args: tuple = (),
+                        block_kwargs: dict | None = None):
     """Return a hash that changes when the module list or file contents change.
 
     The hash incorporates:
@@ -1184,6 +1205,9 @@ def _compute_cache_hash(module_list):
     - File modification times (detects content edits)
     - book.py, custom/styles.py, blocks/helpers.py mtimes (detects config changes)
     - streamtex library version (detects library upgrades)
+    - A fingerprint of ``block_args`` / ``block_kwargs`` when non-empty, so a
+      document built with ``block_kwargs={"lang": "fr"}`` never reuses the
+      TOC / markers / page titles cached for ``"en"``
     """
     parts: list[str] = []
 
@@ -1219,6 +1243,11 @@ def _compute_cache_hash(module_list):
     except ImportError:
         pass
 
+    # 4. Forwarded block args/kwargs (empty → no part, hash unchanged)
+    fp = _block_kwargs_fingerprint(block_args, block_kwargs)
+    if fp:
+        parts.append(f"kw:{fp}")
+
     return hashlib.md5("|".join(parts).encode()).hexdigest()
 
 
@@ -1230,10 +1259,15 @@ _STX_FILE_CACHE_DIR = ".stx_cache"
 _STX_FILE_CACHE_NAME = "page_cache.json"
 
 
-def _resolve_cache_path(module_list) -> str | None:
+def _resolve_cache_path(module_list, block_args: tuple = (),
+                        block_kwargs: dict | None = None) -> str | None:
     """Return the path to the persistent cache file for this project.
 
-    The cache lives in ``<project>/.stx_cache/page_cache.json``.
+    The cache lives in ``<project>/.stx_cache/page_cache.json``. When
+    ``block_args`` / ``block_kwargs`` are forwarded to the blocks, the file
+    name carries their fingerprint — ``page_cache-<fp8>.json`` — so that one
+    cache per variant (one per language, typically) coexists on disk instead
+    of being overwritten at every switch.
     Returns None if the project directory cannot be determined.
     """
     for m in module_list:
@@ -1241,7 +1275,10 @@ def _resolve_cache_path(module_list) -> str | None:
         if fpath:
             # blocks/ is one level below the project root
             project_dir = os.path.dirname(os.path.dirname(os.path.abspath(fpath)))
-            return os.path.join(project_dir, _STX_FILE_CACHE_DIR, _STX_FILE_CACHE_NAME)
+            fp = _block_kwargs_fingerprint(block_args, block_kwargs)
+            stem, ext = os.path.splitext(_STX_FILE_CACHE_NAME)
+            name = f"{stem}-{fp}{ext}" if fp else _STX_FILE_CACHE_NAME
+            return os.path.join(project_dir, _STX_FILE_CACHE_DIR, name)
     return None
 
 
@@ -1611,8 +1648,8 @@ def _warmup_build_cache(module_list, toc_config, marker_config, separator,
     When ``_warmup_export_config`` is set, the export buffer is activated
     so the full-book HTML is captured in session_state alongside the cache.
     """
-    cache_hash = _compute_cache_hash(module_list)
-    cache_path = _resolve_cache_path(module_list)
+    cache_hash = _compute_cache_hash(module_list, block_args, block_kwargs)
+    cache_path = _resolve_cache_path(module_list, block_args, block_kwargs)
     # Use the export config if set by CLI ``stx export html``, otherwise disable
     export_cfg = _warmup_export_config
     if export_cfg is not None:
@@ -2224,8 +2261,8 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
     effective_zoom = st.session_state.get(_ZOOM_KEY, zoom) / 100
 
     # --- Cache management (3-tier: session → file → full rebuild) ---
-    cache_hash = _compute_cache_hash(module_list)
-    cache_path = _resolve_cache_path(module_list)
+    cache_hash = _compute_cache_hash(module_list, block_args, block_kwargs)
+    cache_path = _resolve_cache_path(module_list, block_args, block_kwargs)
 
     # Tier 1: session_state (instant — survives intra-session reruns)
     cache = st.session_state.get(_STX_CACHE_KEY)

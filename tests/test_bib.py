@@ -39,6 +39,75 @@ from streamtex.bib import (
 )
 
 # ===================================================================
+# BibConfig.locale — connector words
+# ===================================================================
+
+class TestBibLocale:
+    """``BibConfig.locale`` drives the connector words of every formatter."""
+
+    def setup_method(self):
+        set_bib_config(BibConfig())
+
+    def teardown_method(self):
+        set_bib_config(BibConfig())
+
+    def _two(self):
+        return BibEntry(key="t", authors=["Vaswani, A.", "Shazeer, N."], year="2017",
+                        title="Attention", booktitle="NeurIPS", entry_type="inproceedings",
+                        pages="1-10")
+
+    def test_authors_short_fr(self):
+        set_bib_config(BibConfig(locale="fr"))
+        assert self._two().authors_short == "Vaswani et Shazeer"
+
+    def test_authors_short_en_unchanged(self):
+        assert self._two().authors_short == "Vaswani & Shazeer"
+
+    def test_apa_fr_amp_and_in(self):
+        set_bib_config(BibConfig(locale="fr"))
+        out = _format_apa(self._two())
+        assert "Vaswani, A., et Shazeer, N." in out
+        assert "Dans <i>NeurIPS</i>." in out
+        assert " & " not in out
+
+    def test_apa_en_unchanged(self):
+        out = _format_apa(self._two())
+        assert "Vaswani, A., & Shazeer, N." in out
+        assert "In <i>NeurIPS</i>." in out
+
+    def test_ieee_fr_and_pages(self):
+        set_bib_config(BibConfig(locale="fr"))
+        e = BibEntry(key="t", authors=["Vaswani, A.", "Shazeer, N.", "Parmar, N."],
+                     year="2017", title="Attention", journal="J", volume="3",
+                     number="2", pages="1-10")
+        out = _format_ieee(e, 1)
+        assert ", et N. Parmar," in out
+        assert "vol. 3, n° 2, p. 1-10" in out
+
+    def test_ieee_en_unchanged(self):
+        e = BibEntry(key="t", authors=["Vaswani, A.", "Shazeer, N."], year="2017",
+                     title="Attention", journal="J", volume="3", number="2", pages="1-10")
+        out = _format_ieee(e, 1)
+        assert "A. Vaswani and N. Shazeer," in out
+        assert "vol. 3, no. 2, pp. 1-10" in out
+
+    def test_harvard_and_mla_fr_pages(self):
+        set_bib_config(BibConfig(locale="fr"))
+        e = BibEntry(key="t", authors=["Vaswani, A."], year="2017", title="Attention",
+                     journal="J", volume="3", number="2", pages="1-10", entry_type="article")
+        assert "p. 1-10" in _format_harvard(e)
+        assert "n° 2" in _format_mla(e) and "p. 1-10" in _format_mla(e)
+
+    def test_unknown_locale_falls_back_to_en(self):
+        set_bib_config(BibConfig(locale="klingon"))
+        assert self._two().authors_short == "Vaswani & Shazeer"
+
+    def test_region_tag_falls_back_to_base_language(self):
+        set_bib_config(BibConfig(locale="fr-BE"))
+        assert self._two().authors_short == "Vaswani et Shazeer"
+
+
+# ===================================================================
 # BibEntry
 # ===================================================================
 

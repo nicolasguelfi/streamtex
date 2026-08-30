@@ -517,6 +517,85 @@ _MARKER_NAV_JS = """
 
   // --- Init ---
   updateUI();
+
+  // Deep-link hook (see _DEEPLINK_JS): select the bar entry for a GLOBAL
+  // marker index without scrolling (the caller already scrolled).
+  window.__stxMarkerNavigateTo = function(globalIdx) {
+    for (var i = 0; i < visible.length; i++) {
+      if (visible[i].index === globalIdx) { currentIdx = i; updateUI(); return; }
+    }
+  };
+})();
+"""
+
+
+# ---------------------------------------------------------------------------
+# Deep link -- ?marker= / ?page= / #<key> / #stx-goto-<n> (see deeplink.py)
+# ---------------------------------------------------------------------------
+
+_DEEPLINK_JS = r"""
+(function() {
+  var markers = __MARKERS__;
+  if (!markers.length) return;
+  var stxMarkerRe = /^stx-marker-(.+)-\d+$/;
+
+  // Mirror of TOCRegistry.get_key_anchor (toc.py)
+  function slugOf(text) {
+    var s = String(text || '').toLowerCase()
+      .replace(/[.'"!?@#$%^&*()+=\[\]{}|\\\/<>,;:~`]/g, '-')
+      .replace(/[-\s]+/g, '-').replace(/^-+|-+$/g, '');
+    return s || 'section';
+  }
+  function markerSlug(m) {
+    var mm = stxMarkerRe.exec(m.anchor || '');
+    return mm ? mm[1] : slugOf(m.label);
+  }
+  function findMarker(ref) {
+    if (!ref) return null;
+    var i;
+    for (i = 0; i < markers.length; i++) if (markers[i].key && markers[i].key === ref) return markers[i];
+    for (i = 0; i < markers.length; i++) if (markers[i].anchor === ref) return markers[i];
+    var slug = slugOf(ref);
+    for (i = 0; i < markers.length; i++) {
+      if (markerSlug(markers[i]) === slug || slugOf(markers[i].label) === slug) return markers[i];
+    }
+    return null;
+  }
+  function firstOfPage(n) {
+    for (var i = 0; i < markers.length; i++) {
+      if ((markers[i].page_idx || 0) === n) return markers[i];
+    }
+    return null;
+  }
+  function resolve() {
+    var q = new URLSearchParams(window.location.search);
+    var ref = (q.get('marker') || '').trim();
+    var m = ref ? findMarker(ref) : null;
+    if (!m) {
+      var p = parseInt(q.get('page') || '', 10);          /* 1-based */
+      if (!isNaN(p) && p >= 1) m = firstOfPage(p - 1);
+    }
+    if (!m) {
+      var h = decodeURIComponent((window.location.hash || '').replace(/^#/, '')).trim();
+      if (h) {
+        var g = /^stx-goto-(\d+)$/.exec(h);                /* 0-based, sidebar convention */
+        m = g ? firstOfPage(parseInt(g[1], 10)) : findMarker(h);
+      }
+    }
+    return m;
+  }
+  function jump() {
+    var m = resolve();
+    if (!m) return;
+    var el = document.getElementById(m.anchor);
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'instant', block: 'start' });
+    var nav = window.__stxMarkerNavigateTo;
+    if (typeof nav === 'function') nav(m.index);
+  }
+  jump();
+  window.addEventListener('load', jump);
+  window.addEventListener('hashchange', jump);
 })();
 """
 
@@ -805,6 +884,9 @@ def enrich_export_html(
             "__MARKERS__", json.dumps(markers, ensure_ascii=False)
         )
         extra_js_parts.append(marker_js)
+        extra_js_parts.append(_DEEPLINK_JS.replace(
+            "__MARKERS__", json.dumps(markers, ensure_ascii=False)
+        ))
 
     if has_search:
         # Convert search index keys to strings for JS object

@@ -64,6 +64,7 @@ try:
 
     # Marker Navigation
     from .marker import st_marker, MarkerConfig
+    from .deeplink import page_url
 
     # Section spacing
     from .spacing import (

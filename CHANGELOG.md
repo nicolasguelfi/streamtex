@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Deep links into a paginated book — `?marker=` / `?page=`** (#42). A
+  link from one deck to another could only land on page 1. `st_book(
+  paginate=True)` now honours, on the first run of a session, `?marker=
+  <key-or-slug>` (the `key=` given to `st_marker()`, or the slug of the
+  marker label) and `?page=<n>` (1-based); `?marker=` wins, invalid values
+  are ignored, and no other parameter (`?lang=`…) is read or modified. The
+  server resolves the page from the existing marker cache (no extra
+  render) and hands the marker index to the navigation JS as the initial
+  `_stxMarkerStartIdx`, so the widget scrolls to a mid-page marker through
+  the already-proven cross-page path. (`streamtex/deeplink.py`,
+  `streamtex/book.py`)
+- **`st_marker(label, key="…")`** — optional stable identifier for deep
+  links, independent of the label so it survives a translation or a
+  rewording (`st_marker(T(leaf, lang), key="electricity")`). Stored in
+  the marker cache as `entry["key"]`. (`streamtex/marker.py`)
+- **Static HTML export honours the same links, client-side** — a small
+  script reads `?marker=` / `?page=` **and** `#<key>` / `#stx-marker-…` /
+  `#stx-goto-<n>`, scrolls to the marker and syncs the floating bar; the
+  static server ignores the query, so one URL form works for the app and
+  the export. Inert without a parameter. Verified in Chromium on the
+  advanced manual (8 URL forms). (`streamtex/export_enrich.py`)
+- **`stx.page_url(base, marker=…, page=…, **params)`** — builds such a
+  link while keeping the query `base` already carries (a hub can wrap its
+  own `with_lang()` link); blocks never compute page numbers.
+
 ## [0.7.26] — 2026-08-29
 
 Multilingual documents — three library gaps found by the POSTAIR / AI Day

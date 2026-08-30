@@ -472,7 +472,15 @@ class TestDeepLinkJs:
         assert '"key": "alpha"' in out
         assert "__MARKERS__" not in out
 
-    def test_deeplink_script_absent_without_markers(self):
+    def test_deeplink_script_absent_without_markers_or_toc(self):
         from streamtex.export_enrich import enrich_export_html
         out = enrich_export_html("<html><head></head><body></body></html>", markers=[])
         assert "URLSearchParams" not in out
+
+    def test_deeplink_script_carries_toc_pages(self):
+        from streamtex.export_enrich import enrich_export_html
+        html = "<html><head></head><body><div id=\"3-footer\"></div></body></html>"
+        out = enrich_export_html(html, toc=[{"title": "Footer", "key_anchor": "3-footer",
+                                             "level": 1, "page_idx": 3}], markers=[])
+        assert '"key_anchor": "3-footer"' in out and '"page_idx": 3' in out
+        assert "hashchange" in out

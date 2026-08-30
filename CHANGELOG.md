@@ -28,7 +28,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   script reads `?marker=` / `?page=` **and** `#<key>` / `#stx-marker-…` /
   `#stx-goto-<n>`, scrolls to the marker and syncs the floating bar; the
   static server ignores the query, so one URL form works for the app and
-  the export. Inert without a parameter. Verified in Chromium on the
+  the export; a page without markers resolves to its first TOC heading;
+  after the initial landing, a hash change (sidebar click) resolves the
+  hash only. Inert without a parameter. Verified in Chromium on the
   advanced manual (8 URL forms). (`streamtex/export_enrich.py`)
 - **`stx.page_url(base, marker=…, page=…, **params)`** — builds such a
   link while keeping the query `base` already carries (a hub can wrap its

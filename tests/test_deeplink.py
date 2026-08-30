@@ -68,9 +68,10 @@ class TestResolveInitialPage:
         assert resolve_initial_page({"marker": None, "page": None}, MARKERS, 10) == (0, None)
         assert resolve_initial_page({"page": "3"}, MARKERS, 0) == (0, None)
 
-    def test_marker_page_bounded_to_total(self):
-        # cache says page 7 but the book now has 5 pages
-        assert resolve_initial_page({"marker": "provenance"}, MARKERS, 5) == (4, 4)
+    def test_stale_marker_page_falls_through(self):
+        # cache says page 7 but the book now has 5 pages: not a target
+        assert resolve_initial_page({"marker": "provenance"}, MARKERS, 5) == (0, None)
+        assert resolve_initial_page({"marker": "provenance", "page": "2"}, MARKERS, 5) == (1, None)
 
     def test_other_params_ignored(self):
         assert resolve_initial_page({"lang": "fr", "project": "x"}, MARKERS, 10) == (0, None)
@@ -97,6 +98,10 @@ class TestPageUrl:
 
     def test_fragment_preserved_and_encoding(self):
         assert page_url("https://x/w#top", marker="é lec") == "https://x/w?marker=%C3%A9+lec#top"
+
+    def test_extra_param_keeps_existing_deep_link(self):
+        assert page_url("https://x/w?marker=m", lang="fr") == "https://x/w?marker=m&lang=fr"
+        assert page_url("https://x/w?page=3", lang="fr") == "https://x/w?page=3&lang=fr"
 
     def test_no_change_without_args(self):
         assert page_url("https://x/w?lang=en") == "https://x/w?lang=en"

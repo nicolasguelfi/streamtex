@@ -83,7 +83,10 @@ def resolve_initial_page(params: Mapping[str, Any],
         m = find_marker(markers, ref)
         if m is not None:
             page = int(m.get("page_idx", 0) or 0)
-            return max(0, min(page, total - 1)), int(m.get("index", 0))
+            # A cached page beyond the current book (stale cache) is not a
+            # target: fall through to ?page= rather than land somewhere else.
+            if 0 <= page < total:
+                return page, int(m.get("index", 0))
     raw = _first(params.get(PAGE_PARAM))
     if raw:
         try:
@@ -102,14 +105,17 @@ def page_url(base: str, *, marker: Optional[str] = None,
     Merges ``marker`` / ``page`` (and any extra keyword, e.g. ``lang="fr"``)
     into the query string of *base*, keeping the parameters *base* already
     carries — a hub can wrap a link produced by its own ``with_lang()``.
-    ``page`` is 1-based. The fragment of *base* is preserved.
+    ``page`` is 1-based. The fragment of *base* is preserved. A deep link
+    already present in *base* is kept unless ``marker`` / ``page`` replaces it.
 
     >>> page_url("https://x/waves?lang=en", marker="electricity")
     'https://x/waves?lang=en&marker=electricity'
     """
     scheme, netloc, path, query, fragment = urlsplit(base)
+    replacing = bool(marker) or page is not None
     items = [(k, v) for k, v in parse_qsl(query, keep_blank_values=True)
-             if k not in (MARKER_PARAM, PAGE_PARAM) and k not in params]
+             if k not in params
+             and not (replacing and k in (MARKER_PARAM, PAGE_PARAM))]
     for k, v in params.items():
         if v is not None:
             items.append((k, str(v)))

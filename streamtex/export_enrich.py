@@ -517,6 +517,102 @@ _MARKER_NAV_JS = """
 
   // --- Init ---
   updateUI();
+
+  // Deep-link hook (see _DEEPLINK_JS): select the bar entry for a GLOBAL
+  // marker index without scrolling (the caller already scrolled).
+  window.__stxMarkerNavigateTo = function(globalIdx) {
+    for (var i = 0; i < visible.length; i++) {
+      if (visible[i].index === globalIdx) { currentIdx = i; updateUI(); return; }
+    }
+  };
+})();
+"""
+
+
+# ---------------------------------------------------------------------------
+# Deep link -- ?marker= / ?page= / #<key> / #stx-goto-<n> (see deeplink.py)
+# ---------------------------------------------------------------------------
+
+_DEEPLINK_JS = r"""
+(function() {
+  var markers = __MARKERS__;
+  var toc = __TOC__;
+  if (!markers.length && !toc.length) return;
+  var stxMarkerRe = /^stx-marker-(.+)-\d+$/;
+
+  // Mirror of TOCRegistry.get_key_anchor (toc.py)
+  function slugOf(text) {
+    var s = String(text || '').toLowerCase()
+      .replace(/[.'"!?@#$%^&*()+=\[\]{}|\\\/<>,;:~`]/g, '-')
+      .replace(/[-\s]+/g, '-').replace(/^-+|-+$/g, '');
+    return s || 'section';
+  }
+  function markerSlug(m) {
+    var mm = stxMarkerRe.exec(m.anchor || '');
+    return mm ? mm[1] : slugOf(m.label);
+  }
+  function findMarker(ref) {
+    if (!ref) return null;
+    var i;
+    for (i = 0; i < markers.length; i++) if (markers[i].key && markers[i].key === ref) return markers[i];
+    for (i = 0; i < markers.length; i++) if (markers[i].anchor === ref) return markers[i];
+    var slug = slugOf(ref);
+    for (i = 0; i < markers.length; i++) {
+      if (markerSlug(markers[i]) === slug || slugOf(markers[i].label) === slug) return markers[i];
+    }
+    return null;
+  }
+  /* First anchor of page n: a marker, else a TOC heading (pages without
+     markers -- a footer, a references appendix -- stay reachable).      */
+  function firstOfPage(n) {
+    var i;
+    for (i = 0; i < markers.length; i++) {
+      if ((markers[i].page_idx || 0) === n) return markers[i];
+    }
+    for (i = 0; i < toc.length; i++) {
+      if ((toc[i].page_idx || 0) === n && toc[i].key_anchor) {
+        return { anchor: toc[i].key_anchor, index: -1 };
+      }
+    }
+    return null;
+  }
+  function pageNumber(raw) {                              /* whole value must be digits */
+    raw = (raw || '').trim();
+    return /^\d+$/.test(raw) ? parseInt(raw, 10) : NaN;
+  }
+  function fromQuery() {
+    var q = new URLSearchParams(window.location.search);
+    var ref = (q.get('marker') || '').trim();
+    var m = ref ? findMarker(ref) : null;
+    if (!m) {
+      var p = pageNumber(q.get('page'));                  /* 1-based */
+      if (!isNaN(p) && p >= 1) m = firstOfPage(p - 1);
+    }
+    return m;
+  }
+  function fromHash() {
+    var h = (window.location.hash || '').replace(/^#/, '');
+    try { h = decodeURIComponent(h); } catch (e) { /* malformed %-encoding: use as is */ }
+    h = h.trim();
+    if (!h) return null;
+    var g = /^stx-goto-(\d+)$/.exec(h);                    /* 0-based, sidebar convention */
+    return g ? firstOfPage(parseInt(g[1], 10)) : findMarker(h);
+  }
+  function goTo(m) {
+    if (!m) return;
+    var el = document.getElementById(m.anchor);
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'instant', block: 'start' });
+    var nav = window.__stxMarkerNavigateTo;
+    if (typeof nav === 'function' && m.index >= 0) nav(m.index);
+  }
+  /* Initial load: the query wins, then the hash. Later hash changes (a
+     click on a sidebar #anchor link) resolve the hash ONLY -- the query
+     is a landing instruction, not a permanent override.                */
+  function initial() { goTo(fromQuery() || fromHash()); }
+  initial();
+  window.addEventListener('load', initial);
+  window.addEventListener('hashchange', function() { goTo(fromHash()); });
 })();
 """
 
@@ -805,6 +901,14 @@ def enrich_export_html(
             "__MARKERS__", json.dumps(markers, ensure_ascii=False)
         )
         extra_js_parts.append(marker_js)
+    if has_markers or has_toc:
+        _toc_pages = [
+            {"key_anchor": e.get("key_anchor"), "page_idx": e.get("page_idx", 0)}
+            for e in (toc or []) if e.get("key_anchor")
+        ]
+        extra_js_parts.append(_DEEPLINK_JS
+            .replace("__MARKERS__", json.dumps(markers or [], ensure_ascii=False))
+            .replace("__TOC__", json.dumps(_toc_pages, ensure_ascii=False)))
 
     if has_search:
         # Convert search index keys to strings for JS object

@@ -85,9 +85,13 @@ class MarkerRegistry:
     def reset(self) -> None:
         self._entries = []
 
-    def register(self, label: str, anchor: str, hidden: bool = False) -> int:
+    def register(self, label: str, anchor: str, hidden: bool = False,
+                 key: str | None = None) -> int:
         idx = len(self._entries)
-        self._entries.append({"index": idx, "label": label, "anchor": anchor, "hidden": hidden})
+        entry = {"index": idx, "label": label, "anchor": anchor, "hidden": hidden}
+        if key:
+            entry["key"] = key
+        self._entries.append(entry)
         return idx
 
     def get_entries(self) -> list[dict]:
@@ -115,13 +119,14 @@ def reset_marker_registry(config: MarkerConfig = None) -> None:
         _registry = MarkerRegistry(config)
 
 
-def register_marker(label: str, anchor: str, hidden: bool = False) -> int:
+def register_marker(label: str, anchor: str, hidden: bool = False,
+                    key: str | None = None) -> int:
     """Register a marker in the global registry. Requires prior init."""
     global _registry
     assert isinstance(_registry, MarkerRegistry), (
         "Marker registry is not initialized. Call reset_marker_registry first."
     )
-    return _registry.register(label, anchor, hidden=hidden)
+    return _registry.register(label, anchor, hidden=hidden, key=key)
 
 
 def marker_entries() -> list[dict]:
@@ -152,7 +157,8 @@ def get_marker_config() -> Optional[MarkerConfig]:
 # Public API — st_marker()
 # ---------------------------------------------------------------------------
 
-def st_marker(label: str = "", visible: bool = False, hidden: bool = False) -> None:
+def st_marker(label: str = "", visible: bool = False, hidden: bool = False,
+              key: str | None = None) -> None:
     """Place a navigation marker in the content.
 
     No-op if the marker registry has not been initialized (backward compat).
@@ -162,6 +168,11 @@ def st_marker(label: str = "", visible: bool = False, hidden: bool = False) -> N
         visible: If True, render a visible dashed line in the content.
         hidden: If True, the marker works for PageUp/PageDown navigation
                 but does not appear in the sidebar list or nav widget.
+        key: Optional stable identifier for deep links
+             (``?marker=<key>`` / ``page_url(base, marker=key)``).
+             Independent of the label, so it survives a translation or a
+             rewording; without it the deep link falls back to the label
+             slug (``"Electricity"`` -> ``electricity``).
     """
     if _registry is None:
         return
@@ -175,7 +186,7 @@ def st_marker(label: str = "", visible: bool = False, hidden: bool = False) -> N
     slug = TOCRegistry.get_key_anchor(label)
     anchor = f"stx-marker-{slug}-{idx}"
 
-    _registry.register(label, anchor, hidden=hidden)
+    _registry.register(label, anchor, hidden=hidden, key=key)
 
     # Same offset as the JS scroll (MarkerConfig.scroll_offset): anchor jumps
     # and scripted navigation must land at the identical position.

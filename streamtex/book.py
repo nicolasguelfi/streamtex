@@ -1173,6 +1173,23 @@ def st_include(block_file_module, *args, _inspector_config=None, **kwargs):
 
 _STX_CACHE_KEY = "_stx_page_cache"
 _STX_PAGE_KEY = "_stx_current_page"
+_STX_INITIAL_MARKER_KEY = "_stx_initial_marker"
+
+
+def _initial_page_from_url(cache, total) -> tuple[int, int | None]:
+    """Resolve the first page of the session from the URL (deep link).
+
+    Reads ``st.query_params`` defensively -- absent outside a real script
+    run (tests, headless) -- and delegates to ``deeplink.resolve_initial_page``.
+    """
+    try:
+        params = dict(st.query_params)
+    except Exception:  # noqa: BLE001 -- no script context / mocked st
+        return 0, None
+    if not params:
+        return 0, None
+    from .deeplink import resolve_initial_page
+    return resolve_initial_page(params, (cache or {}).get("markers", []), total)
 _STX_VIEW_MODE_KEY = "_stx_view_mode"
 _STX_THEME_BG_KEY = "_stx_theme_bg"
 _STX_THEME_TEXT_KEY = "_stx_theme_text"
@@ -1799,7 +1816,8 @@ def _build_paginated_sidebar(cache, current_page, total, toc_config, marker_conf
 
 
 def _inject_paginated_nav_js(current_page, total, marker_config,
-                             page_marker_info=None, last_named_page=None):
+                             page_marker_info=None, last_named_page=None,
+                             initial_marker=None):
     """Inject JS for cross-page navigation via hidden buttons.
 
     Navigation mechanisms:
@@ -1818,6 +1836,14 @@ def _inject_paginated_nav_js(current_page, total, marker_config,
     var lastNamedPage = __LAST_NAMED_PAGE__;
     var pageFirstMarker = __PAGE_FIRST_MARKER__;
     var pageLastMarker  = __PAGE_LAST_MARKER__;
+    var initialMarker = __INITIAL_MARKER__;
+
+    /* --- Deep link (?marker=): the server resolved the page; make the
+       marker widget start (and scroll) on the requested marker instead of
+       the first marker of the page. Consumed by marker.py's init.       */
+    if (initialMarker !== null) {
+        hostWin._stxMarkerStartIdx = initialMarker;
+    }
 
     if (hostWin._stxPaginatedCleanup) {
         try { hostWin._stxPaginatedCleanup(); } catch(e) {}
@@ -2214,7 +2240,9 @@ def _inject_paginated_nav_js(current_page, total, marker_config,
                .replace("__TOTAL_PAGES__", str(total))
                .replace("__LAST_NAMED_PAGE__", str(_lnp))
                .replace("__PAGE_FIRST_MARKER__", pmi_first)
-               .replace("__PAGE_LAST_MARKER__", pmi_last))
+               .replace("__PAGE_LAST_MARKER__", pmi_last)
+               .replace("__INITIAL_MARKER__",
+                        str(int(initial_marker)) if initial_marker is not None else "null"))
     st.iframe(js_body, height=1)
 
 
@@ -2340,8 +2368,13 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
         remove_loading_overlay()
 
     # --- Current page ---
+    # First run of the session: honour a deep link (?marker= / ?page=, see
+    # deeplink.py). Any other run keeps the page chosen by the navigation.
     if _STX_PAGE_KEY not in st.session_state:
-        st.session_state[_STX_PAGE_KEY] = 0
+        _init_page, _init_marker = _initial_page_from_url(cache, total)
+        st.session_state[_STX_PAGE_KEY] = _init_page
+        if _init_marker is not None:
+            st.session_state[_STX_INITIAL_MARKER_KEY] = _init_marker
     current_page = max(0, min(st.session_state[_STX_PAGE_KEY], total - 1))
     st.session_state[_STX_PAGE_KEY] = current_page
 
@@ -2563,8 +2596,12 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
             break
 
     # --- Paginated navigation JS (finds & hides buttons, overscroll, callbacks) ---
+    # A deep-linked marker is consumed once: the widget scrolls to it on this
+    # run, later runs fall back to the first marker of the page.
+    _initial_marker = st.session_state.pop(_STX_INITIAL_MARKER_KEY, None)
     _inject_paginated_nav_js(current_page, total, marker_config, page_marker_info,
-                             last_named_page=_last_named)
+                             last_named_page=_last_named,
+                             initial_marker=_initial_marker)
 
     # --- Inspector panel (opt-in, rendered into reserved sidebar placeholder) ---
     if _inspector_placeholder is not None and st.session_state.get("_stx_inspector_open", False):

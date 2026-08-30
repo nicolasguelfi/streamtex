@@ -403,3 +403,29 @@ class TestScrollOffset:
         inject_marker_navigation()
         assert "scroll-margin-top: 42px;" in mock_render.call_args[0][0]
         assert "var OFFSET = 42;" in mock_html.call_args[0][0]
+
+
+class TestMarkerKey:
+    """st_marker(key=...) — stable identifier for deep links."""
+
+    def test_register_stores_key_only_when_given(self):
+        from streamtex.marker import MarkerConfig, MarkerRegistry
+        reg = MarkerRegistry(MarkerConfig())
+        reg.register("A", "a-1")
+        reg.register("B", "b-2", key="beta")
+        entries = reg.get_entries()
+        assert "key" not in entries[0]
+        assert entries[1]["key"] == "beta"
+
+    def test_st_marker_forwards_key(self):
+        from unittest.mock import patch
+
+        from streamtex.marker import MarkerConfig, marker_entries, reset_marker_registry, st_marker
+        reset_marker_registry(MarkerConfig())
+        with patch("streamtex.marker._render"):
+            st_marker("Électricité", key="electricity")
+            st_marker("Plain")
+        e = marker_entries()
+        assert e[0]["key"] == "electricity"
+        assert e[0]["anchor"].startswith("stx-marker-")
+        assert "key" not in e[1]

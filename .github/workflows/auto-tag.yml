@@ -61,6 +61,10 @@ jobs:
       - name: Publish to PyPI
         if: steps.version.outputs.bumped == 'true'
         uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          # A version already on PyPI (manual publish, re-run) is not an
+          # error: skip it instead of failing the run with 400 (issue #36).
+          skip-existing: true
 
       - name: Create GitHub release
         if: steps.version.outputs.bumped == 'true'

@@ -16,11 +16,9 @@ Prerequisite (one-time): uv run playwright install chromium
 from __future__ import annotations
 
 import http.server
-import socket
 import struct
 import threading
 import zlib
-from contextlib import closing
 
 import pytest
 
@@ -46,12 +44,6 @@ def _png_bytes(width: int = 97, height: int = 53) -> bytes:
             + chunk(b"IDAT", zlib.compress(raw)) + chunk(b"IEND", b""))
 
 
-def _free_port() -> int:
-    with closing(socket.socket()) as s:
-        s.bind(("127.0.0.1", 0))
-        return s.getsockname()[1]
-
-
 @pytest.fixture(scope="module")
 def media_server(tmp_path_factory):
     """Serve app/static/media/portrait.png like a Streamlit server would."""
@@ -60,7 +52,6 @@ def media_server(tmp_path_factory):
     media.mkdir(parents=True)
     (media / "portrait.png").write_bytes(_png_bytes())
 
-    port = _free_port()
     handler = type(
         "Quiet",
         (http.server.SimpleHTTPRequestHandler,),
@@ -71,7 +62,10 @@ def media_server(tmp_path_factory):
     def factory(*args, **kwargs):
         return handler(*args, directory=str(root), **kwargs)
 
-    srv = http.server.ThreadingHTTPServer(("127.0.0.1", port), factory)
+    # Bind port 0 directly — the OS assigns a free port with no
+    # reserve-and-release TOCTOU window.
+    srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), factory)
+    port = srv.server_address[1]
     t = threading.Thread(target=srv.serve_forever, daemon=True)
     t.start()
     try:

@@ -386,27 +386,41 @@ def _inject_toc_headings(html: str, toc: list[dict]) -> str:
 # ---------------------------------------------------------------------------
 
 _BASE_TAG_RE = re.compile(r"<base[\s/>]", re.IGNORECASE)
+_HEAD_OPEN_RE = re.compile(r"<head[^>]*>", re.IGNORECASE)
+_HEAD_CLOSE_RE = re.compile(r"</head>", re.IGNORECASE)
 
 
 def inject_base_href(html: str, base_url: str) -> str:
     """Inject ``<base href="{base_url}">`` right after ``<head>``.
 
-    No-op when *base_url* is empty, when the document already declares a
-    ``<base>`` (author's choice wins), or when there is no ``<head>`` to
-    anchor to.  The URL is normalised to end with ``/`` (URL resolution
-    semantics: without it the last path segment would be dropped) and
+    No-op when *base_url* is empty, when the document's head already
+    declares a ``<base>`` (author's choice wins — the guard only scans
+    the head section, so a literal ``<base`` in a body script or comment
+    cannot block injection), or when there is no ``<head>`` to anchor to
+    (matched case-insensitively, attributes tolerated).  The URL's PATH
+    is normalised to end with ``/`` (URL resolution semantics: without
+    it the last path segment would be dropped), its query/fragment are
+    stripped (irrelevant to relative resolution), and the value is
     HTML-attribute escaped.
     """
     if not base_url:
         return html
-    if _BASE_TAG_RE.search(html):
+    head_open = _HEAD_OPEN_RE.search(html)
+    if not head_open:
         return html
-    if "<head>" not in html:
+    head_close = _HEAD_CLOSE_RE.search(html, head_open.end())
+    head_section = html[head_open.end():
+                        head_close.start() if head_close else len(html)]
+    if _BASE_TAG_RE.search(head_section):
         return html
-    if not base_url.endswith("/"):
-        base_url += "/"
+    from urllib.parse import urlsplit, urlunsplit
+    parts = urlsplit(base_url)
+    p = parts.path or "/"
+    if not p.endswith("/"):
+        p += "/"
+    base_url = urlunsplit((parts.scheme, parts.netloc, p, "", ""))
     tag = f'<base href="{_attr_escape(base_url, quote=True)}">'
-    return html.replace("<head>", f"<head>{tag}", 1)
+    return html[:head_open.end()] + tag + html[head_open.end():]
 
 
 # ---------------------------------------------------------------------------

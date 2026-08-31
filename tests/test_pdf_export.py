@@ -417,6 +417,22 @@ class TestInjectBaseHref:
     def test_config_default_empty(self):
         assert PdfConfig().base_url == ""
 
+    def test_head_with_attributes_and_case(self):
+        html = '<html><HEAD lang="en"><title>T</title></HEAD><body></body></html>'
+        out = inject_base_href(html, "http://localhost:8501/")
+        assert '<HEAD lang="en"><base href="http://localhost:8501/">' in out
+
+    def test_base_in_body_script_does_not_block(self):
+        html = ("<html><head><title>T</title></head>"
+                "<body><script>var s = '<base href=x>';</script></body></html>")
+        out = inject_base_href(html, "http://localhost:8501/")
+        assert '<head><base href="http://localhost:8501/">' in out
+
+    def test_query_and_fragment_stripped_path_normalised(self):
+        out = inject_base_href(
+            self._BASE_HTML, "http://h:1234/sub?lang=fr#frag")
+        assert '<base href="http://h:1234/sub/">' in out
+
 
 class TestExportPdfBaseUrl:
     """export_pdf hands Chromium unchanged HTML without base_url, and the

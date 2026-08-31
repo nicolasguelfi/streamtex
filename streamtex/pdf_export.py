@@ -386,7 +386,7 @@ def _inject_toc_headings(html: str, toc: list[dict]) -> str:
 # ---------------------------------------------------------------------------
 
 _BASE_TAG_RE = re.compile(r"<base[\s/>]", re.IGNORECASE)
-_HEAD_OPEN_RE = re.compile(r"<head[^>]*>", re.IGNORECASE)
+_HEAD_OPEN_RE = re.compile(r"<head(?=[\s>])[^>]*>", re.IGNORECASE)
 _HEAD_CLOSE_RE = re.compile(r"</head>", re.IGNORECASE)
 
 
@@ -414,11 +414,16 @@ def inject_base_href(html: str, base_url: str) -> str:
     if _BASE_TAG_RE.search(head_section):
         return html
     from urllib.parse import urlsplit, urlunsplit
-    parts = urlsplit(base_url)
-    p = parts.path or "/"
-    if not p.endswith("/"):
-        p += "/"
-    base_url = urlunsplit((parts.scheme, parts.netloc, p, "", ""))
+    try:
+        parts = urlsplit(base_url)
+        p = parts.path or "/"
+        if not p.endswith("/"):
+            p += "/"
+        base_url = urlunsplit((parts.scheme, parts.netloc, p, "", ""))
+    except ValueError:
+        # A malformed configured base must never crash the export —
+        # leave the HTML unchanged (historical behaviour).
+        return html
     tag = f'<base href="{_attr_escape(base_url, quote=True)}">'
     return html[:head_open.end()] + tag + html[head_open.end():]
 

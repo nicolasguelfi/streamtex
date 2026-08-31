@@ -433,6 +433,15 @@ class TestInjectBaseHref:
             self._BASE_HTML, "http://h:1234/sub?lang=fr#frag")
         assert '<base href="http://h:1234/sub/">' in out
 
+    def test_header_element_is_not_a_head(self):
+        html = "<html><body><header>H</header><img src='x.png'></body></html>"
+        assert inject_base_href(html, "http://localhost:8501/") == html
+
+    def test_malformed_base_url_is_noop(self):
+        # urlsplit raises ValueError on bracketed junk in the netloc
+        out = inject_base_href(self._BASE_HTML, "http://[::1oops/")
+        assert out == self._BASE_HTML
+
 
 class TestExportPdfBaseUrl:
     """export_pdf hands Chromium unchanged HTML without base_url, and the

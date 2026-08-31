@@ -384,9 +384,13 @@ _MARKER_NAV_CSS = """
 _MARKER_NAV_JS = """
 (function() {
   var markers = __MARKERS__;
+  if (!markers.length) return;
+  // App parity (#45): keyboard/buttons walk the FULL marker list —
+  // st_marker(hidden=True) contract: absent from the popup, ALWAYS a
+  // navigation stop (marker.py navigateTo is the reference).  Only the
+  // popup filters on visibility.
   var visible = markers.filter(function(m) { return !m.hidden; });
-  if (!visible.length) return;
-  var currentIdx = 0;
+  var currentIdx = 0;  // GLOBAL marker index, like the live app
 
   // --- Scroll to marker ---
   function scrollTo(anchor) {
@@ -396,9 +400,9 @@ _MARKER_NAV_JS = """
 
   function navigateTo(idx) {
     if (idx < 0) idx = 0;
-    if (idx >= visible.length) idx = visible.length - 1;
+    if (idx >= markers.length) idx = markers.length - 1;
     currentIdx = idx;
-    scrollTo(visible[idx].anchor);
+    scrollTo(markers[idx].anchor);
     updateUI();
   }
 
@@ -427,18 +431,22 @@ _MARKER_NAV_JS = """
   var popup = document.createElement('div');
   popup.className = 'stx-mn-popup';
   for (var i = 0; i < visible.length; i++) {
-    (function(idx) {
+    (function(globalIdx, vi) {
       var row = document.createElement('div');
       row.className = 'stx-mn-popup-item';
-      row.textContent = (idx + 1) + '. ' + visible[idx].label;
-      row.onclick = function() { navigateTo(idx); popup.style.display = 'none'; };
+      row.textContent = (globalIdx + 1) + '. ' + visible[vi].label;
+      row.onclick = function() { navigateTo(globalIdx); popup.style.display = 'none'; };
       popup.appendChild(row);
-    })(i);
+    })(visible[i].index, i);
   }
 
   counter.onclick = function(e) {
     e.stopPropagation();
-    popup.style.display = popup.style.display === 'none' ? 'block' : 'none';
+    if (!visible.length) return;  // all-hidden deck: no empty popup
+    // The CSS default is display:none while the INLINE style starts
+    // empty — comparing to 'none' made the first click a no-op (it
+    // "closed" an already-closed popup).  Compare to 'block' instead.
+    popup.style.display = popup.style.display !== 'block' ? 'block' : 'none';
     highlightPopup();
   };
 
@@ -455,9 +463,17 @@ _MARKER_NAV_JS = """
   });
 
   // --- UI update ---
+  function nearestVisibleLabel() {
+    for (var i = 0; i < visible.length; i++) {
+      if (visible[i].index >= currentIdx) return visible[i].label;
+    }
+    return visible.length ? visible[visible.length - 1].label : '';
+  }
+
   function updateUI() {
-    counter.textContent = (currentIdx + 1) + ' / ' + visible.length;
-    label.textContent = visible[currentIdx].label;
+    counter.textContent = (currentIdx + 1) + ' / ' + markers.length;
+    var m = markers[currentIdx];
+    label.textContent = m ? (m.label || nearestVisibleLabel()) : '';
     highlightPopup();
     // The TOC sidebar active indicator is owned by the cross-context
     // scroll-spy (stx_scroll_spy.js) — it tracks ALL TOC entry anchors
@@ -467,11 +483,17 @@ _MARKER_NAV_JS = """
 
   function highlightPopup() {
     var items = popup.querySelectorAll('.stx-mn-popup-item');
+    // Active row = the visible entry whose GLOBAL index is current; a
+    // hidden current marker lights no row (same as the live app).
+    var activeVi = -1;
+    for (var v = 0; v < visible.length; v++) {
+      if (visible[v].index === currentIdx) { activeVi = v; break; }
+    }
     for (var j = 0; j < items.length; j++) {
-      items[j].classList.toggle('stx-mn-active', j === currentIdx);
+      items[j].classList.toggle('stx-mn-active', j === activeVi);
     }
     // Scroll active item into view in popup
-    if (items[currentIdx]) items[currentIdx].scrollIntoView({ block: 'nearest' });
+    if (activeVi >= 0 && items[activeVi]) items[activeVi].scrollIntoView({ block: 'nearest' });
   }
 
   // --- Keyboard navigation ---
@@ -502,8 +524,8 @@ _MARKER_NAV_JS = """
     clearTimeout(scrollTimer);
     scrollTimer = setTimeout(function() {
       var best = -1, bestDist = Infinity;
-      for (var i = 0; i < visible.length; i++) {
-        var el = document.getElementById(visible[i].anchor);
+      for (var i = 0; i < markers.length; i++) {
+        var el = document.getElementById(markers[i].anchor);
         if (!el) continue;
         var d = Math.abs(el.getBoundingClientRect().top - 100);
         if (d < bestDist) { bestDist = d; best = i; }
@@ -521,8 +543,9 @@ _MARKER_NAV_JS = """
   // Deep-link hook (see _DEEPLINK_JS): select the bar entry for a GLOBAL
   // marker index without scrolling (the caller already scrolled).
   window.__stxMarkerNavigateTo = function(globalIdx) {
-    for (var i = 0; i < visible.length; i++) {
-      if (visible[i].index === globalIdx) { currentIdx = i; updateUI(); return; }
+    if (globalIdx >= 0 && globalIdx < markers.length) {
+      currentIdx = globalIdx;
+      updateUI();
     }
   };
 })();

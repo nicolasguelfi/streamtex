@@ -484,3 +484,78 @@ class TestDeepLinkJs:
                                              "level": 1, "page_idx": 3}], markers=[])
         assert '"key_anchor": "3-footer"' in out and '"page_idx": 3' in out
         assert "hashchange" in out
+
+
+class TestMarkerNavParity:
+    """App-parity contract for the export marker bar (#45).
+
+    st_marker(hidden=True) = absent from the popup, ALWAYS a navigation
+    stop.  The live app (marker.py) is the reference semantics; these
+    tests pin the generated JS to it.
+    """
+
+    def test_guard_is_full_list(self):
+        from streamtex.export_enrich import _MARKER_NAV_JS
+        # The ENTRY guard keys on the full list (the bar exists for an
+        # all-hidden deck): it must come before `visible` is even built.
+        # (A later `!visible.length` guard exists for the popup only.)
+        entry_guard = _MARKER_NAV_JS.index("if (!markers.length) return;")
+        assert entry_guard < _MARKER_NAV_JS.index("var visible")
+
+    def test_navigation_walks_full_list(self):
+        from streamtex.export_enrich import _MARKER_NAV_JS
+        assert "if (idx >= markers.length) idx = markers.length - 1;" in _MARKER_NAV_JS
+        assert "scrollTo(markers[idx].anchor);" in _MARKER_NAV_JS
+
+    def test_counter_is_global(self):
+        from streamtex.export_enrich import _MARKER_NAV_JS
+        assert "' / ' + markers.length" in _MARKER_NAV_JS
+        assert "' / ' + visible.length" not in _MARKER_NAV_JS
+
+    def test_popup_still_filters_but_numbers_globally(self):
+        from streamtex.export_enrich import _MARKER_NAV_JS
+        assert "markers.filter(function(m) { return !m.hidden; })" in _MARKER_NAV_JS
+        assert "(globalIdx + 1) + '. ' + visible[vi].label" in _MARKER_NAV_JS
+
+    def test_label_falls_back_to_nearest_visible(self):
+        from streamtex.export_enrich import _MARKER_NAV_JS
+        assert "function nearestVisibleLabel()" in _MARKER_NAV_JS
+        assert "m.label || nearestVisibleLabel()" in _MARKER_NAV_JS
+
+    def test_scroll_tracking_walks_full_list(self):
+        from streamtex.export_enrich import _MARKER_NAV_JS
+        assert "document.getElementById(markers[i].anchor)" in _MARKER_NAV_JS
+
+    def test_deeplink_hook_is_direct_global(self):
+        from streamtex.export_enrich import _MARKER_NAV_JS
+        assert "currentIdx = globalIdx;" in _MARKER_NAV_JS
+        # the old global->visible mapping is gone
+        assert "visible[i].index === globalIdx" not in _MARKER_NAV_JS
+
+    def test_generated_js_parses(self):
+        import json
+        import shutil
+        import subprocess
+        import tempfile
+        from pathlib import Path
+
+        import pytest
+
+        from streamtex.export_enrich import _MARKER_NAV_JS
+        if not shutil.which("node"):
+            pytest.skip("node not available")
+        markers = [
+            {"index": 0, "label": "A", "anchor": "a0", "hidden": False},
+            {"index": 1, "label": "", "anchor": "a1", "hidden": True},
+            {"index": 2, "label": "B", "anchor": "a2", "hidden": False},
+        ]
+        js = _MARKER_NAV_JS.replace("__MARKERS__", json.dumps(markers))
+        with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False) as f:
+            f.write(js)
+            p = f.name
+        try:
+            r = subprocess.run(["node", "--check", p],
+                               capture_output=True, text=True)
+            assert r.returncode == 0, r.stderr
+        finally:
+            Path(p).unlink()

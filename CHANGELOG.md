@@ -5,6 +5,41 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+#### HTML export — keyboard navigation honours hidden markers (#45)
+
+- Documented contract of `st_marker(hidden=True)` (and of
+  `st_slide_break`, `marker_hidden=True` by default): hidden = absent
+  from the popup, ALWAYS a keyboard stop.  The live app honours it; the
+  static export's floating bar filtered hidden markers out of
+  PageUp/PageDown/arrow **and ◀ ▶ button** traversal — one press skipped
+  a whole block's sub-slides.  The export bar now walks the FULL marker
+  list, exactly like the app (`marker.py` is the reference semantics).
+- App-parity display changes: the counter shows the GLOBAL index and
+  total (`n / all markers`, hidden included); the popup still lists
+  visible markers only but numbers them by global index; between two
+  visible markers the label falls back to the next visible one; the bar
+  now appears even when ALL markers are hidden (pure
+  `st_slide_break` decks gain keyboard navigation in exports).
+- Deep links unchanged: `?marker=`/`#anchor` of a hidden marker still
+  lands on it; the `__stxMarkerNavigateTo` hook now takes the global
+  index directly (the global→visible mapping is gone).
+- Popup first-click fix: the counter's popup never opened on the FIRST
+  click (inline-style toggle compared `''` to `'none'`); it now opens
+  on the first click.
+- Perimeter: `_MARKER_NAV_JS` only — `stx_scroll_spy.js` (shared
+  live/export), the live app JS and the deep-link script are untouched;
+  the 10-scenario live navigation harness passes unchanged.
+- Tests: `TestMarkerNavParity` contract tests + a new real-Chromium
+  e2e harness for the export bar
+  (`tests/e2e/test_export_marker_nav.py`, 9 scenarios: full traversal
+  order, back navigation, buttons, labels, popup content/global
+  numbering, popup click, hidden deep links, no-hidden-marker document
+  unchanged).
+
 ## [0.7.27] — 2026-08-30
 
 ### Added

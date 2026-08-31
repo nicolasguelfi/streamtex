@@ -496,8 +496,11 @@ class TestMarkerNavParity:
 
     def test_guard_is_full_list(self):
         from streamtex.export_enrich import _MARKER_NAV_JS
-        assert "if (!markers.length) return;" in _MARKER_NAV_JS
-        assert "if (!visible.length) return;" not in _MARKER_NAV_JS
+        # The ENTRY guard keys on the full list (the bar exists for an
+        # all-hidden deck): it must come before `visible` is even built.
+        # (A later `!visible.length` guard exists for the popup only.)
+        entry_guard = _MARKER_NAV_JS.index("if (!markers.length) return;")
+        assert entry_guard < _MARKER_NAV_JS.index("var visible")
 
     def test_navigation_walks_full_list(self):
         from streamtex.export_enrich import _MARKER_NAV_JS

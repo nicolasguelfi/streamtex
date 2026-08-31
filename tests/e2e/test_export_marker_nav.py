@@ -33,6 +33,11 @@ MARKERS = [
     {"index": 5, "label": "Vis five", "anchor": "a5", "hidden": False},
 ]
 
+MARKERS_ALL_HIDDEN = [
+    {"index": 0, "label": "", "anchor": "a0", "hidden": True},
+    {"index": 1, "label": "", "anchor": "a1", "hidden": True},
+]
+
 MARKERS_ALL_VISIBLE = [
     {"index": 0, "label": "One", "anchor": "a0", "hidden": False},
     {"index": 1, "label": "Two", "anchor": "a1", "hidden": False},
@@ -67,6 +72,15 @@ def export_page_no_hidden(tmp_path_factory):
 
 
 @pytest.fixture(scope="module")
+def export_page_all_hidden(tmp_path_factory):
+    out = tmp_path_factory.mktemp("export3") / "deck.html"
+    out.write_text(
+        enrich_export_html(_raw_html(2), markers=MARKERS_ALL_HIDDEN),
+        encoding="utf-8")
+    return out
+
+
+@pytest.fixture(scope="module")
 def browser():
     with playwright.sync_playwright() as p:
         b = p.chromium.launch()
@@ -94,15 +108,24 @@ def _anchor_top(page, anchor: str) -> float:
         f"document.getElementById('{anchor}').getBoundingClientRect().top")
 
 
-def _wait_at(page, anchor: str) -> None:
-    """Wait until the smooth scroll parked *anchor* at the top, then let
-    the bar's 400 ms navigating window close and its scroll tracker's
-    debounce settle on the same index (no snap-back)."""
+COUNTER_JS = ("(t) => document.querySelector"
+              "('#stx-marker-nav .stx-mn-counter')"
+              ".textContent.trim() === t")
+
+
+def _wait_at(page, anchor: str, counter: str) -> None:
+    """Wait on OBSERVABLE state: the smooth scroll parked *anchor* at the
+    top and the bar shows *counter* — then assert it is STABLE across the
+    scroll tracker's debounce (the snap-back this harness guards
+    against), instead of sleeping implementation-derived durations."""
     page.wait_for_function(
         "(a) => Math.abs(document.getElementById(a)"
         ".getBoundingClientRect().top) < 8",
         arg=anchor, timeout=5000)
-    page.wait_for_timeout(650)
+    page.wait_for_function(COUNTER_JS, arg=counter, timeout=5000)
+    page.wait_for_timeout(500)  # give a would-be snap-back time to happen
+    assert page.locator(
+        "#stx-marker-nav .stx-mn-counter").text_content().strip() == counter
 
 
 def _open_popup(page) -> None:
@@ -116,8 +139,7 @@ def test_pagedown_visits_every_marker_in_order(browser, export_page):
     assert _counter(page) == "1 / 6"
     for expected_idx in range(1, 6):
         page.keyboard.press("PageDown")
-        _wait_at(page, f"a{expected_idx}")
-        assert _counter(page) == f"{expected_idx + 1} / 6"
+        _wait_at(page, f"a{expected_idx}", f"{expected_idx + 1} / 6")
     # At the end, PageDown clamps (no wrap) — app parity
     page.keyboard.press("PageDown")
     page.wait_for_timeout(650)
@@ -129,10 +151,9 @@ def test_pageup_walks_back_through_hidden(browser, export_page):
     page = _open(browser, export_page.as_uri())
     for i in range(1, 6):
         page.keyboard.press("PageDown")
-        _wait_at(page, f"a{i}")
+        _wait_at(page, f"a{i}", f"{i + 1} / 6")
     page.keyboard.press("PageUp")
-    _wait_at(page, "a4")
-    assert _counter(page) == "5 / 6"
+    _wait_at(page, "a4", "5 / 6")
     page.close()
 
 
@@ -140,8 +161,7 @@ def test_bar_buttons_share_keyboard_traversal(browser, export_page):
     """The ◀ ▶ buttons stop on hidden markers too (app parity)."""
     page = _open(browser, export_page.as_uri())
     page.locator("#stx-marker-nav button", has_text="▶").click()
-    _wait_at(page, "a1")
-    assert _counter(page) == "2 / 6"
+    _wait_at(page, "a1", "2 / 6")
     page.close()
 
 
@@ -149,7 +169,7 @@ def test_label_between_visibles_shows_nearest_visible(browser, export_page):
     """On a hidden stop the label shows the next visible marker's label."""
     page = _open(browser, export_page.as_uri())
     page.keyboard.press("PageDown")  # -> a1 (hidden, label "")
-    _wait_at(page, "a1")
+    _wait_at(page, "a1", "2 / 6")
     assert _label(page) == "Vis three"
     page.close()
 
@@ -170,23 +190,20 @@ def test_popup_click_navigates_to_global_index(browser, export_page):
     _open_popup(page)
     page.locator("#stx-marker-nav .stx-mn-popup-item",
                  has_text="4. Vis three").click()
-    _wait_at(page, "a3")
-    assert _counter(page) == "4 / 6"
+    _wait_at(page, "a3", "4 / 6")
     page.close()
 
 
 def test_deep_link_to_hidden_marker_lands_on_it(browser, export_page):
     """(c) ?marker=<key> of a HIDDEN marker still lands on it (0.7.27)."""
     page = _open(browser, export_page.as_uri() + "?marker=sub-one")
-    _wait_at(page, "a1")
-    assert _counter(page) == "2 / 6"
+    _wait_at(page, "a1", "2 / 6")
     page.close()
 
 
 def test_hash_anchor_of_hidden_marker_lands_on_it(browser, export_page):
     page = _open(browser, export_page.as_uri() + "#a2")
-    _wait_at(page, "a2")
-    assert _counter(page) == "3 / 6"
+    _wait_at(page, "a2", "3 / 6")
     page.close()
 
 
@@ -196,10 +213,22 @@ def test_document_without_hidden_markers_unchanged(browser, export_page_no_hidde
     assert _counter(page) == "1 / 3"
     assert _label(page) == "One"
     page.keyboard.press("PageDown")
-    _wait_at(page, "a1")
-    assert _counter(page) == "2 / 3"
+    _wait_at(page, "a1", "2 / 3")
     _open_popup(page)
     rows = page.locator("#stx-marker-nav .stx-mn-popup-item")
     assert rows.count() == 3
     assert rows.nth(0).text_content().strip() == "1. One"
+    page.close()
+
+
+def test_all_hidden_deck_gets_bar_but_no_empty_popup(browser, export_page_all_hidden):
+    """Pure st_slide_break deck: keyboard nav works, popup stays closed."""
+    page = _open(browser, export_page_all_hidden.as_uri())
+    assert _counter(page) == "1 / 2"
+    page.keyboard.press("PageDown")
+    _wait_at(page, "a1", "2 / 2")
+    # No visible markers: counter click must NOT open an empty popup
+    page.locator("#stx-marker-nav .stx-mn-counter").click()
+    page.wait_for_timeout(200)
+    assert not page.locator("#stx-marker-nav .stx-mn-popup").is_visible()
     page.close()

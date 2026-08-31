@@ -442,6 +442,7 @@ _MARKER_NAV_JS = """
 
   counter.onclick = function(e) {
     e.stopPropagation();
+    if (!visible.length) return;  // all-hidden deck: no empty popup
     // The CSS default is display:none while the INLINE style starts
     // empty — comparing to 'none' made the first click a no-op (it
     // "closed" an already-closed popup).  Compare to 'block' instead.

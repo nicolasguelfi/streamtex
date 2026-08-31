@@ -9,6 +9,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+#### PDF export — relative media resolved against the running server (#44)
+
+- `export_pdf()` loads the document on `about:blank`; every relative
+  `src`/`poster`/CSS `url()` was dead at print time — projects following
+  the recommended "served, never inlined" pattern
+  (`configure_image_path("app/static/media")`) printed PDFs with **all
+  images missing** (only the `alt` text) and empty frames instead of
+  video posters.
+- New `PdfConfig.base_url: str = ""` (additive): when non-empty, a
+  `<base href>` tag is injected right after `<head>` before rendering,
+  so Chromium resolves the document's relative URLs against it (and
+  `networkidle` waits for those loads).  Normalised to a trailing `/`,
+  attribute-escaped, skipped if the document already declares a
+  `<base>`.  Empty default = byte-identical pipeline to 0.7.27.
+- The "Download as..." panel and `mode=ALWAYS` auto-exports fill
+  `base_url` automatically with the running server's own address
+  (`http://localhost:{server.port}{server.baseUrlPath}` from
+  `st.get_option`, with `st.context.url` as fallback) — the PDF now
+  shows the same media as the screen with zero configuration.  An
+  explicit `PdfConfig.base_url` always wins; bare mode degrades to the
+  historical behaviour.
+- Tests: `TestInjectBaseHref` + `TestExportPdfBaseUrl` (fake Playwright
+  — HTML handed to Chromium is byte-identical without `base_url`), and
+  a real-Chromium e2e (`tests/e2e/test_pdf_media_base_url.py`) proving
+  the image XObject is embedded when the base is set, poster included.
+
 #### HTML export — keyboard navigation honours hidden markers (#45)
 
 - Documented contract of `st_marker(hidden=True)` (and of

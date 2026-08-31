@@ -127,6 +127,40 @@ def _margin_mm(css_value: str) -> int:
     return int(m.group(1)) if m else 0
 
 
+def _resolve_pdf_base_url() -> str:
+    """Base URL of the running Streamlit server, for PDF media resolution.
+
+    Chromium headless (``export_pdf``) runs as a sibling process of this
+    server, so ``localhost`` + the runtime port/baseUrlPath is correct by
+    construction and immune to reverse proxies (issue #44).  The
+    browser-visible ``st.context.url`` is the fallback.  Returns ``""``
+    when neither source is available (bare mode) — ``export_pdf`` then
+    behaves exactly as without a base.
+    """
+    try:
+        port = st.get_option("server.port")
+        base_path = (st.get_option("server.baseUrlPath") or "").strip("/")
+        if port:
+            base = f"http://localhost:{port}/"
+            if base_path:
+                base += base_path + "/"
+            return base
+    except Exception:  # pragma: no cover — bare mode / config drift
+        pass
+    try:
+        from urllib.parse import urlsplit
+        u = urlsplit(str(st.context.url))
+        if u.scheme and u.netloc:
+            path = u.path or "/"
+            if not path.endswith("/"):
+                # Drop the last segment (a page path), keep the directory.
+                path = path.rsplit("/", 1)[0] + "/"
+            return f"{u.scheme}://{u.netloc}{path}"
+    except Exception:  # pragma: no cover — bare mode / older Streamlit
+        pass
+    return ""
+
+
 def _offer_export_downloads(html: str, base_name: str,
                             pdf_config: PdfConfig | None = None,
                             paginated: bool = False) -> None:
@@ -377,6 +411,10 @@ def _offer_export_downloads(html: str, base_name: str,
                             footer_template=defaults.footer_template,
                             theme_bg=st.session_state.get(_STX_THEME_BG_KEY, "#fff"),
                             theme_text=st.session_state.get(_STX_THEME_TEXT_KEY, "#333"),
+                            # Media served by this very server (issue #44):
+                            # an explicit author base_url wins, else the
+                            # running server's own address.
+                            base_url=defaults.base_url or _resolve_pdf_base_url(),
                         )
                         _toc = st.session_state.get(_STX_CACHE_KEY, {}).get("toc")
                         results["pdf"] = export_pdf(effective_html, config=cfg, toc=_toc)
@@ -440,6 +478,8 @@ def _run_auto_exports(
                 # Inject theme colours from session state
                 pdf_cfg.theme_bg = st.session_state.get(_STX_THEME_BG_KEY, "#fff")
                 pdf_cfg.theme_text = st.session_state.get(_STX_THEME_TEXT_KEY, "#333")
+                if not pdf_cfg.base_url:
+                    pdf_cfg.base_url = _resolve_pdf_base_url()  # issue #44
                 _toc = st.session_state.get(_STX_CACHE_KEY, {}).get("toc")
                 export_pdf(html, output_path=path, config=pdf_cfg, toc=_toc)
             else:

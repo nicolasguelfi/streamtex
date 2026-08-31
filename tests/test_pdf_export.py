@@ -10,6 +10,8 @@ from streamtex.pdf_export import (
     _inject_toc_headings,
     _page_dimensions_mm,
     _parse_margin,
+    export_pdf,
+    inject_base_href,
     inject_print_css,
 )
 
@@ -375,3 +377,112 @@ class TestInjectTocHeadings:
         result = _inject_toc_headings(self._BASE_HTML, toc)
         assert "Introduction</div>" in result
         assert "<p>Content here</p>" in result
+
+
+class TestInjectBaseHref:
+    """<base href> injection for relative-media resolution (issue #44)."""
+
+    _BASE_HTML = ("<html><head><title>T</title></head>"
+                  "<body><img src='app/static/media/x.png'></body></html>")
+
+    def test_empty_base_url_is_noop(self):
+        assert inject_base_href(self._BASE_HTML, "") == self._BASE_HTML
+
+    def test_injected_right_after_head(self):
+        out = inject_base_href(self._BASE_HTML, "http://localhost:8501/")
+        assert '<head><base href="http://localhost:8501/">' in out
+
+    def test_trailing_slash_normalised(self):
+        out = inject_base_href(self._BASE_HTML, "http://localhost:8501")
+        assert '<base href="http://localhost:8501/">' in out
+
+    def test_existing_base_wins(self):
+        html = "<html><head><base href='http://other/'></head><body></body></html>"
+        assert inject_base_href(html, "http://localhost:8501/") == html
+
+    def test_no_head_is_noop(self):
+        html = "<div>no head</div>"
+        assert inject_base_href(html, "http://localhost:8501/") == html
+
+    def test_attribute_escaped(self):
+        out = inject_base_href(self._BASE_HTML, 'http://h/"><script>/')
+        head_part = out.split("</title>")[0]
+        assert "<script>" not in head_part
+        assert "&quot;&gt;&lt;script&gt;" in head_part
+
+    def test_body_preserved(self):
+        out = inject_base_href(self._BASE_HTML, "http://localhost:8501/")
+        assert "app/static/media/x.png" in out
+
+    def test_config_default_empty(self):
+        assert PdfConfig().base_url == ""
+
+
+class TestExportPdfBaseUrl:
+    """export_pdf hands Chromium unchanged HTML without base_url, and the
+    <base> tag when configured (fake Playwright, no browser needed)."""
+
+    _HTML = ("<html><head><style>.x{}</style></head>"
+             "<body><img src='app/static/media/x.png'></body></html>")
+
+    def _run(self, monkeypatch, config):
+        import sys
+        import types
+
+        captured = {}
+
+        class _FakePage:
+            def set_content(self, html, wait_until=None):
+                captured["html"] = html
+                captured["wait_until"] = wait_until
+
+            def pdf(self, **kwargs):
+                return b"%PDF-fake"
+
+        class _FakeBrowser:
+            def new_page(self, viewport=None):
+                return _FakePage()
+
+            def close(self):
+                pass
+
+        class _FakeChromium:
+            def launch(self):
+                return _FakeBrowser()
+
+        class _FakeP:
+            chromium = _FakeChromium()
+
+        class _FakeSyncPlaywright:
+            def __enter__(self):
+                return _FakeP()
+
+            def __exit__(self, *args):
+                return False
+
+        fake_mod = types.ModuleType("playwright.sync_api")
+        fake_mod.sync_playwright = lambda: _FakeSyncPlaywright()
+        fake_pkg = types.ModuleType("playwright")
+        fake_pkg.sync_api = fake_mod
+        monkeypatch.setitem(sys.modules, "playwright", fake_pkg)
+        monkeypatch.setitem(sys.modules, "playwright.sync_api", fake_mod)
+
+        result = export_pdf(self._HTML, config=config)
+        assert result == b"%PDF-fake"
+        return captured
+
+    def test_without_base_url_html_unchanged_except_print_css(self, monkeypatch):
+        captured = self._run(monkeypatch, PdfConfig())
+        # The exact pre-#44 pipeline: print CSS + content-width CSS,
+        # nothing else — byte-identical to 0.7.27 without base_url.
+        expected = _inject_content_width_css(
+            inject_print_css(self._HTML, PdfMode.PAGINATED), 100)
+        assert captured["html"] == expected
+        assert "<base" not in captured["html"]
+        assert captured["wait_until"] == "networkidle"
+
+    def test_with_base_url_tag_present(self, monkeypatch):
+        captured = self._run(
+            monkeypatch, PdfConfig(base_url="http://localhost:9999/"))
+        assert '<head><base href="http://localhost:9999/">' in captured["html"]
+        assert "app/static/media/x.png" in captured["html"]

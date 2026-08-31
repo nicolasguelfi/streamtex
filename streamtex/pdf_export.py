@@ -9,6 +9,7 @@ Requires the optional ``pdf`` extra::
 import re
 from dataclasses import dataclass
 from enum import Enum
+from html import escape as _attr_escape
 from typing import Optional
 
 
@@ -85,6 +86,21 @@ class PdfConfig:
 
     theme_text: str = "#333"
     """Text color for page numbers (read from Streamlit theme)."""
+
+    base_url: str = ""
+    """Base URL for resolving the document's relative URLs at print time.
+
+    ``export_pdf`` loads the HTML on ``about:blank`` — without a base,
+    every relative ``src``/``poster``/CSS ``url()`` is dead and the media
+    are missing from the PDF (issue #44).  When non-empty, a
+    ``<base href>`` tag is injected right after ``<head>`` so Chromium
+    resolves relative URLs against it (e.g. the running Streamlit server
+    that serves ``app/static/...``); ``wait_until="networkidle"`` then
+    waits for those loads.  Normalised to end with ``/``.
+
+    Empty (default) = no injection, byte-identical HTML — the historical
+    behaviour.  ``book.py`` fills this automatically with the running
+    server's address for the "Download as..." panel and auto-exports."""
 
 
 # ---------------------------------------------------------------------------
@@ -366,6 +382,34 @@ def _inject_toc_headings(html: str, toc: list[dict]) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Base URL injection (issue #44)
+# ---------------------------------------------------------------------------
+
+_BASE_TAG_RE = re.compile(r"<base[\s/>]", re.IGNORECASE)
+
+
+def inject_base_href(html: str, base_url: str) -> str:
+    """Inject ``<base href="{base_url}">`` right after ``<head>``.
+
+    No-op when *base_url* is empty, when the document already declares a
+    ``<base>`` (author's choice wins), or when there is no ``<head>`` to
+    anchor to.  The URL is normalised to end with ``/`` (URL resolution
+    semantics: without it the last path segment would be dropped) and
+    HTML-attribute escaped.
+    """
+    if not base_url:
+        return html
+    if _BASE_TAG_RE.search(html):
+        return html
+    if "<head>" not in html:
+        return html
+    if not base_url.endswith("/"):
+        base_url += "/"
+    tag = f'<base href="{_attr_escape(base_url, quote=True)}">'
+    return html.replace("<head>", f"<head>{tag}", 1)
+
+
+# ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
@@ -418,6 +462,10 @@ def export_pdf(
 
     cfg = config or PdfConfig()
     html = inject_print_css(html, cfg.mode)
+
+    # Resolve relative media (src=, poster=, CSS url()) against the
+    # configured base — issue #44.  No-op when base_url is empty.
+    html = inject_base_href(html, cfg.base_url)
 
     # Inject content-width CSS if narrower than 100%
     html = _inject_content_width_css(html, cfg.content_width)

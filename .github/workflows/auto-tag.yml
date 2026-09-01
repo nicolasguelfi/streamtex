@@ -20,6 +20,11 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 2
+          # PNG/JPG/WebP/MP4/GIF are Git LFS files (.gitattributes).
+          # Without lfs:true the build packages 130-byte POINTER FILES
+          # instead of the real binaries (issue #50) — ci.yml already
+          # checks out with lfs:true, this workflow must too.
+          lfs: true
 
       - name: Detect version bump
         id: version
@@ -57,6 +62,34 @@ jobs:
       - name: Build package
         if: steps.version.outputs.bumped == 'true'
         run: uv build
+
+      - name: Guard — no Git LFS pointers in artifacts (issue #50)
+        if: steps.version.outputs.bumped == 'true'
+        run: |
+          uv run python - <<'EOF'
+          import sys, tarfile, zipfile
+          from pathlib import Path
+          SIG = b"version https://git-lfs.github.com/spec"
+          bad = []
+          for whl in sorted(Path("dist").glob("*.whl")):
+              z = zipfile.ZipFile(whl)
+              for n in z.namelist():
+                  if z.read(n)[:64].lstrip().startswith(SIG):
+                      bad.append(f"{whl.name}:{n}")
+          for sdist in sorted(Path("dist").glob("*.tar.gz")):
+              with tarfile.open(sdist) as t:
+                  for m in t.getmembers():
+                      if not m.isfile():
+                          continue
+                      f = t.extractfile(m)
+                      if f and f.read(64).lstrip().startswith(SIG):
+                          bad.append(f"{sdist.name}:{m.name}")
+          if bad:
+              print("Git LFS pointer files in distribution artifacts:")
+              print("\n".join(" - " + b for b in bad))
+              sys.exit(1)
+          print("OK: no LFS pointer files in dist artifacts")
+          EOF
 
       - name: Publish to PyPI
         if: steps.version.outputs.bumped == 'true'

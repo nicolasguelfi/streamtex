@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+#### Packaging — PyPI wheel shipped Git LFS pointers instead of the logo PNGs (#50)
+
+- The published wheel (verified on 0.7.29, present since at least
+  0.7.26) contained 129/132-byte ASCII **Git LFS pointer files** in
+  place of `streamtex/static/logo-stx-tiny.png` and
+  `streamtex/static/logo-stx.png` — the "Powered with StreamTeX" logo
+  of export sidebars and the marker bar rendered broken, and since
+  0.7.29 the export materialised the pointer as an ASCII `data/` asset.
+  Not fixable user-side (`git lfs pull` does not apply to a venv).
+- Root cause: `.gitattributes` tracks images via LFS; `ci.yml` checks
+  out with `lfs: true` but `auto-tag.yml` (the build+publish pipeline)
+  did not — `uv build` packaged the pointers as-is.
+- `auto-tag.yml` now checks out with `lfs: true`, and a packaging
+  guard right after `uv build` opens the produced wheel AND sdist and
+  fails the release if any file starts with the LFS pointer signature
+  — covering every current and future LFS-tracked binary, not just the
+  two known logos.  CI/packaging fix only, no library code change.
+
 ## [0.7.29] — 2026-09-01
 
 ### Fixed

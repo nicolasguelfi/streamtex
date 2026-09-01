@@ -385,6 +385,12 @@ def _offer_export_downloads(html: str, base_name: str,
                         pass
 
                 collector = get_asset_collector()
+                # Served media (configure_image_path) must survive off the
+                # server: materialise them into the collector / as data
+                # URIs on the EXPORT copy only (issue #48).
+                from .export import materialize_served_media
+                html_download = materialize_served_media(html_download,
+                                                         collector)
                 if collector:
                     # External mode: create ZIP with HTML + data/ folder
                     results["zip"] = collector.to_zip(html_download, base_name)
@@ -485,14 +491,19 @@ def _run_auto_exports(
             else:
                 from pathlib import Path as _P
                 collector = get_asset_collector()
+                # Materialise served media on the export copy (issue #48);
+                # local variable — the raw `html` stays untouched for the
+                # PDF branch (which resolves media via base_url instead).
+                from .export import materialize_served_media
+                _html_out = materialize_served_media(html, collector)
                 if collector:
                     # External mode: write HTML + data/ folder to disk
                     out_dir = str(_P(path).parent)
-                    written_path = collector.write_to_disk(html, out_dir, base_name)
+                    written_path = collector.write_to_disk(_html_out, out_dir, base_name)
                     path = written_path
                 else:
                     _P(path).parent.mkdir(parents=True, exist_ok=True)
-                    _P(path).write_text(html, encoding="utf-8")
+                    _P(path).write_text(_html_out, encoding="utf-8")
             written.append(path)
         except Exception as exc:
             logger.warning("Auto-export failed for %s: %s", path, exc)

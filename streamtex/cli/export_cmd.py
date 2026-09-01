@@ -240,10 +240,16 @@ def export_html(path, output, asset_mode, title, no_nav, theme_mode, theme_bg, t
     base_name = os.path.basename(project_dir).replace("stx_manual_", "") + suffix
     output_dir = os.path.abspath(output)
 
+    # Materialise served media (configure_image_path) so the export is
+    # self-contained — headless: resolve against the project dir (#48).
+    from ..export import materialize_served_media
+
     # Write to disk — create a fresh AssetCollector to extract data URIs
     # (the global one was reset by _build_page_cache after capturing HTML)
     if use_external:
         collector = AssetCollector()
+        full_html = materialize_served_media(full_html, collector,
+                                             project_root=project_dir)
         html_path = collector.write_to_disk(full_html, output_dir, base_name)
         asset_count = len(collector.assets)
         console.print(
@@ -252,6 +258,8 @@ def export_html(path, output, asset_mode, title, no_nav, theme_mode, theme_bg, t
         )
     else:
         # Embedded mode: single HTML file with base64 data URIs intact
+        full_html = materialize_served_media(full_html, None,
+                                             project_root=project_dir)
         out_dir = Path(output_dir)
         out_dir.mkdir(parents=True, exist_ok=True)
         html_path = out_dir / f"{base_name}.html"

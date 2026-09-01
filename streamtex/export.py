@@ -289,6 +289,89 @@ class AssetCollector:
         self._data_uri_to_path.clear()
 
 
+_SERVED_ATTR_RE = re.compile(r'((?:src|poster)=")(app/static/[^"]+)(")')
+
+
+def materialize_served_media(html: str,
+                             collector: Optional[AssetCollector] = None,
+                             project_root: Optional[str] = None) -> str:
+    """Post-pass on EXPORT HTML: make server-relative media self-contained.
+
+    The "served, never inlined" pattern (``configure_image_path``) emits
+    ``src="app/static/..."`` URLs that only a running server resolves —
+    a downloaded export opened over ``file://`` shows broken media
+    (issue #48).  This rewrites ``src=``/``poster=`` attributes starting
+    with ``app/static/`` by locating the bytes on disk:
+
+    1. the ``configure_image_path`` base + ``fs_root`` (the same
+       resolution ``crop=`` uses — ``image_crop._find_served_file``);
+    2. Streamlit's ``app/static`` serving convention (app static dir);
+    3. ``<project_root>/static/`` when *project_root* is given
+       (headless CLI export, where the script context is absent).
+
+    With a *collector* (``AssetMode.EXTERNAL``) the file is registered
+    (SHA-256 dedup) and the attribute points into ``data/``; without
+    one (``EMBEDDED``) it becomes a base64 data URI.  An unresolvable
+    reference is left unchanged (deployments serving ``/app/static/``
+    keep working) with one warning per path.  The live render is
+    untouched — this runs on the export copy only.  CSS ``url()``
+    references are not covered.
+    """
+    if "app/static/" not in html:
+        return html
+    import logging
+    import mimetypes
+
+    from .image import _static_image_base
+    from .image_crop import _app_static_dir, _find_served_file
+
+    log = logging.getLogger(__name__)
+    warned: set = set()
+
+    def _locate(value: str) -> str:
+        base = _static_image_base or ""
+        if base and value.startswith(base + "/"):
+            p = _find_served_file(value[len(base) + 1:])
+            if p:
+                return p
+        rest = value[len("app/static/"):]
+        try:
+            p = os.path.join(_app_static_dir(), rest)
+            if os.path.isfile(p):
+                return p
+        except Exception:  # pragma: no cover — script-context drift
+            pass
+        if project_root:
+            p = os.path.join(project_root, "static", rest)
+            if os.path.isfile(p):
+                return p
+        return ""
+
+    def _replace(m):
+        prefix, value, quote = m.group(1), m.group(2), m.group(3)
+        file_path = _locate(value)
+        if not file_path:
+            if value not in warned:
+                warned.add(value)
+                log.warning(
+                    "Export: served media not found on disk, left as-is: %s",
+                    value)
+            return m.group(0)
+        mime = mimetypes.guess_type(file_path)[0] or "application/octet-stream"
+        if collector is not None:
+            new = collector.register_file(file_path, mime)
+        else:
+            try:
+                with open(file_path, "rb") as f:
+                    raw = f.read()
+            except OSError:
+                return m.group(0)
+            new = f"data:{mime};base64,{base64.b64encode(raw).decode()}"
+        return f"{prefix}{new}{quote}"
+
+    return _SERVED_ATTR_RE.sub(_replace, html)
+
+
 def build_export_filename(config: "ExportConfig", base_name: str) -> str:
     """Build the full output path for an export config.
 

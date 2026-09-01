@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+#### HTML export — served media materialised into the export (#48)
+
+- A project following the "served, never inlined" pattern
+  (`configure_image_path("app/static/media")`) exported HTML whose
+  `src="app/static/…"` references only a running server can resolve:
+  opened over `file://` (Desktop download, shared archive), **all such
+  media were broken** while `data/` held only collector-tracked assets.
+  HTML twin of the PDF bug fixed in 0.7.28 (#44).
+- New post-pass `materialize_served_media` on the EXPORT copy only (the
+  live render is untouched): `src=`/`poster=` attributes starting with
+  `app/static/` are resolved on disk (`configure_image_path` `fs_root`,
+  Streamlit's `app/static` convention, or `<project>/static` for the
+  headless CLI) and either registered into the `AssetCollector`
+  (`AssetMode.EXTERNAL` → real files under `data/`, SHA-256 dedup) or
+  inlined as data URIs (`EMBEDDED`).  Unresolvable references are left
+  unchanged with a warning — deployments that serve `/app/static/`
+  next to their exports keep working.
+- Applied to the "Download as…" panel, `mode=ALWAYS` auto-exports and
+  `stx export html`.  Documented limitation: CSS `url()` references are
+  not rewritten.
+- Tests: `TestMaterializeServedMedia` (8 unit cases) + real-Chromium
+  e2e over `file://` (`tests/e2e/test_export_served_media.py`): the
+  pre-fix breakage is pinned, then the image paints from `data/…`
+  (EXTERNAL) and from a data URI (EMBEDDED) with no server running.
+
 ## [0.7.28] — 2026-08-31
 
 ### Fixed

@@ -590,3 +590,125 @@ class TestReadStreamlitTheme:
             t = _read_streamlit_theme(d)
             assert t["bg"] == "#222"
             assert t["text"] == "#fafafa"  # from dark defaults
+
+
+class TestMaterializeServedMedia:
+    """Served media are materialised on the export copy (issue #48)."""
+
+    def _setup_media(self, monkeypatch, tmp_path):
+        import streamtex.image as image_mod
+        media = tmp_path / "media"
+        media.mkdir()
+        (media / "portrait.png").write_bytes(b"\x89PNG-fake-bytes")
+        monkeypatch.setattr(image_mod, "_static_image_base", "app/static/media")
+        monkeypatch.setattr(image_mod, "_static_image_fs_root", str(media))
+        return media
+
+    def test_no_served_refs_is_identity(self, monkeypatch, tmp_path):
+        from streamtex.export import materialize_served_media
+        self._setup_media(monkeypatch, tmp_path)
+        html = '<html><body><img src="data:image/png;base64,AAAA"></body></html>'
+        assert materialize_served_media(html) == html
+
+    def test_collector_rewrites_to_data_folder(self, monkeypatch, tmp_path):
+        from streamtex.export import AssetCollector, materialize_served_media
+        self._setup_media(monkeypatch, tmp_path)
+        collector = AssetCollector()
+        html = '<img src="app/static/media/portrait.png" alt="p">'
+        out = materialize_served_media(html, collector)
+        assert 'src="data/images/portrait_' in out
+        assert len(collector.assets) == 1
+
+    def test_deduplication_two_refs_one_asset(self, monkeypatch, tmp_path):
+        from streamtex.export import AssetCollector, materialize_served_media
+        self._setup_media(monkeypatch, tmp_path)
+        collector = AssetCollector()
+        html = ('<img src="app/static/media/portrait.png">'
+                '<video poster="app/static/media/portrait.png"></video>')
+        out = materialize_served_media(html, collector)
+        assert out.count('data/images/portrait_') == 2
+        assert len(collector.assets) == 1
+
+    def test_embedded_mode_inlines_data_uri(self, monkeypatch, tmp_path):
+        from streamtex.export import materialize_served_media
+        self._setup_media(monkeypatch, tmp_path)
+        html = '<img src="app/static/media/portrait.png">'
+        out = materialize_served_media(html, None)
+        assert 'src="data:image/png;base64,' in out
+        assert "app/static" not in out
+
+    def test_poster_attribute_rewritten(self, monkeypatch, tmp_path):
+        from streamtex.export import AssetCollector, materialize_served_media
+        self._setup_media(monkeypatch, tmp_path)
+        collector = AssetCollector()
+        html = '<video poster="app/static/media/portrait.png"></video>'
+        out = materialize_served_media(html, collector)
+        assert 'poster="data/images/portrait_' in out
+
+    def test_not_found_left_unchanged(self, monkeypatch, tmp_path):
+        from streamtex.export import AssetCollector, materialize_served_media
+        self._setup_media(monkeypatch, tmp_path)
+        collector = AssetCollector()
+        html = '<img src="app/static/media/missing.png">'
+        out = materialize_served_media(html, collector)
+        assert out == html
+        assert len(collector.assets) == 0
+
+    def test_project_root_fallback_headless(self, monkeypatch, tmp_path):
+        import streamtex.image as image_mod
+        from streamtex.export import AssetCollector, materialize_served_media
+        monkeypatch.setattr(image_mod, "_static_image_base", "app/static/media")
+        monkeypatch.setattr(image_mod, "_static_image_fs_root", None)
+        project = tmp_path / "proj"
+        (project / "static" / "images").mkdir(parents=True)
+        (project / "static" / "images" / "wave.webp").write_bytes(b"RIFF-fake")
+        collector = AssetCollector()
+        html = '<img src="app/static/images/wave.webp">'
+        out = materialize_served_media(html, collector,
+                                       project_root=str(project))
+        assert 'src="data/images/wave_' in out
+
+    def test_generic_prefix_outside_configured_base(self, monkeypatch, tmp_path):
+        # app/static/... refs NOT under the configured base still resolve
+        # via the project_root convention (mixed-prefix decks).
+        import streamtex.image as image_mod
+        from streamtex.export import materialize_served_media
+        monkeypatch.setattr(image_mod, "_static_image_base", "app/static/media")
+        monkeypatch.setattr(image_mod, "_static_image_fs_root", None)
+        project = tmp_path / "proj2"
+        (project / "static" / "docs").mkdir(parents=True)
+        (project / "static" / "docs" / "x.png").write_bytes(b"\x89PNG")
+        html = '<img src="app/static/docs/x.png">'
+        out = materialize_served_media(html, None, project_root=str(project))
+        assert 'src="data:image/png;base64,' in out
+
+    def test_traversal_rejected(self, monkeypatch, tmp_path):
+        from streamtex.export import AssetCollector, materialize_served_media
+        self._setup_media(monkeypatch, tmp_path)
+        (tmp_path / "secret.txt").write_text("s3cret")
+        collector = AssetCollector()
+        html = '<img src="app/static/media/../../secret.txt">'
+        out = materialize_served_media(html, collector,
+                                       project_root=str(tmp_path))
+        assert out == html
+        assert len(collector.assets) == 0
+
+    def test_absolute_rest_rejected(self, monkeypatch, tmp_path):
+        from streamtex.export import AssetCollector, materialize_served_media
+        self._setup_media(monkeypatch, tmp_path)
+        collector = AssetCollector()
+        html = '<img src="app/static//etc/hosts">'
+        out = materialize_served_media(html, collector,
+                                       project_root=str(tmp_path))
+        assert out == html
+        assert len(collector.assets) == 0
+
+    def test_register_failure_leaves_ref_unchanged(self, monkeypatch, tmp_path):
+        from streamtex.export import AssetCollector, materialize_served_media
+        self._setup_media(monkeypatch, tmp_path)
+        collector = AssetCollector()
+        monkeypatch.setattr(AssetCollector, "register_file",
+                            lambda self, fp, mime: fp)
+        html = '<img src="app/static/media/portrait.png">'
+        out = materialize_served_media(html, collector)
+        assert out == html

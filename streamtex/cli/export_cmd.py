@@ -244,12 +244,22 @@ def export_html(path, output, asset_mode, title, no_nav, theme_mode, theme_bg, t
     # self-contained — headless: resolve against the project dir (#48).
     from ..export import materialize_served_media
 
+    def _materialize(html_in, coll):
+        # configure_image_path may use a RELATIVE fs_root — resolve it
+        # against the project dir, not the caller's cwd.
+        cwd = os.getcwd()
+        os.chdir(project_dir)
+        try:
+            return materialize_served_media(html_in, coll,
+                                            project_root=project_dir)
+        finally:
+            os.chdir(cwd)
+
     # Write to disk — create a fresh AssetCollector to extract data URIs
     # (the global one was reset by _build_page_cache after capturing HTML)
     if use_external:
         collector = AssetCollector()
-        full_html = materialize_served_media(full_html, collector,
-                                             project_root=project_dir)
+        full_html = _materialize(full_html, collector)
         html_path = collector.write_to_disk(full_html, output_dir, base_name)
         asset_count = len(collector.assets)
         console.print(
@@ -258,8 +268,7 @@ def export_html(path, output, asset_mode, title, no_nav, theme_mode, theme_bg, t
         )
     else:
         # Embedded mode: single HTML file with base64 data URIs intact
-        full_html = materialize_served_media(full_html, None,
-                                             project_root=project_dir)
+        full_html = _materialize(full_html, None)
         out_dir = Path(output_dir)
         out_dir.mkdir(parents=True, exist_ok=True)
         html_path = out_dir / f"{base_name}.html"

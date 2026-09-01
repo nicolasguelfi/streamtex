@@ -328,22 +328,41 @@ def materialize_served_media(html: str,
     log = logging.getLogger(__name__)
     warned: set = set()
 
+    def _safe_rel(rel: str) -> bool:
+        """Pure descending relative path — no traversal, no absolute."""
+        if not rel or os.path.isabs(rel) or "\\" in rel:
+            return False
+        return ".." not in rel.split("/")
+
+    def _contained(path: str, root: str) -> bool:
+        try:
+            return os.path.realpath(path).startswith(
+                os.path.realpath(root) + os.sep)
+        except OSError:  # pragma: no cover — filesystem drift
+            return False
+
     def _locate(value: str) -> str:
+        rest = value[len("app/static/"):]
+        if not _safe_rel(rest):
+            return ""
         base = _static_image_base or ""
         if base and value.startswith(base + "/"):
-            p = _find_served_file(value[len(base) + 1:])
-            if p:
-                return p
-        rest = value[len("app/static/"):]
+            sub = value[len(base) + 1:]
+            if _safe_rel(sub):
+                p = _find_served_file(sub)
+                if p:
+                    return p
         try:
-            p = os.path.join(_app_static_dir(), rest)
-            if os.path.isfile(p):
+            root = _app_static_dir()
+            p = os.path.join(root, rest)
+            if os.path.isfile(p) and _contained(p, root):
                 return p
         except Exception:  # pragma: no cover — script-context drift
             pass
         if project_root:
-            p = os.path.join(project_root, "static", rest)
-            if os.path.isfile(p):
+            root = os.path.join(project_root, "static")
+            p = os.path.join(root, rest)
+            if os.path.isfile(p) and _contained(p, root):
                 return p
         return ""
 
@@ -360,6 +379,10 @@ def materialize_served_media(html: str,
         mime = mimetypes.guess_type(file_path)[0] or "application/octet-stream"
         if collector is not None:
             new = collector.register_file(file_path, mime)
+            if new == file_path:
+                # register_file returns its input on read failure — do
+                # NOT write an absolute filesystem path into the export.
+                return m.group(0)
         else:
             try:
                 with open(file_path, "rb") as f:

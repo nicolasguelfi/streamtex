@@ -681,3 +681,34 @@ class TestMaterializeServedMedia:
         html = '<img src="app/static/docs/x.png">'
         out = materialize_served_media(html, None, project_root=str(project))
         assert 'src="data:image/png;base64,' in out
+
+    def test_traversal_rejected(self, monkeypatch, tmp_path):
+        from streamtex.export import AssetCollector, materialize_served_media
+        self._setup_media(monkeypatch, tmp_path)
+        (tmp_path / "secret.txt").write_text("s3cret")
+        collector = AssetCollector()
+        html = '<img src="app/static/media/../../secret.txt">'
+        out = materialize_served_media(html, collector,
+                                       project_root=str(tmp_path))
+        assert out == html
+        assert len(collector.assets) == 0
+
+    def test_absolute_rest_rejected(self, monkeypatch, tmp_path):
+        from streamtex.export import AssetCollector, materialize_served_media
+        self._setup_media(monkeypatch, tmp_path)
+        collector = AssetCollector()
+        html = '<img src="app/static//etc/hosts">'
+        out = materialize_served_media(html, collector,
+                                       project_root=str(tmp_path))
+        assert out == html
+        assert len(collector.assets) == 0
+
+    def test_register_failure_leaves_ref_unchanged(self, monkeypatch, tmp_path):
+        from streamtex.export import AssetCollector, materialize_served_media
+        self._setup_media(monkeypatch, tmp_path)
+        collector = AssetCollector()
+        monkeypatch.setattr(AssetCollector, "register_file",
+                            lambda self, fp, mime: fp)
+        html = '<img src="app/static/media/portrait.png">'
+        out = materialize_served_media(html, collector)
+        assert out == html

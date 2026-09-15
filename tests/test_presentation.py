@@ -587,3 +587,42 @@ class TestSlideBreakFullscreen:
             effective, enabled = _effective_config(cfg)
             assert effective.fullscreen is True
             assert enabled is True
+
+
+class TestCenterContentWithoutRatio:
+    """0.7.32 — center_content=True needs a height floor when enforce_ratio=False."""
+
+    @patch("streamtex.presentation.st")
+    def test_min_height_uses_footer_height(self, mock_st):
+        mock_st.html = MagicMock()
+        _inject_presentation_css(PresentationConfig(
+            center_content=True, enforce_ratio=False, footer=True, footer_height="56px"))
+        css = mock_st.html.call_args[0][0]
+        assert "min-height: calc(100vh - 56px);" in css
+        assert "flex: 0 0 auto;" in css
+        assert ".stMain .block-container > div" in css
+
+    @patch("streamtex.presentation.st")
+    def test_min_height_full_viewport_without_footer(self, mock_st):
+        mock_st.html = MagicMock()
+        _inject_presentation_css(PresentationConfig(
+            center_content=True, enforce_ratio=False, footer=False))
+        css = mock_st.html.call_args[0][0]
+        assert "min-height: calc(100vh - 0px);" in css
+
+    @patch("streamtex.presentation.st")
+    def test_enforce_ratio_true_unchanged(self, mock_st):
+        mock_st.html = MagicMock()
+        _inject_presentation_css(PresentationConfig(center_content=True, enforce_ratio=True))
+        css = mock_st.html.call_args[0][0]
+        assert "min-height" not in css
+        assert "flex: 0 0 auto" not in css
+        assert "max-height: 100vh" in css
+
+    @patch("streamtex.presentation.st")
+    def test_no_floor_when_centering_disabled(self, mock_st):
+        mock_st.html = MagicMock()
+        _inject_presentation_css(PresentationConfig(center_content=False, enforce_ratio=False))
+        css = mock_st.html.call_args[0][0]
+        assert "min-height" not in css
+        assert "flex: 0 0 auto" not in css

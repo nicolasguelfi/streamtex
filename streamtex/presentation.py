@@ -165,6 +165,32 @@ def _inject_presentation_css(config: PresentationConfig) -> None:
             justify-content: center;
         }
         """)
+        if not config.enforce_ratio:
+            # Without enforce_ratio the container has no height of its own
+            # (it wraps its content), so justify-content:center had nothing
+            # to centre in.  Give it the viewport height minus the footer as
+            # a FLOOR only (min-height): a page shorter than the screen is
+            # centred, a taller page keeps growing and scrolling.
+            #
+            # Two flex constraints are needed on top of that:
+            # - the container itself is a flex item of `.stMain` (column,
+            #   height 100vh, overflow auto) with Streamlit's `flex: 0 1 auto`;
+            #   once it is `display:flex` its automatic minimum size no longer
+            #   protects it and it SHRINKS to the viewport, so a taller page
+            #   is centred in 100vh with its top pushed above the scroll
+            #   origin (unreachable).  `flex: 0 0 auto` keeps content height.
+            # - its direct child (Streamlit's stVerticalBlock, a flex item)
+            #   must not stretch, or its content stays glued to the top.
+            footer_h = config.footer_height if config.footer else "0px"
+            css_parts.append(f"""
+        .stMain .block-container {{
+            min-height: calc(100vh - {footer_h});
+            flex: 0 0 auto;
+        }}
+        .stMain .block-container > div {{
+            flex: 0 0 auto;
+        }}
+        """)
 
     # 4. Footer styling
     if config.footer:

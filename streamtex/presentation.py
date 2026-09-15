@@ -7,6 +7,9 @@ import streamlit as st
 
 from .export import _render
 
+# Accepted values for PresentationConfig.text_align (CSS `text-align`).
+_TEXT_ALIGN_VALUES = ("left", "center", "right", "justify")
+
 
 @dataclass
 class PresentationConfig:
@@ -75,6 +78,20 @@ class PresentationConfig:
     content_padding: str = "48px 64px"
     """CSS padding inside each slide container."""
 
+    text_align: Optional[str] = None
+    """Default text alignment for the whole page: ``"left"``, ``"center"``,
+    ``"right"``, ``"justify"`` or ``None``.
+
+    Alignment is an inherited CSS property, so declaring it once here
+    reaches every text, list and block of the page instead of being
+    repeated on each element.  It is emitted on ``.stMain .block-container``
+    WITHOUT ``!important``: any element that declares its own alignment
+    (a ``Style`` on an ``st_block``/``st_write``, or ``st_list(text_align=)``)
+    keeps it, because a declared value always beats an inherited one.
+
+    ``None`` (default) emits nothing at all — the page keeps the browser
+    default, exactly as before 0.7.33."""
+
     # Streamlit UI
     hide_streamlit_header: bool = True
     """Hide the Streamlit header bar."""
@@ -94,6 +111,14 @@ class PresentationConfig:
 
     transition_duration: str = "0.3s"
     """CSS transition duration."""
+
+    def __post_init__(self) -> None:
+        if self.text_align is not None and self.text_align not in _TEXT_ALIGN_VALUES:
+            expected = ", ".join(repr(v) for v in _TEXT_ALIGN_VALUES)
+            raise ValueError(
+                f"PresentationConfig(text_align={self.text_align!r}): "
+                f"unknown value; expected one of {expected} or None"
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -189,6 +214,16 @@ def _inject_presentation_css(config: PresentationConfig) -> None:
         }}
         .stMain .block-container > div {{
             flex: 0 0 auto;
+        }}
+        """)
+
+    # 3b. Page-level default text alignment (0.7.33).
+    #     Inherited by every element of the page; deliberately NOT
+    #     !important so a per-element style stays the local override.
+    if config.text_align:
+        css_parts.append(f"""
+        .stMain .block-container {{
+            text-align: {config.text_align};
         }}
         """)
 

@@ -80,16 +80,44 @@
  * CSS custom property.  Every other rule is here.
  * ========================================================================== */
 
-/* List root (counter-reset, gap, default width). */
+/* List root (counter-reset, gap, box placement, text alignment).
+ *
+ * Every knob is a CSS custom property that the marker observer forwards
+ * from the sentinel span (`data-stx-list-foo` -> `--stx-list-foo`, set
+ * INLINE on this container).  list.py only emits the attributes the caller
+ * asked for, so an omitted knob keeps the fallback below:
+ *
+ *   --stx-list-width          100%       | fit-content     (block_align)
+ *   --stx-list-margin-inline  0          | auto | 0 auto | auto 0
+ *   --stx-list-text-align     (unset)    | left|center|right|justify
+ *   --stx-list-justify        flex-start | center|flex-end  ("inside" mode)
+ *   --stx-list-grow           1          | 0                ("inside" mode)
+ *
+ * Declaring no `text-align` at all is the point of the 0.7.33 fix: a list is
+ * an ordinary inheriting element again, so a container that centres its text
+ * centres its lists too.  The previous hard-coded `text-align: left` (an
+ * INLINE style emitted by list.py) made that impossible for everyone.
+ */
 [data-testid="stVerticalBlock"].stx-list {
   counter-reset: streamtex-counter;
   gap: 0.2rem;
-  width: 100%;
+  width: var(--stx-list-width, 100%);
+  margin-inline: var(--stx-list-margin-inline, 0);
 }
-/* Centered list root (align="center"): width override via observer-set var. */
-[data-testid="stVerticalBlock"].stx-list[data-stx-list-width="fit-content"] {
-  width: fit-content;
-  margin-inline: auto;
+/* Text alignment is declared ONLY when st_list(text_align=...) asked for it
+ * (the observer adds .stx-list--aligned then).  A list that asks for nothing
+ * declares nothing and therefore inherits, like any other element — which is
+ * the whole point of the 0.7.33 fix.  Declaring it on .stx-list itself would
+ * out-specify the per-instance rule of a block sharing the same DOM node. */
+[data-testid="stVerticalBlock"].stx-list--aligned {
+  text-align: var(--stx-list-text-align, left);
+}
+/* Custom properties inherit, so a NESTED list would otherwise be shrunk by
+ * its parent's block_align.  Box knobs are reset one level down; a nested
+ * list that sets its own wins anyway (the observer writes them inline). */
+[data-testid="stVerticalBlock"].stx-list [data-testid="stVerticalBlock"].stx-list {
+  --stx-list-width: 100%;
+  --stx-list-margin-inline: 0;
 }
 
 /* List item: flex row holding [bullet ::before] + [content wrapper]. */
@@ -98,6 +126,9 @@
   flex-direction: row !important;
   align-items: baseline;
   gap: 0.5rem;
+  /* "inside" marker mode: centre/right-align the [bullet][text] pair as a
+   * unit.  Inherited from the list root — see --stx-list-justify above. */
+  justify-content: var(--stx-list-justify, flex-start);
 }
 [data-testid="stVerticalBlock"].stx-list-item.stx-list-item--ordered {
   counter-increment: streamtex-counter;
@@ -121,7 +152,9 @@
 [data-testid="stVerticalBlock"].stx-list-item > [data-testid="stVerticalBlock"],
 [data-testid="stVerticalBlock"].stx-list-item > [data-testid="stLayoutWrapper"] > [data-testid="stVerticalBlock"],
 [data-testid="stVerticalBlock"].stx-list-item > [data-testid="stLayoutWrapper"] {
-  flex-grow: 1;
+  /* --stx-list-grow: 0 ("inside" mode) stops the text cell from eating the
+   * whole row, so justify-content can move bullet + text together. */
+  flex-grow: var(--stx-list-grow, 1);
   width: auto;
   display: flex;
   flex-direction: column;

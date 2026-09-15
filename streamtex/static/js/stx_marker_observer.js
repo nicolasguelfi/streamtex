@@ -98,7 +98,15 @@
         };
       }
     },
-    'list':      { cls: 'stx-list' },
+    'list':      {
+      cls: 'stx-list',
+      // Declaring `text-align` unconditionally on .stx-list would beat a
+      // per-instance block rule on the SAME element (a grid cell holding
+      // only a list collapses onto one stVerticalBlock) and break plain
+      // CSS inheritance.  The property is therefore carried by a modifier
+      // class that exists only when st_list(text_align=...) was used.
+      booleanModifiers: { 'data-stx-list-text-align': 'stx-list--aligned' }
+    },
     'list-item': {
       cls: 'stx-list-item',
       inlineStyles: function () {

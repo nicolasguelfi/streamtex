@@ -73,8 +73,31 @@
   //       modifierClass to the ancestor.  clearMarker removes every listed
   //       modifierClass unconditionally (applyMarker only adds, so an
   //       unconditional symmetric removal is correct).
+  //   computedModifiers ({ modifierClass: predicate(parent) }, optional)
+  //       Same idea, but the decision comes from the ancestor's COMPUTED
+  //       style rather than from an attribute on the span — the only way to
+  //       follow a value the caller may have inherited instead of declared.
+  //       applyMarker adds AND removes these (the predicate can flip);
+  //       clearMarker removes them unconditionally.
+  //   syncsItemAlign   (true, optional)
+  //       The kind owns list items whose computedModifiers depend on ITS
+  //       own text-align; applyMarker re-runs them when that value changes.
   //
   // Adding a new kind: append one entry below.  No other change required.
+  // `text-align` values for which the list marker must sit INSIDE the first
+  // line of the item (the CSS `list-style-position: inside` semantics).  Any
+  // other value keeps the marker in its own column, outside the text.
+  // `getComputedStyle` reports the initial value as `start`, never as `left`.
+  var INSIDE_ALIGNS = { 'center': 1, 'right': 1, 'end': 1 };
+
+  function isInsideAligned(el) {
+    try {
+      return !!INSIDE_ALIGNS[hostWin.getComputedStyle(el).textAlign];
+    } catch (e) {          // pragma: no cover — detached / cross-realm node
+      return false;
+    }
+  }
+
   var KIND_SPECS = {
     'block':     { cls: 'stx-block' },
     'span':      {
@@ -100,6 +123,11 @@
     },
     'list':      {
       cls: 'stx-list',
+      // A list root that changes alignment (its own parameter arriving, or a
+      // container being restyled) must re-decide the marker mode of every
+      // item under it — items resolve their own computed value, but nothing
+      // else would tell them to look again.
+      syncsItemAlign: true,
       // Declaring `text-align` unconditionally on .stx-list would beat a
       // per-instance block rule on the SAME element (a grid cell holding
       // only a list collapses onto one stVerticalBlock) and break plain
@@ -117,7 +145,12 @@
           'gap': '0.5rem'
         };
       },
-      booleanModifiers: { 'data-stx-ordered': 'stx-list-item--ordered' }
+      booleanModifiers: { 'data-stx-ordered': 'stx-list-item--ordered' },
+      // The marker mode follows the EFFECTIVE alignment of the item, whether
+      // it comes from st_list(text_align=…), from the enclosing block or grid
+      // cell, or from PresentationConfig(text_align=…).  Only the browser can
+      // resolve that, hence a computed modifier rather than an attribute.
+      computedModifiers: { 'stx-list-item--inside': isInsideAligned }
     },
     'zoom':      {
       cls: 'stx-zoom',
@@ -283,9 +316,53 @@
       }
     }
 
-    // 6. Hide the marker's own element-container so it doesn't take a
+    // 6. Computed modifiers — presence decided by the parent's own resolved
+    //    style, so they are added AND removed (the value can flip at any
+    //    rerun, e.g. a container that starts declaring `text-align`).
+    applyComputedModifiers(spec, parent);
+
+    // 7. A kind that owns items whose mode depends on ITS alignment pushes
+    //    the change down when — and only when — the resolved value moved.
+    //    Comparing against the last seen value keeps the common idempotent
+    //    re-apply free of any descendant walk.
+    if (spec.syncsItemAlign) {
+      var align = '';
+      try { align = hostWin.getComputedStyle(parent).textAlign; }
+      catch (e) { align = ''; }  // pragma: no cover — detached node
+      if (parent.__stxAlign !== align) {
+        parent.__stxAlign = align;
+        syncItemAlignModes(parent);
+      }
+    }
+
+    // 8. Hide the marker's own element-container so it doesn't take a
     //    grid/flex slot.
     hideMarkerCell(markerSpan);
+  }
+
+  function applyComputedModifiers(spec, parent) {
+    if (!spec.computedModifiers) return;
+    for (var cls in spec.computedModifiers) {
+      if (!Object.prototype.hasOwnProperty.call(spec.computedModifiers, cls)) continue;
+      var on = spec.computedModifiers[cls](parent);
+      if (on) {
+        if (!parent.classList.contains(cls)) parent.classList.add(cls);
+      } else if (parent.classList.contains(cls)) {
+        parent.classList.remove(cls);
+      }
+    }
+  }
+
+  // Re-decide the marker mode of every list item under *root*.  Scoped to one
+  // list, and only called when that list's resolved text-align actually
+  // changed, so the cost stays proportional to real changes.
+  function syncItemAlignModes(root) {
+    var spec = KIND_SPECS['list-item'];
+    if (!spec || !root.querySelectorAll) return;
+    var rows = root.querySelectorAll(PARENT_SEL + '.stx-list-item');
+    for (var i = 0; i < rows.length; i++) {
+      applyComputedModifiers(spec, rows[i]);
+    }
   }
 
   // When a marker span is detached from the DOM (e.g. Streamlit unmounts
@@ -337,6 +414,16 @@
         }
       }
     }
+
+    // 2b. Strip every computed-modifier class declared for this kind, and
+    //     the cached alignment so a reused node re-decides from scratch.
+    if (spec.computedModifiers) {
+      for (var compCls in spec.computedModifiers) {
+        if (!Object.prototype.hasOwnProperty.call(spec.computedModifiers, compCls)) continue;
+        if (parent.classList.contains(compCls)) parent.classList.remove(compCls);
+      }
+    }
+    if (spec.syncsItemAlign) parent.__stxAlign = undefined;
 
     // 3. Strip the kind-prefixed uid attribute.
     if (parent.hasAttribute(uidAttr)) parent.removeAttribute(uidAttr);

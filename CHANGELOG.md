@@ -5,6 +5,42 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+#### Presentation — `center_content=True` had no visible effect with `enforce_ratio=False` (#59)
+
+- The page container got `display:flex; justify-content:center` but no
+  height of its own (it wrapped its content), so nothing was centred:
+  a single-title page measured 237 px tall with its content at 0 → 125 px
+  on a 1080 px viewport.  `enforce_ratio=True` was no workaround for
+  multi-screen documents (it caps the container at `100vh` and truncates).
+- With `enforce_ratio=False` the container now gets
+  `min-height: calc(100vh - <footer_height>)` (`100vh` without footer) as
+  a **floor only**, plus `flex: 0 0 auto`, and its direct Streamlit child
+  (`stVerticalBlock`) no longer stretches (`flex: 0 0 auto`): a page
+  shorter than the screen is vertically centred, a taller page keeps
+  growing and scrolling.  `enforce_ratio=True` is untouched.
+- The container's own `flex: 0 0 auto` also closes a related defect: as
+  a flex item of `.stMain` (column, `100vh`) with Streamlit's
+  `flex: 0 1 auto`, a `display:flex` container could **shrink to the
+  viewport** and centre a taller page in 100vh, pushing its top above
+  the scroll origin (unreachable content) — measured on the in-repo
+  fixture with 0.7.31.
+- Measured after the fix (1920×1080, real 41-page deck): single-title
+  page container 1032 px, content 398 → 523; a 24 849 px page keeps its
+  height and scroll.
+- Tests: `TestCenterContentWithoutRatio` (4 unit cases) and the
+  real-Chromium `tests/e2e/test_presentation_center.py` (3 cases, new
+  fixture `fixtures/presentation_center_app` driven by env flags): short
+  page centred in the container's content box and container = 100vh −
+  footer; tall page same `scrollHeight` with and without
+  `center_content` and its last element reachable; `enforce_ratio=True`
+  unchanged (`max-height: 100vh`, `overflow: hidden`, no `min-height`).
+  The first two fail on 0.7.31.  Run with
+  `uv run pytest -m e2e tests/e2e/test_presentation_center.py -v`.
+
 ## [0.7.31] — 2026-09-15
 
 ### Fixed

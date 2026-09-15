@@ -5,6 +5,67 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+#### Lists — the marker now follows the EFFECTIVE alignment, and no longer changes any width (#63)
+
+- 0.7.33 gave lists two things that did not meet: a list with no
+  parameter finally INHERITED `text-align` from its container, and
+  `st_list(text_align=…)` finally moved the marker INTO the line.  The
+  second only ever happened on the explicit parameter, so a list that
+  merely inherited a centring centred its text and left its bullet at
+  the far left of the row — the plain CSS defect of `text-align: center`
+  without `list-style-position: inside`, and one a project could not
+  repair from the outside (the marker is a `::before` of the row, out of
+  reach of any block style).  Measured on a centred 969 px cell: the
+  marker-to-text distance ran from 32 px to 418 px.  It is now 8 px on
+  every item, inherited or declared, and the two spellings render
+  identically.
+- The 0.7.33 "inside" procedure changed widths.  It shrank the item's
+  text cell (`--stx-list-grow: 0`) so that `justify-content` could move
+  the pair, but a nested list lives inside that cell and shrank with it,
+  and an item carrying a nested list had its marker placed against the
+  whole box instead of against its own first line.  Measured on the same
+  cell with `text_align="center"` on every list: nested lists at 92% of
+  their container and markers up to 394 px from their text.  Both are now
+  100% and 8 px.
+- The marker mode is now the standard `list-style-position: inside`
+  semantics: an inline box at the start of the FIRST LINE of the item's
+  content.  The content keeps the whole width of the row, so a nested
+  list keeps 100% of its item and lengthening an item moves neither the
+  list nor the grid that carries it.
+- The exported HTML carried the same contradiction: `ol, ul {
+  text-align: left; }` in the document head, the export twin of the
+  inline floor 0.7.33 removed from the live root.  It is gone, so an
+  exported list inherits its alignment like every other element, and the
+  document resolves `list-style-position` the way the live page does.
+
+### Changed
+
+- `st_list(text_align="center"|"right")` and an INHERITED `center`/`right`
+  are now exactly equivalent — from a container, a grid cell, or
+  `PresentationConfig(text_align=…)`.  Declaring the alignment once on the
+  page is enough; no per-list parameter is needed.
+- Live, the mode is decided per ITEM by the marker observer, from
+  `getComputedStyle(row).textAlign` — the only place an inherited value is
+  known.  It is carried by a `.stx-list-item--inside` class, added and
+  removed like every other thing the observer writes, and re-decided when
+  a list's alignment changes.  No `!important`, no inline style on any
+  text.  A nested list that re-declares its own alignment is handled with
+  no extra scoping, since each item resolves its own value.
+- The sentinel span no longer carries `data-stx-list-justify` /
+  `data-stx-list-grow`; `st_list(text_align=)` declares the alignment and
+  nothing else.  `block_align=` and the deprecated `align=` are unchanged.
+
+### Notes
+
+- Non-regression: a list with no alignment parameter, in a container that
+  declares no alignment, renders exactly as in 0.7.33 — the marker stays
+  in its own column and wrapped lines keep their hanging indent (guarded
+  by the e2e control cases, nested ones included).
+
 ## [0.7.33] — 2026-09-15
 
 ### Fixed

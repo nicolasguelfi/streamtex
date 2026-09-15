@@ -90,8 +90,11 @@
  *   --stx-list-width          100%       | fit-content     (block_align)
  *   --stx-list-margin-inline  0          | auto | 0 auto | auto 0
  *   --stx-list-text-align     (unset)    | left|center|right|justify
- *   --stx-list-justify        flex-start | center|flex-end  ("inside" mode)
- *   --stx-list-grow           1          | 0                ("inside" mode)
+ *
+ * The "inside" marker mode is NOT one of these: it follows the EFFECTIVE
+ * alignment of each item (parameter OR inheritance), which only the browser
+ * can resolve, so the observer reads `getComputedStyle(row).textAlign` and
+ * stamps `.stx-list-item--inside`.  See the inside-mode block further down.
  *
  * Declaring no `text-align` at all is the point of the 0.7.33 fix: a list is
  * an ordinary inheriting element again, so a container that centres its text
@@ -122,13 +125,16 @@
 
 /* List item: flex row holding [bullet ::before] + [content wrapper]. */
 [data-testid="stVerticalBlock"].stx-list-item {
+  /* Marker metrics, shared by both modes: the outside column and the inside
+   * inline box are the same size, so switching mode never moves the text by
+   * a different amount.  The inside mode also subtracts them from the first
+   * line's budget — see the `max-width` below. */
+  --stx-list-marker-width: 1.2rem;
+  --stx-list-marker-gap: 0.5rem;
   display: flex !important;
   flex-direction: row !important;
   align-items: baseline;
-  gap: 0.5rem;
-  /* "inside" marker mode: centre/right-align the [bullet][text] pair as a
-   * unit.  Inherited from the list root — see --stx-list-justify above. */
-  justify-content: var(--stx-list-justify, flex-start);
+  gap: var(--stx-list-marker-gap);
 }
 [data-testid="stVerticalBlock"].stx-list-item.stx-list-item--ordered {
   counter-increment: streamtex-counter;
@@ -137,7 +143,7 @@
 [data-testid="stVerticalBlock"].stx-list-item::before {
   flex-shrink: 0;
   text-align: right;
-  min-width: 1.2rem;
+  min-width: var(--stx-list-marker-width);
   color: inherit;
   font-weight: inherit;
   align-self: baseline;
@@ -152,14 +158,83 @@
 [data-testid="stVerticalBlock"].stx-list-item > [data-testid="stVerticalBlock"],
 [data-testid="stVerticalBlock"].stx-list-item > [data-testid="stLayoutWrapper"] > [data-testid="stVerticalBlock"],
 [data-testid="stVerticalBlock"].stx-list-item > [data-testid="stLayoutWrapper"] {
-  /* --stx-list-grow: 0 ("inside" mode) stops the text cell from eating the
-   * whole row, so justify-content can move bullet + text together. */
-  flex-grow: var(--stx-list-grow, 1);
+  /* Always the full width of the row: the marker never takes width away from
+   * the content, in either mode (0.7.34). */
+  flex-grow: 1;
   width: auto;
   display: flex;
   flex-direction: column;
   gap: 0;
   min-width: 0;
+}
+/* The content wrapper carries a SECOND copy of the bullet — list.py emits the
+ * per-item `content` for this pseudo-element too — dormant in outside mode. */
+[data-testid="stVerticalBlock"].stx-list-item > [data-testid="stVerticalBlock"]::before,
+[data-testid="stVerticalBlock"].stx-list-item > [data-testid="stLayoutWrapper"] > [data-testid="stVerticalBlock"]::before {
+  display: none;
+}
+
+/* ----------------------------------------------------------------------------
+ * "Inside" marker mode (0.7.34) — `list-style-position: inside`.
+ *
+ * The marker is an inline box at the start of the FIRST LINE of the item's
+ * content, so bullet and text are laid out in the same line box and the
+ * inherited `text-align` places the pair as a unit.  Nothing changes width:
+ * the content wrapper keeps `flex-grow: 1` and every nested list keeps 100%
+ * of it.  This is what the 0.7.33 procedure (`--stx-list-grow: 0` +
+ * `justify-content`) could not do: shrinking the text cell also shrank the
+ * nested lists it contains, and an item carrying a nested list had its bullet
+ * placed against the whole box instead of against its own first line.
+ *
+ * The mode is switched on per ITEM by the marker observer, from the item's
+ * EFFECTIVE computed `text-align` — so an inherited `center` behaves exactly
+ * like `st_list(text_align="center")`.  Being per item, a nested list that
+ * re-declares `left` inside a centred one is handled with no extra scoping.
+ *
+ * The rules below MUST stay after the outside-mode ones: both sides have the
+ * same specificity and source order is what picks the winner (no !important).
+ * -------------------------------------------------------------------------- */
+[data-testid="stVerticalBlock"].stx-list-item--inside::before {
+  display: none;
+}
+/* The wrapper stops being a flex column: an inline `::before` followed by an
+ * inline-block first cell needs an ordinary block formatting context. */
+[data-testid="stVerticalBlock"].stx-list-item--inside > [data-testid="stVerticalBlock"],
+[data-testid="stVerticalBlock"].stx-list-item--inside > [data-testid="stLayoutWrapper"] > [data-testid="stVerticalBlock"] {
+  display: block;
+}
+[data-testid="stVerticalBlock"].stx-list-item--inside > [data-testid="stVerticalBlock"]::before,
+[data-testid="stVerticalBlock"].stx-list-item--inside > [data-testid="stLayoutWrapper"] > [data-testid="stVerticalBlock"]::before {
+  display: inline-block;
+  min-width: var(--stx-list-marker-width);
+  margin-inline-end: var(--stx-list-marker-gap);
+  text-align: right;
+  color: inherit;
+  font-weight: inherit;
+}
+/* Only the item's OWN first cell joins the marker's line.  Its boxes go
+ * `display: inline` so its text shares the marker's inline formatting context:
+ * the marker is then genuinely the first inline box of the first line, the
+ * line wraps like any other text, and `text-align` moves marker and text
+ * together — which an inline-BLOCK cell could not do (measured: a wrapping
+ * item centres its own lines inside a full-width cell and leaves the marker
+ * behind at the cell's left edge).  Every later child of the item — a second
+ * paragraph, a nested list — stays a block at 100% of the item.
+ *
+ * Streamlit's element container and the one wrapper it puts around the
+ * rendered element are the only boxes between the cell and the text, hence
+ * the short chains below (st_write emits stHtml; markdown adds a paragraph). */
+[data-testid="stVerticalBlock"].stx-list-item--inside > [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"]:first-child,
+[data-testid="stVerticalBlock"].stx-list-item--inside > [data-testid="stVerticalBlock"] > .element-container:first-child,
+[data-testid="stVerticalBlock"].stx-list-item--inside > [data-testid="stLayoutWrapper"] > [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"]:first-child,
+[data-testid="stVerticalBlock"].stx-list-item--inside > [data-testid="stLayoutWrapper"] > [data-testid="stVerticalBlock"] > .element-container:first-child {
+  display: inline;
+}
+[data-testid="stVerticalBlock"].stx-list-item--inside [data-testid="stElementContainer"]:first-child > [data-testid="stHtml"],
+[data-testid="stVerticalBlock"].stx-list-item--inside [data-testid="stElementContainer"]:first-child > [data-testid="stMarkdown"],
+[data-testid="stVerticalBlock"].stx-list-item--inside [data-testid="stElementContainer"]:first-child > [data-testid="stMarkdown"] > [data-testid="stMarkdownContainer"],
+[data-testid="stVerticalBlock"].stx-list-item--inside [data-testid="stElementContainer"]:first-child > [data-testid="stMarkdown"] > [data-testid="stMarkdownContainer"] > p {
+  display: inline;
 }
 
 /* ============================================================================

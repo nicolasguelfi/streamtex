@@ -153,6 +153,34 @@ class TestHtmlExportBuffer:
         assert "streamtex-page" in html
         assert "<p>content</p>" in html
 
+    def test_lists_are_no_longer_barred_from_inheriting_text_align(self):
+        """0.7.34 — the export twin of the inline `text-align: left` 0.7.33
+        removed from the live list root.  `ol, ul { text-align: left }` in the
+        document head made a centred page unable to centre its lists, so the
+        export contradicted the live rendering."""
+        buf = self._make_buffer()
+        buf.append("<ul><li>x</li></ul>")
+        html = buf.generate_full_html()
+        assert "ol, ul { text-align: left; }" not in html
+
+    def test_export_moves_the_marker_inside_when_alignment_is_inherited(self):
+        """`list-style-position` does not follow `text-align`, and no selector
+        can match on an INHERITED value — so the document resolves it the same
+        way the live observer does, with the browser's own computed style."""
+        buf = self._make_buffer()
+        buf.append("<ul><li>x</li></ul>")
+        html = buf.generate_full_html()
+        assert "getComputedStyle(el).textAlign" in html
+        assert "listStylePosition = 'inside'" in html
+        assert "{ center: 1, right: 1, end: 1 }" in html
+        assert html.index("<script>") > html.index("streamtex-page")
+
+    def test_export_script_never_overrides_a_declared_position(self):
+        """A list that used `st_list(text_align=…)` already carries the
+        property inline; the script only adds what inheritance implied."""
+        html = self._make_buffer().generate_full_html()
+        assert "if (el.style.listStylePosition) continue;" in html
+
     def test_generate_full_html_no_zoom_when_default(self):
         buf = self._make_buffer()
         buf.append("<p>test</p>")

@@ -16,15 +16,21 @@ _current_list_level = ContextVar("list_level", default=0)
 # ---------------------------------------------------------------------------
 # Alignment (0.7.33) — two distinct CSS notions, two distinct parameters.
 #
-#   text_align  -> `text-align` on the list, plus the equivalent of
-#                  `list-style-position: inside` for center/right so the
-#                  bullet travels WITH its text.  Never touches any width.
+#   text_align  -> `text-align` on the list.  Never touches any width.
 #   block_align -> `width: fit-content` + auto margins: places the list BOX,
 #                  which makes the list as wide as its content.
 #
 # Both are carried to the DOM as `data-stx-list-*` attributes on the sentinel
 # span; the marker observer forwards every `data-stx-foo` as a `--stx-foo`
 # custom property on the list container, and stx_global.css reads those.
+#
+# The "inside" marker mode — the `list-style-position: inside` semantics that
+# keep bullet and text together when the text is centred or right-aligned — is
+# NOT carried here (0.7.34).  It follows the EFFECTIVE alignment of each item,
+# which is just as often inherited from a container as declared by `text_align`,
+# and only the browser can resolve that: the marker observer reads the computed
+# `text-align` of every item and stamps `.stx-list-item--inside` on it.  The
+# HTML export mirrors the same rule with a few lines of script (see export.py).
 # ---------------------------------------------------------------------------
 _TEXT_ALIGN_VALUES = ("left", "center", "right", "justify")
 _BLOCK_ALIGN_VALUES = ("left", "center", "right")
@@ -32,11 +38,8 @@ _BLOCK_ALIGN_VALUES = ("left", "center", "right")
 # `margin-inline: <start> <end>` placing a fit-content list box.
 _BLOCK_ALIGN_MARGIN = {"left": "0 auto", "center": "auto", "right": "auto 0"}
 
-# text_align values that need the marker INSIDE the line box.  The flex row
-# stops stretching its text cell (--stx-list-grow: 0) and justifies the
-# [bullet][text] pair as a unit — the structural equivalent of the CSS
-# `list-style-position: inside` used by the HTML export.
-_INSIDE_JUSTIFY = {"center": "center", "right": "flex-end"}
+# text_align values for which the marker belongs INSIDE the first line.
+_INSIDE_ALIGNS = ("center", "right")
 
 
 def _validate_align(param: str, value: str | None,
@@ -63,7 +66,7 @@ def _list_export_css(text_align: str | None, block_align: str | None) -> str:
     parts: list[str] = []
     if text_align:
         parts.append(f"text-align: {text_align};")
-        if text_align in _INSIDE_JUSTIFY:
+        if text_align in _INSIDE_ALIGNS:
             parts.append("list-style-position: inside;")
     if block_align:
         parts.append("width: fit-content;")
@@ -81,12 +84,26 @@ def _build_list_item_payload(item_id: str, bullet_content: str, is_ordered: bool
     All other rules (flex layout, gap, baseline alignment, marker-cell
     hide, inner content wrapper) live in the global stylesheet under
     ``.stx-list-item``.
+
+    The value is declared on TWO pseudo-elements (0.7.34): the item row, which
+    renders the marker in its own column ("outside"), and the item's content
+    wrapper, which renders it inline at the start of the first line
+    ("inside").  Exactly one of the two is displayed — the global stylesheet
+    decides from ``.stx-list-item--inside``, which the marker observer stamps
+    from the item's effective ``text-align``.  The wrapper is reached through
+    the two shapes Streamlit gives a nested container: a direct
+    ``stVerticalBlock`` (≤ 1.55) or one behind an ``stLayoutWrapper`` (≥ 1.56).
+    Only one of them exists in a given Streamlit version, so the marker is
+    never drawn twice.
     """
+    row = f'[data-stx-list-item-uid="{item_id}"]'
+    selectors = ", ".join((
+        f'{row}::before',
+        f'{row} > [data-testid="stVerticalBlock"]::before',
+        f'{row} > [data-testid="stLayoutWrapper"] > [data-testid="stVerticalBlock"]::before',
+    ))
     bullet_css = (
-        f'<style>'
-        f'[data-stx-list-item-uid="{item_id}"]::before'
-        f'{{ content: {bullet_content}; }}'
-        f'</style>'
+        f'<style>{selectors} {{ content: {bullet_content}; }}</style>'
     )
     marker_attrs = (
         f'class="stx-marker {item_id}" '
@@ -106,7 +123,8 @@ def _build_list_root_payload(list_id: str, text_align: str | None = None,
 
     The styling rules (counter-reset, gap, width, margins, alignment) live
     in the global stylesheet under ``.stx-list``; every knob is read from a
-    ``--stx-list-*`` custom property.  The observer forwards each
+    ``--stx-list-*`` custom property.  The marker mode is not among them: it
+    is decided per item by the observer from the resolved ``text-align``.  The observer forwards each
     ``data-stx-list-*`` attribute set here onto the list container as that
     property, so an attribute omitted here leaves the CSS fallback in
     place — which is how "inherit from my container" stays the default.
@@ -114,10 +132,6 @@ def _build_list_root_payload(list_id: str, text_align: str | None = None,
     attrs = ""
     if text_align:
         attrs += f' data-stx-list-text-align="{text_align}"'
-        justify = _INSIDE_JUSTIFY.get(text_align)
-        if justify:
-            attrs += (f' data-stx-list-justify="{justify}"'
-                      ' data-stx-list-grow="0"')
     if block_align:
         attrs += (' data-stx-list-width="fit-content"'
                   f' data-stx-list-margin-inline="{_BLOCK_ALIGN_MARGIN[block_align]}"')
@@ -202,11 +216,15 @@ def st_list(
     :param text_align: Alignment of the list TEXT — ``"left"``, ``"center"``,
         ``"right"``, ``"justify"`` or ``None``.  Mirrors the CSS pair
         ``text-align`` + ``list-style-position: inside``: for ``"center"``
-        and ``"right"`` the bullet moves INTO the line so bullet and text
-        stay together.  Never changes any width, so the list keeps filling
-        its cell — the safe choice inside a grid.  ``None`` (default) sets
+        and ``"right"`` the bullet moves INTO the first line of each item so
+        bullet and text stay together.  Never changes any width, so the list
+        keeps filling its cell and a nested list keeps the full width of its
+        item — the safe choice inside a grid.  ``None`` (default) sets
         nothing and the list inherits the alignment of its container, like
-        any other HTML element.
+        any other HTML element; an INHERITED ``center`` or ``right`` moves
+        the bullet into the line just the same (0.7.34), so declaring the
+        alignment once on the container — or on
+        ``PresentationConfig(text_align=…)`` — is enough.
     :param block_align: Placement of the list BOX — ``"left"``, ``"center"``,
         ``"right"`` or ``None``.  Shrinks the list to ``width: fit-content``
         and places it with automatic margins; the bullet column stays

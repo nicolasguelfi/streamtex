@@ -488,15 +488,52 @@ class HtmlExportBuffer:
             f"}}\n"
             f"/* Mirror Streamlit stVerticalBlock: all children stretch to full width */\n"
             f".stx-block > * {{ align-self: stretch; }}\n"
-            f"/* Prevent text-align inheritance into lists (Streamlit isolates via shadow DOM) */\n"
-            f"ol, ul {{ text-align: left; }}\n"
             f"</style>\n"
             f"</head>\n<body>\n"
             f"<div class=\"streamtex-page\">\n"
             f"{body}\n"
             f"</div>\n"
+            f"{_LIST_INSIDE_JS}\n"
             f"</body>\n</html>\n"
         )
+
+
+# ---------------------------------------------------------------------------
+# Marker mode in the export — the twin of `.stx-list-item--inside` live
+# ---------------------------------------------------------------------------
+# Until 0.7.33 the exported document carried `ol, ul { text-align: left; }`,
+# the export twin of the inline `text-align: left` the live list root used to
+# force: it made a centred page or block unable to centre its lists, exactly
+# the defect 0.7.33 fixed on the live side only.  The rule is gone, so lists
+# inherit `text-align` like every other element.
+#
+# `list-style-position` does not follow `text-align` on its own, though, and no
+# selector can match on an INHERITED value — which is why this runs in the
+# document instead of in the stylesheet.  It is the same rule the marker
+# observer applies live, resolved by the same engine: a list whose effective
+# alignment is `center` or `right` takes its marker inside the line.  A list
+# that declares `text_align=` already carries the property inline from
+# `_list_export_css`, so this only ever adds what inheritance implied.
+_LIST_INSIDE_JS = (
+    "<script>\n"
+    "(function () {\n"
+    "  var INSIDE = { center: 1, right: 1, end: 1 };\n"
+    "  function apply() {\n"
+    "    var lists = document.querySelectorAll('ul, ol');\n"
+    "    for (var i = 0; i < lists.length; i++) {\n"
+    "      var el = lists[i];\n"
+    "      if (el.style.listStylePosition) continue;\n"
+    "      if (INSIDE[getComputedStyle(el).textAlign]) {\n"
+    "        el.style.listStylePosition = 'inside';\n"
+    "      }\n"
+    "    }\n"
+    "  }\n"
+    "  if (document.readyState === 'loading') {\n"
+    "    document.addEventListener('DOMContentLoaded', apply);\n"
+    "  } else { apply(); }\n"
+    "})();\n"
+    "</script>"
+)
 
 
 # ---------------------------------------------------------------------------

@@ -1,6 +1,7 @@
 """Tests for the list module."""
 
 import os
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -910,20 +911,19 @@ class TestListAlignmentParameters:
             return mock_html.call_args_list[0][0][0], pushed
 
     # --- text_align: text only, never a width ---------------------------
-    @pytest.mark.parametrize("value,justify", [("center", "center"), ("right", "flex-end")])
-    def test_text_align_center_right_switch_on_inside_mode(self, mock_streamlit, value, justify):
-        marker, _ = self._run(text_align=value)
-        assert f'data-stx-list-text-align="{value}"' in marker
-        assert f'data-stx-list-justify="{justify}"' in marker
-        assert 'data-stx-list-grow="0"' in marker
-        assert "data-stx-list-width" not in marker, "text_align must not touch the width"
+    @pytest.mark.parametrize("value", ["left", "center", "right", "justify"])
+    def test_text_align_only_declares_the_alignment(self, mock_streamlit, value):
+        """0.7.34 — the marker mode is no longer carried by the sentinel span.
 
-    @pytest.mark.parametrize("value", ["left", "justify"])
-    def test_text_align_left_justify_keep_the_outside_marker(self, mock_streamlit, value):
+        It follows the item's EFFECTIVE alignment, which the observer reads
+        from the computed style, so the span declares the alignment and
+        nothing else — and above all no width.
+        """
         marker, _ = self._run(text_align=value)
         assert f'data-stx-list-text-align="{value}"' in marker
         assert "data-stx-list-justify" not in marker
         assert "data-stx-list-grow" not in marker
+        assert "data-stx-list-width" not in marker, "text_align must not touch the width"
 
     def test_no_parameter_emits_no_alignment_attribute(self, mock_streamlit):
         marker, _ = self._run()
@@ -995,3 +995,92 @@ class TestListAlignmentParameters:
                 pass
             style = mock_st_block.call_args.kwargs["style"]
             assert "text-align" not in str(style)
+
+
+class TestInsideMarkerFollowsEffectiveAlignment:
+    """0.7.34 — the marker joins the first line whenever the EFFECTIVE
+    alignment is centre/right, whether declared or inherited.
+
+    The decision cannot be made in Python (an inherited value is only known
+    to the browser), so the contract is split across three files and each
+    half is pinned here: list.py emits the bullet for both pseudo-elements,
+    the observer stamps ``.stx-list-item--inside`` from the computed style,
+    and the stylesheet shows exactly one of the two markers.
+    """
+
+    CSS = (Path(__file__).resolve().parents[1]
+           / "streamtex" / "static" / "css" / "stx_global.css").read_text(encoding="utf-8")
+    JS = (Path(__file__).resolve().parents[1]
+          / "streamtex" / "static" / "js" / "stx_marker_observer.js").read_text(encoding="utf-8")
+
+    # --- list.py: one `content`, two pseudo-elements --------------------
+    def test_bullet_content_is_declared_for_both_markers(self, mock_streamlit,
+                                                         _marker_runtime_on):
+        with st_list() as lst:
+            with lst.item():
+                pass
+        joined = _collect_html(mock_streamlit)
+        assert '[data-stx-list-item-uid="li-' in joined
+        # the outside marker, on the item row
+        assert "::before, " in joined
+        # the inside marker, on the item's content wrapper (both Streamlit shapes)
+        assert '> [data-testid="stVerticalBlock"]::before' in joined
+        assert ('> [data-testid="stLayoutWrapper"] > '
+                '[data-testid="stVerticalBlock"]::before') in joined
+        assert joined.count("content:") == 1, "one declaration must serve both markers"
+
+    def test_ordered_counter_reaches_the_inside_marker(self, mock_streamlit,
+                                                       _marker_runtime_on):
+        with st_list(list_type=ListTypes.ordered) as lst:
+            with lst.item():
+                pass
+        joined = _collect_html(mock_streamlit)
+        assert joined.count("counter(streamtex-counter") == 1
+        assert '> [data-testid="stVerticalBlock"]::before' in joined
+
+    # --- the observer: computed, not declared ---------------------------
+    def test_observer_reads_the_computed_alignment(self):
+        assert "computedModifiers: { 'stx-list-item--inside': isInsideAligned }" in self.JS
+        assert "getComputedStyle(el).textAlign" in self.JS
+        # `start` is what Chromium reports for the initial value — it must NOT
+        # switch the mode on, or every plain list would change.
+        assert "var INSIDE_ALIGNS = { 'center': 1, 'right': 1, 'end': 1 };" in self.JS
+
+    def test_observer_undoes_the_computed_modifier(self):
+        """clearMarker must strip it, like every other thing applyMarker adds —
+        otherwise a DOM node reused by Streamlit for another construct keeps
+        an inside marker that no longer belongs to it (the 0.6.27 bleed)."""
+        clear = self.JS.split("function clearMarker")[1]
+        assert "spec.computedModifiers" in clear
+        assert "parent.classList.remove(compCls)" in clear
+
+    def test_observer_repropagates_when_a_list_changes_alignment(self):
+        assert "syncsItemAlign: true" in self.JS
+        assert "function syncItemAlignModes" in self.JS
+
+    # --- the stylesheet: exactly one marker, no width change ------------
+    def test_outside_mode_hides_the_inside_marker(self):
+        assert ('[data-testid="stVerticalBlock"].stx-list-item > '
+                '[data-testid="stVerticalBlock"]::before') in self.CSS
+
+    def test_inside_mode_hides_the_outside_marker(self):
+        assert '.stx-list-item--inside::before' in self.CSS
+        outside = self.CSS.index('.stx-list-item > [data-testid="stVerticalBlock"]::before')
+        inside = self.CSS.index('.stx-list-item--inside::before')
+        assert inside > outside, (
+            "the two modes have the same specificity: the inside rules must come "
+            "last or they never win"
+        )
+
+    def test_the_content_wrapper_always_keeps_the_full_width(self):
+        """The 0.7.33 procedure shrank the text cell (`--stx-list-grow: 0`),
+        which also shrank every nested list inside it."""
+        assert "var(--stx-list-grow" not in self.CSS
+        assert "var(--stx-list-justify" not in self.CSS
+        assert "flex-grow: 1;" in self.CSS
+
+    def test_the_first_cell_joins_the_marker_line(self):
+        assert '.stx-list-item--inside > [data-testid="stLayoutWrapper"] > ' \
+               '[data-testid="stVerticalBlock"] > [data-testid="stElementContainer"]' \
+               ':first-child' in self.CSS
+        assert "display: inline;" in self.CSS

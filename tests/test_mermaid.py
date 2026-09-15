@@ -213,7 +213,11 @@ class TestExportRendering:
         with _patched_mermaid(mermaid=mock_lib):
             st_mermaid(malicious)
         html = generate_export_html()
-        assert "<script>" not in html
+        # The payload itself must not survive as markup.  The document
+        # carries a <script> of its own since 0.7.34 (the list marker
+        # mode), so the assertion targets the injected tag, not the tag
+        # name anywhere in the page.
+        assert "<script>alert" not in html
         assert "&lt;script&gt;" in html
 
 

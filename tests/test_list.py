@@ -885,3 +885,113 @@ class TestListItemMarkerPath:
         joined = _collect_html(mock_streamlit)
         # Default level-1 unordered bullet is `'•'`.
         assert "'•'" in joined
+
+
+class TestListAlignmentParameters:
+    """0.7.33 — text_align (text) and block_align (box) are distinct notions."""
+
+    @staticmethod
+    def _marker(mock_html):
+        return mock_html.call_args_list[0][0][0]
+
+    @staticmethod
+    def _run(**kwargs):
+        """Open a list with *kwargs* and return (marker_html, pushed_wrappers)."""
+        with patch("streamtex.list.st_block") as mock_st_block, \
+             patch("streamtex.list.st.html") as mock_html, \
+             patch("streamtex.list.is_export_active", return_value=True), \
+             patch("streamtex.list.export_push_wrapper") as mock_push, \
+             patch("streamtex.list.export_pop_wrapper"):
+            mock_st_block.return_value.__enter__ = MagicMock(return_value=None)
+            mock_st_block.return_value.__exit__ = MagicMock(return_value=False)
+            with st_list(**kwargs):
+                pass
+            pushed = [c[0][0] for c in mock_push.call_args_list]
+            return mock_html.call_args_list[0][0][0], pushed
+
+    # --- text_align: text only, never a width ---------------------------
+    @pytest.mark.parametrize("value,justify", [("center", "center"), ("right", "flex-end")])
+    def test_text_align_center_right_switch_on_inside_mode(self, mock_streamlit, value, justify):
+        marker, _ = self._run(text_align=value)
+        assert f'data-stx-list-text-align="{value}"' in marker
+        assert f'data-stx-list-justify="{justify}"' in marker
+        assert 'data-stx-list-grow="0"' in marker
+        assert "data-stx-list-width" not in marker, "text_align must not touch the width"
+
+    @pytest.mark.parametrize("value", ["left", "justify"])
+    def test_text_align_left_justify_keep_the_outside_marker(self, mock_streamlit, value):
+        marker, _ = self._run(text_align=value)
+        assert f'data-stx-list-text-align="{value}"' in marker
+        assert "data-stx-list-justify" not in marker
+        assert "data-stx-list-grow" not in marker
+
+    def test_no_parameter_emits_no_alignment_attribute(self, mock_streamlit):
+        marker, _ = self._run()
+        for attr in ("text-align", "justify", "grow", "width", "margin-inline"):
+            assert f"data-stx-list-{attr}" not in marker
+
+    # --- block_align: the box, hence a content-driven width -------------
+    @pytest.mark.parametrize("value,margin", [
+        ("center", "auto"), ("left", "0 auto"), ("right", "auto 0"),
+    ])
+    def test_block_align_sets_width_and_margins(self, mock_streamlit, value, margin):
+        marker, _ = self._run(block_align=value)
+        assert 'data-stx-list-width="fit-content"' in marker
+        assert f'data-stx-list-margin-inline="{margin}"' in marker
+        assert "data-stx-list-text-align" not in marker, "block_align must not touch the text"
+
+    def test_align_is_a_synonym_of_block_align(self, mock_streamlit):
+        legacy, _ = self._run(align="center")
+        modern, _ = self._run(block_align="center")
+        strip = lambda m: m.split('data-stx-uid="')[1].split('"', 1)[1]  # noqa: E731
+        assert strip(legacy) == strip(modern)
+
+    def test_block_align_wins_over_the_deprecated_align(self, mock_streamlit):
+        marker, _ = self._run(block_align="right", align="center")
+        assert 'data-stx-list-margin-inline="auto 0"' in marker
+
+    # --- validation ------------------------------------------------------
+    @pytest.mark.parametrize("kwargs", [
+        {"text_align": "middle"}, {"block_align": "justify"}, {"align": "top"},
+    ])
+    def test_unknown_value_raises_value_error(self, mock_streamlit, kwargs):
+        with pytest.raises(ValueError, match="unknown value"):
+            self._run(**kwargs)
+
+    # --- export ----------------------------------------------------------
+    def test_export_emits_list_style_position_inside(self, mock_streamlit):
+        _, pushed = self._run(text_align="center")
+        assert "text-align: center;" in pushed[0]
+        assert "list-style-position: inside;" in pushed[0]
+        assert "fit-content" not in pushed[0]
+
+    def test_export_left_align_has_no_inside_marker(self, mock_streamlit):
+        _, pushed = self._run(text_align="left")
+        assert "text-align: left;" in pushed[0]
+        assert "list-style-position" not in pushed[0]
+
+    def test_export_block_align_emits_fit_content(self, mock_streamlit):
+        _, pushed = self._run(block_align="center")
+        assert "width: fit-content;" in pushed[0]
+        assert "margin-inline: auto;" in pushed[0]
+
+    def test_export_merges_with_the_user_style(self, mock_streamlit):
+        _, pushed = self._run(l_style=Style("color: red", "t_red"), text_align="center")
+        assert "color: red;" in pushed[0]
+        assert "text-align: center;" in pushed[0]
+
+    def test_export_without_alignment_is_unchanged(self, mock_streamlit):
+        _, pushed = self._run(l_style=Style("color: red", "t_red2"))
+        assert pushed[0] == '<ul style="color: red">'
+
+    # --- the left-align floor is gone ------------------------------------
+    def test_list_root_no_longer_forces_text_align_left(self, mock_streamlit):
+        with patch("streamtex.list.st_block") as mock_st_block, \
+             patch("streamtex.list.st.html"), \
+             patch("streamtex.list.is_export_active", return_value=False):
+            mock_st_block.return_value.__enter__ = MagicMock(return_value=None)
+            mock_st_block.return_value.__exit__ = MagicMock(return_value=False)
+            with st_list():
+                pass
+            style = mock_st_block.call_args.kwargs["style"]
+            assert "text-align" not in str(style)

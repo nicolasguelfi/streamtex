@@ -5,6 +5,86 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+#### Lists — `st_list(align=)` had been inert since 0.6.13, and lists refused to inherit `text-align` (#61)
+
+- `align="center"` produced **no geometric change at all**, live and in
+  the HTML export.  `list.py` put `data-stx-list-width="fit-content"` on
+  the sentinel span and `stx_global.css` selected on that ATTRIBUTE, but
+  the marker observer forwards every `data-stx-*` as a CSS custom
+  property (`--stx-list-width`) and never copies the attribute onto the
+  parent, so the rule never matched; the export emitted no width either.
+  Silent regression of the 0.6.13 marker migration — the unit tests only
+  asserted the marker HTML string.  Measured in a 681 px grid cell: root
+  width 681 with and without the parameter.
+- The list root also carried a hard-coded INLINE `text-align: left`,
+  added to stop an inherited alignment from splitting bullet and text.
+  It made alignment un-inheritable for every user and could not be
+  undone from a project (inline beats any per-instance rule).  A list is
+  now an ordinary inheriting element: a container that centres its text
+  centres its lists.
+- The docstring of `align=` was wrong (it announced `align-items:
+  <align>`, the code did `width: fit-content`).
+- `streamtex-docs` uses `align=` 17 times and demonstrates it in the
+  official manual; those examples become functional again.  The
+  `streamtex-docs` repository should be updated separately to show
+  `text_align=` wherever centring the TEXT is the real intent.
+
+### Added
+
+#### Lists — `text_align=` and `block_align=`: the two CSS notions, finally distinct (#61)
+
+- `st_list(text_align=)` — `"left" | "center" | "right" | "justify"`.
+  Aligns the TEXT and, for `center`/`right`, moves the marker INTO the
+  line so bullet and text travel together — the equivalent of the CSS
+  pair `text-align` + `list-style-position: inside`, which the flex-box
+  rendering had no way to express.  **It never changes any width**, so a
+  list keeps filling its grid cell: the safe choice when the geometry
+  must stay stable.  `None` (default) declares nothing and inherits.
+- `st_list(block_align=)` — `"left" | "center" | "right"`.  Places the
+  list BOX with `width: fit-content` + automatic margins.  Documented
+  with its trade-off: the list becomes as wide as its content, so
+  editing one item moves the layout.
+- `st_list(align=)` is kept as an exact synonym of `block_align` (no
+  runtime warning, no breakage for existing projects).  An unknown value
+  on any of the three now raises `ValueError` instead of being ignored.
+- Live, every knob is a `--stx-list-*` custom property read by
+  `stx_global.css`; `text-align` is carried by a `.stx-list--aligned`
+  modifier class that exists only when the caller asked for it, so a
+  list that asks for nothing declares nothing and inherits.  The export
+  emits the standard properties on the real `<ul>`/`<ol>`.
+
+#### Presentation — `PresentationConfig(text_align=)` (#61)
+
+- Declares the page default alignment once on `.stMain
+  .block-container`, inherited by every text, block and list, instead of
+  repeating it on each element.  Emitted **without** `!important`, so
+  any element that declares its own alignment keeps it — a declared
+  value always beats an inherited one.  `None` (default) emits nothing.
+  An unknown value raises `ValueError` at construction.
+
+### Deprecated
+
+- `st_list(align=)` — use `block_align=` for the box placement, or
+  `text_align=` when the intent is to align the text.  Still supported,
+  still an exact synonym, no runtime warning.
+
+### Notes
+
+- Non-regression: a list with no alignment parameter **and no inherited
+  alignment** renders exactly as in 0.7.32 (guarded by the e2e control
+  case).  A list inside a container that declares an alignment now
+  inherits it, which is the point of the fix.
+- Tests: `TestListAlignmentParameters` (19 unit cases), `TestPageTextAlign`
+  (8 unit cases) and the real-Chromium `tests/e2e/test_list_alignment.py`
+  (6 geometric scenarios, fixture `list_alignment_app`) — the HTML-string
+  tests are what let all three defects through, so the new net measures
+  boxes.  Run with
+  `uv run pytest -m e2e tests/e2e/test_list_alignment.py -v`.
+
 ## [0.7.32] — 2026-09-15
 
 ### Fixed

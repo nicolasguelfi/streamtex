@@ -2,6 +2,8 @@
 
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from streamtex.presentation import (
     _PRES_FOOTER_KEY,
     _PRES_FULLSCREEN_KEY,
@@ -626,3 +628,37 @@ class TestCenterContentWithoutRatio:
         css = mock_st.html.call_args[0][0]
         assert "min-height" not in css
         assert "flex: 0 0 auto" not in css
+
+
+class TestPageTextAlign:
+    """0.7.33 — PresentationConfig.text_align declares the page default once."""
+
+    def test_default_is_none(self):
+        assert PresentationConfig().text_align is None
+
+    @patch("streamtex.presentation.st")
+    def test_none_emits_nothing(self, mock_st):
+        mock_st.html = MagicMock()
+        _inject_presentation_css(PresentationConfig())
+        css = mock_st.html.call_args[0][0]
+        assert "text-align" not in css
+
+    @pytest.mark.parametrize("value", ["left", "center", "right", "justify"])
+    @patch("streamtex.presentation.st")
+    def test_value_is_emitted_on_the_page_container(self, mock_st, value):
+        mock_st.html = MagicMock()
+        _inject_presentation_css(PresentationConfig(text_align=value))
+        css = mock_st.html.call_args[0][0]
+        assert f"text-align: {value};" in css
+        assert ".stMain .block-container" in css
+
+    @patch("streamtex.presentation.st")
+    def test_emitted_without_important_so_local_styles_win(self, mock_st):
+        mock_st.html = MagicMock()
+        _inject_presentation_css(PresentationConfig(text_align="center"))
+        css = mock_st.html.call_args[0][0]
+        assert "text-align: center !important" not in css
+
+    def test_unknown_value_raises_value_error(self):
+        with pytest.raises(ValueError, match="unknown value"):
+            PresentationConfig(text_align="middle")

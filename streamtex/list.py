@@ -13,6 +13,63 @@ from .utils import generate_key
 
 _current_list_level = ContextVar("list_level", default=0)
 
+# ---------------------------------------------------------------------------
+# Alignment (0.7.33) — two distinct CSS notions, two distinct parameters.
+#
+#   text_align  -> `text-align` on the list, plus the equivalent of
+#                  `list-style-position: inside` for center/right so the
+#                  bullet travels WITH its text.  Never touches any width.
+#   block_align -> `width: fit-content` + auto margins: places the list BOX,
+#                  which makes the list as wide as its content.
+#
+# Both are carried to the DOM as `data-stx-list-*` attributes on the sentinel
+# span; the marker observer forwards every `data-stx-foo` as a `--stx-foo`
+# custom property on the list container, and stx_global.css reads those.
+# ---------------------------------------------------------------------------
+_TEXT_ALIGN_VALUES = ("left", "center", "right", "justify")
+_BLOCK_ALIGN_VALUES = ("left", "center", "right")
+
+# `margin-inline: <start> <end>` placing a fit-content list box.
+_BLOCK_ALIGN_MARGIN = {"left": "0 auto", "center": "auto", "right": "auto 0"}
+
+# text_align values that need the marker INSIDE the line box.  The flex row
+# stops stretching its text cell (--stx-list-grow: 0) and justifies the
+# [bullet][text] pair as a unit — the structural equivalent of the CSS
+# `list-style-position: inside` used by the HTML export.
+_INSIDE_JUSTIFY = {"center": "center", "right": "flex-end"}
+
+
+def _validate_align(param: str, value: str | None,
+                    allowed: tuple[str, ...]) -> str | None:
+    """Return *value* unchanged, or raise ``ValueError`` if unknown."""
+    if value is None:
+        return None
+    if value not in allowed:
+        expected = ", ".join(repr(v) for v in allowed)
+        raise ValueError(
+            f"st_list({param}={value!r}): unknown value; "
+            f"expected one of {expected} or None"
+        )
+    return value
+
+
+def _list_export_css(text_align: str | None, block_align: str | None) -> str:
+    """Return the CSS declarations added to the exported ``<ul>``/``<ol>``.
+
+    The export renders real list markup, so the standard properties apply
+    directly: ``list-style-position: inside`` is the export twin of the
+    flex-box "inside" mode used live.
+    """
+    parts: list[str] = []
+    if text_align:
+        parts.append(f"text-align: {text_align};")
+        if text_align in _INSIDE_JUSTIFY:
+            parts.append("list-style-position: inside;")
+    if block_align:
+        parts.append("width: fit-content;")
+        parts.append(f"margin-inline: {_BLOCK_ALIGN_MARGIN[block_align]};")
+    return " ".join(parts)
+
 
 def _build_list_item_payload(item_id: str, bullet_content: str, is_ordered: bool) -> str:
     """Return the per-item bullet CSS + sentinel marker span for a list item.
@@ -43,19 +100,31 @@ def _build_list_item_payload(item_id: str, bullet_content: str, is_ordered: bool
     )
 
 
-def _build_list_root_payload(list_id: str, align: str) -> str:
+def _build_list_root_payload(list_id: str, text_align: str | None = None,
+                             block_align: str | None = None) -> str:
     """Return the sentinel marker span for a list root container.
 
-    The single styling rule (counter-reset + gap + default width) lives in
-    the global stylesheet under ``.stx-list``.  ``align="center"`` is
-    forwarded as ``data-stx-list-width="fit-content"`` so the global
-    stylesheet can override the default 100% width.
+    The styling rules (counter-reset, gap, width, margins, alignment) live
+    in the global stylesheet under ``.stx-list``; every knob is read from a
+    ``--stx-list-*`` custom property.  The observer forwards each
+    ``data-stx-list-*`` attribute set here onto the list container as that
+    property, so an attribute omitted here leaves the CSS fallback in
+    place — which is how "inherit from my container" stays the default.
     """
-    width_attr = ' data-stx-list-width="fit-content"' if align == "center" else ''
+    attrs = ""
+    if text_align:
+        attrs += f' data-stx-list-text-align="{text_align}"'
+        justify = _INSIDE_JUSTIFY.get(text_align)
+        if justify:
+            attrs += (f' data-stx-list-justify="{justify}"'
+                      ' data-stx-list-grow="0"')
+    if block_align:
+        attrs += (' data-stx-list-width="fit-content"'
+                  f' data-stx-list-margin-inline="{_BLOCK_ALIGN_MARGIN[block_align]}"')
     return (
         f'<span class="stx-marker {list_id}" '
         f'data-stx-kind="list" data-stx-uid="{list_id}"'
-        f'{width_attr} style="display:none"></span>'
+        f'{attrs} style="display:none"></span>'
     )
 
 
@@ -119,7 +188,9 @@ def st_list(
     list_type: ListType = ListTypes.unordered,
     l_style: Style = s.none,
     li_style: Style = s.none,
-    align: str = None,
+    text_align: str | None = None,
+    block_align: str | None = None,
+    align: str | None = None,
     alt_li_styles: list[Style] | None = None,
 ):
     """
@@ -128,9 +199,24 @@ def st_list(
     :param list_type: The type of list, either ordered (`<ol>`) or unordered (`<ul>`). Defaults to unordered.
     :param l_style: A `Style` object for the entire list. Supports custom list-level styles for `ListStyle`.
     :param li_style: A `Style` object for individual list items. Defaults to `StxStyles.none`.
-    :param align: Optional alignment for list items as a block (e.g. ``"center"``).
-        When set, the list container uses ``align-items: <align>`` so that
-        bullet + text form a centered unit.  Defaults to ``None`` (no change).
+    :param text_align: Alignment of the list TEXT — ``"left"``, ``"center"``,
+        ``"right"``, ``"justify"`` or ``None``.  Mirrors the CSS pair
+        ``text-align`` + ``list-style-position: inside``: for ``"center"``
+        and ``"right"`` the bullet moves INTO the line so bullet and text
+        stay together.  Never changes any width, so the list keeps filling
+        its cell — the safe choice inside a grid.  ``None`` (default) sets
+        nothing and the list inherits the alignment of its container, like
+        any other HTML element.
+    :param block_align: Placement of the list BOX — ``"left"``, ``"center"``,
+        ``"right"`` or ``None``.  Shrinks the list to ``width: fit-content``
+        and places it with automatic margins; the bullet column stays
+        aligned and the group is placed as a unit.  **It makes the list as
+        wide as its content**, so editing one item changes the list width:
+        avoid it in a grid whose geometry must stay stable — use
+        ``text_align`` there.
+    :param align: Deprecated synonym of ``block_align`` (kept for backward
+        compatibility, no runtime warning).  Prefer ``block_align`` for the
+        box placement, or ``text_align`` when the intent is to align text.
     :param alt_li_styles: Optional list of ``Style`` objects to cycle through for each item.
         Applied after ``li_style`` and before the per-item ``style`` argument.
         The style at index ``i % len(alt_li_styles)`` is merged for the i-th item.
@@ -153,6 +239,12 @@ def st_list(
                 with l2.item(): st_write("Nested Item 2")
     ```
     """
+    text_align = _validate_align("text_align", text_align, _TEXT_ALIGN_VALUES)
+    block_align = _validate_align("block_align", block_align, _BLOCK_ALIGN_VALUES)
+    align = _validate_align("align", align, _BLOCK_ALIGN_VALUES)
+    if block_align is None:
+        block_align = align
+
     current_level = _current_list_level.get()
     next_level = current_level + 1
     token = _current_list_level.set(next_level)
@@ -183,14 +275,26 @@ def st_list(
         list_id = generate_key("ul")
         tag = "ol" if is_ordered else "ul"
 
-        marker = _build_list_root_payload(list_id, align)
+        marker = _build_list_root_payload(list_id, text_align, block_align)
 
         # Export wrapper: semantic <ul>/<ol> (suppresses st_block's own <div>)
         if is_export_active():
-            export_push_wrapper(f'<{tag} style="{l_style}">')
+            _extra = _list_export_css(text_align, block_align)
+            _base = f"{l_style}".strip()
+            if _base and _extra:
+                _style_attr = f"{_base.rstrip(';')}; {_extra}"
+            else:
+                _style_attr = _base or _extra
+            export_push_wrapper(f'<{tag} style="{_style_attr}">')
 
-        _list_base = Style("text-align: left;", "stx-list-base")
-        with st_block(style=_list_base + l_style, _export_wrapper=False):
+        # NOTE (0.7.33): the list root used to carry a hard-coded inline
+        # `text-align: left`, added to stop an inherited alignment from
+        # splitting bullet and text.  That floor also made alignment
+        # un-inheritable for every user.  The default now lives in the
+        # global stylesheet as the fallback of `--stx-list-text-align`
+        # (`inherit`), and the split is cured properly by the "inside"
+        # mode that `text_align=` switches on.
+        with st_block(style=l_style, _export_wrapper=False):
             st.html(marker)
             yield ListController(li_style=li_style, bullet_content=bullet_content, is_ordered=is_ordered, alt_li_styles=alt_li_styles)
 

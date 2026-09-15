@@ -429,3 +429,31 @@ class TestMarkerKey:
         assert e[0]["key"] == "electricity"
         assert e[0]["anchor"].startswith("stx-marker-")
         assert "key" not in e[1]
+
+
+class TestPendingStepQueue:
+    """0.7.31 — next/prev requests arriving before init are queued, not dropped."""
+
+    @patch("streamtex.marker.st.iframe")
+    def test_injected_js_has_pending_step_queue(self, mock_html):
+        reset_marker_registry(MarkerConfig())
+        register_marker("A", "a-1")
+        from streamtex.marker import inject_marker_navigation
+        inject_marker_navigation()
+        js = mock_html.call_args[0][0]
+        assert "hostWin._stxPendingStep" in js
+        assert "var PENDING_STEP_CAP = 2;" in js
+        assert "replayPendingStep();" in js
+
+    @patch("streamtex.marker.st.iframe")
+    def test_keys_and_arrows_go_through_step(self, mock_html):
+        """No caller navigates with a bare currentIdx +/- 1 any more."""
+        reset_marker_registry(MarkerConfig())
+        register_marker("A", "a-1")
+        from streamtex.marker import inject_marker_navigation
+        inject_marker_navigation()
+        js = mock_html.call_args[0][0]
+        assert "navigateTo(currentIdx + 1)" not in js
+        assert "navigateTo(currentIdx - 1)" not in js
+        assert "btnNext.onclick = function() { step(1); };" in js
+        assert "var INIT_MIN_MS = 500;" in js

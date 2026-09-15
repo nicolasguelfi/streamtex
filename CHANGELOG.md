@@ -5,6 +5,64 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+#### Marker navigation — a next/prev key pressed just after a page change was silently dropped (paginated books) (#57)
+
+- In a paginated book the floating-widget script (`marker.py`) is
+  re-injected on every rerun and only flipped `_initialized` after a
+  fixed 500 ms delay; `keyHandler` and `navigateTo` returned early until
+  then, so a `next_keys` / `prev_keys` press (or a ▶ / ◀ click on the
+  bar) arriving in that window did nothing and was never replayed.
+  Measured with Playwright: 20 presses lost out of 40 when each press
+  followed the previous page change by 100 ms (in-repo 15-page deck and
+  a real 41-page training deck alike).
+- The request is now **queued and replayed**: `keyHandler` and the
+  ▶ / ◀ buttons go through `step(delta)`, which before init records a
+  net step count on `hostWin._stxPendingStep` (survives the
+  re-injection, like `_stxPendingPage` in `book.py`; capped at ±2 so a
+  rapid double press still advances by two — the 0.7.10 coalescing
+  semantics; 3 s TTL so a stale request never fires on an unrelated
+  rerun) and `init` replays it once.  When a page navigation is already
+  in flight at init time (`hostWin._stxScrollReset` set by `book.py`),
+  the replay is deferred to the instance that lands, otherwise
+  `book.py` would coalesce it into the in-flight navigation and drop it.
+- A second, previously undiagnosed gap is closed as well: Chromium
+  neuters every listener registered by an iframe's script the moment
+  that iframe navigates or is removed, and on real decks Streamlit
+  replaces the widget iframe ~150 ms *before* the new script runs — no
+  handler at all during that gap.  A persistent key guard is now created
+  and registered through `hostWin.eval` (host-document realm, installed
+  once per window, survives re-injection) and queues a next/prev key
+  into the same `_stxPendingStep` whenever no initialised widget
+  instance is live.
+- The init keeps its 500 ms floor (it must run after `book.py`'s scroll
+  resets at 0/50/100/200/400 ms, or `prev` landing on the last marker of
+  the previous page and `?marker=` deep links would be undone) and now
+  only waits *longer* — 50 ms retries up to 2 s — when the marker
+  elements are not in the DOM yet (slow renders).  Nothing else changes:
+  keys, `scroll_offset`, the bar, the popup, the sidebar tables and the
+  `book.py` coalescing are untouched; the HTML export has its own
+  navigation script and is not affected.
+- After the fix: 0 lost out of 40 on the in-repo deck (300 / 700 /
+  1 200 / 2 000 ms delays: 0 lost), 0 out of 40 on the 41-page training
+  deck (marker-count instrument, two runs).  Partially addresses navigation-refactor
+  task 6.14 / 6.6 (readiness signal) — the "shorten the init" half is
+  deliberately left for a later phase.
+- Tests: `TestPendingStepQueue` (2 unit cases) and the real-Chromium
+  `tests/e2e/test_marker_key_queue.py` (7 cases, new 12-page fixture
+  `fixtures/marker_key_queue_app`): a press 50 ms after a page change is
+  honoured, a double press advances by two, a ▶ click in the window is
+  honoured, dead time per page stays under 2 s, a press during an
+  intermediate page's init survives an in-flight navigation, a key
+  pressed while the widget iframe is dead is caught by the host-realm
+  guard, and the guard that `prev` still lands on the last marker of
+  the previous page by scrolling.  The bug cases fail on 0.7.30 and
+  pass on 0.7.31.
+  Run with `uv run pytest -m e2e tests/e2e/test_marker_key_queue.py -v`.
+
 ## [0.7.30] — 2026-09-01
 
 ### Fixed

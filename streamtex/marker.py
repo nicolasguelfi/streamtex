@@ -261,6 +261,28 @@ def inject_marker_navigation(
     var _initialized = false;
     var popupOpen = __POPUP_OPEN__;
 
+    /* --- Pending-step queue (0.7.31) ---
+       This script is re-injected on every Streamlit rerun and only flips
+       _initialized after the init delay below.  A next/prev request that
+       arrives in that window used to be silently dropped (paginated books:
+       a key pressed shortly after a page change did nothing).  It is now
+       remembered on hostWin -- like _stxPendingPage in book.py, so it
+       survives the re-injection -- as a NET step count (next = +1,
+       prev = -1), capped to PENDING_STEP_CAP (a rapid double press advances
+       by two, the 0.7.10 coalescing semantics), and replayed once at init.
+       A TTL guards against a stale request firing on an unrelated rerun
+       (e.g. after landing on a page that injects no widget).          */
+    var PENDING_STEP_CAP = 2;
+    var PENDING_STEP_TTL_MS = 3000;
+    /* Init timing: INIT_MIN_MS keeps the historical 500 ms floor (book.py
+       resets the scroll position at 0/50/100/200/400 ms after a page
+       change; init must run AFTER the last reset so its scroll-to-marker
+       is not undone).  If the marker elements are not in the DOM yet
+       (slow render), init is retried every 50 ms up to INIT_MAX_MS.  */
+    var INIT_MIN_MS = 500;
+    var INIT_RETRY_MS = 50;
+    var INIT_MAX_MS = 2000;
+
     if (!markers.length) return;
 
     /* --- Cleanup previous run --- */
@@ -285,6 +307,44 @@ def inject_marker_navigation(
             }
         }
         return false;
+    }
+
+    /* --- Persistent key guard (host realm, installed once per window) ---
+       Chromium neuters every listener registered by an iframe's script as
+       soon as that iframe navigates or is removed (verified 2026-09), so
+       this instance's keyHandler dies with its iframe: between Streamlit
+       replacing the previous widget iframe and this script running,
+       nobody listens and a key is lost.  The guard is created AND
+       registered through hostWin.eval, so it belongs to the host
+       document's own realm and survives every re-injection.  It queues a
+       next/prev key into hostWin._stxPendingStep whenever no initialised
+       instance is live (flag + frame connectivity) and steps aside
+       otherwise.  Literals below mirror PENDING_STEP_CAP / _TTL_MS.   */
+    hostWin._stxMarkerKeys = { next: nextKeys, prev: prevKeys };
+    hostWin._stxMarkerInitialized = false;
+    hostWin._stxMarkerFrame = window.frameElement || null;
+    window.addEventListener('pagehide', function() {
+        hostWin._stxMarkerInitialized = false;
+    });
+    if (!hostWin._stxMarkerKeyGuard) {
+        hostWin._stxMarkerMatchKey = hostWin.eval('(' + matchesKey.toString() + ')');
+        hostWin._stxMarkerKeyGuard = hostWin.eval('(' + (function(e) {
+            var tag = (e.target.tagName || '').toUpperCase();
+            if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT'
+                || e.target.isContentEditable) return;
+            var fr = window._stxMarkerFrame;
+            if (window._stxMarkerInitialized && fr && fr.isConnected) return;
+            var keys = window._stxMarkerKeys, match = window._stxMarkerMatchKey;
+            if (!keys || !match) return;
+            var delta = match(e, keys.next) ? 1 : (match(e, keys.prev) ? -1 : 0);
+            if (!delta) return;
+            e.preventDefault(); e.stopPropagation();
+            var now = Date.now(), p = window._stxPendingStep;
+            var n = (p && (now - p.t) < 3000) ? p.n : 0;
+            n = Math.max(-2, Math.min(2, n + delta));
+            window._stxPendingStep = { n: n, t: now };
+        }).toString() + ')');
+        hostWin.eval("document.addEventListener('keydown', window._stxMarkerKeyGuard, true)");
     }
 
     /* --- Find marker element --- */
@@ -350,6 +410,35 @@ def inject_marker_navigation(
         updateUI();
     }
 
+    /* --- Relative navigation with pre-init queueing --- */
+    function queueStep(delta) {
+        var now = Date.now();
+        var p = hostWin._stxPendingStep;
+        var n = (p && (now - p.t) < PENDING_STEP_TTL_MS) ? p.n : 0;
+        n = Math.max(-PENDING_STEP_CAP, Math.min(PENDING_STEP_CAP, n + delta));
+        hostWin._stxPendingStep = { n: n, t: now };
+    }
+    function step(delta) {
+        if (!_initialized) { queueStep(delta); return; }
+        navigateTo(currentIdx + delta);
+    }
+    function replayPendingStep() {
+        var p = hostWin._stxPendingStep;
+        hostWin._stxPendingStep = null;
+        if (!(p && p.n && (Date.now() - p.t) < PENDING_STEP_TTL_MS)) return;
+        if (hostWin._stxScrollReset) {
+            /* A page navigation is already in flight: book.py sets this
+               flag right before clicking the hidden page button and clears
+               it when the landing page's nav script runs.  Replaying now
+               would be coalesced into that navigation by book.py's
+               pending-page logic (same target page => dropped).  Keep the
+               step queued, with a fresh TTL, for the instance that lands. */
+            hostWin._stxPendingStep = { n: p.n, t: Date.now() };
+            return;
+        }
+        navigateTo(currentIdx + p.n);
+    }
+
     /* ================================================================
        NAV WIDGET — fixed-width counter + popup marker list
        ================================================================ */
@@ -397,7 +486,7 @@ def inject_marker_navigation(
     btnPrev.style.cssText = btnStyle;
     btnPrev.onmouseenter = function() { this.style.background = btnHover; };
     btnPrev.onmouseleave = function() { this.style.background = 'none'; };
-    btnPrev.onclick = function() { navigateTo(currentIdx - 1); };
+    btnPrev.onclick = function() { step(-1); };
 
     /* Fixed-width counter (global marker index) — click to jump */
     var totalDigits = String(markers.length).length;
@@ -446,7 +535,7 @@ def inject_marker_navigation(
     btnNext.style.cssText = btnStyle;
     btnNext.onmouseenter = function() { this.style.background = btnHover; };
     btnNext.onmouseleave = function() { this.style.background = 'none'; };
-    btnNext.onclick = function() { navigateTo(currentIdx + 1); };
+    btnNext.onclick = function() { step(1); };
 
     var btnList = hostDoc.createElement('button');
     btnList.textContent = '\\u2630';
@@ -847,16 +936,22 @@ def inject_marker_navigation(
         var tag = (e.target.tagName || '').toUpperCase();
         if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT'
             || e.target.isContentEditable) return;
+        /* next/prev are accepted at any time.  Before init they are
+           queued instead of being dropped: on the host document the
+           persistent guard (above, runs first) has already queued the
+           key, so only events coming from a child iframe are queued here. */
+        var delta = matchesKey(e, nextKeys) ? 1 : (matchesKey(e, prevKeys) ? -1 : 0);
+        if (delta) {
+            e.preventDefault(); e.stopPropagation();
+            if (!_initialized) {
+                if (e.currentTarget !== hostDoc) queueStep(delta);
+                return false;
+            }
+            navigateTo(currentIdx + delta); return false;
+        }
         if (!_initialized) return;
         if (e.key === 'Escape' && popupOpen) {
             e.preventDefault(); togglePopup(false); return false;
-        }
-        if (matchesKey(e, nextKeys)) {
-            e.preventDefault(); e.stopPropagation();
-            navigateTo(currentIdx + 1); return false;
-        } else if (matchesKey(e, prevKeys)) {
-            e.preventDefault(); e.stopPropagation();
-            navigateTo(currentIdx - 1); return false;
         }
     }
 
@@ -925,7 +1020,24 @@ def inject_marker_navigation(
     };
 
     /* --- Init --- */
-    var initTimer = setTimeout(function() {
+    var initStarted = Date.now();
+    var initTimer = null;
+    function markersReady() {
+        if (hostDoc.querySelector('.streamtex-marker')) return true;
+        for (var i = 0; i < markers.length; i++) {
+            if (findMarkerElement(markers[i].anchor)) return true;
+        }
+        return false;
+    }
+    function scheduleInit(delay) {
+        initTimer = setTimeout(function() {
+            if (!markersReady() && (Date.now() - initStarted) < INIT_MAX_MS) {
+                scheduleInit(INIT_RETRY_MS); return;
+            }
+            init();
+        }, delay);
+    }
+    function init() {
         var startIdx = hostWin._stxMarkerStartIdx != null ? hostWin._stxMarkerStartIdx : 0;
         if (startIdx < 0) startIdx = markers.length + startIdx;
         startIdx = Math.max(0, Math.min(startIdx, markers.length - 1));
@@ -960,9 +1072,13 @@ def inject_marker_navigation(
             popupOpen = hostWin._stxMarkerPopupState;
         }
         _initialized = true;
+        hostWin._stxMarkerInitialized = true;
         updateUI(); scanIframes();
         if (popupOpen) { popup.style.display = 'block'; highlightPopup(); }
-    }, 500);
+        /* Replay a next/prev request that arrived before init (queue). */
+        replayPendingStep();
+    }
+    scheduleInit(INIT_MIN_MS);
 })();
 """
 

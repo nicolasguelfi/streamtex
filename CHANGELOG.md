@@ -5,6 +5,57 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.36] — 2026-10-03 — Safety net: see the defects before the screen does
+
+Lot B of the roadmap (boards `lecons1` / `lots1`). Measured before release:
+the real build of every block of the maintainer's three largest projects —
+**1,658 blocks in 49 books** (all-trainings 34 books / 1,198 blocks,
+sumvadis 10 / 268, ai4se6d 5 / 192) — with no error; 63 browser end-to-end
+tests and the CLI non-regression (10 StreamTeX roots, two scenarios) show no
+difference from 0.7.35.
+
+### Added
+
+- **`stx validate --build`** (#75) — runs the real `build()` of every block
+  of every `book.py` (Streamlit AppTest, no browser, one subprocess per
+  book), with a checking `st_book` that sets up the bibliography, TOC and
+  markers and forwards the book's `block_args` / `block_kwargs`. Reports per
+  block: the exception if `build()` raises, every image that resolves to
+  nothing (an empty frame), every image inlined above 512 KB (#80), and —
+  statically — a styled `st_block` with an empty body (renders nothing in
+  the app). `--book PATH` (repeatable), `--timeout`. Run it in the project's
+  environment: `uv run stx validate --build`. (`streamtex/cli/build_check.py`)
+- **Project rules** (#76) — `[[validate.rules]]` in `stx.toml`, run by
+  `stx validate`: `glob` + `forbid` / `require` regexes (every match /
+  every file without a match is a violation, reported `path:line`), or
+  `run` (a command whose non-zero exit fails), `severity = "error" |
+  "warning"`. (`streamtex/cli/project_rules.py`)
+- **`stx.load_json` / `load_toml` / `load_text` / `watch_file`** (#77) —
+  data files read at build time are re-read when they change (mtime and
+  size) and registered; a cached page set (session or persisted) is
+  discarded when one of them changed. Reloading the page is enough.
+  (`streamtex/watch.py`)
+- `stx validate` lists, as information only, the top-level `def st_*` of the
+  project that streamtex also provides (#79) — e.g. a local
+  `st_hover_tooltip` kept after its promotion in 0.7.8.
+
+### Changed
+
+- **Page-cache key** (#53, #77) — now includes every `custom/**/*.py` (not
+  only `styles.py`) and the helper modules next to the blocks in each block
+  directory (`shared-blocks/` folders included): editing a tuning module no
+  longer leaves a stale TOC / marker cache, even after a restart. Existing
+  caches rebuild once.
+
+### Fixed
+
+- **`from streamtex import *` no longer exports sub-modules** (#78) —
+  without `__all__` it exported 50 of them, and `streamtex/list.py`
+  shadowed the builtin `list` in every block. `__all__` lists exactly the
+  names exported before, minus the modules (measured on 1,151
+  star-importing files of the maintainer's projects: none used a sub-module
+  through the star import). Sub-modules stay importable explicitly.
+
 ## [0.7.35] — 2026-10-03 — Claude profiles: project mode, and nothing of yours overwritten
 
 Lot A of the roadmap drawn from the maintainer's three largest projects

@@ -1264,6 +1264,16 @@ def _block_kwargs_fingerprint(block_args: tuple = (),
     return hashlib.md5(payload.encode()).hexdigest()[:8]
 
 
+def _watched_current(cache: dict) -> bool:
+    from .watch import snapshot_is_current
+    return snapshot_is_current(cache.get("watched"))
+
+
+def _watched_snapshot() -> dict:
+    from .watch import watched_snapshot
+    return watched_snapshot()
+
+
 def _compute_cache_hash(module_list, block_args: tuple = (),
                         block_kwargs: dict | None = None):
     """Return a hash that changes when the module list or file contents change.
@@ -1271,7 +1281,12 @@ def _compute_cache_hash(module_list, block_args: tuple = (),
     The hash incorporates:
     - Module names (detects add/remove/reorder)
     - File modification times (detects content edits)
-    - book.py, custom/styles.py, blocks/helpers.py mtimes (detects config changes)
+    - book.py, every custom/**/*.py, blocks/helpers.py and the helper modules
+      next to the blocks (detects config changes, #53)
+
+    Data files read through ``stx.load_*`` / ``watch_file`` are NOT part of
+    the hash (the registry is empty until the blocks have run): the cache
+    stores their mtimes under ``"watched"`` and is discarded when one changed.
     - streamtex library version (detects library upgrades)
     - A fingerprint of ``block_args`` / ``block_kwargs`` when non-empty, so a
       document built with ``block_kwargs={"lang": "fr"}`` never reuses the
@@ -1301,6 +1316,29 @@ def _compute_cache_hash(module_list, block_args: tuple = (),
             os.path.join(project_dir, "blocks", "helpers.py"),
         ]
         for fp in ancillary:
+            if os.path.isfile(fp):
+                parts.append(f"{fp}:{os.path.getmtime(fp)}")
+        # #53 — every custom/**/*.py (config, visuals, slide helpers…), not
+        # only styles.py, and the helper modules living next to the blocks
+        # in every block directory (shared-blocks/ folders included).
+        seen = set(ancillary)
+        extra: list[str] = []
+        custom_dir = os.path.join(project_dir, "custom")
+        if os.path.isdir(custom_dir):
+            for root, dirs, files in os.walk(custom_dir):
+                dirs[:] = [d for d in dirs if d != "__pycache__"]
+                extra += [os.path.join(root, f) for f in files if f.endswith(".py")]
+        block_dirs = {os.path.dirname(os.path.abspath(getattr(m, "__file__", "") or ""))
+                      for m in module_list if getattr(m, "__file__", None)}
+        module_files = {os.path.abspath(getattr(m, "__file__", "") or "") for m in module_list}
+        for d in sorted(block_dirs):
+            try:
+                names = os.listdir(d)
+            except OSError:
+                continue
+            extra += [os.path.join(d, f) for f in names
+                      if f.endswith(".py") and os.path.join(d, f) not in module_files]
+        for fp in sorted(set(extra) - seen):
             if os.path.isfile(fp):
                 parts.append(f"{fp}:{os.path.getmtime(fp)}")
 
@@ -1359,6 +1397,10 @@ def _load_file_cache(cache_path: str, expected_hash: str) -> dict | None:
             data = json.load(f)
         if data.get("hash") != expected_hash:
             logger.debug("File cache hash mismatch — will rebuild.")
+            return None
+        from .watch import snapshot_is_current
+        if not snapshot_is_current(data.get("watched")):
+            logger.debug("A data file read by the blocks changed — will rebuild.")
             return None
         # search_index keys are ints in memory but strings in JSON; convert back
         si = data.get("search_index")
@@ -1701,6 +1743,9 @@ def _build_page_cache(module_list, toc_config, marker_config, separator,
         "cited_keys": _bib_cited,
         "doc_version": st.session_state.get("_stx_doc_version", ""),
         "lib_version": st.session_state.get("_stx_lib_version", ""),
+        # Data files the blocks read through stx.load_*/watch_file during
+        # this build (#53): checked again when the persisted cache is loaded.
+        "watched": _watched_snapshot(),
     }
 
 
@@ -2348,6 +2393,7 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
     has_valid_cache = (
         cache is not None
         and cache.get("hash") == cache_hash
+        and _watched_current(cache)
         and cache.get("total") == total
     )
     # Invalidate cache if search was enabled but cache lacks search_index

@@ -912,7 +912,7 @@ def test_ensure_claude_gitignore_adds_rules(tmp_path):
 
 
 def test_ensure_claude_gitignore_untracks_files(tmp_path):
-    """_ensure_claude_gitignore removes tracked .claude/ files from git index."""
+    """With commit=True, tracked .claude/ files are removed from the git index (#69)."""
     import subprocess
 
     from rich.console import Console
@@ -946,7 +946,7 @@ def test_ensure_claude_gitignore_untracks_files(tmp_path):
         cwd=str(proj), capture_output=True, timeout=10,
     )
 
-    _ensure_claude_gitignore(str(proj), console)
+    _ensure_claude_gitignore(str(proj), console, commit=True)
 
     # .claude/CLAUDE.md.j2 should be untracked
     result = subprocess.run(
@@ -972,8 +972,8 @@ def test_ensure_claude_gitignore_untracks_files(tmp_path):
     assert (proj / ".claude" / "CLAUDE.md.j2").exists()
 
 
-def test_ensure_claude_gitignore_auto_commits(tmp_path):
-    """Migration auto-commits when no pre-existing staged changes."""
+def test_ensure_claude_gitignore_commits_only_on_request(tmp_path):
+    """Without commit=True nothing is untracked or committed; with it, one commit (#69)."""
     import subprocess
 
     from rich.console import Console
@@ -1003,7 +1003,22 @@ def test_ensure_claude_gitignore_auto_commits(tmp_path):
 
     _ensure_claude_gitignore(str(proj), console)
 
-    # Should have auto-committed — no staged changes left
+    # Default: no commit, the file is still tracked, the index is untouched
+    result = subprocess.run(
+        ["git", "log", "-1", "--format=%s"],
+        cwd=str(proj), capture_output=True, text=True, timeout=10,
+    )
+    assert result.stdout.strip() == "init"
+    result = subprocess.run(
+        ["git", "ls-files", ".claude/refs.md"],
+        cwd=str(proj), capture_output=True, text=True, timeout=10,
+    )
+    assert "refs.md" in result.stdout
+    assert ".claude/*" in (proj / ".gitignore").read_text()
+
+    _ensure_claude_gitignore(str(proj), console, commit=True)
+
+    # Explicit request: committed — no staged changes left
     result = subprocess.run(
         ["git", "diff", "--cached", "--name-only"],
         cwd=str(proj), capture_output=True, text=True, timeout=10,
@@ -1052,7 +1067,7 @@ def test_ensure_claude_gitignore_skips_commit_if_staged(tmp_path):
     (proj / "book.py").write_text("# book v2")
     subprocess.run(["git", "add", "book.py"], cwd=str(proj), capture_output=True, timeout=10)
 
-    _ensure_claude_gitignore(str(proj), console)
+    _ensure_claude_gitignore(str(proj), console, commit=True)
 
     # Should NOT have auto-committed — staged changes still present
     result = subprocess.run(

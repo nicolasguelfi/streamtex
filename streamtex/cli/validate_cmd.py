@@ -35,6 +35,17 @@ def _print_issues(console, label: str, issues) -> tuple[int, int]:
     return len(errors), len(warnings)
 
 
+def _declares_claude_mode(stx_toml: Path) -> bool:
+    """True when stx.toml has a [claude] table with a ``mode`` key (valid or not)."""
+    import tomllib
+
+    try:
+        with open(stx_toml, "rb") as f:
+            return "mode" in tomllib.load(f).get("claude", {})
+    except (OSError, tomllib.TOMLDecodeError):
+        return False
+
+
 @click.command("validate")
 @click.option(
     "--strict",
@@ -122,6 +133,30 @@ def validate(strict: bool) -> None:
             e, w = _print_issues(console, f"{pack_obj.name}:{kit_path.stem}", issues)
             total_errors += e
             total_warnings += w
+
+    # 5) Claude declaration (project mode, #71) — printed only when declared
+    from .claude_project import is_project_mode, validate_declaration
+
+    if stx_toml.is_file() and (is_project_mode(str(project_dir)) or _declares_claude_mode(stx_toml)):
+        console.print("[bold]Claude[/bold]")
+        try:
+            from .claude_cmd import find_claude_repo
+            from .workspace_cmd import load_stx_toml
+
+            claude_repo = find_claude_repo(str(project_dir), load_stx_toml(str(project_dir)))
+        except click.ClickException:
+            claude_repo = None
+        problems = validate_declaration(str(project_dir), claude_repo)
+        if problems:
+            console.print("  [red]\\[claude]: FAIL[/red]")
+            for msg in problems:
+                console.print(f"    [red]\\[claude][/red] {msg}")
+            total_errors += len(problems)
+        elif claude_repo is None:
+            console.print("  [yellow]\\[claude]: WARN[/yellow] streamtex-claude not found — profile not checked")
+            total_warnings += 1
+        else:
+            console.print("  [green]\\[claude]: OK[/green]")
 
     # Summary + exit code (PLAN §7.5: 0 = OK, 1 = warnings, 2 = errors)
     if total_errors:

@@ -82,31 +82,27 @@ def _render_claude_md(template_path: str, project_name: str, profile: str) -> st
 
 
 def _render_claude_md_for_target(
-    target: str, profile: str,
+    target: str, profile: str, *, previous_render: str | None = None,
 ) -> str | None:
-    """Render CLAUDE.md from .claude/CLAUDE.md.j2 if the template exists.
+    """Render ``.claude/CLAUDE.md.j2`` (if present) where it belongs (#67).
 
-    Writes the rendered content to ``CLAUDE.md`` at the project root.
-    Returns the rendered path, or ``None`` if no template was found.
+    The root ``CLAUDE.md`` receives the render only when stx owns it (absent,
+    or equal to *previous_render* / the new render); a user-authored root
+    file is left untouched and the render goes to ``.claude/CLAUDE.md``.
+    Returns the destination relative to *target*, or ``None`` without template.
     """
+    from ._claude_files import write_profile_claude_md
+
     template_path = os.path.join(target, ".claude", "CLAUDE.md.j2")
     if not os.path.isfile(template_path):
         return None
 
     project_name = os.path.basename(os.path.abspath(target))
     rendered = _render_claude_md(template_path, project_name, profile)
-
-    dst = os.path.join(target, "CLAUDE.md")
-    # Make writable if read-only
-    if os.path.isfile(dst):
-        st = os.stat(dst)
-        if not st.st_mode & 0o200:
-            os.chmod(dst, st.st_mode | 0o200)
-
-    with open(dst, "w", encoding="utf-8") as f:
-        f.write(rendered)
-
-    return dst
+    dest_rel, _changed = write_profile_claude_md(
+        target, rendered, candidates=(previous_render,),
+    )
+    return dest_rel
 
 
 def find_claude_repo(ws_root: str, config: dict) -> str:
@@ -197,11 +193,34 @@ def _make_writable(directory: str) -> None:
             os.chmod(fpath, st.st_mode | 0o200)
 
 
+def _previous_profile_render(target: str, profile: str) -> str | None:
+    """Render of the template installed BEFORE an install/update (#67).
+
+    A root CLAUDE.md equal to this render was produced by stx, so stx may
+    replace it; any other content belongs to the user.
+    """
+    j2_path = os.path.join(target, ".claude", "CLAUDE.md.j2")
+    if not os.path.isfile(j2_path):
+        return None
+    return _render_claude_md(j2_path, os.path.basename(os.path.abspath(target)), profile)
+
+
 def install_profile(claude_repo: str, profile: str, target: str) -> list[str]:
     """Install a Claude profile into *target* project.
 
+    The installed set is exactly :func:`collect_source_files` — the set that
+    ``update``, ``diff`` and ``check`` compare against — so a child profile
+    (``extends``) gets its parent then its ``overlay/`` (#65, #66).
+
+    - Shared references and commands are read-only copies (``0o444``).
+    - A user-authored root ``CLAUDE.md`` is never overwritten: the profile
+      text then goes to ``.claude/CLAUDE.md`` (#67).
+    - An existing ``.claude/settings.json`` is merged, never replaced (#68).
+
     Returns the list of installed file paths (relative to target).
     """
+    from ._claude_files import SETTINGS_PATH, merge_settings, write_profile_claude_md
+
     profile_dir = os.path.join(claude_repo, "profiles", profile)
     if not os.path.isdir(profile_dir):
         raise click.ClickException(
@@ -211,51 +230,43 @@ def install_profile(claude_repo: str, profile: str, target: str) -> list[str]:
     installed: list[str] = []
     target = os.path.abspath(target)
     claude_dir = os.path.join(target, ".claude")
+    previous_render = _previous_profile_render(target, profile)
     os.makedirs(claude_dir, exist_ok=True)
 
-    # Unlock any previously read-only files so copytree can overwrite them
+    # Unlock any previously read-only files so they can be overwritten
     _make_writable(claude_dir)
 
-    # 1. Copy profile contents into .claude/ (except CLAUDE.md and manifest.toml)
-    for entry in os.listdir(profile_dir):
-        if entry == "manifest.toml":
+    for rel, src in collect_source_files(claude_repo, profile).items():
+        dst = os.path.join(target, rel)
+        if rel == "CLAUDE.md":
+            # A raw CLAUDE.md shipped by the profile: same ownership rule
+            with open(src, encoding="utf-8") as f:
+                dest_rel, _changed = write_profile_claude_md(
+                    target, f.read(), candidates=(previous_render,),
+                )
+            installed.append(dest_rel)
             continue
-        src = os.path.join(profile_dir, entry)
-
-        if entry == "CLAUDE.md":
-            # CLAUDE.md goes to project root
-            dst = os.path.join(target, "CLAUDE.md")
-            shutil.copy2(src, dst)
-            installed.append("CLAUDE.md")
+        if rel == SETTINGS_PATH and os.path.isfile(dst):
+            merge_settings(src, dst)
+            installed.append(rel)
             continue
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
+        if os.path.isfile(dst) and not os.access(dst, os.W_OK):
+            os.chmod(dst, 0o644)
+        shutil.copy2(src, dst)
+        installed.append(rel)
 
-        dst = os.path.join(claude_dir, entry)
-        if os.path.isdir(src):
-            shutil.copytree(src, dst, dirs_exist_ok=True)
-            for root, _dirs, files in os.walk(dst):
-                for f in files:
-                    rel = os.path.relpath(os.path.join(root, f), target)
-                    installed.append(rel)
-        else:
-            os.makedirs(os.path.dirname(dst), exist_ok=True)
-            shutil.copy2(src, dst)
-            installed.append(os.path.relpath(dst, target))
+    # Read-only protection, as in 0.7.34: every file under .claude/references
+    # and .claude/commands (the shared copies land there, merged with the
+    # profile's own commands).
+    for kind in ("references", "commands"):
+        if not os.path.isdir(os.path.join(claude_repo, "shared", kind)):
+            continue
+        for root, _dirs, files in os.walk(os.path.join(claude_dir, kind)):
+            for f in files:
+                os.chmod(os.path.join(root, f), 0o444)
 
-    # 2. Copy shared/references/ and shared/commands/ (read-only copies)
-    for shared_kind, dst_name in [("references", "references"), ("commands", "commands")]:
-        shared_dir = os.path.join(claude_repo, "shared", shared_kind)
-        if os.path.isdir(shared_dir):
-            dst_dir = os.path.join(claude_dir, dst_name)
-            shutil.copytree(shared_dir, dst_dir, dirs_exist_ok=True)
-            for root, _dirs, files in os.walk(dst_dir):
-                for f in files:
-                    fpath = os.path.join(root, f)
-                    os.chmod(fpath, 0o444)
-                    rel = os.path.relpath(fpath, target)
-                    if rel not in installed:
-                        installed.append(rel)
-
-    # 3. Create .claude/custom/ directory with README if it doesn't exist
+    # Create .claude/custom/ directory with README if it doesn't exist
     custom_dir = os.path.join(claude_dir, "custom")
     if not os.path.isdir(custom_dir):
         os.makedirs(custom_dir, exist_ok=True)
@@ -264,20 +275,26 @@ def install_profile(claude_repo: str, profile: str, target: str) -> list[str]:
             f.write(_CUSTOM_README)
         installed.append(os.path.relpath(readme_path, target))
 
-    # 4. Write .claude/.stx-profile marker
+    # Write .claude/.stx-profile marker
     marker_path = os.path.join(claude_dir, ".stx-profile")
     with open(marker_path, "w", encoding="utf-8") as f:
         f.write(profile + "\n")
     installed.append(os.path.relpath(marker_path, target))
 
-    # 5. Render CLAUDE.md from .claude/CLAUDE.md.j2 template (if present)
-    rendered = _render_claude_md_for_target(target, profile)
-    if rendered:
-        rel = os.path.relpath(rendered, target)
-        if rel not in installed:
-            installed.append(rel)
+    # Render CLAUDE.md from .claude/CLAUDE.md.j2 (if present), where it belongs
+    rendered = _render_claude_md_for_target(target, profile, previous_render=previous_render)
+    if rendered and rendered not in installed:
+        installed.append(rendered)
 
     return sorted(installed)
+
+
+# Files stx writes itself (never part of a profile source, never pruned).
+_GENERATED_PATHS = frozenset({
+    os.path.join(".claude", ".stx-profile"),
+    os.path.join(".claude", "CLAUDE.md"),   # profile text when the root CLAUDE.md is the user's
+    os.path.join(".claude", "stx.lock"),    # project mode lock file
+})
 
 
 @dataclass
@@ -399,11 +416,17 @@ def compare_profile(
     target = os.path.abspath(target)
     diffs: list[FileDiff] = []
 
+    from ._claude_files import SETTINGS_PATH, settings_cover
+
     for rel_path, src_path in sorted(source_files.items()):
         dst_path = os.path.join(target, rel_path)
         if not os.path.isfile(dst_path):
             diffs.append(FileDiff(path=rel_path, status="missing"))
         elif filecmp.cmp(src_path, dst_path, shallow=False):
+            diffs.append(FileDiff(path=rel_path, status="identical"))
+        elif rel_path == SETTINGS_PATH and settings_cover(dst_path, src_path):
+            # Merged settings (#68): the local file contains everything the
+            # profile sets, plus the user's own entries.
             diffs.append(FileDiff(path=rel_path, status="identical"))
         else:
             diffs.append(FileDiff(path=rel_path, status="modified"))
@@ -420,7 +443,7 @@ def compare_profile(
             for fname in filenames:
                 abs_path = os.path.join(root, fname)
                 rel = os.path.relpath(abs_path, target)
-                if rel not in source_files and fname != ".stx-profile":
+                if rel not in source_files and rel not in _GENERATED_PATHS:
                     diffs.append(FileDiff(path=rel, status="extra"))
 
     return sorted(diffs, key=lambda d: d.path)
@@ -430,11 +453,66 @@ def compare_profile(
 # Click commands
 # ---------------------------------------------------------------------------
 
+def plan_install(claude_repo: str, profile: str, target: str) -> tuple[list[tuple[str, str]], list[str]]:
+    """What :func:`install_profile` would do, without writing anything (#70).
+
+    Returns ``(actions, conflicts)``: ``actions`` is a sorted list of
+    ``(relative_path, action)`` with action in ``create`` / ``replace`` /
+    ``keep`` / ``merge``; ``conflicts`` lists existing files that stx did not
+    install (the target has no ``.claude/.stx-profile``) and that the install
+    would replace.
+    """
+    from ._claude_files import SETTINGS_PATH, root_claude_md_is_owned
+
+    target = os.path.abspath(target)
+    previously_installed = read_installed_profile(target) is not None
+    previous_render = _previous_profile_render(target, profile)
+    actions: list[tuple[str, str]] = []
+    conflicts: list[str] = []
+    for rel, src in sorted(collect_source_files(claude_repo, profile).items()):
+        dst = os.path.join(target, rel)
+        if rel == "CLAUDE.md":
+            with open(src, encoding="utf-8") as f:
+                owned = root_claude_md_is_owned(target, candidates=(previous_render, f.read()))
+            dest = rel if owned else os.path.join(".claude", "CLAUDE.md")
+            exists = os.path.isfile(os.path.join(target, dest))
+            actions.append((dest, "replace" if exists else "create"))
+            continue
+        if not os.path.isfile(dst):
+            actions.append((rel, "create"))
+        elif filecmp.cmp(src, dst, shallow=False):
+            actions.append((rel, "keep"))
+        elif rel == SETTINGS_PATH:
+            actions.append((rel, "merge"))
+        else:
+            actions.append((rel, "replace"))
+            if not previously_installed:
+                conflicts.append(rel)
+    j2 = [src for rel, src in collect_source_files(claude_repo, profile).items()
+          if rel == os.path.join(".claude", "CLAUDE.md.j2")]
+    if j2:
+        rendered = _render_claude_md(j2[0], os.path.basename(target), profile)
+        owned = root_claude_md_is_owned(target, candidates=(previous_render, rendered))
+        dest = "CLAUDE.md" if owned else os.path.join(".claude", "CLAUDE.md")
+        exists = os.path.isfile(os.path.join(target, dest))
+        actions.append((dest, ("replace" if exists else "create") + " (rendered from CLAUDE.md.j2)"))
+    return actions, conflicts
+
+
 @click.command()
 @click.argument("profile")
 @click.argument("path", default=".")
-def install(profile, path):
-    """Install a Claude AI profile into a project."""
+@click.option("--dry-run", is_flag=True, help="Show every file the install would write; write nothing.")
+@click.option("-y", "--yes", is_flag=True,
+              help="Install even when existing files that stx did not install would be replaced.")
+def install(profile, path, dry_run, yes):
+    """Install a Claude AI profile into a project.
+
+    A user-authored root CLAUDE.md is never overwritten: the profile text then
+    goes to .claude/CLAUDE.md (Claude Code reads both). An existing
+    .claude/settings.json is merged. Use --dry-run first in an existing
+    repository.
+    """
     ws_root = find_workspace_root()
     if ws_root is None:
         raise click.ClickException(
@@ -445,13 +523,50 @@ def install(profile, path):
     claude_repo = find_claude_repo(ws_root, config)
 
     target = os.path.abspath(path)
+    console = get_console()
+
+    if not os.path.isdir(os.path.join(claude_repo, "profiles", profile)):
+        raise click.ClickException(
+            f"Profile '{profile}' not found in {os.path.join(claude_repo, 'profiles')}"
+        )
+    actions, conflicts = plan_install(claude_repo, profile, target)
+
+    if dry_run:
+        console.print(f"[cyan]Dry run[/cyan] — profile '{profile}' into {target} (nothing written)")
+        if conflicts:
+            console.print(f"\n[yellow]{len(conflicts)} existing file(s) not installed by stx "
+                          "would be replaced:[/yellow]")
+            for rel in conflicts:
+                console.print(f"  [yellow]![/yellow] {rel}")
+        counts: dict[str, int] = {}
+        for _rel, action in actions:
+            counts[action.split(" ")[0]] = counts.get(action.split(" ")[0], 0) + 1
+        console.print("\n" + ", ".join(f"{n} {a}" for a, n in sorted(counts.items())))
+        for rel, action in actions:
+            if not action.startswith("keep"):
+                console.print(f"  {action:<8} {rel}")
+        return
+
+    if conflicts and not yes:
+        listing = "\n".join(f"  {rel}" for rel in conflicts[:20])
+        more = f"\n  ... and {len(conflicts) - 20} more" if len(conflicts) > 20 else ""
+        raise click.ClickException(
+            f"{len(conflicts)} existing file(s) were not installed by stx and would be "
+            f"replaced:\n{listing}{more}\n"
+            "Review with --dry-run, then rerun with --yes to install anyway."
+        )
+
     installed = install_profile(claude_repo, profile, target)
 
-    console = get_console()
     console.print(f"[green]Profile '{profile}' installed into {target}[/green]")
     console.print(f"  {len(installed)} files copied")
     for f in installed:
         console.print(f"    {f}")
+    if os.path.join(".claude", "CLAUDE.md") in installed:
+        console.print(
+            "  [dim]Your root CLAUDE.md was left untouched; the profile text is in "
+            ".claude/CLAUDE.md (Claude Code reads both).[/dim]"
+        )
 
 
 @click.command("list")
@@ -562,16 +677,32 @@ def find_profile_targets(ws_root: str) -> list[tuple[str, str]]:
     """Find all directories with an installed Claude profile.
 
     Scans first-level directories and ``projects/`` subdirectories for
-    ``.claude/.stx-profile`` markers.
+    ``.claude/.stx-profile`` markers or a project-mode ``[claude]``
+    declaration, plus the workspace root itself when it declares project mode.
 
     Returns a list of ``(target_path, profile_name)`` tuples.
     """
+    from .claude_project import read_declaration
+
     results: list[tuple[str, str]] = []
 
+    def _declared(dirpath: str) -> str | None:
+        try:
+            decl = read_declaration(dirpath)
+        except click.ClickException:
+            return None
+        return decl.profile if decl else None
+
     def _check(dirpath: str) -> None:
-        profile = read_installed_profile(dirpath)
+        profile = read_installed_profile(dirpath) or _declared(dirpath)
         if profile is not None:
             results.append((dirpath, profile))
+
+    # The workspace root itself, only when it declares project mode (#71):
+    # a root with a classic profile keeps 0.7.34 behaviour (not scanned).
+    root_profile = _declared(ws_root)
+    if root_profile is not None:
+        results.append((ws_root, root_profile))
 
     for entry in sorted(os.listdir(ws_root)):
         entry_path = os.path.join(ws_root, entry)
@@ -638,14 +769,13 @@ _CLAUDE_GITIGNORE_BLOCK = """\
 """
 
 
-def _ensure_claude_gitignore(target: str, console) -> None:
-    """Ensure .claude/ is in .gitignore and untracked from git.
+def _ensure_claude_gitignore(target: str, console, *, commit: bool = False) -> None:
+    """Ensure .claude/ is in .gitignore; untrack it from git only on request (#69).
 
-    This migrates existing repos where .claude/ was previously tracked.
-    If the migration changes the git index and there are no pre-existing
-    staged changes, the migration is auto-committed.  Otherwise the user
-    is told to commit manually (to avoid mixing migration with unrelated
-    staged work).
+    The ``.gitignore`` block is always added when missing. Removing tracked
+    ``.claude/`` files from the index and committing happen only when
+    *commit* is True (``stx claude update --commit``); otherwise the git
+    commands are printed for the user to run. stx never commits on its own.
     """
     import subprocess
 
@@ -693,6 +823,17 @@ def _ensure_claude_gitignore(target: str, console) -> None:
     if not tracked:
         return
 
+    if not commit:
+        console.print(
+            f"  [yellow]Note:[/yellow] {len(tracked)} .claude/ file(s) are still tracked by git. "
+            "To stop tracking them (local copies kept), run:\n"
+            "    git rm -r --cached .claude/ && git add .claude/custom/ .claude/.stx-profile"
+            + (" .gitignore" if gitignore_changed else "")
+            + "\n    git commit -m \"chore: stop tracking .claude/ managed files\"\n"
+            "  or rerun with [bold]--commit[/bold]."
+        )
+        return
+
     # 3. Check for pre-existing staged changes (to avoid mixing with migration)
     staged_before = _git("diff", "--cached", "--name-only")
     has_staged = bool(staged_before.stdout.strip())
@@ -714,12 +855,12 @@ def _ensure_claude_gitignore(target: str, console) -> None:
     if gitignore_changed:
         _git("add", ".gitignore")
 
-    # 5. Auto-commit if no pre-existing staged changes
+    # 5. Commit (explicitly requested) if no pre-existing staged changes
     if has_staged:
         console.print(
             "  [green]\u2713[/green] .claude/ untracked from git "
             "(run [bold]git commit[/bold] to finalize — "
-            "skipped auto-commit because you have other staged changes)"
+            "not committed because you have other staged changes)"
         )
     else:
         result = _git(
@@ -727,19 +868,40 @@ def _ensure_claude_gitignore(target: str, console) -> None:
             "chore: stop tracking .claude/ managed files\n\n"
             "Files in .claude/ (except custom/ and .stx-profile) are now\n"
             "managed by `stx claude install/update`, not git.\n"
-            "Local copies are preserved. This migration was performed\n"
-            "automatically by `stx update`.",
+            "Local copies are preserved. Requested with `stx claude update --commit`.",
         )
         if result.returncode == 0:
             console.print(
-                "  [green]\u2713[/green] .claude/ untracked from git "
-                "[dim](auto-committed)[/dim]"
+                "  [green]\u2713[/green] .claude/ untracked from git [dim](committed)[/dim]"
             )
         else:
             console.print(
                 "  [green]\u2713[/green] .claude/ untracked from git "
                 "(run [bold]git commit[/bold] to finalize)"
             )
+
+
+def _is_managed_clone(target: str) -> bool:
+    """True when *target* is a repo declared in the enclosing workspace's ``[repos]``.
+
+    Those clones (streamtex-docs, …) are created and pulled by ``stx update``;
+    they are not user projects.
+    """
+    parent = os.path.dirname(os.path.abspath(target))
+    ws_root = find_workspace_root(parent)
+    if ws_root is None:
+        return False
+    try:
+        config = load_stx_toml(ws_root)
+    except Exception:  # noqa: BLE001 — unreadable config: treat as a user project
+        return False
+    for name, conf in config.get("repos", {}).items():
+        if not isinstance(conf, dict):
+            continue
+        path = os.path.abspath(os.path.join(ws_root, conf.get("path", name)))
+        if path == os.path.abspath(target):
+            return True
+    return False
 
 
 _BACKUP_PREFIX = os.path.join(".claude", ".backup")
@@ -751,7 +913,7 @@ def _is_protected_path(rel_path: str) -> bool:
     """Return True if rel_path must NEVER be removed, even under prune."""
     if rel_path == _BACKUP_PREFIX or rel_path.startswith(_BACKUP_PREFIX + os.sep):
         return True
-    if rel_path == _STX_PROFILE_PATH:
+    if rel_path == _STX_PROFILE_PATH or rel_path in _GENERATED_PATHS:
         return True
     # .claude/custom/ is already filtered by compare_profile(); this is
     # defence in depth in case the filter ever regresses.
@@ -846,6 +1008,7 @@ def _update_single_target(
     force: bool,
     console,
     yes: bool = False,
+    commit: bool | None = None,
 ) -> int:
     """Update a single target from its profile source.
 
@@ -863,9 +1026,21 @@ def _update_single_target(
     and an interactive confirmation prompt is required, unless yes=True.
 
     Returns the number of files updated (installs + overwrites + prunes).
+
+    A target in project mode (``[claude] mode = "project"``) is synced from
+    its declaration instead (#71).
     """
+    from .claude_project import is_project_mode, read_declaration, sync_project
+
+    if is_project_mode(target):
+        plan = sync_project(target, claude_repo, read_declaration(target), force=force, console=console)
+        return len(plan.install) + len(plan.update) + len(plan.merge) + len(plan.prune) + (
+            len(plan.keep_modified) if force else 0)
+
     diffs = compare_profile(claude_repo, profile, target)
     source_files = collect_source_files(claude_repo, profile)
+    # Render of the template as installed BEFORE this update (#67)
+    previous_render = _previous_profile_render(target, profile)
 
     # Ensure .claude/custom/ exists (for projects created before this feature)
     custom_dir = os.path.join(target, ".claude", "custom")
@@ -875,8 +1050,12 @@ def _update_single_target(
         with open(readme_path, "w", encoding="utf-8") as f:
             f.write(_CUSTOM_README)
 
-    # Migrate: ensure .claude/ is gitignored and untracked
-    _ensure_claude_gitignore(target, console)
+    # Migrate: ensure .claude/ is gitignored (untracked only with --commit, #69).
+    # Clones of official repos that stx itself manages and pulls keep the
+    # 0.7.34 migration commit, so that their tree stays clean for `git pull`.
+    if commit is None:
+        commit = _is_managed_clone(target)
+    _ensure_claude_gitignore(target, console, commit=commit)
 
     # Categorise diffs before showing the recap.
     to_install = [d for d in diffs if d.status == "missing"]
@@ -947,31 +1126,52 @@ def _update_single_target(
     if pruned:
         _remove_empty_dirs(target, pruned)
 
-    # Re-render CLAUDE.md from .j2 template after any file update
-    # (also renders if CLAUDE.md is missing or .j2 was updated)
+    # Re-render CLAUDE.md from .j2 template after any file update, where it
+    # belongs (#67): the root file only when stx owns it, otherwise
+    # .claude/CLAUDE.md — a user-authored root CLAUDE.md is never rewritten.
     j2_path = os.path.join(target, ".claude", "CLAUDE.md.j2")
-    claude_md_path = os.path.join(target, "CLAUDE.md")
     if os.path.isfile(j2_path):
+        from ._claude_files import write_profile_claude_md
+
         project_name = os.path.basename(os.path.abspath(target))
         rendered = _render_claude_md(j2_path, project_name, profile)
-        needs_render = not os.path.isfile(claude_md_path)
-        if not needs_render:
-            with open(claude_md_path, encoding="utf-8") as f:
-                needs_render = f.read() != rendered
-        if needs_render:
-            if os.path.isfile(claude_md_path):
-                st = os.stat(claude_md_path)
-                if not st.st_mode & 0o200:
-                    os.chmod(claude_md_path, st.st_mode | 0o200)
-            with open(claude_md_path, "w", encoding="utf-8") as f:
-                f.write(rendered)
-            updated.append("CLAUDE.md")
-            console.print("  [green]\u2713[/green] CLAUDE.md [dim](rendered from .claude/CLAUDE.md.j2)[/dim]")
+        root_md = os.path.join(target, "CLAUDE.md")
+        if force and os.path.isfile(root_md):
+            # --force: take the root file back explicitly, with a backup
+            # when it was the user's
+            from ._claude_files import root_claude_md_is_owned
+
+            with open(root_md, encoding="utf-8") as f:
+                current = f.read()
+            if not root_claude_md_is_owned(target, candidates=(previous_render, rendered)):
+                stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+                bdir = os.path.join(target, ".claude", ".backup", stamp)
+                os.makedirs(bdir, exist_ok=True)
+                shutil.copy2(root_md, os.path.join(bdir, "CLAUDE.md"))
+                console.print(f"  [dim]Backup of your CLAUDE.md saved to "
+                              f"{os.path.relpath(bdir, target)}/CLAUDE.md[/dim]")
+            previous_render = current
+            generated = os.path.join(target, ".claude", "CLAUDE.md")
+            if os.path.isfile(generated):
+                os.remove(generated)
+        dest_rel, changed = write_profile_claude_md(
+            target, rendered, candidates=(previous_render,),
+        )
+        if changed:
+            updated.append(dest_rel)
+            console.print(
+                f"  [green]\u2713[/green] {dest_rel} [dim](rendered from .claude/CLAUDE.md.j2)[/dim]"
+            )
+            if dest_rel != "CLAUDE.md":
+                console.print(
+                    "  [dim]Your root CLAUDE.md is your own: it was left untouched; "
+                    "Claude Code reads both files.[/dim]"
+                )
 
     if updated:
         console.print(f"\n[green]Updated {len(updated)} file(s).[/green]")
         for f in updated:
-            if f != "CLAUDE.md":  # already printed above with render note
+            if f not in ("CLAUDE.md", os.path.join(".claude", "CLAUDE.md")):  # printed above
                 console.print(f"  [green]\u2713[/green] {f}")
     else:
         console.print("\n[bold green]Profile is already up to date.[/bold green]")
@@ -1041,7 +1241,12 @@ def diff_cmd(path: str) -> None:
     "-y", "--yes", is_flag=True,
     help="Skip the confirmation prompt before applying destructive changes.",
 )
-def update_cmd(path: str, force: bool, update_all: bool, yes: bool) -> None:
+@click.option(
+    "--commit", is_flag=True,
+    help="Untrack managed .claude/ files from git and commit that change "
+         "(by default stx prints the git commands and never commits).",
+)
+def update_cmd(path: str, force: bool, update_all: bool, yes: bool, commit: bool) -> None:
     """Update an installed Claude profile from the source repo.
 
     Aligns the installed .claude/ tree with the current streamtex-claude
@@ -1077,6 +1282,7 @@ def update_cmd(path: str, force: bool, update_all: bool, yes: bool) -> None:
             console.print(f"\n[bold cyan]\u2500\u2500 {rel} [/bold cyan]([cyan]{profile}[/cyan])")
             total_updated += _update_single_target(
                 claude_repo, profile, target_path, force, console, yes=yes,
+                commit=True if commit else None,
             )
 
         separator = "\u2500" * 40
@@ -1095,7 +1301,8 @@ def update_cmd(path: str, force: bool, update_all: bool, yes: bool) -> None:
     # Single target mode
     _ws_root, claude_repo, profile, target = _resolve_profile_context(path)
     console.print(f"[cyan]Profile:[/cyan] {profile}")
-    _update_single_target(claude_repo, profile, target, force, console, yes=yes)
+    _update_single_target(claude_repo, profile, target, force, console, yes=yes,
+                          commit=True if commit else None)
 
 
 @click.command("check")
@@ -1116,10 +1323,18 @@ def check_cmd() -> None:
         console.print("[yellow]No projects with Claude profiles found.[/yellow]")
         return
 
+    from .claude_project import desired_files, is_project_mode, plan_sync, read_declaration, read_lock
+
     has_problems = False
     for target_path, profile in targets:
         rel = os.path.relpath(target_path, ws_root)
-        diffs = compare_profile(claude_repo, profile, target_path)
+        if is_project_mode(target_path):
+            plan = plan_sync(target_path, desired_files(claude_repo, read_declaration(target_path)),
+                             read_lock(target_path))
+            diffs = [FileDiff(p, "missing") for p in plan.install] + [
+                FileDiff(p, "modified") for p in plan.update + plan.merge + plan.keep_modified]
+        else:
+            diffs = compare_profile(claude_repo, profile, target_path)
 
         problems = [d for d in diffs if d.status in ("modified", "missing")]
         if problems:
@@ -1137,9 +1352,14 @@ def check_cmd() -> None:
         else:
             console.print(f"[green]\u2713[/green] {rel} ({profile}) \u2014 up to date")
 
+    from .claude_global import print_commands_report
+
+    print_commands_report(ws_root, targets, claude_repo, console)
+
     if has_problems:
         console.print(
-            "\n[yellow]Run 'stx claude update --all' to synchronize.[/yellow]"
+            "\n[yellow]Run 'stx claude update --all' to synchronize "
+            "(project mode: 'stx claude sync').[/yellow]"
         )
         raise SystemExit(1)
     else:

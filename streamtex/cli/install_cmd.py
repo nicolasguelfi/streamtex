@@ -221,13 +221,22 @@ def _maybe_clone_docs_for_template(
     help="Skip the auto-add of the `streamtex-design` pack to the project's "
          "stx.toml after project creation.",
 )
-def install(preset, project, template, dev, no_design_pack):
+@click.option(
+    "--global-commands/--no-global-commands",
+    "global_commands",
+    default=None,
+    help="Copy (or not) the shared Claude commands into ~/.claude/commands. "
+    "Default: the machine setting [claude] global_commands (true if unset).",
+)
+def install(preset, project, template, dev, no_design_pack, global_commands):
     """Install or update a StreamTeX workspace, optionally creating a project.
 
     First run:  stx install --preset power --project hello
     Add project: stx install --project myapp --template collection
     Dev mode:    stx install --project myapp --dev
     """
+    if global_commands is not None:
+        os.environ["STX_GLOBAL_COMMANDS"] = "1" if global_commands else "0"
     console = get_console()
     ws_root = find_workspace_root()
 

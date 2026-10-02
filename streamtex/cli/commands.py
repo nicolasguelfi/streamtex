@@ -14,6 +14,8 @@ from .claude_cmd import diff_cmd as claude_diff
 from .claude_cmd import install as claude_install
 from .claude_cmd import list_cmd as claude_list
 from .claude_cmd import update_cmd as claude_update
+from .claude_global import global_group as claude_global_group
+from .claude_project import sync_cmd as claude_sync
 from .component_cmd import component as component_group
 from .deploy_cmd import configure_domain_cmd as deploy_configure_domain
 from .deploy_cmd import docker as deploy_docker
@@ -115,6 +117,8 @@ claude.add_command(claude_list)
 claude.add_command(claude_update)
 claude.add_command(claude_diff)
 claude.add_command(claude_check)
+claude.add_command(claude_global_group)
+claude.add_command(claude_sync)
 
 
 # --- Bibliography subgroup -------------------------------------------------

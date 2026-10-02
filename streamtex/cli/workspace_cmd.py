@@ -457,7 +457,18 @@ def _run_uv_sync(
 # ---------------------------------------------------------------------------
 
 def _install_global_commands(ws_root: str, config: dict, console) -> None:
-    """Copy ``shared/commands/`` to ``~/.claude/commands/`` (read-only)."""
+    """Copy ``shared/commands/`` to ``~/.claude/commands/`` (read-only).
+
+    Skipped when the machine setting ``[claude] global_commands = false`` or
+    ``--no-global-commands`` says so (#72). Every copied file is recorded in
+    ``~/.config/streamtex/global-commands.json`` so that
+    ``stx claude global remove`` removes exactly what stx wrote (#74).
+    """
+    from ._claude_files import global_commands_enabled
+
+    if not global_commands_enabled():
+        console.print("  [dim]global commands: skipped (global_commands = false)[/dim]")
+        return
     try:
         from .claude_cmd import find_claude_repo
 
@@ -494,6 +505,17 @@ def _install_global_commands(ws_root: str, config: dict, console) -> None:
                 console.print(
                     f"  [green]global[/green]: {count} shared command(s) → ~/.claude/commands/"
                 )
+                from ._claude_files import sha256_file
+                from .claude_global import load_record, save_record
+
+                record = load_record()
+                for root, _dirs, files in os.walk(shared_cmd_dir):
+                    for f in files:
+                        rel = os.path.relpath(os.path.join(root, f), shared_cmd_dir)
+                        dst = os.path.join(global_claude_cmd, rel)
+                        if os.path.isfile(dst):
+                            record[rel] = sha256_file(dst)
+                save_record(record, source=claude_repo)
     except click.ClickException:
         pass  # No claude repo configured/cloned yet — skip silently
 
@@ -545,6 +567,13 @@ def _install_precommit_hooks(ws_root: str, config: dict, console, *, dry_run: bo
         missing_sources = _has_missing_local_sources(path)
         if missing_sources:
             env = {**os.environ, "UV_NO_SOURCES": "1"}
+        # `uv run` re-syncs implicitly and, without local sources, rewrites
+        # uv.lock (editable paths → PyPI). Keep the exact bytes to put back.
+        lock_path = os.path.join(path, "uv.lock")
+        lock_before = None
+        if missing_sources and os.path.isfile(lock_path):
+            with open(lock_path, "rb") as f:
+                lock_before = f.read()
 
         try:
             result = subprocess.run(
@@ -563,9 +592,15 @@ def _install_precommit_hooks(ws_root: str, config: dict, console, *, dry_run: bo
         if result.returncode == 0:
             console.print(f"  [green]{name}[/green]: ok")
             installed += 1
-            # uv run re-syncs implicitly and may dirty uv.lock again
-            if missing_sources:
-                _restore_uv_lock_if_only_dirty(path)
+            # uv run re-syncs implicitly and may dirty uv.lock again: put the
+            # file back exactly as it was (whatever else is modified, and
+            # without discarding a change the user made before this command).
+            if lock_before is not None:
+                with open(lock_path, "rb") as f:
+                    changed = f.read() != lock_before
+                if changed:
+                    with open(lock_path, "wb") as f:
+                        f.write(lock_before)
         else:
             stderr = (result.stderr or "").strip()
             # Detect common failure: local editable source not found
@@ -867,8 +902,17 @@ def _upgrade_cli_tool(
     help="Allow uv to refresh uv.lock (upgrade streamtex + apply pyproject changes). "
     "Default is --locked: deterministic sync to the committed lock state.",
 )
-def update(skip_sync, skip_profiles, dry_run, repair, force, upgrade_deps):
+@click.option(
+    "--global-commands/--no-global-commands",
+    "global_commands",
+    default=None,
+    help="Copy (or not) the shared Claude commands into ~/.claude/commands. "
+    "Default: the machine setting [claude] global_commands (true if unset).",
+)
+def update(skip_sync, skip_profiles, dry_run, repair, force, upgrade_deps, global_commands):
     """Pull repos, clone missing, sync deps, install hooks, update profiles."""
+    if global_commands is not None:
+        os.environ["STX_GLOBAL_COMMANDS"] = "1" if global_commands else "0"
     ws_root, config = _require_workspace()
     repos = config.get("repos", {})
     console = get_console()

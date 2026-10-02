@@ -5,6 +5,97 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.35] — 2026-10-03 — Claude profiles: project mode, and nothing of yours overwritten
+
+Lot A of the roadmap drawn from the maintainer's three largest projects
+(boards `claude1` / `lots1`). Measured before release on copies of the 10
+StreamTeX roots of the maintainer's machine (13 already-profiled targets),
+against a frozen 0.7.34, in two scenarios (default answers / yes-to-all):
+every remaining difference is listed under "Changed" below.
+
+### Added
+
+- **Project mode** (#71, supersedes #5) — a project declares its Claude
+  content in `stx.toml`:
+  ```toml
+  [claude]
+  mode = "project"
+  profile = "presentation"
+  include = []        # extra profiles merged in
+  exclude = []        # groups left out, e.g. ["stx-ce", "ce"]
+  ```
+  `stx claude sync [--dry-run] [--force] [--remove]` makes `.claude/` match
+  it and records every installed file (sha256), the profile and the
+  streamtex-claude revision in `.claude/stx.lock`. The lock gives a 3-way
+  comparison: an upstream change is applied, a local edit is kept and
+  reported (`--force` replaces it, with a backup), a file no longer declared
+  is removed only if unchanged, a file stx never installed is never touched,
+  `custom/` never. `--remove` uninstalls symmetrically. `stx update`,
+  `stx claude update --all` and `stx claude check` handle project-mode
+  targets through the same path, the workspace root included when it
+  declares project mode. `stx validate` checks the `[claude]` section.
+  Git keeps `stx.toml` and `stx.lock`; the copies are ignored.
+  (`streamtex/cli/claude_project.py`)
+- **`stx claude install --dry-run`** (#70) — every file the install would
+  write, nothing written. An install over existing files that stx did not
+  install now stops and lists them; `--yes` proceeds.
+- **`stx claude global status | remove`** (#74) — classify the `stx-*`
+  entries of `~/.claude/commands` (current / outdated / obsolete / modified
+  by you) and remove only stx copies (dry run unless `--yes`). Copies are
+  now recorded in `~/.config/streamtex/global-commands.json`.
+  (`streamtex/cli/claude_global.py`)
+- **Optional global commands** (#72) — `[claude] global_commands = false`
+  in `~/.config/streamtex/config.toml`, `--no-global-commands` /
+  `--global-commands` on `stx install` and `stx update`
+  (`$STX_GLOBAL_COMMANDS` underneath). Default unchanged: copied.
+- **Duplicate report** (#73) — `stx claude check` and `stx status` list the
+  command groups present both in `~/.claude/commands` and in a project
+  (both load), obsolete global groups (`stx-pattern`) and, when the global
+  copy is off, a workspace with no local profile. Silent otherwise.
+- `stx claude update --commit` — untrack managed `.claude/` files from git
+  and commit that change, on request.
+
+### Changed
+
+- **One installer** (#65, #66) — `install_profile` installs exactly the set
+  that `update`, `diff` and `check` compare against
+  (`collect_source_files`). A child profile (`extends`, e.g.
+  `presentation`) now installs its parent then its `overlay/`; it used to
+  land in `.claude/overlay/`, where Claude Code reads nothing. File set and
+  modes of the other profiles are unchanged. `streamtex-claude/install.py`
+  delegates to this installer when streamtex is importable.
+- **A user-authored `CLAUDE.md` is never overwritten** (#67) — stx writes
+  the root `CLAUDE.md` only when it owns it (absent, or equal to the render
+  of the template installed before the update); otherwise the profile text
+  goes to `.claude/CLAUDE.md` (Claude Code loads both — measured) and the
+  root file stays byte-identical. Profiled projects whose root file is the
+  render behave as before. `stx claude update --force` takes the root file
+  back explicitly, with a backup in `.claude/.backup/`.
+  *Measured difference:* the workspace clones of streamtex-docs whose
+  git-tracked `CLAUDE.md` differs from their installed template are no
+  longer rewritten (their tree stays clean); `--force` restores 0.7.34.
+- **`settings.json` merged** (#68) — an existing `.claude/settings.json` is
+  completed (missing keys, union of permission lists), never replaced;
+  `check` treats a file that contains everything the profile sets as
+  up to date.
+- **stx no longer commits in your projects** (#69) — `stx claude update`
+  adds the `.gitignore` block but untracks and commits only with
+  `--commit`, printing the git commands otherwise. Clones of official repos
+  declared in the workspace `[repos]` (created and pulled by `stx update`)
+  keep the 0.7.34 migration commit so their tree stays clean for `git pull`.
+
+### Fixed
+
+- **`uv.lock` put back byte for byte after the hooks step** — `uv run
+  pre-commit install` without local sources rewrites `uv.lock`; 0.7.34
+  restored it with `git checkout` only when it was the sole modified file,
+  which (a) left it rewritten whenever anything else was modified and
+  (b) discarded a pending change of the user's to `uv.lock` (measured on a
+  workspace clone: 1,142 insertions / 1,169 deletions lost). The file now
+  gets its exact previous bytes back.
+- `tests/test_cli_validate.py` — the "empty project" tests no longer see
+  packs installed in the venv (they failed with all extras installed).
+
 ## [0.7.34] — 2026-09-15
 
 ### Fixed

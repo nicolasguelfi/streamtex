@@ -733,3 +733,18 @@ def status(as_json):
         _print_json(report)
     else:
         _print_rich(report)
+
+    # 8. Claude commands: duplicates global/project, obsolete groups (#73)
+    if not as_json and ws_root and config is not None:
+        try:
+            from .claude_cmd import find_claude_repo, find_profile_targets
+            from .claude_global import print_commands_report
+            from .console import get_console
+
+            try:
+                claude_repo = find_claude_repo(ws_root, config)
+            except click.ClickException:
+                claude_repo = None
+            print_commands_report(ws_root, find_profile_targets(ws_root), claude_repo, get_console())
+        except Exception:
+            logger.debug("Failed to print Claude commands section", exc_info=True)

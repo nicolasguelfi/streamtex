@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+import pytest
 from click.testing import CliRunner
 
 from streamtex.cli.commands import cli
@@ -26,14 +27,26 @@ def _run(cmd: list[str], cwd: Path):
         os.chdir(prev)
 
 
-def test_validate_runs_on_empty_project(tmp_path: Path):
+@pytest.fixture
+def no_installed_packs(monkeypatch):
+    """An empty project means no packs at all — not even those installed in the venv.
+
+    Without this, a venv that has streamtex-pack-design installed (e.g. with
+    all extras) makes the "empty project" tests see its packs and warnings.
+    """
+    from streamtex.core import discovery
+
+    monkeypatch.setattr(discovery, "discover_packs", lambda *_a, **_k: [])
+
+
+def test_validate_runs_on_empty_project(tmp_path: Path, no_installed_packs):
     project = _make_project(tmp_path)
     result = _run(["validate"], project)
     # Empty project = no packs to validate; should return 0 with friendly output
     assert result.exit_code == 0, result.output
 
 
-def test_validate_outputs_sections(tmp_path: Path):
+def test_validate_outputs_sections(tmp_path: Path, no_installed_packs):
     project = _make_project(tmp_path)
     result = _run(["validate"], project)
     assert result.exit_code == 0
@@ -116,7 +129,7 @@ def test_validate_has_strict_flag():
     assert "--strict" in result.output
 
 
-def test_validate_strict_clean_project_exits_zero(tmp_path: Path):
+def test_validate_strict_clean_project_exits_zero(no_installed_packs, tmp_path: Path):
     project = _make_project(tmp_path)
     result = _run(["validate", "--strict"], project)
     assert result.exit_code == 0, result.output

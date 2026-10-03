@@ -40,6 +40,10 @@ Fixes found by the coherence audit of 0.7.40 (board `audit1`, 2026-10-03). No re
 
 ## [0.7.40] — 2026-10-03 — Kept widget values, versioned facts
 
+> **First published release of lots A-F.** 0.7.35 to 0.7.39 below are internal
+> milestones of the same night: they were never tagged nor published on PyPI.
+> Upgrading from 0.7.34 to 0.7.40 brings every section from 0.7.35 to 0.7.40.
+
 Lot F of the roadmap (boards `lecons1` / `lots1`). No rendering change.
 
 ### Added

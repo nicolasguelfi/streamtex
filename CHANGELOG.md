@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.42] — 2026-10-03 — shortauthor, project init and validate fixes
+
+Measured before release, 0.7.41 (PyPI) against this release, nine projects
+(535 blocks, each project in its own environment): 0 block renders differently
+apart from 2 unstable by nature (a Plotly chart's random id; a block that also
+differs between two 0.7.41 runs). The only rendering change is opt-in: entries
+with a `shortauthor` field.
+
 ### Added
 - Bibliography: the biblatex field `shortauthor` shortens the citation and
   leaves the bibliography alone — `author = {{European Parliament and

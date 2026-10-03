@@ -20,6 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `~/.venvs/<project>` showed up as an untracked file in every such project),
   ignores `.stx_cache/` (render caches written by builds) and keeps
   `.claude/stx.lock` (project mode) under version control.
+- `stx validate` prints stx.toml section names in its messages: `[patterns]`,
+  `[book.defaults]`, `[source]`… were read as Rich markup and vanished
+  ("deprecated  — … remove  (and the @pattern annotations)").
 
 ## [0.7.41] — 2026-10-03 — Coherence-audit fixes
 

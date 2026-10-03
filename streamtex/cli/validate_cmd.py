@@ -14,6 +14,7 @@ import sys
 from pathlib import Path
 
 import click
+from rich.markup import escape
 
 from ._shared import _find_project_dir
 from .console import get_console
@@ -190,7 +191,7 @@ def validate(strict: bool, build: bool, books: tuple[str, ...], timeout: int,
         console.print("[bold]Versions[/bold]")
         for vp in vprobs:
             color = "red" if vp.severity == "error" else "yellow"
-            console.print(f"  [{color}]{vp.severity}[/{color}] {vp.message}")
+            console.print(f"  [{color}]{vp.severity}[/{color}] {escape(vp.message)}")
             if vp.severity == "error":
                 total_errors += 1
             else:
@@ -208,7 +209,7 @@ def validate(strict: bool, build: bool, books: tuple[str, ...], timeout: int,
         if len(markers) > 20:
             console.print(f"  ... and {len(markers) - 20} more file(s)")
         for msg in deprecated:
-            console.print(f"  [yellow]deprecated[/yellow] {msg}")
+            console.print(f"  [yellow]deprecated[/yellow] {escape(msg)}")
         total_errors += len(markers)
         total_warnings += len(deprecated)
 
@@ -221,7 +222,7 @@ def validate(strict: bool, build: bool, books: tuple[str, ...], timeout: int,
         for sf in stale:
             console.print(f"  [yellow]stale[/yellow] facts/{sf.source}.toml: read from {sf.recorded}, "
                           f"the source is now {sf.current} — re-check its {sf.count} fact(s), "
-                          "then update [source].version")
+                          "then update \\[source].version")
         total_warnings += len(stale)
 
     # 5e) stx.toml sections read at run time: [book.defaults], [[run.documents]]
@@ -231,7 +232,7 @@ def validate(strict: bool, build: bool, books: tuple[str, ...], timeout: int,
     if section_problems:
         console.print("[bold]stx.toml[/bold]")
         for msg in section_problems:
-            console.print(f"  [yellow]warning[/yellow] {msg}")
+            console.print(f"  [yellow]warning[/yellow] {escape(msg)}")
         total_warnings += len(section_problems)
 
     # 6) Project rules declared in stx.toml (#76)
@@ -251,9 +252,9 @@ def validate(strict: bool, build: bool, books: tuple[str, ...], timeout: int,
                 console.print(f"  [green]{rid}: OK[/green]")
                 continue
             color = "red" if vs[0].severity == "error" else "yellow"
-            console.print(f"  [{color}]{rid}: {len(vs)} violation(s)[/{color}] — {vs[0].message}")
+            console.print(f"  [{color}]{rid}: {len(vs)} violation(s)[/{color}] — {escape(vs[0].message)}")
             for v in vs[:10]:
-                console.print(f"    {v.where}")
+                console.print(f"    {escape(str(v.where))}")
             if len(vs) > 10:
                 console.print(f"    ... and {len(vs) - 10} more")
         for v in violations:

@@ -31,6 +31,8 @@ def test_validate_reports_hygiene(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     r = CliRunner().invoke(cli, ["validate"])
     assert r.exit_code == 2 and "conflict marker" in r.output and "deprecated" in r.output
+    # the section name is printed, not swallowed as Rich markup
+    assert "remove [patterns]" in " ".join(r.output.split())
 
 
 def test_stx_toml_sections_typos_and_bad_documents_are_warned(tmp_path):
@@ -67,3 +69,4 @@ def test_validate_prints_stx_toml_section_warnings(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     r = CliRunner().invoke(cli, ["validate"])
     assert "banner_colour" in r.output and r.exit_code == 1, r.output
+    assert "[book.defaults]" in r.output

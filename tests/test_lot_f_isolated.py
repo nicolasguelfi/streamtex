@@ -97,6 +97,12 @@ def test_stale_facts(tmp_path):
     assert stale_facts(_facts(tmp_path / "fresh", current="0.85.0")) == []
 
 
+def test_stale_facts_ignores_an_empty_version_file(tmp_path):
+    root = _facts(tmp_path)
+    (root / "gse" / "VERSION").write_text("\n")
+    assert stale_facts(root) == []
+
+
 def test_validate_reports_stale_facts(tmp_path, monkeypatch):
     from streamtex.core import discovery
 

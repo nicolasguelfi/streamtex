@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import os
 from collections.abc import Sequence
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 ENV_KEY = "STX_LANG"
 QUERY_KEY = "lang"
@@ -78,9 +79,15 @@ def current_lang(default: str | None = None) -> str:
 
 
 def with_lang(url: str, lang: str) -> str:
-    """A link to a document in *lang*: the language travels in the address."""
-    sep = "&" if "?" in url else "?"
-    return f"{url}{sep}{QUERY_KEY}={lang}"
+    """A link to a document in *lang*: the language travels in the address.
+
+    An existing ``lang=`` is replaced, the other parameters and the
+    ``#fragment`` are kept.
+    """
+    parts = urlsplit(url)
+    query = [(k, v) for k, v in parse_qsl(parts.query, keep_blank_values=True) if k != QUERY_KEY]
+    query.append((QUERY_KEY, lang))
+    return urlunsplit(parts._replace(query=urlencode(query)))
 
 
 def T(entry, lang: str | None = None, *, strict: bool = False):

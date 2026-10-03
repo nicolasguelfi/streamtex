@@ -272,10 +272,11 @@ echo "[entrypoint] Mode: ${MODE} | Dir: $(pwd)"
 rm -rf .stx_cache .streamlit/cache
 
 # A failure below never stops the service, but it is never silent either:
-# the error goes to the container log and to /app/static-html/STX_ERRORS.txt.
+# the error goes to the container log and to /app/STX_ERRORS.txt (outside the
+# folder nginx serves with autoindex: the error log is not public).
 report_failure() {
     echo "[entrypoint] ERROR: $1 failed (exit $2) — see the lines above" >&2
-    echo "$(date -u +%FT%TZ) $1 failed (exit $2) in $(pwd)" >> /app/static-html/STX_ERRORS.txt
+    echo "$(date -u +%FT%TZ) $1 failed (exit $2) in $(pwd)" >> /app/STX_ERRORS.txt
 }
 
 # Re-warm the page cache (for Streamlit fast first load)

@@ -87,7 +87,8 @@ def _current_version(spec: str, base: Path) -> str | None:
                 return tomllib.load(f).get("project", {}).get("version")
         except (OSError, tomllib.TOMLDecodeError):
             return None
-    return path.read_text(encoding="utf-8").strip().splitlines()[0].strip() if path.stat().st_size else None
+    lines = path.read_text(encoding="utf-8").strip().splitlines()
+    return lines[0].strip() if lines else None
 
 
 def _count(node: Any) -> int:

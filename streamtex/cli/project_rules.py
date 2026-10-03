@@ -58,13 +58,18 @@ def _files(project_dir: Path, pattern: str) -> list[Path]:
                   and ".venv" not in p.parts and "node_modules" not in p.parts)
 
 
+def rule_id(rule: dict, index: int) -> str:
+    """The rule's ``id``, or ``rule-<n>`` (1-based) when it declares none."""
+    return str(rule.get("id") or f"rule-{index + 1}")
+
+
 def check_rules(project_dir: Path, rules: list[dict] | None = None,
                 *, timeout: int = 600) -> list[RuleViolation]:
     """Run every declared rule; return the violations (empty = all pass)."""
     rules = load_rules(project_dir) if rules is None else rules
     out: list[RuleViolation] = []
     for i, rule in enumerate(rules):
-        rid = str(rule.get("id") or f"rule-{i + 1}")
+        rid = rule_id(rule, i)
         sev = "warning" if rule.get("severity") == "warning" else "error"
         msg = str(rule.get("message") or rid)
         if "run" in rule:

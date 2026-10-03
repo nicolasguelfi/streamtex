@@ -56,6 +56,17 @@ def test_no_defaults_section_changes_nothing(tmp_path, monkeypatch):
     assert seen["kwargs"] == {"page_width": 80}
 
 
+def test_st_book_help_documents_book_defaults_and_its_parameters():
+    import inspect
+
+    import streamtex
+
+    doc = streamtex.st_book.__doc__
+    assert "[book.defaults]" in doc and 'doc_version="auto"' in doc
+    assert ":param separator:" in doc  # the implementation's own docstring follows
+    assert "toc_config" in inspect.signature(streamtex.st_book).parameters
+
+
 def test_doc_version_auto_reads_pyproject(tmp_path):
     mod = _project(tmp_path)
     assert book._project_version(str(mod)) == "2.4.1"

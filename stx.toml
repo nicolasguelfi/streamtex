@@ -1,0 +1,7 @@
+# stx.toml — the StreamTeX library repository as a Claude project (board s2).
+# Only the Claude profile is declared here; the workspace configuration
+# (repos, presets) stays in ../stx.toml.
+
+[claude]
+mode = "project"
+profile = "library"

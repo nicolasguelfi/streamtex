@@ -41,3 +41,4 @@ BIG/
 !.claude/.stx-profile
 tests/e2e/_artefacts/
 tests/e2e/_*_artefacts/
+!.claude/stx.lock

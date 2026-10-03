@@ -7,8 +7,10 @@ from click.testing import CliRunner
 
 from streamtex.cli.build_check import (
     INLINE_LIMIT_BYTES,
+    block_fingerprints,
     discover_books,
     empty_styled_blocks,
+    normalize_auto_numbers,
     run_book,
 )
 from streamtex.cli.commands import cli
@@ -79,6 +81,62 @@ def test_run_book_reports_a_book_that_does_not_load(tmp_path):
     (p / "book.py").write_text("import does_not_exist\n")
     r = run_book(p / "book.py", timeout=60)
     assert r.book_error and "does_not_exist" in r.book_error
+
+
+def _snapshot_project(tmp_path: Path, *, intro: bool, md_text: str, numbering: str = "none") -> Path:
+    """Two books in one: an optional first block, then a section block with Markdown text."""
+    p = tmp_path / ("with" if intro else "without")
+    (p / "blocks").mkdir(parents=True)
+    (p / "blocks" / "__init__.py").write_text("")
+    (p / "blocks" / "bck_intro.py").write_text(textwrap.dedent("""
+        from streamtex import st_write
+        def build(**_):
+            st_write("intro", toc_lvl="1")
+    """))
+    (p / "blocks" / "bck_section.py").write_text(textwrap.dedent(f"""
+        from streamtex import st_write, st_marker
+        from streamtex.markdown import st_markdown
+        def build(**_):
+            st_marker("section")
+            st_write("Section", toc_lvl="1")
+            st_markdown({md_text!r})
+    """))
+    mods = "i, s" if intro else "s"
+    (p / "book.py").write_text(textwrap.dedent(f"""
+        from streamtex import st_book, TOCConfig
+        import blocks.bck_intro as i, blocks.bck_section as s
+        st_book([{mods}], toc_config=TOCConfig(numbering={numbering!r}))
+    """))
+    return p
+
+
+def test_snapshot_sees_markdown_text_and_ignores_position_numbers(tmp_path):
+    base = block_fingerprints(run_book(_snapshot_project(tmp_path / "a", intro=False, md_text="Old text.") / "book.py",
+                                       timeout=120, capture=True))
+    moved = block_fingerprints(run_book(_snapshot_project(tmp_path / "b", intro=True, md_text="Old text.") / "book.py",
+                                        timeout=120, capture=True))
+    edited = block_fingerprints(run_book(_snapshot_project(tmp_path / "c", intro=False, md_text="New text.") / "book.py",
+                                         timeout=120, capture=True))
+    key = "blocks.bck_section"
+    assert key in base and key in moved and key in edited
+    assert moved[key] == base[key]      # a block inserted before it shifts anchors, not content
+    assert edited[key] != base[key]     # a changed Markdown text is seen
+    # with visible section numbers, the shift IS on screen ("1 Section" -> "2 Section"): reported
+    shown = [block_fingerprints(run_book(_snapshot_project(tmp_path / f"n{i}", intro=intro, md_text="Old text.",
+                                                           numbering="both") / "book.py",
+                                         timeout=120, capture=True))[key]
+             for i, intro in enumerate((False, True))]
+    assert shown[0] != shown[1]
+
+
+def test_normalize_auto_numbers_keeps_visible_text():
+    html = ("<div id='42-1-faq'><a href=\"#42-faq\">Chapter 42</a>"
+            "<div id=\"stx-marker-phase2-26\" data-marker-index=\"26\"></div>"
+            "<input id=\"stx-wrap-stx-wrap-1026\"></div>")
+    assert normalize_auto_numbers(html) == (
+        "<div id='N-faq'><a href=\"#N-faq\">Chapter 42</a>"
+        "<div id=\"stx-marker-phase2-N\" data-marker-index=\"N\"></div>"
+        "<input id=\"stx-wrap-stx-wrap-N\"></div>")
 
 
 def test_empty_styled_block_static_check(tmp_path):

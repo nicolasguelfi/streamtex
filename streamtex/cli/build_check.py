@@ -25,6 +25,7 @@ from __future__ import annotations
 import ast
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -150,6 +151,20 @@ if os.environ.get("STX_BUILD_CHECK_CAPTURE"):
                 if getattr(_m, _attr, None) is _orig_html:
                     setattr(_m, _attr, _capture)
 
+    # Text that reaches the screen through Streamlit itself (st_markdown,
+    # show_explanation, a block's own st.markdown / st.code...) is not HTML
+    # emitted by streamtex: capture it too, or a changed text goes unseen.
+    import streamlit as _stl
+
+    def _text_capture(kind, orig):
+        def _wrapped(body="", *a, **k):
+            res["html"].setdefault(current[0], []).append(f"<!--st.{kind}-->" + _norm(body))
+            return orig(body, *a, **k)
+        return _wrapped
+
+    for _kind in ("markdown", "code", "latex", "caption"):
+        setattr(_stl, _kind, _text_capture(_kind, getattr(_stl, _kind)))
+
 streamtex.st_book = _check_book
 _book.st_book = _check_book
 os.chdir(os.path.dirname(BOOK))
@@ -226,11 +241,37 @@ def run_book(book: Path, timeout: int = 120, *, capture: bool = False,
                       data["inlined_media"], data["book_error"], data.get("html", {}))
 
 
+# Numbers the library generates from a block's POSITION in the book: section
+# anchors ("42-1-title"), navigation markers ("stx-marker-key-26",
+# data-marker-index, "marker-31") and code-wrap toggles ("stx-wrap-1026").
+# Inserting a block shifts them in every block after it without changing
+# what is shown, so the fingerprint ignores them.
+_AUTO_NUMBERS = [
+    (re.compile(r"""((?:id|for)=['"]|href=['"]#)\d+(?:-\d+)*-"""), r"\1N-"),
+    (re.compile(r"(stx-marker-[\w.-]*?)-\d+(['\"])"), r"\1-N\2"),
+    (re.compile(r"(stx-marker-)marker-\d+"), r"\1marker-N"),
+    (re.compile(r"""data-marker-index=(['"])\d+"""), r"data-marker-index=\1N"),
+    (re.compile(r"stx-wrap-\d+"), "stx-wrap-N"),
+]
+
+
+def normalize_auto_numbers(html: str) -> str:
+    """*html* with the position-derived numbers replaced by ``N``."""
+    for pattern, repl in _AUTO_NUMBERS:
+        html = pattern.sub(repl, html)
+    return html
+
+
 def block_fingerprints(result: BookResult) -> dict[str, str]:
-    """``{block: sha256}`` of the HTML each block emitted (base64 media hashed)."""
+    """``{block: sha256}`` of what each block put on screen.
+
+    The HTML streamtex emitted plus the text sent to ``st.markdown`` /
+    ``st.code`` / ``st.latex`` / ``st.caption``; base64 media are hashed and
+    position-derived numbers are ignored (:func:`normalize_auto_numbers`).
+    """
     import hashlib
 
-    return {block: hashlib.sha256("\n".join(parts).encode("utf-8")).hexdigest()
+    return {block: hashlib.sha256(normalize_auto_numbers("\n".join(parts)).encode("utf-8")).hexdigest()
             for block, parts in sorted(result.html.items())}
 
 

@@ -29,3 +29,13 @@ def _isolate_global_dev_config(tmp_path_factory, monkeypatch):
     isolated_dir = Path(tmp_path_factory.mktemp("stx-dev-config"))
     monkeypatch.setattr(dev_config, "_GLOBAL_DIR", isolated_dir)
     monkeypatch.setattr(dev_config, "_GLOBAL_FILE", isolated_dir / "dev.json")
+
+
+@pytest.fixture
+def reset_watch():
+    """Empty the streamtex.watch file cache before and after a test."""
+    from streamtex import watch
+
+    watch._reset_for_tests()
+    yield
+    watch._reset_for_tests()

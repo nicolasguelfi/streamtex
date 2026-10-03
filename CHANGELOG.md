@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Bibliography: the biblatex field `shortauthor` shortens the citation and
+  leaves the bibliography alone — `author = {{European Parliament and
+  Council}}, shortauthor = {EU}` cites "(EU, 2024)". Since 0.7.41 an
+  institutional author (`{{...}}`) is cited whole, which can be long on a
+  slide; entries without the field render as before.
+
 ### Fixed
 - `stx validate --build` renders the books with the project's own environment
   (`.venv`) when it has one. Run by a global `stx` (uv tool), it used the tool's

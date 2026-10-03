@@ -50,6 +50,20 @@ def test_institutional_authors_shown_whole():
     assert e2.authors == ["European Parliament", "Council"]
 
 
+def test_shortauthor_shortens_the_citation_not_the_bibliography():
+    from streamtex.bib import BibFormat, format_entry
+
+    e = _one("@misc{aiact, author = {{European Parliament and Council}}, "
+             "shortauthor = {EU}, year = {2024}, title = {AI Act}}")
+    assert e.authors_short == "EU"
+    bib.get_bib_registry().register_many([e])
+    assert "EU, 2024" in cite("aiact")
+    for fmt in BibFormat:
+        assert "European Parliament and Council" in format_entry(e, fmt, 1)
+    # without the field, nothing changes
+    assert _one("@misc{un, author = {{United Nations}}, year = {1992}}").authors_short == "United Nations"
+
+
 def test_ancient_and_original_dates_in_the_citation_code():
     entries = parse_bibtex_string(
         "@book{plato, author = {Plato}, year = {1935}, origdate = {-380}}\n"

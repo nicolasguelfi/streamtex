@@ -132,7 +132,15 @@ class BibEntry:
 
     @property
     def authors_short(self) -> str:
-        """Short form: 'Vaswani et al.' or 'Vaswani & Shazeer'."""
+        """Short form: 'Vaswani et al.' or 'Vaswani & Shazeer'.
+
+        A ``shortauthor`` field (biblatex) wins: ``author = {{European
+        Parliament and Council}}, shortauthor = {EU}`` cites as "EU" while the
+        bibliography keeps the full name.
+        """
+        short = self.extra.get("shortauthor", "").strip()
+        if short:
+            return short
         if not self.authors:
             return "Unknown"
 

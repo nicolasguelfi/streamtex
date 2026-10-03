@@ -50,6 +50,9 @@ from ._claude_files import (
 from .console import get_console
 
 LOCK_PATH = os.path.join(".claude", "stx.lock")
+# Format of stx.lock. A lock without ``format`` (written by 0.7.35-0.7.40) is
+# format 1. A higher number comes from a newer stx: refused, never rewritten.
+LOCK_FORMAT = 1
 _LOCK_GITIGNORE_LINE = "!.claude/stx.lock"
 
 
@@ -170,6 +173,11 @@ def read_lock(target: str) -> Lock | None:
     except (OSError, tomllib.TOMLDecodeError):
         return None
     head = data.get("lock", {})
+    fmt = head.get("format", 1)
+    if not isinstance(fmt, int) or fmt > LOCK_FORMAT:
+        raise click.ClickException(
+            f"{LOCK_PATH} has format {fmt!r}, this stx reads format {LOCK_FORMAT} — "
+            "upgrade streamtex before syncing")
     return Lock(
         profile=head.get("profile", ""),
         include=list(head.get("include", [])),
@@ -191,6 +199,7 @@ def write_lock(target: str, lock: Lock) -> None:
         "# .claude/stx.lock — written by `stx claude sync`; do not edit.",
         "# Versioned with the project: a clone + `stx claude sync` rebuilds the same .claude/.",
         "[lock]",
+        f"format = {LOCK_FORMAT}",
         f"profile = {_q(lock.profile)}",
         f"include = [{', '.join(_q(x) for x in lock.include)}]",
         f"exclude = [{', '.join(_q(x) for x in lock.exclude)}]",

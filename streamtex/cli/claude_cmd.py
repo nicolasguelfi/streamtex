@@ -328,6 +328,42 @@ def _read_profile_extends(profile_dir: str) -> str:
     return manifest.get("profile", {}).get("extends", "")
 
 
+# ``[shared]`` kinds of a manifest that the installer places by declaration
+# (shared/references and shared/commands are copied whole, see below), and
+# where they land under ``.claude/`` — the same mapping as streamtex-claude's
+# install.py ``SHARED_DEST_PATHS``.
+_SHARED_DECLARED_DEST = {
+    "skills": "developer/skills",
+    "agents": "developer/agents",
+    "import-formats": "import-formats",
+}
+
+
+def _collect_declared_shared(claude_repo: str, profile_dir: str, files: dict[str, str]) -> None:
+    """Add the ``[shared] skills / agents / import-formats`` a manifest declares.
+
+    An entry is a file (``reuse-architecture.md``) or a folder (``marp``).
+    Undeclared shared files are not added; nothing is ever removed here.
+    """
+    manifest_path = os.path.join(profile_dir, "manifest.toml")
+    if not os.path.isfile(manifest_path):
+        return
+    import tomllib
+    with open(manifest_path, "rb") as f:
+        shared = tomllib.load(f).get("shared", {})
+    for kind, dest in _SHARED_DECLARED_DEST.items():
+        for entry in shared.get(kind, []):
+            src = os.path.join(claude_repo, "shared", kind, entry)
+            if os.path.isfile(src):
+                files[os.path.join(".claude", dest, entry)] = src
+            elif os.path.isdir(src):
+                for root, _dirs, filenames in os.walk(src):
+                    for fname in filenames:
+                        abs_src = os.path.join(root, fname)
+                        rel = os.path.relpath(abs_src, os.path.join(claude_repo, "shared", kind))
+                        files[os.path.join(".claude", dest, rel)] = abs_src
+
+
 def _collect_dir_files(
     directory: str,
     base_dir: str,
@@ -362,6 +398,9 @@ def collect_source_files(claude_repo: str, profile: str) -> dict[str, str]:
     - everything else → ``.claude/``
     - ``shared/references/`` → ``.claude/references/``
     - ``shared/commands/`` → ``.claude/commands/``
+    - ``[shared] skills / agents / import-formats`` declared in the manifest →
+      ``.claude/developer/skills/``, ``.claude/developer/agents/``,
+      ``.claude/import-formats/``
 
     When a profile has ``extends``, the parent files are collected first
     (recursively), then the child's ``overlay/`` directory is applied on top.
@@ -384,6 +423,7 @@ def collect_source_files(claude_repo: str, profile: str) -> dict[str, str]:
         if os.path.isdir(overlay_dir):
             _collect_dir_files(overlay_dir, overlay_dir, files)
 
+        _collect_declared_shared(claude_repo, profile_dir, files)
         return files
 
     # No extends — existing behaviour
@@ -400,6 +440,7 @@ def collect_source_files(claude_repo: str, profile: str) -> dict[str, str]:
                     rel = os.path.relpath(abs_src, shared_dir)
                     files[os.path.join(".claude", shared_kind, rel)] = abs_src
 
+    _collect_declared_shared(claude_repo, profile_dir, files)
     return files
 
 

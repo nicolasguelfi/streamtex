@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+Coherence audit of 0.7.40, board `audit1` (2026-10-03). No rendering change.
+
+### Fixed
+- `stx claude install / update / sync` now install the `[shared] skills`,
+  `agents` and `import-formats` that a profile's `manifest.toml` declares
+  (`reuse-architecture`, `modular-design-philosophy`, `authoring-gate`,
+  `import-conventions`, the deploy and import agents, the marp/html/latex import
+  formats). The library installer used to skip them while streamtex-claude's
+  `install.py` installed them: 20 files per profile were missing. The change only
+  adds files — nothing installed today is removed. Measured on the `library` and
+  `documentation` installations: 20 files to add, 0 to remove. A test now checks
+  that the library installs at least every file of the standalone installer.
+
+### Changed
+- `.claude/stx.lock` records `format = 1`. A lock without it (0.7.35-0.7.40) is
+  read as format 1; a higher format (newer stx) is refused instead of rewritten.
+  Note: `stx claude update` run with streamtex 0.7.34 or older does not know the
+  lock and removes it as an orphan — upgrade streamtex in project-mode projects.
+
 ## [0.7.40] — 2026-10-03 — Kept widget values, versioned facts
 
 Lot F of the roadmap (boards `lecons1` / `lots1`). No rendering change.

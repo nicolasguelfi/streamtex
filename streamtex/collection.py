@@ -301,7 +301,7 @@ def _get_collection_base_url() -> str:
 
 
 # ---------------------------------------------------------------------------
-# A chain of documents: "next deck" (L9)
+# A chain of documents: "next deck" (#92)
 # ---------------------------------------------------------------------------
 
 def next_project(config: CollectionConfig, current_key: str,

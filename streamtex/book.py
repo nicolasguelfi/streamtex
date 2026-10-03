@@ -2736,7 +2736,7 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
 
 
 # ---------------------------------------------------------------------------
-# Book defaults declared once per project (L7)
+# Book defaults declared once per project (#90)
 # ---------------------------------------------------------------------------
 
 #: The book settings ``[book.defaults]`` of ``stx.toml`` may provide. Book

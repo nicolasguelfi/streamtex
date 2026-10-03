@@ -30,9 +30,9 @@ import pytest
 
 playwright = pytest.importorskip("playwright.sync_api")
 
-# Path is intentionally fixed — only the laptop running the FC deck has
-# the project at this location.  CI / other devs skip cleanly.
-FC_PROJECT = Path(
+# The FC deck lives outside this repository: $STX_E2E_FC_PROJECT points at it;
+# the default is its place on the maintainer's laptop. Elsewhere: skipped.
+FC_PROJECT = Path(os.environ.get("STX_E2E_FC_PROJECT") or
     "/Volumes/Mac_Data/Win_data/data/backups/"
     "Dropbox-nicolas.guelfi@laposte.net/messir Dropbox/Nicolas Guelfi/"
     "users/NG/dev-dropbox/dvlpt/eclipse/git/lu.uni.sage.publications.2025/"

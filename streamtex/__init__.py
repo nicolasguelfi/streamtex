@@ -187,11 +187,11 @@ try:
     # Data files kept live: re-read on change, part of the page-cache key (#53)
     from .watch import load_json, load_text, load_toml, watch_file
 
-    # Run-time switches and the chain of documents (L9, L10)
+    # Run-time switches and the chain of documents (#92, #93)
     from .runtime_flags import env_flag, is_editable, is_exportable
     from .collection import next_project, st_next_deck
 
-    # Widget values that survive pagination (L22)
+    # Widget values that survive pagination (#94)
     from .kept import kept_value, kept_widget
 
     # Browser recommendation banner

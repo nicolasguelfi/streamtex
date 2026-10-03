@@ -218,7 +218,7 @@ def _maybe_clone_docs_for_template(
     "--no-design-pack",
     is_flag=True,
     default=False,
-    help="Skip the auto-add of the `streamtex-design` pack to the project's "
+    help="Skip the auto-add of the `streamtex-pack-design` pack to the project's "
          "stx.toml after project creation.",
 )
 @click.option(
@@ -718,10 +718,12 @@ def _install_is_interactive() -> bool:
     return sys.stdin.isatty()
 
 
+# The pack lives in the streamtex-packs monorepo (the former streamtex-design
+# repository is archived; its last release was v0.1.0).
 _DEFAULT_DESIGN_PACK = {
-    "name": "streamtex-design",
-    "ref": "github.com/nicolasguelfi/streamtex-design",
-    "rev": "v0.1.0",
+    "name": "streamtex-pack-design",
+    "ref": "github.com/nicolasguelfi/streamtex-packs#streamtex-pack-design",
+    "rev": "pack-design-v0.3.0",
 }
 
 # Presets that opt in to the streamtex-design pack by default (PLAN §29.6).
@@ -731,7 +733,7 @@ _DESIGN_PACK_PRESETS = {"standard", "power", "developer"}
 def _add_default_design_pack(
     ws_root: str, project_name: str, preset: str, console
 ) -> None:
-    """Add the official ``streamtex-design`` pack to the project's stx.toml.
+    """Add the official ``streamtex-pack-design`` pack to the project's stx.toml.
 
     Activated only for presets that opt in (``standard``, ``power``,
     ``developer``); the ``basic`` and ``user`` presets stay minimal. The
@@ -767,10 +769,10 @@ def _add_default_design_pack(
             },
         )
         console.print(
-            f"[green]streamtex-design:[/green] added to "
+            f"[green]{_DEFAULT_DESIGN_PACK['name']}:[/green] added to "
             f"{stx_toml_path.relative_to(ws_root)} "
             f"(rev={_DEFAULT_DESIGN_PACK['rev']})"
         )
     except Exception as exc:
         # Auto-add is convenience; never break the install flow if it fails.
-        console.print(f"[yellow]streamtex-design auto-add:[/yellow] {exc}")
+        console.print(f"[yellow]{_DEFAULT_DESIGN_PACK['name']} auto-add:[/yellow] {exc}")

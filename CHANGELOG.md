@@ -60,6 +60,15 @@ Fixes found by the coherence audit of 0.7.40 (board `audit1`, 2026-10-03). No re
   Existing project files are never rewritten; `stx deploy diff` shows the change.
 
 ### Changed
+- `stx install` (presets standard / power / developer) adds the design pack
+  from the `streamtex-packs` monorepo, `pack-design-v0.3.0` (board `audit2`). It
+  used to add `github.com/nicolasguelfi/streamtex-design` v0.1.0, an archived
+  repository. New projects only; existing `stx.toml` files are not touched.
+- Code comments and test docstrings cite issue numbers (`#75`…`#95`) instead of
+  the lesson labels `(L1)`…`(L23)`, which were defined nowhere in the
+  repositories.
+- The two FC-deck end-to-end tests read the deck's location from
+  `$STX_E2E_FC_PROJECT` (default: unchanged); they are skipped when it is absent.
 - `stx validate` warns about the stx.toml sections the library reads at run time
   (board `audit2`): `[book.defaults]` keys outside the closed list (a typo used
   to be a log line at render time) and `[[run.documents]]` entries `stx run --set`

@@ -1,4 +1,4 @@
-"""Editable in development, PyPI in production — check what production gets (L18).
+"""Editable in development, PyPI in production — check what production gets (#87).
 
 Two measured failures behind this module (ai4se6d):
 

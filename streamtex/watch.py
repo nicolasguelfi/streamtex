@@ -1,4 +1,4 @@
-"""Data files read at build time, kept live (L13, #53).
+"""Data files read at build time, kept live (#77, #53).
 
 A block or a helper that reads a data file (tuning values, a schedule, a
 list of slides…) with ``open()`` + ``functools.lru_cache`` keeps the first

@@ -182,7 +182,7 @@ def validate(strict: bool, build: bool, books: tuple[str, ...], timeout: int,
         else:
             console.print("  [green]\\[claude]: OK[/green]")
 
-    # 5b) Version coherence: .stx-version / pyproject / uv.lock (L18)
+    # 5b) Version coherence: .stx-version / pyproject / uv.lock (#87)
     from .published_check import version_problems
 
     vprobs = version_problems(project_dir)
@@ -196,7 +196,7 @@ def validate(strict: bool, build: bool, books: tuple[str, ...], timeout: int,
             else:
                 total_warnings += 1
 
-    # 5c) Hygiene: conflict markers (error), deprecated configuration (warning) (L20)
+    # 5c) Hygiene: conflict markers (error), deprecated configuration (warning) (#89)
     from .project_rules import conflict_markers, deprecated_config
 
     markers = conflict_markers(project_dir)
@@ -212,7 +212,7 @@ def validate(strict: bool, build: bool, books: tuple[str, ...], timeout: int,
         total_errors += len(markers)
         total_warnings += len(deprecated)
 
-    # 5d) Facts read from a versioned source that has moved on (L23)
+    # 5d) Facts read from a versioned source that has moved on (#95)
     from streamtex.facts import stale_facts
 
     stale = stale_facts(project_dir)
@@ -234,7 +234,7 @@ def validate(strict: bool, build: bool, books: tuple[str, ...], timeout: int,
             console.print(f"  [yellow]warning[/yellow] {msg}")
         total_warnings += len(section_problems)
 
-    # 6) Project rules declared in stx.toml (L12)
+    # 6) Project rules declared in stx.toml (#76)
     from .project_rules import check_rules, load_rules, rule_id
 
     rules = load_rules(project_dir)
@@ -262,7 +262,7 @@ def validate(strict: bool, build: bool, books: tuple[str, ...], timeout: int,
             else:
                 total_warnings += 1
 
-    # 6b) Local copies of public st_* functions — information only (L15)
+    # 6b) Local copies of public st_* functions — information only (#79)
     from .project_rules import local_copies_of_public_api
 
     copies = local_copies_of_public_api(project_dir)
@@ -274,7 +274,7 @@ def validate(strict: bool, build: bool, books: tuple[str, ...], timeout: int,
         if len(copies) > 20:
             console.print(f"  ... and {len(copies) - 20} more")
 
-    # 7) Real build of every block (L11, L16)
+    # 7) Real build of every block (#75, #80)
     if build:
         import json as _json
 

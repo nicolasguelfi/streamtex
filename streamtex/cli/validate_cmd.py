@@ -278,10 +278,18 @@ def validate(strict: bool, build: bool, books: tuple[str, ...], timeout: int,
     if build:
         import json as _json
 
-        from .build_check import block_fingerprints, discover_books, empty_styled_blocks, run_book
+        from .build_check import (
+            block_fingerprints,
+            discover_books,
+            empty_styled_blocks,
+            project_python,
+            run_book,
+        )
 
         targets = [Path(b).resolve() for b in books] or discover_books(project_dir)
-        python = None
+        # The project's environment (its packs, its streamtex), not the one of
+        # the stx running this command (a global uv tool has neither).
+        python = project_python(project_dir)
         if published:
             from .published_check import installed_streamtex, published_python
 
@@ -296,7 +304,8 @@ def validate(strict: bool, build: bool, books: tuple[str, ...], timeout: int,
                 targets = []
             else:
                 console.print(f"  streamtex {installed_streamtex(python)} (published) — {python}")
-        console.print(f"[bold]Build[/bold] ({len(targets)} book(s), real build() of every block)")
+        console.print(f"[bold]Build[/bold] ({len(targets)} book(s), real build() of every block)"
+                      + (f" — {python}" if python and not published else ""))
         capture = bool(snapshot or against)
         reference = _json.loads(Path(against).read_text(encoding="utf-8")) if against else None
         fingerprints: dict[str, dict[str, str]] = {}

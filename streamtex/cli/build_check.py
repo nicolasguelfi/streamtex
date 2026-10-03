@@ -205,6 +205,19 @@ def discover_books(project_dir: str | os.PathLike, max_depth: int = 4) -> list[P
     return sorted(books)
 
 
+def project_python(project_dir: str | os.PathLike) -> str | None:
+    """The interpreter of the project's own environment (``.venv``), if any.
+
+    A global ``stx`` (uv tool) must render the books with the PROJECT's
+    environment — its packs, its streamtex — not with the tool's own.
+    """
+    for rel in ("bin/python", "Scripts/python.exe"):
+        cand = Path(project_dir) / ".venv" / rel
+        if cand.exists():
+            return str(cand)
+    return None
+
+
 def run_book(book: Path, timeout: int = 120, *, capture: bool = False,
              python: str | None = None) -> BookResult:
     """Execute *book* under AppTest in a subprocess and collect per-block results.

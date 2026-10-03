@@ -237,3 +237,23 @@ def test_local_copies_of_public_api_are_reported_not_counted(tmp_path, monkeypat
     r = CliRunner().invoke(cli, ["validate"])
     assert r.exit_code == 0, r.output                   # information only
     assert "defines st_hover_tooltip" in r.output
+
+
+def test_build_uses_the_project_environment(tmp_path, monkeypatch):
+    """A global stx renders the books with the project's .venv, not its own (s2 pilot)."""
+    import sys
+
+    from streamtex.cli.build_check import project_python
+    from streamtex.core import discovery
+
+    assert project_python(tmp_path) is None
+    p = _project(tmp_path)
+    (p / ".venv").symlink_to(sys.prefix)               # like a Dropbox project: .venv -> ~/.venvs/x
+    assert project_python(p) == str(p / ".venv" / "bin" / "python")
+    monkeypatch.setattr(discovery, "discover_packs", lambda *_a, **_k: [])
+    (p / "stx.toml").write_text('[project]\nname = "p"\n')
+    (p / "pyproject.toml").write_text('[project]\nname = "p"\nversion = "0.1.0"\n')
+    monkeypatch.chdir(p)
+    r = CliRunner().invoke(cli, ["validate", "--build", "--timeout", "120"])
+    assert str(p / ".venv" / "bin" / "python") in r.output.replace("\n", "")
+    assert "bck_boom: NameError" in r.output              # the books did run with it

@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- `stx validate --build` renders the books with the project's own environment
+  (`.venv`) when it has one. Run by a global `stx` (uv tool), it used the tool's
+  interpreter, which has neither the project's packs nor its streamtex: every
+  book of a project with a local pack failed (`ModuleNotFoundError`), found by the
+  project-mode pilot on all-trainings (board `s2`). `uv run stx validate` is
+  unchanged (it already ran in the project's environment). The interpreter used
+  is printed on the "Build" line.
+
 ## [0.7.41] — 2026-10-03 — Coherence-audit fixes
 
 Fixes found by the coherence audit of 0.7.40 (boards `audit1` and `audit2`,

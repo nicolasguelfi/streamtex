@@ -32,6 +32,17 @@ Fixes found by the coherence audit of 0.7.40 (board `audit1`, 2026-10-03). No re
   `documentation` installations: 20 files to add, 0 to remove. A test now checks
   that the library installs at least every file of the standalone installer.
 
+- `stx validate --build --snapshot / --against` (board `audit2`) now sees the
+  text a block shows through Streamlit itself — `st_markdown()`,
+  `show_explanation()`, a block's own `st.markdown` / `st.code` / `st.latex` /
+  `st.caption`. It used to fingerprint only the HTML streamtex emitted, so a
+  changed Markdown text went unseen. Numbers derived from a block's position
+  (section anchors, navigation markers, code-wrap toggles) are ignored: inserting
+  a block no longer makes the blocks after it "change"; a visible section number
+  that moves is still reported. Snapshots taken before this release are not
+  comparable: take a new one. Measured on the 11 books of streamtex-docs: 217
+  blocks, identical fingerprints over two runs.
+
 ### Changed
 - `.claude/stx.lock` records `format = 1`. A lock without it (0.7.35-0.7.40) is
   read as format 1; a higher format (newer stx) is refused instead of rewritten.

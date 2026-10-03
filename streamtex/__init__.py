@@ -78,6 +78,7 @@ try:
         st_slide_break, SlideBreakConfig, SlideBreakMode,
         set_slide_break_config, get_slide_break_config,
         add_slide_break_options,
+        st_slide, set_slide_container, get_slide_container, SLIDE_CONTAINER,
     )
 
     # Presentation profiles (display configurations)
@@ -266,6 +267,7 @@ __all__ = [
     "ProjectBlockRegistry",
     "ProjectMeta",
     "ReuseArchitectureError",
+    "SLIDE_CONTAINER",
     "ScaleConfig",
     "ScaleCurve",
     "SlideBreakConfig",
@@ -308,6 +310,7 @@ __all__ = [
     "get_model_capabilities",
     "get_presentation_config",
     "get_slide_break_config",
+    "get_slide_container",
     "get_spacing",
     "get_static_sources",
     "inject_link_preview_scaffold",
@@ -348,6 +351,7 @@ __all__ = [
     "set_link_config",
     "set_presentation_config",
     "set_slide_break_config",
+    "set_slide_container",
     "set_spacing",
     "set_static_sources",
     "set_zoom",
@@ -388,6 +392,7 @@ __all__ = [
     "st_presentation_footer",
     "st_refs",
     "st_scatter_chart",
+    "st_slide",
     "st_slide_break",
     "st_space",
     "st_span",

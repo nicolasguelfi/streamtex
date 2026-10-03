@@ -89,8 +89,12 @@ except Exception:
 
 
 def _check_book(module_list, toc_config=None, marker_config=None, *args, block_args=(),
-                block_kwargs=None, bib_sources=None, bib_config=None, **kwargs):
+                block_kwargs=None, bib_sources=None, bib_config=None, lang=None, **kwargs):
     from streamtex.export import ExportConfig, reset_export_buffer
+
+    if lang is not None:  # same rule as st_book(lang=…)
+        from streamtex.i18n import current_lang
+        block_kwargs = {"lang": current_lang() if lang == "auto" else lang, **(block_kwargs or {})}
     from streamtex.marker import reset_marker_registry
     from streamtex.toc import reset_toc_registry
 
@@ -120,6 +124,29 @@ def _check_book(module_list, toc_config=None, marker_config=None, *args, block_a
     current[0] = "(book)"
 
 
+# Optional capture of the HTML each block emits (stx validate --snapshot/--against).
+if os.environ.get("STX_BUILD_CHECK_CAPTURE"):
+    import hashlib, re
+    import streamtex.export as _exp
+
+    _orig_html = _exp.st_html
+    res["html"] = {}
+    _data_uri = re.compile(r"data:[^\"')\s]+")
+
+    def _norm(html):
+        return _data_uri.sub(lambda m: "data:" + hashlib.sha256(m.group(0).encode()).hexdigest()[:12],
+                             str(html))
+
+    def _capture(html, *a, **k):
+        res["html"].setdefault(current[0], []).append(_norm(html))
+        return _orig_html(html, *a, **k)
+
+    for _m in list(sys.modules.values()):
+        if getattr(_m, "__name__", "").startswith("streamtex"):
+            for _attr in ("_render", "st_html"):
+                if getattr(_m, _attr, None) is _orig_html:
+                    setattr(_m, _attr, _capture)
+
 streamtex.st_book = _check_book
 _book.st_book = _check_book
 os.chdir(os.path.dirname(BOOK))
@@ -143,6 +170,7 @@ class BookResult:
     missing_media: list = field(default_factory=list)   # [block, uri]
     inlined_media: list = field(default_factory=list)   # [block, uri, bytes]
     book_error: str | None = None
+    html: dict = field(default_factory=dict)            # block -> [html fragments] (capture)
 
 
 def discover_books(project_dir: str | os.PathLike, max_depth: int = 4) -> list[Path]:
@@ -159,7 +187,7 @@ def discover_books(project_dir: str | os.PathLike, max_depth: int = 4) -> list[P
     return sorted(books)
 
 
-def run_book(book: Path, timeout: int = 120) -> BookResult:
+def run_book(book: Path, timeout: int = 120, *, capture: bool = False) -> BookResult:
     """Execute *book* under AppTest in a subprocess and collect per-block results."""
     with tempfile.TemporaryDirectory(prefix="stx-build-") as tmp:
         runner = Path(tmp) / "stx_build_runner.py"
@@ -175,6 +203,8 @@ def run_book(book: Path, timeout: int = 120) -> BookResult:
         )
         env = {**os.environ, "STX_BUILD_CHECK_OUT": str(out), "STX_BUILD_CHECK_BOOK": str(book),
                "STX_BUILD_CHECK_INLINE_LIMIT": str(INLINE_LIMIT_BYTES)}
+        if capture:
+            env["STX_BUILD_CHECK_CAPTURE"] = "1"
         try:
             proc = subprocess.run([sys.executable, "-c", driver], cwd=str(book.parent), env=env,
                                   capture_output=True, text=True, timeout=timeout + 60)
@@ -185,7 +215,15 @@ def run_book(book: Path, timeout: int = 120) -> BookResult:
             return BookResult(str(book), book_error="runner produced no result: " + " | ".join(tail))
         data = json.loads(out.read_text(encoding="utf-8"))
     return BookResult(str(book), data["blocks"], data["errors"], data["missing_media"],
-                      data["inlined_media"], data["book_error"])
+                      data["inlined_media"], data["book_error"], data.get("html", {}))
+
+
+def block_fingerprints(result: BookResult) -> dict[str, str]:
+    """``{block: sha256}`` of the HTML each block emitted (base64 media hashed)."""
+    import hashlib
+
+    return {block: hashlib.sha256("\n".join(parts).encode("utf-8")).hexdigest()
+            for block, parts in sorted(result.html.items())}
 
 
 def empty_styled_blocks(project_dir: str | os.PathLike) -> list[tuple[str, int]]:

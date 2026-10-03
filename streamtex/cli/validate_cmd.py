@@ -64,7 +64,13 @@ def _declares_claude_mode(stx_toml: Path) -> bool:
     help="With --build: check only this book.py (repeatable). Default: every book.py found.",
 )
 @click.option("--timeout", default=180, show_default=True, help="With --build: seconds per book.")
-def validate(strict: bool, build: bool, books: tuple[str, ...], timeout: int) -> None:
+@click.option("--snapshot", "snapshot", type=click.Path(dir_okay=False),
+              help="With --build: write the HTML fingerprint of every block to this JSON file.")
+@click.option("--against", "against", type=click.Path(exists=True, dir_okay=False),
+              help="With --build: compare every block's HTML with a --snapshot file; "
+                   "each block that renders differently is a warning.")
+def validate(strict: bool, build: bool, books: tuple[str, ...], timeout: int,
+             snapshot: str | None, against: str | None) -> None:
     """Run pack + component + design system + kit validation on the current project.
 
     Also runs the project rules declared in stx.toml ([[validate.rules]]) and,
@@ -215,13 +221,29 @@ def validate(strict: bool, build: bool, books: tuple[str, ...], timeout: int) ->
 
     # 7) Real build of every block (L11, L16)
     if build:
-        from .build_check import discover_books, empty_styled_blocks, run_book
+        import json as _json
+
+        from .build_check import block_fingerprints, discover_books, empty_styled_blocks, run_book
 
         targets = [Path(b).resolve() for b in books] or discover_books(project_dir)
         console.print(f"[bold]Build[/bold] ({len(targets)} book(s), real build() of every block)")
+        capture = bool(snapshot or against)
+        reference = _json.loads(Path(against).read_text(encoding="utf-8")) if against else None
+        fingerprints: dict[str, dict[str, str]] = {}
         for book in targets:
-            r = run_book(book, timeout=timeout)
+            r = run_book(book, timeout=timeout, capture=capture)
             rel = os.path.relpath(r.book, project_dir)
+            if capture:
+                fingerprints[rel] = block_fingerprints(r)
+            if reference is not None and rel in reference:
+                changed = sorted(b for b, h in fingerprints[rel].items()
+                                 if reference[rel].get(b) not in (None, h))
+                if changed:
+                    console.print(f"  [yellow]{rel}: {len(changed)} block(s) render differently "
+                                  "from the snapshot[/yellow]")
+                    for b in changed[:20]:
+                        console.print(f"    {b}")
+                    total_warnings += len(changed)
             if r.book_error:
                 console.print(f"  [red]{rel}: FAIL[/red] — {r.book_error}")
                 total_errors += 1
@@ -241,6 +263,9 @@ def validate(strict: bool, build: bool, books: tuple[str, ...], timeout: int) ->
                               "(configure_image_path + set_static_sources)")
             total_errors += len(r.errors)
             total_warnings += len(r.missing_media) + len(r.inlined_media)
+        if snapshot:
+            Path(snapshot).write_text(_json.dumps(fingerprints, indent=1, sort_keys=True), encoding="utf-8")
+            console.print(f"  snapshot written: {snapshot}")
         empties = empty_styled_blocks(project_dir)
         if empties:
             console.print("  [yellow]empty styled st_block (renders nothing in the app):[/yellow]")

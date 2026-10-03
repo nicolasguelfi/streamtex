@@ -152,6 +152,22 @@ class ScaleConfig:
     custom_tablet: Optional[list] = None
     custom_mobile: Optional[list] = None
 
+    @classmethod
+    def amphi(cls, **overrides) -> "ScaleConfig":
+        """The lecture-hall preset: base 30 pt, tablet x0.70, mobile x0.55.
+
+        The scale both projection projects of the maintainer set by hand
+        (sumvadis ``postair_display.py``, all-trainings ``shared/display.py``):
+        30 pt keeps a projected deck readable from the back of a lecture hall,
+        and the stronger tablet / mobile shrink keeps the same document
+        usable on a phone. It sets the BASE of the document only — every
+        block keeps its own ``st_zoom`` and sizes. Any field can be
+        overridden: ``ScaleConfig.amphi(base_pt_desktop=28)``.
+        """
+        values = {"base_pt_desktop": 30, "tablet_scale": 0.70, "mobile_scale": 0.55}
+        values.update(overrides)
+        return cls(**values)
+
     def __post_init__(self):
         if not (1 <= self.count <= _PALIER_COUNT_MAX):
             raise ValueError(

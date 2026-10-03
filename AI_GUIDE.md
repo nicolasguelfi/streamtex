@@ -255,11 +255,12 @@ PLAN → PRODUCE → REVIEW → FIX → COMPOUND → INTEGRATE`. CE artifacts li
 `/stx-issue:comment`, `/stx-issue:list` — create and manage GitHub issues with
 auto-collected environment metadata.
 
-### Patterns — `stx-pattern` (5 commands, shared)
+### Reuse architecture — packs, components, design systems, kits (shared)
 
-`/stx-pattern:list`, `/stx-pattern:show`, `/stx-pattern:new`,
-`/stx-pattern:reindex`, `/stx-pattern:validate` — manage the reusable design
-patterns catalog (see Section 4i in stx-guide).
+`/stx-pack:run`, `/stx-component:run`, `/stx-ds:run`, `/stx-kit:run`,
+`/stx-validate:run` — manage the Python packs that carry reusable components,
+design systems and kits (e.g. `/stx-component:run list`, `/stx-component:run new <name>`).
+They replace the former `stx-pattern` markdown catalogue.
 
 ---
 

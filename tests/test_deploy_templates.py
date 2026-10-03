@@ -35,3 +35,14 @@ def test_deploy_ci_writes_the_workflow_once(tmp_path):
     assert "stx validate --build" in wf.read_text()
     r = CliRunner().invoke(cli, ["deploy", "ci", str(tmp_path)])
     assert r.exit_code != 0 and "--force" in r.output
+
+
+def test_generated_files_install_streamtex_from_pypi_for_every_uv_command():
+    """--frozen with --no-sources is refused by uv; a frozen local-streamtex lock fails (audit2)."""
+    dockerfile = generate_dockerfile()
+    assert "UV_NO_SOURCES_PACKAGE=streamtex" in dockerfile          # ENV: build AND entrypoint
+    assert "RUN uv sync --no-dev" in dockerfile and "uv sync --frozen" not in dockerfile
+    assert 'if uv run python -c "import playwright"' in dockerfile   # pdf extra is optional
+    assert '"tomlkit>=0.13"' in dockerfile and '"click>=8.0"' in dockerfile
+    workflow = generate_ci_workflow()
+    assert "UV_NO_SOURCES_PACKAGE: streamtex" in workflow and "uv sync --frozen" not in workflow

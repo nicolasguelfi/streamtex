@@ -43,6 +43,22 @@ Fixes found by the coherence audit of 0.7.40 (board `audit1`, 2026-10-03). No re
   comparable: take a new one. Measured on the 11 books of streamtex-docs: 217
   blocks, identical fingerprints over two runs.
 
+- Generated deployment files (`stx deploy`, `stx deploy ci`; board `audit2`) —
+  measured on a project whose `uv.lock` records a local streamtex, as `stx dev
+  link` leaves it:
+  - the Dockerfile ran `uv sync --frozen --no-dev --no-sources`, which uv
+    refuses ("'--frozen' cannot be used with '--no-sources'"): the image of a
+    new project could not build. It now runs `uv sync --no-dev` with
+    `ENV UV_NO_SOURCES_PACKAGE=streamtex`, which also holds for the later `uv run`
+    steps and the entrypoint (only streamtex loses its local source, as with
+    `stx validate --build --published`);
+  - Chromium is installed only when the project has playwright (the `pdf`
+    extra), and the stx CLI dependencies (click, rich, tomlkit) are installed;
+  - the `stx deploy ci` workflow ran `uv sync --frozen --no-sources-package
+    streamtex`, which fails on such a lock ("Distribution not found"): it now sets
+    `UV_NO_SOURCES_PACKAGE: streamtex` for the whole job and runs `uv sync`.
+  Existing project files are never rewritten; `stx deploy diff` shows the change.
+
 ### Changed
 - `.claude/stx.lock` records `format = 1`. A lock without it (0.7.35-0.7.40) is
   read as format 1; a higher format (newer stx) is refused instead of rewritten.

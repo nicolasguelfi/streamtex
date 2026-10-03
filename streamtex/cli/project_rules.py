@@ -185,3 +185,40 @@ def deprecated_config(project_dir: Path) -> list[str]:
     except (OSError, tomllib.TOMLDecodeError):
         return []
     return [f"[{k}] — {why}" for k, why in DEPRECATED_SECTIONS.items() if k in data]
+
+
+def stx_toml_section_problems(project_dir: Path) -> list[str]:
+    """Mistakes in the stx.toml sections the library reads at run time.
+
+    ``[book.defaults]`` keys outside the closed list (a typo is otherwise only a
+    log line when the book renders) and ``[[run.documents]]`` entries that
+    ``stx run --set`` would refuse (missing id/book/port, duplicate id or port,
+    book not found). Warnings: the document still renders.
+    """
+    path = project_dir / "stx.toml"
+    if not path.is_file():
+        return []
+    try:
+        with open(path, "rb") as f:
+            data = tomllib.load(f)
+    except (OSError, tomllib.TOMLDecodeError):
+        return []                       # an unreadable stx.toml is reported elsewhere
+    out: list[str] = []
+    defaults = data.get("book", {}).get("defaults")
+    if isinstance(defaults, dict):
+        from streamtex.book import BOOK_DEFAULT_KEYS
+
+        unknown = sorted(set(defaults) - BOOK_DEFAULT_KEYS)
+        if unknown:
+            out.append(f"[book.defaults]: unknown key(s) {', '.join(unknown)} — ignored by st_book "
+                       f"(allowed: {', '.join(sorted(BOOK_DEFAULT_KEYS))})")
+    if data.get("run", {}).get("documents"):
+        import click
+
+        from .run_set import load_documents
+
+        try:
+            load_documents(project_dir)
+        except click.ClickException as exc:
+            out.append(exc.message)
+    return out

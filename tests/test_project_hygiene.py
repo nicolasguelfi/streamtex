@@ -31,3 +31,39 @@ def test_validate_reports_hygiene(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     r = CliRunner().invoke(cli, ["validate"])
     assert r.exit_code == 2 and "conflict marker" in r.output and "deprecated" in r.output
+
+
+def test_stx_toml_sections_typos_and_bad_documents_are_warned(tmp_path):
+    from streamtex.cli.project_rules import stx_toml_section_problems
+
+    (tmp_path / "book.py").write_text("")
+    (tmp_path / "stx.toml").write_text(
+        '[book.defaults]\npaginate = true\npagewidth = 80\n'
+        '[[run.documents]]\nid = "a"\nbook = "book.py"\nport = 8601\n'
+        '[[run.documents]]\nid = "a"\nbook = "book.py"\nport = 8602\n')
+    problems = stx_toml_section_problems(tmp_path)
+    assert len(problems) == 2
+    assert "pagewidth" in problems[0] and "page_width" in problems[0]
+    assert "duplicate" in problems[1]
+
+
+def test_stx_toml_sections_valid_or_absent_say_nothing(tmp_path):
+    from streamtex.cli.project_rules import stx_toml_section_problems
+
+    (tmp_path / "book.py").write_text("")
+    (tmp_path / "stx.toml").write_text('[project]\nname = "p"\n')
+    assert stx_toml_section_problems(tmp_path) == []
+    (tmp_path / "stx.toml").write_text(
+        '[book.defaults]\npage_width = 80\n[[run.documents]]\nid = "a"\nbook = "book.py"\nport = 8601\n')
+    assert stx_toml_section_problems(tmp_path) == []
+
+
+def test_validate_prints_stx_toml_section_warnings(tmp_path, monkeypatch):
+    from streamtex.core import discovery
+
+    monkeypatch.setattr(discovery, "discover_packs", lambda *_a, **_k: [])
+    (tmp_path / "stx.toml").write_text('[project]\nname = "p"\n[book.defaults]\nbanner_colour = "red"\n')
+    (tmp_path / "pyproject.toml").write_text('[project]\nname = "p"\nversion = "0.1.0"\n')
+    monkeypatch.chdir(tmp_path)
+    r = CliRunner().invoke(cli, ["validate"])
+    assert "banner_colour" in r.output and r.exit_code == 1, r.output

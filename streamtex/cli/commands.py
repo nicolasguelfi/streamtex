@@ -17,7 +17,9 @@ from .claude_cmd import update_cmd as claude_update
 from .claude_global import global_group as claude_global_group
 from .claude_project import sync_cmd as claude_sync
 from .component_cmd import component as component_group
+from .deploy_cmd import ci_cmd as deploy_ci
 from .deploy_cmd import configure_domain_cmd as deploy_configure_domain
+from .deploy_cmd import diff_cmd as deploy_diff
 from .deploy_cmd import docker as deploy_docker
 from .deploy_cmd import hetzner_cmd as deploy_hetzner
 from .deploy_cmd import huggingface_cmd as deploy_huggingface
@@ -151,6 +153,8 @@ def deploy():
 
 
 deploy.add_command(deploy_preflight)
+deploy.add_command(deploy_diff)
+deploy.add_command(deploy_ci)
 deploy.add_command(deploy_docker)
 deploy.add_command(deploy_huggingface)
 deploy.add_command(deploy_status)

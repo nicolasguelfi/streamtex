@@ -303,9 +303,11 @@ class TestBibTeXParser:
         assert entries[0].title == "Quoted Title"
 
     def test_nested_braces(self):
+        # Protective braces are TeX syntax: decoded for display (0.7.38). They
+        # used to be shown literally ("A {B} C").
         bib = '@article{t, title = {A {B} C}}'
         entries = parse_bibtex_string(bib)
-        assert entries[0].title == "A {B} C"
+        assert entries[0].title == "A B C"
 
     def test_empty_input(self):
         assert parse_bibtex_string("") == []

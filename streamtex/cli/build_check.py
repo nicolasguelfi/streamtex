@@ -54,9 +54,10 @@ _orig_src = _img.get_image_src
 
 def _served_path(uri):
     """Disk path behind a configure_image_path-served URI (the book's static dir)."""
-    if _img._static_image_fs_root:
-        return os.path.join(_img._static_image_fs_root, uri)
-    prefix = _img._static_image_base
+    fs_root = getattr(_img, "_static_image_fs_root", None)
+    if fs_root:
+        return os.path.join(fs_root, uri)
+    prefix = getattr(_img, "_static_image_base", "app/static/images")
     if prefix == "app/static" or prefix.startswith("app/static/"):
         rest = prefix[len("app/static"):].lstrip("/")
         return os.path.join(os.path.dirname(BOOK), "static", rest, uri)  # = _crop._app_static_dir
@@ -67,7 +68,7 @@ def _src(uri):
     out = _orig_src(uri)
     if uri and not out:
         res["missing_media"].append([current[0], str(uri)])
-    elif uri and out == f"{_img._static_image_base}/{uri}":
+    elif uri and out == f"{getattr(_img, '_static_image_base', '')}/{uri}":
         path = _served_path(uri)
         if path is not None and not os.path.isfile(path):
             res["missing_media"].append([current[0], str(uri)])
@@ -187,8 +188,13 @@ def discover_books(project_dir: str | os.PathLike, max_depth: int = 4) -> list[P
     return sorted(books)
 
 
-def run_book(book: Path, timeout: int = 120, *, capture: bool = False) -> BookResult:
-    """Execute *book* under AppTest in a subprocess and collect per-block results."""
+def run_book(book: Path, timeout: int = 120, *, capture: bool = False,
+             python: str | None = None) -> BookResult:
+    """Execute *book* under AppTest in a subprocess and collect per-block results.
+
+    *python*: the interpreter to run it with (default: this one) — e.g. an
+    isolated environment holding the published wheel (``--published``).
+    """
     with tempfile.TemporaryDirectory(prefix="stx-build-") as tmp:
         runner = Path(tmp) / "stx_build_runner.py"
         runner.write_text(_RUNNER, encoding="utf-8")
@@ -206,7 +212,7 @@ def run_book(book: Path, timeout: int = 120, *, capture: bool = False) -> BookRe
         if capture:
             env["STX_BUILD_CHECK_CAPTURE"] = "1"
         try:
-            proc = subprocess.run([sys.executable, "-c", driver], cwd=str(book.parent), env=env,
+            proc = subprocess.run([python or sys.executable, "-c", driver], cwd=str(book.parent), env=env,
                                   capture_output=True, text=True, timeout=timeout + 60)
         except subprocess.TimeoutExpired:
             return BookResult(str(book), book_error=f"timed out after {timeout}s")

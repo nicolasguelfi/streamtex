@@ -246,6 +246,13 @@ repos:
     hooks:
       - id: ruff
         args: [--fix, --exit-non-zero-on-fix]
+  # A merge that leaves <<<<<<< / >>>>>>> markers in 46 files was once
+  # committed and deployed; these hooks stop it before the commit.
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-merge-conflict
+      - id: check-toml
 """
 
 

@@ -5,6 +5,67 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.38] — 2026-10-03 — Production: references that read right, deployments that never fail in silence
+
+Lot C of the roadmap (boards `lecons1` / `lots1`). Measured before release:
+the per-block HTML of the three largest projects (1,605 blocks) differs from
+0.7.37 only in the announced places — 34 blocks whose citation codes change
+(sumvadis 14, ai4se6d 20) and 11 bibliography blocks that now wrap long
+URLs; all-trainings is unchanged.
+
+### Added
+
+- **`BibConfig(strict=True)`** (#86) — an unknown key in `cite()` raises
+  instead of printing `[key?]`.
+- **`BibConfig.projection(**overrides)`** (#86) — hover cards readable on a
+  projected deck (780 px, text ×2), the calibration copied into nine
+  `refs.py`.
+- **`stx validate --build --published`** (#87) — runs every block against
+  the published wheel: the project is resolved with streamtex WITHOUT its
+  local source (local packs keep theirs, as in the Docker image) in an
+  isolated environment (`~/.cache/streamtex/published/`). A project that
+  does not resolve that way is reported: production would fail the same way.
+- **Version coherence in `stx validate`** (#87) — `.stx-version` above the
+  locked streamtex (the Docker guard would fail) is an error; below the
+  pyproject minimum, or streamtex locked to a local source, a warning.
+- **`stx deploy diff`** (#88) — how a project's `Dockerfile`,
+  `entrypoint.sh`, `nginx.conf` differ from the current templates.
+- **`stx deploy ci`** (#88) — writes `.github/workflows/stx-validate.yml`
+  (ruff + `stx validate --build`).
+- **Hygiene in `stx validate`** (#89) — git conflict markers (error) and
+  deprecated `stx.toml` sections such as `[patterns]` (warning).
+
+### Changed
+
+- **BibTeX values are TeX-decoded** (#86) — accents (`\'e`, `\=o`, `{\"O}`,
+  `\v{Z}`…), symbols (`\oe`, `\ss`…), escaped characters (`\&`, `\%`, `\#`)
+  and grouping braces (`{GPT}` → `GPT`). Measured on the projects' .bib
+  files: 205 of 421 entries read differently, all of them showing TeX or
+  braces before. `parse_bibtex_string` now returns decoded values.
+- **Institutional authors shown whole** (#86) — `{{United Nations}}` is one
+  name ("United Nations", not "Nations"); new `BibEntry.institutional`.
+- **Ancient and original dates** (#86) — with `origdate` (biblatex), or a
+  negative / pre-1500 `year`, the citation code shows "c. 380 BCE"
+  ("~380 av. J.-C." in French); the edition year stays in the hover card and
+  the reference list.
+- **Deployment templates** (#88) — the generated entrypoint logs a failed
+  cache warmup or static export to stderr and `/app/static-html/STX_ERRORS.txt`
+  (the service still starts); the Dockerfile no longer exports at build time
+  (it was done twice and failed silently at the root of multi-module
+  repos). Only newly generated files change: `stx deploy` never overwrites
+  existing ones (`stx deploy diff` shows the gap).
+- **`stx project new`** (#89) — `.pre-commit-config.yaml` adds
+  `check-merge-conflict` and `check-toml`.
+
+### Fixed
+
+- **Author fields with nested braces** (#34) — `{\v{Z}}{\'i}dek` defeated the
+  two-level pattern and dropped the whole field ("Unknown" in citations);
+  values are now read at any depth.
+- **Long URLs in `st_bibliography`** (#54) — entries wrap
+  (`overflow-wrap: anywhere`) instead of widening the whole exported
+  document.
+
 ## [0.7.37] — 2026-10-03 — Writing slides: thin helpers, explicit values
 
 Lot D of the roadmap (boards `lecons1` / `lots1`). Design rule from the

@@ -111,6 +111,9 @@ class BibEntry:
     language: str = ""
     keywords: str = ""
     extra: Dict[str, str] = field(default_factory=dict)
+    #: Authors written as ONE unit in BibTeX — ``{{United Nations}}`` — shown
+    #: whole, never cut to their last word.
+    institutional: List[str] = field(default_factory=list)
 
     # --- Computed properties -------------------------------------------------
 
@@ -120,6 +123,8 @@ class BibEntry:
         if not self.authors:
             return "Unknown"
         first = self.authors[0]
+        if first in self.institutional:
+            return first
         if "," in first:
             return first.split(",")[0].strip()
         parts = first.strip().split()
@@ -132,6 +137,8 @@ class BibEntry:
             return "Unknown"
 
         def _last(author: str) -> str:
+            if author in self.institutional:
+                return author
             if "," in author:
                 return author.split(",")[0].strip()
             parts = author.strip().split()
@@ -234,6 +241,20 @@ class BibConfig:
     card_width: Optional[str] = None
     card_font_scale: float = 1.0
     card_css: str = ""
+    #: An unknown key in cite() raises instead of printing "[key?]" — a
+    #: missing reference fails the build, not the projection.
+    strict: bool = False
+
+    @classmethod
+    def projection(cls, **overrides) -> "BibConfig":
+        """Hover cards readable on a projected deck (780 px wide, text x2).
+
+        The calibration the lecture-hall project copied into nine ``refs.py``.
+        Any field can be overridden: ``BibConfig.projection(strict=True)``.
+        """
+        values: Dict[str, Any] = {"card_width": "780px", "card_font_scale": 2.0}
+        values.update(overrides)
+        return cls(**values)
 
 
 _bib_config: BibConfig = BibConfig()
@@ -442,9 +463,14 @@ def parse_bibtex_string(content: str) -> List[BibEntry]:
             continue
 
         key = body[:comma_pos].strip()
-        fields = _parse_bibtex_fields(body[comma_pos + 1:])
+        raw = _parse_bibtex_fields_raw(body[comma_pos + 1:])
+        authors, institutional = _split_authors(raw.pop("author", ""))
+        fields = {k: _decode_tex(v) for k, v in raw.items()}
+        if authors:
+            fields["authors"] = authors
 
         entry = _fields_to_entry(key, entry_type, fields)
+        entry.institutional = institutional
         entries.append(entry)
         pos = end + 1
 
@@ -479,26 +505,158 @@ def _find_matching_brace(content: str, start: int) -> int:
     return -1
 
 
-def _parse_bibtex_fields(fields_str: str) -> Dict[str, str]:
-    """Parse field=value pairs from a BibTeX entry body."""
-    fields = {}
-    pattern = re.compile(
-        r'(\w+)\s*=\s*(?:'
-        r'\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}'
-        r'|"([^"]*)"'
-        r'|(\d+)'
-        r')',
-        re.DOTALL
-    )
-    for match in pattern.finditer(fields_str):
-        name = match.group(1).lower()
-        value = match.group(2) or match.group(3) or match.group(4) or ""
-        value = re.sub(r'\s+', ' ', value.replace("\n", " ")).strip()
-        # Strip outer braces from values like {{UNESCO}} → UNESCO
-        while value.startswith("{") and value.endswith("}"):
-            value = value[1:-1]
-        fields[name] = value
+def _read_braced(text: str, i: int) -> tuple[str, int]:
+    """Value inside the brace group starting at *text[i]* == '{' (any depth)."""
+    depth = 0
+    for j in range(i, len(text)):
+        ch = text[j]
+        if ch == "\\":
+            continue
+        if ch == "{" and (j == 0 or text[j - 1] != "\\"):
+            depth += 1
+        elif ch == "}" and (j == 0 or text[j - 1] != "\\"):
+            depth -= 1
+            if depth == 0:
+                return text[i + 1:j], j + 1
+    return text[i + 1:], len(text)
+
+
+def _parse_bibtex_fields_raw(fields_str: str) -> Dict[str, str]:
+    """``name = value`` pairs, values kept RAW (inner braces and TeX intact).
+
+    Brace groups are read at any depth — ``{\\v{Z}}{\\'i}dek`` used to defeat
+    the two-level pattern and drop the whole author field (#34).
+    """
+    fields: Dict[str, str] = {}
+    i, n = 0, len(fields_str)
+    name_re = re.compile(r"\s*,?\s*(\w[\w-]*)\s*=\s*")
+    while i < n:
+        m = name_re.match(fields_str, i)
+        if not m:
+            nxt = fields_str.find(",", i + 1)
+            if nxt < 0:
+                break
+            i = nxt
+            continue
+        name = m.group(1).lower()
+        j = m.end()
+        if j >= n:
+            break
+        ch = fields_str[j]
+        if ch == "{":
+            value, j = _read_braced(fields_str, j)
+        elif ch == '"':
+            k = j + 1
+            depth = 0
+            while k < n and not (fields_str[k] == '"' and depth == 0):
+                if fields_str[k] == "{":
+                    depth += 1
+                elif fields_str[k] == "}":
+                    depth -= 1
+                k += 1
+            value, j = fields_str[j + 1:k], k + 1
+        else:
+            k = j
+            while k < n and fields_str[k] not in ",}\n":
+                k += 1
+            value, j = fields_str[j:k].strip(), k
+        fields[name] = re.sub(r"\s+", " ", value.replace("\n", " ")).strip()
+        i = j
     return fields
+
+
+#: Accent macros → combining characters (NFC-composed afterwards).
+_TEX_ACCENTS = {
+    "'": "\u0301", "`": "\u0300", "^": "\u0302", '"': "\u0308", "~": "\u0303",
+    "=": "\u0304", ".": "\u0307", "u": "\u0306", "v": "\u030c", "H": "\u030b",
+    "c": "\u0327", "k": "\u0328", "r": "\u030a", "d": "\u0323", "b": "\u0331",
+}
+_TEX_SYMBOLS = {
+    "ss": "ß", "o": "ø", "O": "Ø", "ae": "æ", "AE": "Æ", "oe": "œ", "OE": "Œ",
+    "aa": "å", "AA": "Å", "l": "ł", "L": "Ł", "i": "ı", "j": "ȷ",
+}
+_TEX_ESCAPES = {"&": "&", "%": "%", "$": "$", "_": "_", "#": "#", "{": "{", "}": "}"}
+
+
+def _decode_tex(value: str) -> str:
+    """Decode the usual TeX in a BibTeX value: accents, ``\\oe``-like symbols,
+    escaped characters, then drop the grouping braces. Plain values are
+    returned unchanged."""
+    if "\\" not in value and "{" not in value:
+        return value
+    import unicodedata
+
+    def _accent(m: re.Match) -> str:
+        mark, letter = m.group(1), m.group(2) or m.group(3)
+        if letter in ("i", "j") and m.group(0).find("\\" + letter) >= 0:
+            letter = "ı" if letter == "i" else "ȷ"
+        return unicodedata.normalize("NFC", letter + _TEX_ACCENTS[mark])
+
+    out = value
+    # {\'e}, \'{e}, \'e  and  \v{Z}, \c{c}, \c c
+    letter_accents = "".join(re.escape(k) for k in _TEX_ACCENTS if not k.isalpha())
+    out = re.sub(r"\\([" + letter_accents + r"])\s*(?:\{\\?(\w)\}|\\?(\w))", _accent, out)
+    out = re.sub(r"\\([uvHckrdb])(?:\s*\{\\?(\w)\}|\s+(\w))", _accent, out)
+    out = re.sub(r"\\(" + "|".join(sorted(_TEX_SYMBOLS, key=len, reverse=True)) + r")(?![a-zA-Z])\s?",
+                 lambda m: _TEX_SYMBOLS[m.group(1)], out)
+    out = re.sub(r"\\([&%$_#{}])", lambda m: "\x00" + m.group(1) + "\x00", out)
+    out = out.replace("{", "").replace("}", "")
+    out = re.sub("\x00(.)\x00", lambda m: _TEX_ESCAPES[m.group(1)], out)
+    return unicodedata.normalize("NFC", re.sub(r"\s+", " ", out).strip())
+
+
+def _split_authors(raw: str) -> tuple[List[str], List[str]]:
+    """Split an author field on top-level ``and``; detect ``{{One Unit}}`` names."""
+    names: List[str] = []
+    depth, start, i = 0, 0, 0
+    while i < len(raw):
+        ch = raw[i]
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+        elif depth == 0 and raw.startswith(" and ", i):
+            names.append(raw[start:i])
+            start = i + 5
+            i += 4
+        i += 1
+    names.append(raw[start:])
+    authors, institutional = [], []
+    for name in (x.strip() for x in names):
+        if not name:
+            continue
+        whole = name.startswith("{") and name.endswith("}") and _read_braced(name, 0)[1] == len(name)
+        decoded = _decode_tex(name)
+        authors.append(decoded)
+        if whole and "\\" not in name[:2]:
+            institutional.append(decoded)
+    return authors, institutional
+
+
+def _parse_bibtex_fields(fields_str: str) -> Dict[str, str]:
+    """Parse field=value pairs from a BibTeX entry body (TeX decoded)."""
+    return {k: _decode_tex(v) for k, v in _parse_bibtex_fields_raw(fields_str).items()}
+
+
+def _label_year(entry: "BibEntry") -> str:
+    """The year shown in an author-year citation code.
+
+    ``origdate`` (biblatex) wins over the edition ``year``; a negative year
+    or one before 1500 reads as an ancient date — "c. 380 BCE" (en) /
+    "~380 av. J.-C." (fr). The edition year stays in the hover card and the
+    reference list.
+    """
+    raw = (entry.extra.get("origdate") or entry.year or "").strip()
+    m = re.match(r"^(-?\d+)", raw)
+    if not m:
+        return entry.year
+    year = int(m.group(1))
+    french = (_bib_config.locale or "en").lower().startswith("fr")
+    if year < 0:
+        return f"~{-year} av. J.-C." if french else f"c. {-year} BCE"
+    if year < 1500:
+        return f"~{year}" if french else f"c. {year}"
+    return m.group(1) if entry.extra.get("origdate") else entry.year
 
 
 # ===================================================================
@@ -812,6 +970,11 @@ def cite(*keys: str, prefix: str = "", suffix: str = "") -> str:
     for key in keys:
         entry = _bib_registry.get(key)
         if entry is None:
+            if cfg.strict:
+                raise KeyError(
+                    f"cite: unknown bibliography key {key!r} (BibConfig(strict=True)) — "
+                    "add it to the .bib or fix the key"
+                )
             logger.warning(f"cite: key '{key}' not found")
             parts.append(f"[{key}?]")
             continue
@@ -819,7 +982,7 @@ def cite(*keys: str, prefix: str = "", suffix: str = "") -> str:
         num = _bib_registry.cite(key)
 
         if cfg.citation_style == CitationStyle.AUTHOR_YEAR:
-            label = f"{entry.authors_short}, {entry.year}"
+            label = f"{entry.authors_short}, {_label_year(entry)}"
         elif cfg.citation_style == CitationStyle.NUMERIC:
             label = str(num)
         else:  # SUPERSCRIPT
@@ -940,7 +1103,7 @@ def st_bibliography(*, style=None, title: str = "References",
             anchor_id = f"bib-{entry.key}"
             _render(
                 f'<p id="{anchor_id}" style="margin-bottom:10px;text-indent:-2.5em;'
-                f'padding-left:2.5em;line-height:1.6;{entry_css}">'
+                f'padding-left:2.5em;line-height:1.6;overflow-wrap:anywhere;{entry_css}">'
                 f'{num_html}{formatted}</p>'
             )
 

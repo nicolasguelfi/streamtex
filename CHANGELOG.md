@@ -5,9 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.7.41] — 2026-10-03 — Coherence-audit fixes
 
-Fixes found by the coherence audit of 0.7.40 (board `audit1`, 2026-10-03). No rendering change.
+Fixes found by the coherence audit of 0.7.40 (boards `audit1` and `audit2`,
+2026-10-03). No rendering change. Measured before release, 0.7.40 (PyPI)
+against this release, each project in its own environment:
+
+- per-block snapshot (the corrected one, which also sees Markdown text) of the
+  three largest projects: all-trainings 1,197 blocks, sumvadis 217, ai4se6d 191 —
+  0 block renders differently; 4 blocks differ, and they also differ between two
+  runs of 0.7.40 (unstable by nature: `bck_closing_dlh`,
+  `bck_mistral_bk_demo_loop_en/fr`, `bck_llm_context_benchmark`); no build error;
+- CLI non-regression (`stx claude check` + `stx update` on copies of the 10
+  StreamTeX roots, default answers and "y" everywhere, plus two install trials):
+  the only differences are the 20 shared files per profiled target now
+  installed (100 and 300 additions), no removal, no modification, no git change.
 
 ### Fixed
 - `streamtex.facts.stale_facts()` no longer raises `IndexError` when a source's

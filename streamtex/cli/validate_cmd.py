@@ -225,7 +225,7 @@ def validate(strict: bool, build: bool, books: tuple[str, ...], timeout: int,
         total_warnings += len(stale)
 
     # 6) Project rules declared in stx.toml (L12)
-    from .project_rules import check_rules, load_rules
+    from .project_rules import check_rules, load_rules, rule_id
 
     rules = load_rules(project_dir)
     if rules:
@@ -234,11 +234,11 @@ def validate(strict: bool, build: bool, books: tuple[str, ...], timeout: int,
         by_rule: dict[str, list] = {}
         for v in violations:
             by_rule.setdefault(v.rule, []).append(v)
-        for rule in rules:
-            rid = str(rule.get("id") or "")
-            vs = [v for k, lst in by_rule.items() for v in lst if k == rid] if rid else []
+        for i, rule in enumerate(rules):
+            rid = rule_id(rule, i)
+            vs = by_rule.get(rid, [])
             if not vs:
-                console.print(f"  [green]{rid or 'rule'}: OK[/green]")
+                console.print(f"  [green]{rid}: OK[/green]")
                 continue
             color = "red" if vs[0].severity == "error" else "yellow"
             console.print(f"  [{color}]{rid}: {len(vs)} violation(s)[/{color}] — {vs[0].message}")

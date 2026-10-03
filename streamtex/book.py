@@ -2810,9 +2810,7 @@ import inspect as _inspect  # noqa: E402
 _IMPL_PARAMS = list(_inspect.signature(_st_book_impl).parameters)
 
 
-@_functools.wraps(_st_book_impl)
-def st_book(module_list, *args, **kwargs):
-    """Generates a web page e-book from a list of block modules.
+_DEFAULTS_DOC = """Generates a web page e-book from a list of block modules.
 
     Every parameter of the book can be given here; the ones NOT given are
     taken from ``[book.defaults]`` of the project's ``stx.toml`` when it
@@ -2821,8 +2819,17 @@ def st_book(module_list, *args, **kwargs):
     ``doc_version``, ``lang``), then from the defaults below.
     ``doc_version="auto"`` reads ``[project].version`` of ``pyproject.toml``.
     """
+
+
+@_functools.wraps(_st_book_impl)
+def st_book(module_list, *args, **kwargs):
     positional = set(_IMPL_PARAMS[1:1 + len(args)])
     for key, value in _book_defaults().items():
         if key not in kwargs and key not in positional:
             kwargs[key] = value
     return _st_book_impl(module_list, *args, **kwargs)
+
+
+# functools.wraps copied the implementation's docstring over the wrapper's:
+# keep both, so help(st_book) documents [book.defaults] and doc_version="auto".
+st_book.__doc__ = _DEFAULTS_DOC + "\n" + (_st_book_impl.__doc__ or "")

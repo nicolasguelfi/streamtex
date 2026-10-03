@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+Fixes found by the coherence audit of 0.7.40 (board `audit1`, 2026-10-03). No rendering change.
+
+### Fixed
+- `streamtex.facts.stale_facts()` no longer raises `IndexError` when a source's
+  version file is empty (it is skipped).
+- `streamtex.i18n.with_lang()` replaces an existing `lang=` instead of adding a
+  second one, and keeps the `#fragment` at the end of the address.
+- `stx validate`: a `[[validate.rules]]` entry without `id` is shown as `rule-<n>`
+  with its violations; it used to print `rule: OK` while counting an error.
+- `help(st_book)` documents `[book.defaults]` and `doc_version="auto"` again,
+  followed by the parameters (the 0.7.39 wrapper's docstring was overwritten).
+- Generated deploy `entrypoint.sh` (`stx deploy`): the error log is written to
+  `/app/STX_ERRORS.txt`, outside `/app/static-html/` that nginx serves with
+  `autoindex on` — it was public at `/html/STX_ERRORS.txt`. Existing project
+  files are not rewritten; `stx deploy diff` shows the difference.
+
 ## [0.7.40] — 2026-10-03 — Kept widget values, versioned facts
 
 Lot F of the roadmap (boards `lecons1` / `lots1`). No rendering change.

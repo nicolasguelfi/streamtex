@@ -170,6 +170,9 @@ def test_current_lang_order(langs, monkeypatch):
 def test_with_lang_and_set_languages(langs):
     assert i18n.with_lang("http://h/x", "fr") == "http://h/x?lang=fr"
     assert i18n.with_lang("http://h/x?a=1", "fr") == "http://h/x?a=1&lang=fr"
+    # an existing lang= is replaced, not repeated; the #fragment stays last
+    assert i18n.with_lang("http://h/x?lang=en&a=1", "fr") == "http://h/x?a=1&lang=fr"
+    assert i18n.with_lang("http://h/x#sec", "fr") == "http://h/x?lang=fr#sec"
     with pytest.raises(ValueError):
         i18n.set_languages(("en",), "fr")
 

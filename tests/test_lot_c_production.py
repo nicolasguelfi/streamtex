@@ -85,7 +85,8 @@ def test_dockerfile_exports_once_and_entrypoint_never_hides_a_failure():
     assert "2>/dev/null || true" not in entry
     assert 'report_failure "stx export html"' in entry
     assert 'report_failure "stx cache warmup"' in entry
-    assert "STX_ERRORS.txt" in entry
+    # the error log is written outside the folder nginx serves (autoindex on)
+    assert ">> /app/STX_ERRORS.txt" in entry and "static-html/STX_ERRORS" not in entry
 
 
 def test_deploy_diff(tmp_path):

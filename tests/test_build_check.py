@@ -147,6 +147,24 @@ def test_validate_runs_declared_rules(tmp_path, monkeypatch):
     assert r.exit_code == 2 and "no-hex: 1 violation(s)" in r.output and "bck.py:1" in r.output
 
 
+def test_validate_shows_the_violation_of_a_rule_without_id(tmp_path, monkeypatch):
+    from streamtex.core import discovery
+
+    monkeypatch.setattr(discovery, "discover_packs", lambda *_a, **_k: [])
+    (tmp_path / "stx.toml").write_text(textwrap.dedent('''
+        [project]
+        name = "p"
+        [[validate.rules]]
+        glob = "*.py"
+        forbid = '#[0-9a-fA-F]{6}'
+    '''))
+    (tmp_path / "bck.py").write_text("c = '#123456'\n")
+    (tmp_path / "pyproject.toml").write_text('[project]\nname = "p"\nversion = "0.1.0"\n')
+    monkeypatch.chdir(tmp_path)
+    r = CliRunner().invoke(cli, ["validate"])
+    assert r.exit_code == 2 and "rule-1: 1 violation(s)" in r.output and ": OK" not in r.output
+
+
 def test_local_copies_of_public_api_are_reported_not_counted(tmp_path, monkeypatch):
     from streamtex.core import discovery
 

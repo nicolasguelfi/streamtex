@@ -1,65 +1,15 @@
-"""Lot F — widget values that survive pagination (L22), versioned facts (L23)."""
+"""streamtex.facts: versioned facts, fact(), stale_facts() and stx validate (#95)."""
 
 import textwrap
 
 import pytest
 from click.testing import CliRunner
 
-from streamtex import watch
 from streamtex.cli.commands import cli
 from streamtex.facts import fact, stale_facts
 
+pytestmark = pytest.mark.usefixtures("reset_watch")
 
-@pytest.fixture(autouse=True)
-def _clean():
-    watch._reset_for_tests()
-    yield
-    watch._reset_for_tests()
-
-
-# --- L22 ------------------------------------------------------------------
-
-SCRIPT = textwrap.dedent("""
-    import streamlit as st
-    import streamtex as stx
-    page = st.session_state.get("page", 1)
-    if page == 1:
-        st.radio("Language", ["en", "fr"], **stx.kept_widget("lang", default="en"))
-    st.write("lang=" + stx.kept_value("lang", "en"))
-""")
-
-
-def test_kept_value_survives_pages_without_the_widget():
-    from streamlit.testing.v1 import AppTest
-
-    at = AppTest.from_string(SCRIPT).run()
-    at.radio[0].set_value("fr").run()
-    assert at.markdown[-1].value == "lang=fr"
-    for page in (2, 3, 4):                     # the widget is absent on these pages
-        at.session_state["page"] = page
-        at.run()
-        assert at.markdown[-1].value == "lang=fr", page
-    at.session_state["page"] = 1
-    at.run()                                   # back on page 1: the widget shows the kept value
-    assert at.radio[0].value == "fr"
-
-
-def test_without_the_pattern_the_value_is_lost():
-    """The defect the helper exists for (measured in sumvadis): a plain widget key is purged."""
-    from streamlit.testing.v1 import AppTest
-
-    plain = SCRIPT.replace('**stx.kept_widget("lang", default="en")', 'key="lang_plain"').replace(
-        'stx.kept_value("lang", "en")', 'st.session_state.get("lang_plain", "en")')
-    at = AppTest.from_string(plain).run()
-    at.radio[0].set_value("fr").run()
-    at.session_state["page"] = 2
-    at.run()
-    at.session_state["page"] = 3
-    at.run()
-    assert at.markdown[-1].value == "lang=en"
-
-
-# --- L23 ------------------------------------------------------------------
 
 def _facts(tmp_path, recorded="0.85.0", current="0.86.0"):
     tmp_path.mkdir(parents=True, exist_ok=True)

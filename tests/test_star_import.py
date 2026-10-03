@@ -49,3 +49,10 @@ def test_submodules_remain_importable_explicitly():
     from streamtex import styles  # noqa: F401
 
     assert hasattr(stx_list, "st_list")
+
+
+def test_names_kept_out_of_the_star_import():
+    """Projects define their own T / current_lang / fact: the star import must not shadow them."""
+    ns = _star()
+    for name in ("T", "TF", "current_lang", "with_lang", "set_languages", "fact"):
+        assert name not in ns, name

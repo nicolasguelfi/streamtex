@@ -560,7 +560,7 @@ def _inject_bib_preview_if_enabled():
         inject_bib_preview_scaffold()
 
 
-def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConfig = None, separator=None,
+def _st_book_impl(module_list, toc_config: TOCConfig = None, marker_config: MarkerConfig = None, separator=None,
             export: bool = True, export_title: str = "StreamTeX Export",
             pdf_config: PdfConfig = None,
             exports: list[ExportConfig] | None = None,
@@ -623,6 +623,8 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
 
         resolved = current_lang() if lang == "auto" else lang
         block_kwargs = {"lang": resolved, **(block_kwargs or {})}
+    if doc_version == "auto":
+        doc_version = _project_version()
     _block_args = tuple(block_args or ())
     _block_kwargs = dict(block_kwargs or {})
     # --- Resolve PdfConfig from exports list if not provided directly ---
@@ -2731,3 +2733,96 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
     end_time = time.time()
     logger.debug("st_book (paginated) completed in %.2fs [page %d/%d]",
                  end_time - start_time, current_page + 1, total)
+
+
+# ---------------------------------------------------------------------------
+# Book defaults declared once per project (L7)
+# ---------------------------------------------------------------------------
+
+#: The book settings ``[book.defaults]`` of ``stx.toml`` may provide. Book
+#: configuration only — nothing that reaches the content of a block.
+BOOK_DEFAULT_KEYS = frozenset({
+    "paginate", "page_width", "zoom", "export", "export_title", "loading",
+    "chrome_banner", "banner_color", "doc_version", "lang",
+})
+
+
+def _main_script_dir() -> str:
+    try:
+        from streamlit.runtime.scriptrunner import get_script_run_ctx
+
+        ctx = get_script_run_ctx(suppress_warning=True)
+        path = getattr(ctx, "main_script_path", None) if ctx else None
+        if path:
+            return os.path.dirname(os.path.abspath(path))
+    except Exception:  # noqa: BLE001 — bare mode / Streamlit drift
+        pass
+    return os.getcwd()
+
+
+def _find_upwards(start: str, name: str) -> str | None:
+    cur = os.path.abspath(start)
+    while True:
+        cand = os.path.join(cur, name)
+        if os.path.isfile(cand):
+            return cand
+        parent = os.path.dirname(cur)
+        if parent == cur:
+            return None
+        cur = parent
+
+
+def _book_defaults(start: str | None = None) -> dict:
+    """``[book.defaults]`` of the nearest ``stx.toml`` above the book (live re-read)."""
+    path = _find_upwards(start or _main_script_dir(), "stx.toml")
+    if not path:
+        return {}
+    from .watch import load_toml
+
+    try:
+        section = load_toml(path).get("book", {}).get("defaults", {})
+    except Exception:  # noqa: BLE001 — a broken stx.toml must not break the book
+        logger.warning("stx.toml [book.defaults] unreadable: %s", path, exc_info=True)
+        return {}
+    unknown = set(section) - BOOK_DEFAULT_KEYS
+    if unknown:
+        logger.warning("stx.toml [book.defaults]: ignored key(s) %s (allowed: %s)",
+                       sorted(unknown), ", ".join(sorted(BOOK_DEFAULT_KEYS)))
+    return {k: v for k, v in section.items() if k in BOOK_DEFAULT_KEYS}
+
+
+def _project_version(start: str | None = None) -> str | None:
+    """``[project].version`` of the nearest ``pyproject.toml`` above the book."""
+    path = _find_upwards(start or _main_script_dir(), "pyproject.toml")
+    if not path:
+        return None
+    from .watch import load_toml
+
+    try:
+        return load_toml(path).get("project", {}).get("version")
+    except Exception:  # noqa: BLE001
+        return None
+
+
+import functools as _functools  # noqa: E402
+import inspect as _inspect  # noqa: E402
+
+_IMPL_PARAMS = list(_inspect.signature(_st_book_impl).parameters)
+
+
+@_functools.wraps(_st_book_impl)
+def st_book(module_list, *args, **kwargs):
+    """Generates a web page e-book from a list of block modules.
+
+    Every parameter of the book can be given here; the ones NOT given are
+    taken from ``[book.defaults]`` of the project's ``stx.toml`` when it
+    declares them (``paginate``, ``page_width``, ``zoom``, ``export``,
+    ``export_title``, ``loading``, ``chrome_banner``, ``banner_color``,
+    ``doc_version``, ``lang``), then from the defaults below.
+    ``doc_version="auto"`` reads ``[project].version`` of ``pyproject.toml``.
+    """
+    positional = set(_IMPL_PARAMS[1:1 + len(args)])
+    for key, value in _book_defaults().items():
+        if key not in kwargs and key not in positional:
+            kwargs[key] = value
+    return _st_book_impl(module_list, *args, **kwargs)

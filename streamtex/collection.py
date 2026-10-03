@@ -31,6 +31,10 @@ class CollectionConfig:
     description: str = ""
     cards_per_row: int = 3
     projects: Dict[str, ProjectMeta] = field(default_factory=dict)
+    #: Card frame and description colour — themable (a dark deck needs
+    #: another border than the light default). Defaults keep the 0.7.x look.
+    card_border: str = "1px solid #ddd"
+    card_text_color: str = "#666"
 
     @classmethod
     def from_toml(cls, path: str) -> "CollectionConfig":
@@ -87,6 +91,8 @@ class CollectionConfig:
             title=collection_data.get("title", cls.title),
             description=collection_data.get("description", ""),
             cards_per_row=collection_data.get("cards_per_row", 3),
+            card_border=collection_data.get("card_border", "1px solid #ddd"),
+            card_text_color=collection_data.get("card_text_color", "#666"),
         )
 
         # Parse projects
@@ -224,7 +230,7 @@ def _render_project_card(
     card_html = f"""
     <a href="?project={project_key}" target="_blank" style="text-decoration: none; color: inherit;">
         <div style="
-            border: 1px solid #ddd;
+            border: {config.card_border};
             border-radius: 8px;
             padding: 16px;
             margin-bottom: 16px;
@@ -235,7 +241,7 @@ def _render_project_card(
         onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='none';">
             {f'<img src="{cover_src}" alt="{project.title}" style="width: 100%; height: auto; border-radius: 4px; margin-bottom: 12px;">' if cover_src else ''}
             <h3 style="margin: 8px 0; font-size: 1.3rem;">{project.title}</h3>
-            <p style="margin: 8px 0; font-size: 0.95rem; color: #666;">{project.description}</p>
+            <p style="margin: 8px 0; font-size: 0.95rem; color: {config.card_text_color};">{project.description}</p>
         </div>
     </a>
     """
@@ -292,3 +298,45 @@ def _get_collection_base_url() -> str:
     # For external mode, we just return a safe default
     # (The actual URL is determined by where the collection is running)
     return "/"
+
+
+# ---------------------------------------------------------------------------
+# A chain of documents: "next deck" (L9)
+# ---------------------------------------------------------------------------
+
+def next_project(config: CollectionConfig, current_key: str,
+                 *, wrap: bool = False) -> Optional[tuple[str, ProjectMeta]]:
+    """The project after *current_key* in the collection order (``order``, then key).
+
+    ``None`` after the last one, unless *wrap*. URLs already honour the
+    ``STX_URL_<KEY>`` override (one variable per document, set by
+    ``stx run --set``).
+    """
+    keys = list(config.projects)
+    if current_key not in keys:
+        raise KeyError(f"{current_key!r} is not in the collection ({', '.join(keys)})")
+    i = keys.index(current_key) + 1
+    if i >= len(keys):
+        if not wrap:
+            return None
+        i = 0
+    return keys[i], config.projects[keys[i]]
+
+
+def st_next_deck(config: CollectionConfig, current_key: str, label: str = "Next \u2192",
+                 *, lang: Optional[str] = None, style: str = "") -> None:
+    """A link to the next document of the collection (nothing after the last one).
+
+    *lang*: carry the language in the address (``?lang=fr``), as the
+    documents of a multilingual collection expect. *style*: CSS of the link.
+    """
+    nxt = next_project(config, current_key)
+    if nxt is None:
+        return
+    key, project = nxt
+    url = project.project_url or f"?project={key}"
+    if lang:
+        from .i18n import with_lang
+        url = with_lang(url, lang)
+    css = style or "text-decoration: none; font-weight: 600;"
+    _render(f'<a class="stx-next-deck" href="{url}" target="_self" style="{css}">{label} {project.title}</a>')

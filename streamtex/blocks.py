@@ -172,7 +172,16 @@ class ProjectBlockRegistry:
 
     _instances: List["ProjectBlockRegistry"] = []
 
-    def __init__(self, blocks_dir: Path):
+    def __init__(self, blocks_dir: Path, shared_dirs: Optional[List[Path]] = None):
+        """
+        :param blocks_dir: the module's own ``blocks/`` directory (flat).
+        :param shared_dirs: optional directories of blocks SHARED by several
+            modules (e.g. ``modules/shared-blocks/blocks``), scanned
+            recursively. A block name not found locally is looked up there,
+            in order; a local block always wins. Iteration, ``len()`` and
+            ``list_blocks()`` stay the module's own blocks, so
+            ``st_book(registry)`` is unchanged (#19).
+        """
         p = Path(blocks_dir)
         if not p.is_dir():
             raise ValueError(
@@ -182,6 +191,8 @@ class ProjectBlockRegistry:
                 f"ProjectBlockRegistry(__file__)."
             )
         self.blocks_dir = p
+        self.shared_dirs = [Path(d) for d in (shared_dirs or [])]
+        self._shared_manifest: Optional[Dict[str, str]] = None
         self._cache: Dict[str, object] = {}
         self._mtimes: Dict[str, float] = {}
         self._manifest: Optional[Dict] = None
@@ -217,13 +228,38 @@ class ProjectBlockRegistry:
                 logger.debug("Failed to read block file '%s' for composite detection", path, exc_info=True)
         return composites
 
+    @property
+    def shared_manifest(self) -> Dict[str, str]:
+        """``{block name: path}`` of the shared directories (first occurrence wins)."""
+        if self._shared_manifest is None:
+            found: Dict[str, str] = {}
+            for d in self.shared_dirs:
+                if not d.is_dir():
+                    continue
+                for path in sorted(d.rglob("bck_*.py")):
+                    if "__pycache__" in path.parts:
+                        continue
+                    found.setdefault(path.stem, str(path))
+            self._shared_manifest = found
+        return self._shared_manifest
+
+    def list_shared_blocks(self) -> List[str]:
+        return sorted(n for n in self.shared_manifest if n not in self.manifest)
+
     def get(self, block_name: str) -> object:
-        if block_name not in self.manifest:
+        if block_name in self.manifest:
+            path = self.manifest[block_name]["path"]
+            module_name = f"project_blocks.{block_name}"
+        elif block_name in self.shared_manifest:
+            path = self.shared_manifest[block_name]
+            module_name = f"shared_blocks.{block_name}"
+        else:
             available = ", ".join(sorted(self.manifest.keys()))
+            shared = ", ".join(self.list_shared_blocks())
             raise BlockNotFoundError(
                 f"Block '{block_name}' not found.\nAvailable: {available}"
+                + (f"\nShared: {shared}" if shared else "")
             )
-        path = self.manifest[block_name]["path"]
         current_mtime = os.path.getmtime(path)
         needs_load = (
             block_name not in self._cache
@@ -231,15 +267,14 @@ class ProjectBlockRegistry:
         )
         if needs_load:
             try:
-                spec = importlib.util.spec_from_file_location(
-                    f"project_blocks.{block_name}", path
-                )
+                spec = importlib.util.spec_from_file_location(module_name, path)
                 if spec and spec.loader:
                     module = importlib.util.module_from_spec(spec)
                     spec.loader.exec_module(module)
                     self._cache[block_name] = module
                     self._mtimes[block_name] = current_mtime
-                    self.manifest[block_name]["loaded"] = True
+                    if block_name in self.manifest:
+                        self.manifest[block_name]["loaded"] = True
                 else:
                     raise BlockImportError(f"Cannot create spec for '{block_name}'")
             except Exception as e:

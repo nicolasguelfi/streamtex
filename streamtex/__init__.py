@@ -187,6 +187,10 @@ try:
     # Data files kept live: re-read on change, part of the page-cache key (#53)
     from .watch import load_json, load_text, load_toml, watch_file
 
+    # Run-time switches and the chain of documents (L9, L10)
+    from .runtime_flags import env_flag, is_editable, is_exportable
+    from .collection import next_project, st_next_deck
+
     # Browser recommendation banner
     from .browser import st_chrome_banner
 
@@ -289,6 +293,7 @@ __all__ = [
     "compute_scale",
     "configure_image_path",
     "emit_scale_css",
+    "env_flag",
     "exec_static",
     "export_bibtex",
     "export_pdf",
@@ -316,6 +321,8 @@ __all__ = [
     "inject_link_preview_scaffold",
     "inject_zoom_logic",
     "is_cached",
+    "is_editable",
+    "is_exportable",
     "list_image_versions",
     "list_providers",
     "load_atomic_block",
@@ -330,6 +337,7 @@ __all__ = [
     "load_json",
     "load_text",
     "load_toml",
+    "next_project",
     "page_url",
     "parse_bibtex_string",
     "parse_ris_string",
@@ -387,6 +395,7 @@ __all__ = [
     "st_marker",
     "st_mermaid",
     "st_metric",
+    "st_next_deck",
     "st_overlay",
     "st_plantuml",
     "st_presentation_footer",

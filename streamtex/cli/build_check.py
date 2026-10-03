@@ -93,6 +93,8 @@ def _check_book(module_list, toc_config=None, marker_config=None, *args, block_a
                 block_kwargs=None, bib_sources=None, bib_config=None, lang=None, **kwargs):
     from streamtex.export import ExportConfig, reset_export_buffer
 
+    if lang is None:  # [book.defaults] of stx.toml, as the real st_book
+        lang = getattr(_book, "_book_defaults", lambda *_a: {})(os.path.dirname(BOOK)).get("lang")
     if lang is not None:  # same rule as st_book(lang=…)
         from streamtex.i18n import current_lang
         block_kwargs = {"lang": current_lang() if lang == "auto" else lang, **(block_kwargs or {})}

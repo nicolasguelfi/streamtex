@@ -347,11 +347,25 @@ StreamTeX provides installable AI profiles via
 | **documentation** | Manual authors | inherits project + adds stx-coherence/stx-pattern | 2 |
 | **library** | Library developers | inherits + adds stx-coherence | — |
 
-Install a profile:
+Install a profile — two ways (since 0.7.35):
 
 ```bash
-stx claude install project ./my-project
+# Classic: copy the profile into the project once, update it on demand
+stx claude install project ./my-project      # --dry-run shows what would change
+stx claude update ./my-project               # --commit to commit the untracking
+
+# Project mode: declare the profile in the project's stx.toml …
+#   [claude]
+#   mode = "project"
+#   profile = "presentation"      # optional include = [...] / exclude = [...]
+# … then let stx keep .claude/ in line with it (records .claude/stx.lock)
+stx claude sync                               # --dry-run, --force, --remove
 ```
+
+A `CLAUDE.md` you wrote is never overwritten (the profile text goes to
+`.claude/CLAUDE.md`), and stx never commits in your project unless asked.
+The commands stx used to copy into `~/.claude/commands` are listed and removed
+with `stx claude global status` / `stx claude global remove --yes`.
 
 ## Reuse architecture (`stx pack` / `stx component` / `stx ds` / `stx kit`)
 
@@ -374,6 +388,28 @@ stx kit install streamtex_design:project-default
 # Validate the project's stx.toml + packs + components + DS + kits
 stx validate
 ```
+
+## Validate, run several documents, deploy
+
+```bash
+# Run the real build() of every block of every book.py, headless:
+# exceptions, media that resolve to nothing, inlined media > 512 KB
+stx validate --build
+stx validate --build --snapshot before.json   # per-block HTML fingerprint …
+stx validate --build --against before.json    # … then: which blocks changed?
+stx validate --build --published              # against the PUBLISHED streamtex
+
+# Several documents of one project ([[run.documents]] in stx.toml: id, book, port)
+stx run --set            # all of them, in the background; --doc ID, --lang fr
+stx run --list           # their state;  stx run --kill  to stop them
+
+# Deployment files
+stx deploy diff          # how Dockerfile / entrypoint.sh / nginx.conf differ from the templates
+stx deploy ci            # write .github/workflows/stx-validate.yml (ruff + validate --build)
+```
+
+The snapshot fingerprints the HTML that blocks emit; text rendered through
+`st_markdown()` / `show_explanation()` is not part of it.
 
 When you scaffold a project with `stx install --preset standard --project NAME`,
 the `streamtex-design` pack is added automatically to the project's

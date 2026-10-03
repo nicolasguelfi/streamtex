@@ -151,7 +151,7 @@ def pack():
 
 @pack.command("add")
 @click.argument("ref")
-@click.option("--dev", is_flag=True, help="Editable install (auteur de pack, Q17).")
+@click.option("--dev", is_flag=True, help="Editable install (for pack authors).")
 def add_cmd(ref: str, dev: bool) -> None:
     """Add a pack to the current project's stx.toml.
 

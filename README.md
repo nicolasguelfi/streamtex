@@ -357,11 +357,12 @@ stx claude install project ./my-project
 
 The **reuse architecture** ships components, design systems, and kits
 as Python packs via PEP 621 entry points. The official pack is
-[**streamtex-design**](https://github.com/nicolasguelfi/streamtex-design).
+[**streamtex-pack-design**](https://github.com/nicolasguelfi/streamtex-packs/tree/main/streamtex-pack-design),
+in the `streamtex-packs` monorepo.
 
 ```bash
 # Add a pack to a project (git, local, or PyPI)
-stx pack add github.com/nicolasguelfi/streamtex-design --rev v0.1.0
+stx pack add 'git:https://github.com/nicolasguelfi/streamtex-packs@pack-design-v0.3.0#subdirectory=streamtex-pack-design'
 
 # List installed packs and components
 stx pack list
@@ -429,8 +430,8 @@ for the full list of example projects.
 ### Reference
 
 - [AI Guide](https://github.com/nicolasguelfi/streamtex/blob/main/AI_GUIDE.md) — zero-code workflows with Claude/Cursor
-- [Cheatsheet (EN)](https://github.com/nicolasguelfi/streamtex/blob/main/.claude/references/streamtex_cheatsheet_en.md)
-- [Coding Standards](https://github.com/nicolasguelfi/streamtex/blob/main/.claude/references/coding_standards.md)
+- [Cheatsheet (EN)](https://github.com/nicolasguelfi/streamtex-claude/blob/main/shared/references/streamtex_cheatsheet_en.md)
+- [Coding Standards](https://github.com/nicolasguelfi/streamtex-claude/blob/main/shared/references/coding_standards.md)
 
 ## Project Structure
 

@@ -503,6 +503,18 @@ stx claude update .         # Update profile from source
 stx claude update . --force # Override local CLAUDE.md changes
 ```
 
+In **project mode** (`[claude] mode = "project"` in the project's `stx.toml`),
+one command keeps `.claude/` in line with the declaration:
+```bash
+stx claude sync --dry-run   # what would change
+stx claude sync             # apply (your own edits are kept; --force overwrites with a backup)
+```
+
+Before publishing, check what the screen will show, not just the imports:
+```bash
+stx validate --build        # runs every block for real (headless)
+```
+
 ### Can I create my own commands?
 
 **Yes.** Add markdown files to `.claude/commands/` following the existing format.

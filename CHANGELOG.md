@@ -60,6 +60,12 @@ Fixes found by the coherence audit of 0.7.40 (board `audit1`, 2026-10-03). No re
   Existing project files are never rewritten; `stx deploy diff` shows the change.
 
 ### Changed
+- `stx validate` warns about the stx.toml sections the library reads at run time
+  (board `audit2`): `[book.defaults]` keys outside the closed list (a typo used
+  to be a log line at render time) and `[[run.documents]]` entries `stx run --set`
+  would refuse (missing id/book/port, duplicate id or port, book not found).
+  Measured on the maintainer's 17 `stx.toml`: none uses these sections yet, so
+  no new warning.
 - `.claude/stx.lock` records `format = 1`. A lock without it (0.7.35-0.7.40) is
   read as format 1; a higher format (newer stx) is refused instead of rewritten.
   Note: `stx claude update` run with streamtex 0.7.34 or older does not know the

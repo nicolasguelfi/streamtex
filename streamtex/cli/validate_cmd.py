@@ -224,6 +224,16 @@ def validate(strict: bool, build: bool, books: tuple[str, ...], timeout: int,
                           "then update [source].version")
         total_warnings += len(stale)
 
+    # 5e) stx.toml sections read at run time: [book.defaults], [[run.documents]]
+    from .project_rules import stx_toml_section_problems
+
+    section_problems = stx_toml_section_problems(project_dir)
+    if section_problems:
+        console.print("[bold]stx.toml[/bold]")
+        for msg in section_problems:
+            console.print(f"  [yellow]warning[/yellow] {msg}")
+        total_warnings += len(section_problems)
+
     # 6) Project rules declared in stx.toml (L12)
     from .project_rules import check_rules, load_rules, rule_id
 

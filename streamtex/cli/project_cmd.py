@@ -224,16 +224,21 @@ def generate_gitignore() -> str:
     return """\
 __pycache__/
 *.pyc
-.venv/
+# No trailing slash: .venv is often a link to an environment kept elsewhere
+# (~/.venvs/<project>), and ".venv/" only matches real directories.
+.venv
 *.egg-info/
 dist/
 build/
 .ruff_cache/
+# Render caches written by builds and `stx validate --build`
+.stx_cache/
 
 # Claude profile — managed by stx claude install/update, not git
 .claude/*
 !.claude/custom/
 !.claude/.stx-profile
+!.claude/stx.lock
 """
 
 

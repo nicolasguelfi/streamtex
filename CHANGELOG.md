@@ -15,6 +15,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   project-mode pilot on all-trainings (board `s2`). `uv run stx validate` is
   unchanged (it already ran in the project's environment). The interpreter used
   is printed on the "Build" line.
+- `stx project init` writes a `.gitignore` that also ignores a `.venv` *link*
+  (the old `.venv/` rule only matched a real directory, so the link to
+  `~/.venvs/<project>` showed up as an untracked file in every such project),
+  ignores `.stx_cache/` (render caches written by builds) and keeps
+  `.claude/stx.lock` (project mode) under version control.
 
 ## [0.7.41] — 2026-10-03 — Coherence-audit fixes
 

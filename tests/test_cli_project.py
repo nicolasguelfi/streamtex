@@ -137,6 +137,24 @@ def test_generate_gitignore_has_pycache():
     assert "__pycache__" in content
 
 
+def test_generate_gitignore_ignores_venv_link_and_caches(tmp_path):
+    """A .venv link (not only a directory) and .stx_cache/ stay out of git."""
+    import subprocess
+    (tmp_path / ".gitignore").write_text(generate_gitignore())
+    (tmp_path / "env").mkdir()
+    (tmp_path / ".venv").symlink_to(tmp_path / "env")
+    (tmp_path / ".stx_cache").mkdir()
+    (tmp_path / ".stx_cache" / "x").write_text("x")
+    (tmp_path / ".claude").mkdir()
+    (tmp_path / ".claude" / "stx.lock").write_text("format = 1\n")
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    out = subprocess.run(["git", "status", "--porcelain", "--untracked-files=all"],
+                         cwd=tmp_path, capture_output=True, text=True, check=True).stdout
+    assert ".venv" not in out
+    assert ".stx_cache" not in out
+    assert ".claude/stx.lock" in out
+
+
 def test_generate_collection_toml_valid():
     content = generate_collection_toml("hub")
     data = tomllib.loads(content)

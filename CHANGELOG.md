@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.40] — 2026-10-03 — Kept widget values, versioned facts
+
+Lot F of the roadmap (boards `lecons1` / `lots1`). No rendering change.
+
+### Added
+
+- **`stx.kept_widget(name, default)` / `stx.kept_value(name)`** (#94) — the
+  two-key pattern for a widget whose value must outlive its page in a
+  paginated book (Streamlit purges a widget key as soon as a rerun ends
+  without the widget). `st.radio("Language", ["en", "fr"],
+  **stx.kept_widget("lang", default="en"))`, then `stx.kept_value("lang")`
+  on any page.
+- **`streamtex.facts`** (#95) — facts taken from an evolving source live in
+  `facts/<source>.toml` with the source version they were read from
+  (`[source] version`, optional `current` = a VERSION file or a
+  pyproject.toml); `fact(source, "key.sub")` reads one and raises on an
+  unknown source or key; `stx validate` warns when the source has moved on,
+  with the number of facts to re-check. `fact` is not in the star import.
+
 ## [0.7.39] — 2026-10-03 — Projects with several documents
 
 Lot E of the roadmap (boards `lecons1` / `lots1`). Book configuration only —

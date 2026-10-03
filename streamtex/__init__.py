@@ -191,6 +191,9 @@ try:
     from .runtime_flags import env_flag, is_editable, is_exportable
     from .collection import next_project, st_next_deck
 
+    # Widget values that survive pagination (L22)
+    from .kept import kept_value, kept_widget
+
     # Browser recommendation banner
     from .browser import st_chrome_banner
 
@@ -323,6 +326,8 @@ __all__ = [
     "is_cached",
     "is_editable",
     "is_exportable",
+    "kept_value",
+    "kept_widget",
     "list_image_versions",
     "list_providers",
     "load_atomic_block",

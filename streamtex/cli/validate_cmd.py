@@ -212,6 +212,18 @@ def validate(strict: bool, build: bool, books: tuple[str, ...], timeout: int,
         total_errors += len(markers)
         total_warnings += len(deprecated)
 
+    # 5d) Facts read from a versioned source that has moved on (L23)
+    from streamtex.facts import stale_facts
+
+    stale = stale_facts(project_dir)
+    if stale:
+        console.print("[bold]Facts[/bold]")
+        for sf in stale:
+            console.print(f"  [yellow]stale[/yellow] facts/{sf.source}.toml: read from {sf.recorded}, "
+                          f"the source is now {sf.current} — re-check its {sf.count} fact(s), "
+                          "then update [source].version")
+        total_warnings += len(stale)
+
     # 6) Project rules declared in stx.toml (L12)
     from .project_rules import check_rules, load_rules
 

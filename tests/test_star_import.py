@@ -1,4 +1,4 @@
-"""``from streamtex import *`` exports the API, never a sub-module (L14).
+"""``from streamtex import *`` exports the API, never a sub-module (#78).
 
 A sub-module named like a builtin (``streamtex/list.py``) used to shadow the
 builtin ``list`` in every block that star-imports streamtex.

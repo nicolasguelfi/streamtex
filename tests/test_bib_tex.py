@@ -1,5 +1,5 @@
 """BibTeX: TeX decoding, nested braces (#34), institutional authors, ancient
-dates, strict keys, projection cards, long URLs (#54) — L17."""
+dates, strict keys, projection cards, long URLs (#54) — #86."""
 
 import pytest
 

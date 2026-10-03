@@ -1,4 +1,4 @@
-"""Multilingual documents: the language lives in the address (L1).
+"""Multilingual documents: the language lives in the address (#85).
 
 The design of the maintainer's two multilingual projects (sumvadis
 ``postair_lang.py``, D2 of 2026-08-29; all-trainings ``shared/i18n.py``),

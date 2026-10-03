@@ -49,7 +49,7 @@ def test_design_pack_added_for_opt_in_presets(tmp_path, preset):
 
     stx_toml = (ws_root / "projects" / f"demo_{preset}" / "stx.toml").read_text()
     data = tomllib.loads(stx_toml)
-    assert any(p["name"] == "streamtex-design" for p in data.get("packs", []))
+    assert any(p["name"] == "streamtex-pack-design" for p in data.get("packs", []))
 
 
 @pytest.mark.parametrize("preset", ["basic", "user"])
@@ -72,7 +72,7 @@ def test_design_pack_idempotent(tmp_path):
     data = tomllib.loads(
         (ws_root / "projects" / "demo" / "stx.toml").read_text()
     )
-    streamtex_design = [p for p in data["packs"] if p["name"] == "streamtex-design"]
+    streamtex_design = [p for p in data["packs"] if p["name"] == "streamtex-pack-design"]
     assert len(streamtex_design) == 1
 
 
@@ -82,3 +82,9 @@ def test_design_pack_skipped_when_stx_toml_missing(tmp_path):
     console = MagicMock()
     _add_default_design_pack(str(ws_root), "demo", "standard", console)
     assert not (ws_root / "projects" / "demo" / "stx.toml").exists()
+
+
+def test_default_design_pack_is_the_monorepo_release():
+    """The archived streamtex-design repository is no longer the default (audit2)."""
+    assert _DEFAULT_DESIGN_PACK["ref"] == "github.com/nicolasguelfi/streamtex-packs#streamtex-pack-design"
+    assert _DEFAULT_DESIGN_PACK["rev"].startswith("pack-design-v")

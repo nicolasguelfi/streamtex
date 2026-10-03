@@ -1,4 +1,4 @@
-"""``stx run --set``: run the documents of a multi-document project together (L8).
+"""``stx run --set``: run the documents of a multi-document project together (#91).
 
 The launcher both large projects wrote for themselves (sumvadis
 ``run-postair.py``, 396 lines; all-trainings ``run-trainings.py``, 366 lines,

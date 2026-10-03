@@ -1,4 +1,4 @@
-"""Run-time switches of a deployed document: editable? exportable? (L10).
+"""Run-time switches of a deployed document: editable? exportable? (#93).
 
 Both large projects carried their own copy (sumvadis ``postair_env.py``,
 formerly seven ``config.py``; ai4se6d three ``custom/config.py`` with 167

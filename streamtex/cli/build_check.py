@@ -1,4 +1,4 @@
-"""``stx validate --build`` — run the REAL ``build()`` of every block (L11, L16).
+"""``stx validate --build`` — run the REAL ``build()`` of every block (#75, #80).
 
 A green count of imports says nothing about what reaches the screen: blocks
 that raise at run time (a bad enum member, a wrong keyword), media that

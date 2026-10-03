@@ -417,7 +417,7 @@ def _activate_section_horizontal(spacing: Spacing) -> None:
 
 
 # ---------------------------------------------------------------------------
-# st_slide — one slide inside a block: its break, then its container (L4)
+# st_slide — one slide inside a block: its break, then its container (#81)
 # ---------------------------------------------------------------------------
 
 from contextlib import contextmanager as _contextmanager  # noqa: E402

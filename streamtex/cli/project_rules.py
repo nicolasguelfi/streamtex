@@ -1,4 +1,4 @@
-"""Project rules declared in ``stx.toml`` and run by ``stx validate`` (L12).
+"""Project rules declared in ``stx.toml`` and run by ``stx validate`` (#76).
 
 A rule written in prose is not checked by anything; a project's own
 invariants become rules that can fail::
@@ -111,7 +111,7 @@ def check_rules(project_dir: Path, rules: list[dict] | None = None,
 
 
 def local_copies_of_public_api(project_dir: Path) -> list[tuple[str, int, str]]:
-    """Top-level ``def st_*`` in the project that streamtex also provides (L15).
+    """Top-level ``def st_*`` in the project that streamtex also provides (#79).
 
     Information only: a local copy may be a deliberate specialisation; the
     author decides whether to switch to the library's version.

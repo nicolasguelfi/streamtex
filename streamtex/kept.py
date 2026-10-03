@@ -1,4 +1,4 @@
-"""Widget values that survive pagination (L22).
+"""Widget values that survive pagination (#94).
 
 Streamlit purges a widget's session key as soon as a rerun ends without that
 widget — and in a paginated book a widget only lives on its own page. The

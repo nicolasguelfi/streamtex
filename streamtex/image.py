@@ -301,7 +301,7 @@ def st_image(
     # 6. Handle Link Wrapping
     html_content = contain_link(html_content, link, False, hover)
 
-    # 6b. Local placement (L6): explicit, never inferred from `style` — a
+    # 6b. Local placement (#83): explicit, never inferred from `style` — a
     #     text-align inside the image style was always a no-op, and turning it
     #     on would move images in existing documents. The box spans the
     #     container (so a percentage width keeps its meaning) and has no line

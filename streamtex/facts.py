@@ -1,4 +1,4 @@
-"""Facts read from a versioned source, with a staleness check (L23).
+"""Facts read from a versioned source, with a staleness check (#95).
 
 ai4se6d spent 24 commits in one day re-aligning counts, names and paths on a
 new version of the method it teaches (GSE-One v0.85), with errors and

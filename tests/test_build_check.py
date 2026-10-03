@@ -1,4 +1,4 @@
-"""``stx validate --build`` and the other lot-B checks (L11, L12, L15, L16)."""
+"""``stx validate --build`` and the other lot-B checks (#75, #76, #79, #80)."""
 
 import textwrap
 from pathlib import Path

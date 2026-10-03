@@ -135,3 +135,48 @@ def local_copies_of_public_api(project_dir: Path) -> list[tuple[str, int, str]]:
                 if isinstance(node, ast.FunctionDef) and node.name in public:
                     found.append((str(p.relative_to(project_dir)), node.lineno, node.name))
     return sorted(found)
+
+
+_TEXT_SUFFIXES = {".py", ".toml", ".md", ".txt", ".json", ".yaml", ".yml", ".cfg", ".css", ".html", ".sh"}
+
+
+def conflict_markers(project_dir: Path) -> list[tuple[str, int]]:
+    """Files holding git conflict markers (``<<<<<<<`` … ``>>>>>>>``), as ``(path, line)``."""
+    import os
+
+    found: list[tuple[str, int]] = []
+    skip = {".venv", "venv", "node_modules", "__pycache__", ".git", "site-packages", "static", ".stx_cache"}
+    for dirpath, dirnames, filenames in os.walk(project_dir):
+        dirnames[:] = [d for d in dirnames if d not in skip and not d.startswith(".")]
+        for f in filenames:
+            p = Path(dirpath) / f
+            if p.suffix not in _TEXT_SUFFIXES:
+                continue
+            try:
+                lines = p.read_text(encoding="utf-8", errors="ignore").splitlines()
+            except OSError:
+                continue
+            for i, line in enumerate(lines, 1):
+                if line.startswith("<<<<<<< ") or line == "<<<<<<<":
+                    found.append((str(p.relative_to(project_dir)), i))
+                    break
+    return sorted(found)
+
+
+#: stx.toml sections that no longer do anything, with what replaced them.
+DEPRECATED_SECTIONS = {
+    "patterns": "streamtex-patterns was replaced by packs / components (reuse architecture) — "
+                "remove [patterns] (and the @pattern annotations) or migrate them to a pack",
+}
+
+
+def deprecated_config(project_dir: Path) -> list[str]:
+    path = project_dir / "stx.toml"
+    if not path.is_file():
+        return []
+    try:
+        with open(path, "rb") as f:
+            data = tomllib.load(f)
+    except (OSError, tomllib.TOMLDecodeError):
+        return []
+    return [f"[{k}] — {why}" for k, why in DEPRECATED_SECTIONS.items() if k in data]

@@ -69,8 +69,11 @@ def _declares_claude_mode(stx_toml: Path) -> bool:
 @click.option("--against", "against", type=click.Path(exists=True, dir_okay=False),
               help="With --build: compare every block's HTML with a --snapshot file; "
                    "each block that renders differently is a warning.")
+@click.option("--published", is_flag=True, default=False,
+              help="With --build: run the blocks against the PUBLISHED streamtex (and the project's "
+                   "other dependencies) resolved without local sources, as production installs them.")
 def validate(strict: bool, build: bool, books: tuple[str, ...], timeout: int,
-             snapshot: str | None, against: str | None) -> None:
+             snapshot: str | None, against: str | None, published: bool) -> None:
     """Run pack + component + design system + kit validation on the current project.
 
     Also runs the project rules declared in stx.toml ([[validate.rules]]) and,
@@ -179,6 +182,36 @@ def validate(strict: bool, build: bool, books: tuple[str, ...], timeout: int,
         else:
             console.print("  [green]\\[claude]: OK[/green]")
 
+    # 5b) Version coherence: .stx-version / pyproject / uv.lock (L18)
+    from .published_check import version_problems
+
+    vprobs = version_problems(project_dir)
+    if vprobs:
+        console.print("[bold]Versions[/bold]")
+        for vp in vprobs:
+            color = "red" if vp.severity == "error" else "yellow"
+            console.print(f"  [{color}]{vp.severity}[/{color}] {vp.message}")
+            if vp.severity == "error":
+                total_errors += 1
+            else:
+                total_warnings += 1
+
+    # 5c) Hygiene: conflict markers (error), deprecated configuration (warning) (L20)
+    from .project_rules import conflict_markers, deprecated_config
+
+    markers = conflict_markers(project_dir)
+    deprecated = deprecated_config(project_dir)
+    if markers or deprecated:
+        console.print("[bold]Hygiene[/bold]")
+        for path, line in markers[:20]:
+            console.print(f"  [red]conflict marker[/red] {path}:{line}")
+        if len(markers) > 20:
+            console.print(f"  ... and {len(markers) - 20} more file(s)")
+        for msg in deprecated:
+            console.print(f"  [yellow]deprecated[/yellow] {msg}")
+        total_errors += len(markers)
+        total_warnings += len(deprecated)
+
     # 6) Project rules declared in stx.toml (L12)
     from .project_rules import check_rules, load_rules
 
@@ -226,12 +259,27 @@ def validate(strict: bool, build: bool, books: tuple[str, ...], timeout: int,
         from .build_check import block_fingerprints, discover_books, empty_styled_blocks, run_book
 
         targets = [Path(b).resolve() for b in books] or discover_books(project_dir)
+        python = None
+        if published:
+            from .published_check import installed_streamtex, published_python
+
+            console.print("[bold]Published environment[/bold] (dependencies resolved without local sources)")
+            python, plog = published_python(project_dir)
+            if python is None:
+                console.print("  [red]FAIL[/red] the project does not resolve without its local sources — "
+                              "production would fail the same way:")
+                for line in plog.strip().splitlines()[-6:]:
+                    console.print(f"    {line}")
+                total_errors += 1
+                targets = []
+            else:
+                console.print(f"  streamtex {installed_streamtex(python)} (published) — {python}")
         console.print(f"[bold]Build[/bold] ({len(targets)} book(s), real build() of every block)")
         capture = bool(snapshot or against)
         reference = _json.loads(Path(against).read_text(encoding="utf-8")) if against else None
         fingerprints: dict[str, dict[str, str]] = {}
         for book in targets:
-            r = run_book(book, timeout=timeout, capture=capture)
+            r = run_book(book, timeout=timeout, capture=capture, python=python)
             rel = os.path.relpath(r.book, project_dir)
             if capture:
                 fingerprints[rel] = block_fingerprints(r)

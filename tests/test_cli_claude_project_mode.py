@@ -13,6 +13,7 @@ import os
 import subprocess
 from pathlib import Path
 
+import click
 import pytest
 from click.testing import CliRunner
 from rich.console import Console
@@ -32,6 +33,7 @@ from streamtex.cli.claude_cmd import (
     plan_install,
 )
 from streamtex.cli.claude_project import (
+    LOCK_FORMAT,
     LOCK_PATH,
     ClaudeDecl,
     desired_files,
@@ -489,6 +491,20 @@ def test_managed_clone_keeps_the_migration_commit_user_project_does_not(tmp_path
         _update_single_target(str(repo), "project", str(t), False, QUIET, yes=True)
     assert "stop tracking" in _git(clone, "log", "-1", "--format=%s").stdout   # 0.7.34 behaviour
     assert _git(mine, "log", "-1", "--format=%s").stdout.strip() == "init"      # #69: never
+
+
+def test_lock_records_its_format_and_refuses_a_newer_one(tmp_path):
+    repo = _claude_repo(tmp_path)
+    target = _project(tmp_path, decl=DECL)
+    sync_project(str(target), str(repo), read_declaration(str(target)), console=QUIET)
+    lock_file = target / LOCK_PATH
+    assert f"format = {LOCK_FORMAT}" in lock_file.read_text()
+    # a lock written by 0.7.35-0.7.40 has no format: read as format 1
+    lock_file.write_text(lock_file.read_text().replace(f"format = {LOCK_FORMAT}\n", ""))
+    assert read_lock(str(target)).profile == "presentation"
+    lock_file.write_text(lock_file.read_text().replace("[lock]\n", f"[lock]\nformat = {LOCK_FORMAT + 1}\n"))
+    with pytest.raises(click.ClickException, match="format"):
+        read_lock(str(target))
 
 
 def test_hooks_step_puts_uv_lock_back_byte_for_byte(tmp_path, monkeypatch):

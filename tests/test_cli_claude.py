@@ -311,6 +311,47 @@ def test_collect_source_files(tmp_path):
     assert all("manifest.toml" not in v for v in files)
 
 
+def test_collect_source_files_adds_declared_shared_skills_agents_formats(tmp_path):
+    ws = _make_workspace(tmp_path)
+    claude = ws / "streamtex-claude"
+    (claude / "profiles" / "project" / "manifest.toml").write_text(
+        '[profile]\nname = "project"\n[shared]\nskills = ["reuse.md"]\n'
+        'agents = ["converter.md"]\nimport-formats = ["marp"]\n')
+    for rel in ("skills/reuse.md", "skills/undeclared.md", "agents/converter.md",
+                "import-formats/marp/conventions.md"):
+        (claude / "shared" / rel).parent.mkdir(parents=True, exist_ok=True)
+        (claude / "shared" / rel).write_text("x\n")
+    files = collect_source_files(str(claude), "project")
+    assert os.path.join(".claude", "developer", "skills", "reuse.md") in files
+    assert os.path.join(".claude", "developer", "agents", "converter.md") in files
+    assert os.path.join(".claude", "import-formats", "marp", "conventions.md") in files
+    assert not any("undeclared" in k for k in files)       # only what the manifest declares
+
+
+_CLAUDE_REPO = os.path.join(os.path.dirname(__file__), "..", "..", "streamtex-claude")
+
+
+@pytest.mark.skipif(not os.path.isfile(os.path.join(_CLAUDE_REPO, "install.py")),
+                    reason="needs the sibling streamtex-claude checkout")
+@pytest.mark.parametrize("profile", ["project", "presentation", "library", "documentation"])
+def test_library_installer_places_every_file_of_the_standalone_installer(tmp_path, profile, capsys):
+    """stx claude install and streamtex-claude's install.py: same files at least (audit1)."""
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("stx_claude_install", os.path.join(_CLAUDE_REPO, "install.py"))
+    standalone = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(standalone)
+    standalone._library_installer = lambda: None             # force its own code path
+    std = tmp_path / "std" / "proj"
+    std.mkdir(parents=True)
+    assert standalone.install_profile(profile, std, "proj")
+    expected = {str(p.relative_to(std)) for p in std.rglob("*") if p.is_file()}
+    expected.discard("CLAUDE.md")                            # rendered at install, not a source file
+    expected.discard(os.path.join(".claude", ".stx-profile"))
+    missing = expected - set(collect_source_files(_CLAUDE_REPO, profile))
+    assert not missing, sorted(missing)
+
+
 def test_collect_source_files_unknown_profile(tmp_path):
     ws = _make_workspace(tmp_path)
     files = collect_source_files(str(ws / "streamtex-claude"), "nonexistent")

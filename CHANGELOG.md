@@ -5,6 +5,47 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.39] — 2026-10-03 — Projects with several documents
+
+Lot E of the roadmap (boards `lecons1` / `lots1`). Book configuration only —
+the content of a block keeps its explicit values. Measured before release:
+the per-block HTML of the three largest projects (1,605 blocks) is
+identical to 0.7.38; 63 browser end-to-end tests pass; CLI non-regression
+identical.
+
+### Added
+
+- **`[book.defaults]` in `stx.toml`** (#90) — the settings a book does not
+  pass (`paginate`, `page_width`, `zoom`, `export`, `export_title`,
+  `loading`, `chrome_banner`, `banner_color`, `doc_version`, `lang`) come
+  from the nearest `stx.toml` above the book (re-read live); anything the
+  book passes, by keyword or position, wins. **`doc_version="auto"`** reads
+  `[project].version` of `pyproject.toml`.
+- **Shared block directories** (#90, closes #19) —
+  `ProjectBlockRegistry(blocks_dir, shared_dirs=[…])`: a name not found
+  locally is looked up in the shared directories (recursive), a local block
+  always wins; iteration, `len()` and `list_blocks()` keep the module's own
+  blocks, so `st_book(registry)` is unchanged. `list_shared_blocks()`.
+- **`stx run --set`** (#91) — the documents declared in `[[run.documents]]`
+  (id, book, port) start together in the background, each with
+  `$STX_URL_<ID>` of every document; `--doc`, `--list`, `--kill`, `--fresh`
+  (stop + clear the page cache), `--lang`, `--ports-offset`, `--open`
+  (optionally `--chrome-profile DIR`: a projection profile allowed to
+  autoplay media). State and logs in `.stx_run/`. Uses the project's
+  `.venv` when present. `stx run` without these options is unchanged.
+- **`next_project()` / `st_next_deck()`** (#92) — the next document of a
+  collection, the language carried in the address.
+- **`stx.is_editable()` / `stx.is_exportable()` / `stx.env_flag()`** (#93) —
+  `STX_EDITABLE` / `STX_EXPORTABLE` (legacy `IS_*` accepted) from the
+  environment, then an optional `.env` file; default `False`; nothing in
+  the library reads them implicitly.
+
+### Changed
+
+- **`CollectionConfig.card_border` / `card_text_color`** (#92) — the
+  collection cards' frame and text colours are settings (also in
+  `collection.toml`); the defaults keep the previous look.
+
 ## [0.7.38] — 2026-10-03 — Production: references that read right, deployments that never fail in silence
 
 Lot C of the roadmap (boards `lecons1` / `lots1`). Measured before release:

@@ -197,10 +197,35 @@ def _resolve_port(port_arg: int | None) -> int:
 )
 @click.option("--headless", is_flag=True, help="Don't open any browser.")
 @click.option("-f", "--force", is_flag=True, help="Kill any process using the target port before starting.")
+@click.option("--set", "run_set_flag", is_flag=True,
+              help="Run the documents declared in stx.toml [[run.documents]] together, in the background "
+                   "(fixed ports, $STX_URL_<ID> for each). Restrict with --doc.")
+@click.option("--doc", "docs", multiple=True, help="With --set / --list / --kill: only this document id.")
+@click.option("--list", "list_only", is_flag=True, help="List the declared documents and their state.")
+@click.option("--kill", is_flag=True, help="Stop the declared documents (or --doc ones).")
+@click.option("--fresh", is_flag=True, help="With --set: stop, clear the page cache, start again.")
+@click.option("--lang", default=None, help="With --set / --list: URLs carry ?lang=CODE.")
+@click.option("--ports-offset", default=0, show_default=True, help="With --set: add N to every declared port.")
+@click.option("--open/--no-open", "open_browser", default=False, help="With --set: open the documents.")
+@click.option("--chrome-profile", default=None,
+              help="With --set --open: a dedicated Chrome profile directory, media autoplay allowed "
+                   "(projection), e.g. ~/.stx-projection-chrome.")
 @click.argument("extra_args", nargs=-1, type=click.UNPROCESSED)
-def run(book, port, browser, headless, force, extra_args):
-    """Run a StreamTeX project (shortcut for streamlit run)."""
+def run(book, port, browser, headless, force, run_set_flag, docs, list_only, kill, fresh, lang,
+        ports_offset, open_browser, chrome_profile, extra_args):
+    """Run a StreamTeX project (shortcut for streamlit run).
+
+    With --set: run every document of a multi-document project (stx.toml
+    [[run.documents]]); --list, --kill manage them.
+    """
     console = get_console()
+    if run_set_flag or list_only or kill:
+        from .run_set import run_set
+
+        run_set(tuple(docs), list_only=list_only, kill=kill and not run_set_flag, fresh=fresh,
+                lang=lang, offset=ports_offset, open_browser=open_browser,
+                chrome_profile=chrome_profile, console=console)
+        return
     entry = _find_book(book)
 
     actual_port = _resolve_port(port)

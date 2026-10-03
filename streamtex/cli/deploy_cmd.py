@@ -67,9 +67,13 @@ def generate_dockerfile() -> str:
     return """\
 FROM python:3.13-slim
 
+# UV_NO_SOURCES_PACKAGE: streamtex never comes from a local path in the image
+# (a `stx dev link` source in pyproject.toml points outside the build context).
+# Set as ENV, it holds for every later `uv` command — build steps AND the
+# entrypoint's `uv run` at start-up — not only for the first `uv sync`.
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 \\
     STREAMLIT_SERVER_HEADLESS=true STREAMLIT_BROWSER_GATHERUSAGESTATS=false \\
-    UV_LINK_MODE=copy
+    UV_LINK_MODE=copy UV_NO_SOURCES_PACKAGE=streamtex
 
 WORKDIR /app
 
@@ -84,12 +88,17 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/
 # fetches the latest PyPI packages.
 ARG SOURCE_COMMIT=unknown
 
-# Install dependencies + CLI extras (rich for stx export html)
+# Install dependencies + the stx CLI dependencies (the entrypoint runs stx)
 # .stx-version is copied first: changing the required version invalidates the cache.
+# (No --frozen: it installs the lock as written, so a lock that records a local
+# streamtex fails here; uv also refuses --frozen together with --no-sources.)
+# Chromium only when the project uses playwright (the `pdf` extra).
 COPY .stx-version pyproject.toml uv.lock ./
-RUN uv sync --frozen --no-dev --no-sources && \\
-    uv pip install rich && \\
-    uv run playwright install --with-deps chromium
+RUN uv sync --no-dev && \\
+    uv pip install "click>=8.0" "rich>=13.0" "tomlkit>=0.13" && \\
+    if uv run python -c "import playwright" 2>/dev/null; then \\
+        uv run playwright install --with-deps chromium; \\
+    fi
 
 # Fail the build if the installed streamtex version is older than required.
 RUN REQUIRED=$(cat .stx-version | tr -d '[:space:]') && \\
@@ -2581,11 +2590,15 @@ on:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    # As production does: streamtex never from a local path, for EVERY uv
+    # command of the job (sync, then the `uv run` steps).
+    env:
+      UV_NO_SOURCES_PACKAGE: streamtex
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
       - name: Install (as production does, without local sources for streamtex)
-        run: uv sync --frozen --no-sources-package streamtex
+        run: uv sync
       - name: Lint
         run: uv run ruff check .
       - name: Real build of every block

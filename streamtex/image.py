@@ -64,6 +64,9 @@ def st_image(
     overlay: Optional[MediaOverlay] = None,
     crop: CropConfig | tuple | list | None = None,
     natural_size: Optional[tuple[float, float]] = None,
+    max_vw: Optional[float] = None,
+    max_vh: Optional[float] = None,
+    align: Optional[str] = None,
 ) -> Optional[str]:
     """
     Generates an HTML `img` tag based on the image URI, with optional styles, link wrapping, and hover effects.
@@ -90,9 +93,27 @@ def st_image(
         `None` (default) keeps the emitted HTML strictly identical to
         previous versions.
     :param natural_size: Optional `(W, H)` natural pixel dimensions of the
-        source image, used with `crop` when the library cannot read them
-        (mandatory for http(s) URIs in this version).  Refused without
-        `crop`, and refused when the `CropConfig` already carries one.
+        source image, used with `crop` or `max_vh` when the library cannot
+        read them (http(s) URIs).  Refused without `crop` / `max_vw` /
+        `max_vh`, and refused when the `CropConfig` already carries one.
+    :param max_vw: Optional bound on the displayed width, in % of the
+        window width (``vw``).
+    :param max_vh: Optional bound on the displayed height, in % of the
+        window height (``vh``).  With either bound, the image takes the
+        largest size that respects ``width`` (default ``100%`` of its
+        container) AND the bounds, without distortion — written per call,
+        so each visual keeps its own bounds.  `height` must stay
+        ``"auto"``.  When the natural size cannot be read (remote URI
+        without `natural_size`), the bounds become ``max-width`` /
+        ``max-height`` (the image is then never enlarged).  Both `None`
+        (default) keeps the emitted HTML strictly identical.
+
+    :param align: Optional ``"left"`` / ``"center"`` / ``"right"``: place
+        this image, contradicting its container locally. By default the
+        image follows the ``text-align`` of its container (it is inline);
+        a ``text-align`` inside `style` does NOT place it (it applies to the
+        ``<img>`` itself) — use ``align=``. `None` (default) keeps the
+        emitted HTML strictly identical.
     :return: A string containing the HTML `img` tag, optionally wrapped in a hyperlink.
 
     Notes:
@@ -102,11 +123,18 @@ def st_image(
     - The function wraps the image tag in a link if `link` is provided, using the `contain_link` function.
     """
     # 0. Crop parameters — validate before any work.
-    if natural_size is not None and crop is None:
+    bounded = max_vw is not None or max_vh is not None
+    if natural_size is not None and crop is None and not bounded:
         raise ValueError(
-            "natural_size= requires crop= — an orphan natural_size is "
-            "almost always an editing mistake"
+            "natural_size= requires crop= (or max_vw= / max_vh=) — an orphan "
+            "natural_size is almost always an editing mistake"
         )
+    if align is not None and align not in ("left", "center", "right"):
+        raise ValueError(f"align= must be 'left', 'center' or 'right', got {align!r}")
+    for _name, _bound in (("max_vw", max_vw), ("max_vh", max_vh)):
+        if _bound is not None and (isinstance(_bound, bool) or not isinstance(_bound, (int, float))
+                                   or _bound <= 0):
+            raise ValueError(f"{_name}= must be a positive number of {_name[-2:]} units, got {_bound!r}")
     crop_cfg = normalize_crop(crop, natural_size) if crop is not None else None
 
     # 1. Convert integer sizes to pixel-based strings
@@ -202,6 +230,24 @@ def st_image(
 
     # 4. Construct the CSS style string
     css_style = f"{str(style)} width: {width}; height: {height};"
+    if bounded:
+        if height != "auto":
+            raise ValueError(
+                "max_vw= / max_vh= are incompatible with an explicit height= — "
+                f"the bounds fix the size without distortion; remove height (got {height!r})"
+            )
+        ratio = _display_ratio(uri, natural_size, crop_cfg)
+        width = _bounded_width(width, max_vw, max_vh, ratio)
+        if ratio is None:
+            # Unknown natural size: plain CSS bounds (never enlarges).
+            limits = []
+            if max_vw is not None:
+                limits.append(f"max-width: min(100%, {_num(max_vw)}vw);")
+            if max_vh is not None:
+                limits.append(f"max-height: {_num(max_vh)}vh;")
+            css_style = f"{str(style)} width: auto; height: auto; {' '.join(limits)}"
+        else:
+            css_style = f"{str(style)} width: {width}; height: auto;"
 
     # 4b. Crop pre-checks — the height conflict is tested after step 1c
     #     so an editor-panel display_height is refused too, and the
@@ -255,6 +301,17 @@ def st_image(
     # 6. Handle Link Wrapping
     html_content = contain_link(html_content, link, False, hover)
 
+    # 6b. Local placement (L6): explicit, never inferred from `style` — a
+    #     text-align inside the image style was always a no-op, and turning it
+    #     on would move images in existing documents. The box spans the
+    #     container (so a percentage width keeps its meaning) and has no line
+    #     height (no descender gap under the inline image).
+    if align is not None:
+        html_content = (
+            f'<div class="stx-image-align" style="text-align: {align}; width: 100%; '
+            f'line-height: 0;">{html_content}</div>'
+        )
+
     # 7. Render (pass light_bg to force a white background inside the
     #    iframe — useful for SVG diagrams designed for light mode)
     _render(html_content, light_bg=light_bg)
@@ -281,6 +338,46 @@ def st_image(
         )
 
     return uri if img_src else None
+
+def _num(value: float) -> str:
+    return f"{value:.4f}".rstrip("0").rstrip(".")
+
+
+def _display_ratio(uri: str, natural_size, crop_cfg) -> Optional[float]:
+    """Width / height of the displayed image (cropped zone included), or None."""
+    from .image_crop import _find_local_file, _find_served_file, _read_local_image_size
+
+    size = None
+    if natural_size is not None:
+        size = tuple(natural_size)
+    elif crop_cfg is not None and crop_cfg.natural_size is not None:
+        size = tuple(crop_cfg.natural_size)
+    elif uri and not __is_url(uri):
+        path = _find_local_file(uri) or _find_served_file(uri)
+        if not path and (__is_absolute_path(uri) or __is_relative_path(uri)):
+            path = uri if __is_absolute_path(uri) else os.path.join(os.getcwd(), uri)
+        if path and os.path.isfile(path):
+            size = _read_local_image_size(path, mtime=os.path.getmtime(path))
+    if not size or size[0] <= 0 or size[1] <= 0:
+        return None
+    w, h = float(size[0]), float(size[1])
+    if crop_cfg is not None:
+        w *= 1 - (crop_cfg.left + crop_cfg.right) / 100
+        h *= 1 - (crop_cfg.top + crop_cfg.bottom) / 100
+    return w / h if h > 0 else None
+
+
+def _bounded_width(width: str, max_vw, max_vh, ratio: Optional[float]) -> str:
+    """``min(width, max_vw vw, max_vh vh * ratio)`` — the largest box within all bounds."""
+    if ratio is None:
+        return width
+    parts = [str(width)]
+    if max_vw is not None:
+        parts.append(f"{_num(max_vw)}vw")
+    if max_vh is not None:
+        parts.append(f"calc({_num(max_vh)}vh * {ratio:.6f})")
+    return parts[0] if len(parts) == 1 else f"min({', '.join(parts)})"
+
 
 def get_image_src(uri: str) -> str:
     """

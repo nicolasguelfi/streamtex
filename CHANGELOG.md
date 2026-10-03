@@ -5,6 +5,48 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.37] — 2026-10-03 — Writing slides: thin helpers, explicit values
+
+Lot D of the roadmap (boards `lecons1` / `lots1`). Design rule from the
+maintainer: helpers stay thin — they write the calls a block would write by
+hand and take a per-call override — and values stay explicit in every block.
+Measured before release: the per-block HTML of the three largest projects
+(**1,605 blocks**, captured with `stx validate --build --snapshot`) is
+identical to 0.7.36; 63 browser end-to-end tests pass; CLI non-regression
+identical.
+
+### Added
+
+- **`st_slide(cut=False, style=None)`** (#81) — one slide of a block: the
+  break before it (`cut=True`), then its container; nothing else (the title,
+  marker, zoom and sizes stay in the block). Default container
+  `SLIDE_CONTAINER` (≥ 80 vh, 10 vh margins, content centred vertically);
+  `set_slide_container(style)` once per book, e.g. with the design system's
+  own container. Promoted from all-trainings `slide()` (341 slides).
+- **`st_image(max_vw=, max_vh=)`** (#82) — per-call bounds: the image takes
+  `min(width, max_vw vw, max_vh vh × ratio)`, the ratio read from the local
+  or served file, `natural_size=`, or the cropped zone (`crop=`); without a
+  readable ratio (remote URI) the bounds become CSS `max-width` /
+  `max-height`. `st_video` is not covered (native element, see #56).
+- **`st_image(align="left" | "center" | "right")`** (#83) — place one image
+  locally; by default an image keeps following its container's alignment.
+  The `text-align` inside an image `style` is deliberately NOT reinterpreted:
+  doing so changed the HTML of 102 sumvadis blocks and the box tree of two
+  ai4se6d images in flex grid cells.
+- **`ScaleConfig.amphi(**overrides)`** (#84) — the lecture-hall preset
+  (base 30 pt, tablet ×0.70, mobile ×0.55) both projection projects set by
+  hand; the document base only.
+- **`streamtex.i18n`** (#85) — `current_lang()` (`$STX_LANG` > `?lang=` >
+  default), `set_languages()`, `T()` (fallback to the default language, then
+  the first value; an empty string is a value; `strict=True` refuses bare
+  strings), `TF()`, `with_lang()`; **`st_book(lang="auto" | code)`** hands
+  the language to every block. Not exported by `from streamtex import *`:
+  projects that define their own `T` keep it.
+- **`stx validate --build --snapshot FILE` / `--against FILE`** — the HTML
+  fingerprint of every block (base64 media hashed), and the list of blocks
+  that render differently from a snapshot: a "rendered identically" check
+  for any refactoring pass.
+
 ## [0.7.36] — 2026-10-03 — Safety net: see the defects before the screen does
 
 Lot B of the roadmap (boards `lecons1` / `lots1`). Measured before release:

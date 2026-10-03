@@ -578,7 +578,8 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
             loading: bool = True,
             scale=None,
             block_args: tuple = (),
-            block_kwargs: dict | None = None):
+            block_kwargs: dict | None = None,
+            lang: str | None = None):
     """Generates a web page e-book from a list of block modules.
 
     :param separator: Optional module with a build() function, rendered between each block.
@@ -612,7 +613,16 @@ def st_book(module_list, toc_config: TOCConfig = None, marker_config: MarkerConf
         ``block.build()`` call. Both are part of the pagination cache key
         (one cache per variant — e.g. ``{"lang": "fr"}`` gets its own
         TOC / markers / page titles); keep the values to plain data.
+    :param lang: Hand a language to every block (``build(lang=…)``):
+        ``"auto"`` = :func:`streamtex.i18n.current_lang` (``$STX_LANG`` >
+        ``?lang=`` > default), or an explicit code. An explicit ``"lang"``
+        in ``block_kwargs`` wins. ``None`` (default) forwards nothing.
     """
+    if lang is not None:
+        from .i18n import current_lang
+
+        resolved = current_lang() if lang == "auto" else lang
+        block_kwargs = {"lang": resolved, **(block_kwargs or {})}
     _block_args = tuple(block_args or ())
     _block_kwargs = dict(block_kwargs or {})
     # --- Resolve PdfConfig from exports list if not provided directly ---

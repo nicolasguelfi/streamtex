@@ -414,3 +414,67 @@ def _activate_section_horizontal(spacing: Spacing) -> None:
         set_section_zoom(spacing.zoom)
     else:
         set_section_zoom(None)
+
+
+# ---------------------------------------------------------------------------
+# st_slide — one slide inside a block: its break, then its container (L4)
+# ---------------------------------------------------------------------------
+
+from contextlib import contextmanager as _contextmanager  # noqa: E402
+
+from .styles import Style as _Style  # noqa: E402
+
+#: The default box of a slide: at least 80 vh tall, 10 vh margins, content
+#: centred vertically — the container both large projects wrap their slides
+#: in (all-trainings ``slide_center``, sumvadis ``page_fill_top``).
+SLIDE_CONTAINER = _Style(
+    "min-height: 80vh; margin: 10vh 0; display: flex; flex-direction: column; "
+    "justify-content: center;",
+    "stx_slide",
+)
+
+_slide_container: Optional[_Style] = None
+
+
+def set_slide_container(style: Optional[_Style]) -> None:
+    """Set the container every :func:`st_slide` uses (``None`` = ``SLIDE_CONTAINER``).
+
+    A book-level setting, called once in ``book.py`` — typically with the
+    design system's own container::
+
+        stx.set_slide_container(s.project.containers.slide_center)
+    """
+    global _slide_container
+    _slide_container = style
+
+
+def get_slide_container() -> _Style:
+    return _slide_container if _slide_container is not None else SLIDE_CONTAINER
+
+
+@_contextmanager
+def st_slide(cut: bool = False, style: Optional[_Style] = None):
+    """One slide of a block: a break before it if *cut*, then its container.
+
+    It adds nothing else: the title, the marker, the zoom, the alignment and
+    every size stay written in the block, slide by slide, so that any slide
+    can be specialised at any time. It writes exactly the two calls a block
+    would write by hand::
+
+        with st_slide():                 # the first slide of the block
+            ...
+        with st_slide(cut=True):         # a break, then the slide
+            ...
+        with st_slide(cut=True, style=Style("min-height: 60vh;", "short")):
+            ...                          # this slide only
+
+    :param cut: ``True`` = ``st_slide_break()`` before the slide.
+    :param style: a ``Style`` added (``+``) to the container for this slide.
+    """
+    from .container import st_block
+
+    if cut:
+        st_slide_break()
+    box = get_slide_container()
+    with st_block(box + style if style is not None else box):
+        yield

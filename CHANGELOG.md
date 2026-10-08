@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Password gate (`STX_PASSWORD`): a password whose beginning repeats was
+  missed — with `AAB`, typing `A A A B` failed, and so did `ABAC` typed as
+  `ABABAC`. The matcher now falls back to the longest prefix that still ends
+  the typed stream (KMP), so the sequence is found anywhere, as documented
+  (#100). The `auth` docstring also says that the static HTML export
+  (`/html/`) is not behind the gate.
+
 ## [0.7.42] — 2026-10-03 — shortauthor, project init and validate fixes
 
 Measured before release, 0.7.41 (PyPI) against this release, nine projects

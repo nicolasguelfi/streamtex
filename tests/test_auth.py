@@ -4,6 +4,8 @@ import os
 from contextlib import contextmanager
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 # Alphabet + digits — the 36 chars used in the grid
 _ALL_CHARS = list("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
 
@@ -347,3 +349,50 @@ class TestConfigurablePassword:
         get_target = _import_get_target()
         with patch.dict(os.environ, {"STX_PASSWORD": "abc123"}):
             assert get_target() == ("A", "B", "C", "1", "2", "3")
+
+
+# ── Sequence matching with fallback (#100) ─────────────────────────────
+
+def _stream_accepts(password: str, typed: str) -> bool:
+    from streamtex.auth import _advance_match
+    target = tuple(password)
+    match = 0
+    for c in typed:
+        match = _advance_match(target, match, c)
+        if match == len(target):
+            return True
+    return False
+
+
+@pytest.mark.parametrize("password, typed, accepted", [
+    ("AAB", "AAAB", True),        # #100: the beginning repeats
+    ("ABAC", "ABABAC", True),     # #100: a longer self-overlap
+    ("AAB", "AAB", True),
+    ("ABC", "XABC", True),
+    ("STX", "QWERTYSTX", True),   # anywhere in the stream
+    ("ABC", "ABXC", False),       # an interruption breaks the sequence
+    ("ABC", "AB", False),
+    ("ABAB", "ABABAB", True),
+])
+def test_sequence_found_anywhere_in_stream(password, typed, accepted):
+    assert _stream_accepts(password, typed) is accepted
+
+
+def test_long_random_prefix_then_password():
+    import random
+    rnd = random.Random(0)
+    noise = "".join(rnd.choice("AB") for _ in range(500))
+    assert _stream_accepts("AABAB", noise + "AABAB")
+
+
+def test_gate_keeps_progress_on_repeated_first_char():
+    """STX_PASSWORD=aab : A, A matched (2), a third A keeps 2, then B authenticates."""
+    gate = _import_gate()
+    with patch.dict(os.environ, {"STX_PASSWORD": "aab"}):
+        session = _fresh_session(_stx_match=2)
+        with _patch_gate(session=session, clicked_char="A"):
+            gate()
+            assert session["_stx_match"] == 2
+        with _patch_gate(session=session, clicked_char="B"):
+            gate()
+            assert session["_stx_authenticated"] is True

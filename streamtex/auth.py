@@ -12,6 +12,10 @@ Examples: ``STX_PASSWORD=demo`` → click **D → E → M → O**;
 ``STX_PASSWORD=hello`` → click **H → E → L → L → O**;
 ``STX_PASSWORD=abc123`` → click **A → B → C → 1 → 2 → 3**.
 
+The static HTML export (``stx export html``, the ``/html/`` route of a
+deployed container) is **not** behind this gate: export and cache warmup
+return before the gate runs. Protect ``/html/`` at the web server if needed.
+
 In local dev, the gate is off by default.  Set ``STX_GATE=1`` (without
 ``STX_PASSWORD``) to preview it locally with the default sequence S-T-X.
 """
@@ -32,7 +36,7 @@ load_dotenv()  # loads .env if present (no-op on Coolify where env vars are set 
 # ── Session-state keys ────────────────────────────────────────────────
 
 _AUTH_KEY = "_stx_authenticated"
-_MATCH_KEY = "_stx_match"        # int (0-2): progress in S→T→X
+_MATCH_KEY = "_stx_match"        # int: progress in the target sequence
 _CIRCLES_KEY = "_stx_circles"    # list[6]: None or colour string
 _NEXT_KEY = "_stx_next"          # int (0-5): next circle slot
 _TOTAL_KEY = "_stx_total"        # int: total clicks (detects wrap)
@@ -43,6 +47,35 @@ _VALID_CHARS = set("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
 
 # Ordered grid: A-Z then 0-9 (36 chars for a 6×6 grid)
 _ORDERED_CHARS = list("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
+
+
+def _advance_match(target: tuple[str, ...], match: int, clicked: str) -> int:
+    """Progress in *target* after one more key: the longest prefix of
+    *target* that ends the stream of keys typed so far.
+
+    On a mismatch it falls back to the next shorter prefix that still ends
+    the stream (KMP), instead of restarting from the first character only:
+    with ``AAB``, typing ``A A A B`` is accepted (#100).
+    """
+    if not target:
+        return 0
+    # failure[i] = length of the longest proper prefix of target[:i + 1]
+    # that is also a suffix of it
+    failure = [0] * len(target)
+    k = 0
+    for i in range(1, len(target)):
+        while k and target[i] != target[k]:
+            k = failure[k - 1]
+        if target[i] == target[k]:
+            k += 1
+        failure[i] = k
+    if match >= len(target):
+        match = failure[-1]
+    while match and clicked != target[match]:
+        match = failure[match - 1]
+    if clicked == target[match]:
+        match += 1
+    return match
 
 
 def _get_target() -> tuple[str, ...]:
@@ -293,13 +326,7 @@ def _password_gate() -> None:
 
         # 2. Advance sequence match (embedded anywhere in the stream)
         target = _get_target()
-        match = st.session_state[_MATCH_KEY]
-        if match < len(target) and clicked == target[match]:
-            match += 1
-        elif clicked == target[0]:
-            match = 1  # restart from first char
-        else:
-            match = 0
+        match = _advance_match(target, st.session_state[_MATCH_KEY], clicked)
         st.session_state[_MATCH_KEY] = match
 
         if match == len(target):

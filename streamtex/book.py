@@ -1,5 +1,6 @@
 import contextlib
 import copy
+import functools
 import hashlib
 import importlib.resources as resources
 import json
@@ -106,15 +107,66 @@ def _inject_block_horizontal_css(block_spacing) -> None:
     st.html(css)
 
 
+def _playwright_browsers_dir(package_dir: str) -> str:
+    """Where Playwright keeps its browsers (``PLAYWRIGHT_BROWSERS_PATH`` or
+    the platform default), without starting its driver."""
+    import sys
+    env = os.environ.get("PLAYWRIGHT_BROWSERS_PATH", "")
+    if env == "0":
+        return os.path.join(package_dir, "driver", "package", ".local-browsers")
+    if env:
+        return env
+    if sys.platform == "darwin":
+        return os.path.expanduser("~/Library/Caches/ms-playwright")
+    if sys.platform.startswith("win"):
+        return os.path.join(os.environ.get("LOCALAPPDATA", ""), "ms-playwright")
+    cache = os.environ.get("XDG_CACHE_HOME") or os.path.expanduser("~/.cache")
+    return os.path.join(cache, "ms-playwright")
+
+
+def _chromium_installed_on_disk() -> bool | None:
+    """True/False from Playwright's files on disk; None if the layout is unknown.
+
+    ``driver/package/browsers.json`` gives the Chromium revision this
+    Playwright expects; ``playwright install`` marks a finished install with
+    ``<browsers dir>/chromium-<revision>/INSTALLATION_COMPLETE``.
+    """
+    import importlib.util
+    spec = importlib.util.find_spec("playwright")
+    if spec is None or not spec.origin:
+        return False
+    package_dir = os.path.dirname(spec.origin)
+    try:
+        with open(os.path.join(package_dir, "driver", "package", "browsers.json"),
+                  encoding="utf-8") as f:
+            browsers = json.load(f)["browsers"]
+        revision = next(b["revision"] for b in browsers if b["name"] == "chromium")
+    except (OSError, ValueError, KeyError, StopIteration):
+        return None
+    marker = os.path.join(_playwright_browsers_dir(package_dir),
+                          f"chromium-{revision}", "INSTALLATION_COMPLETE")
+    return os.path.isfile(marker)
+
+
+@functools.lru_cache(maxsize=1)
 def _is_pdf_available() -> bool:
-    """Return True if playwright is installed AND Chromium browser is present."""
+    """Return True if playwright is installed AND its Chromium is present.
+
+    Read from Playwright's files on disk, once per process: the export panel
+    asks on every rerun, and starting the Playwright driver for it cost
+    0.25-0.7 s each time (#98). Installing Chromium while the app runs needs a
+    restart of the app to show the PDF option. Falls back to asking the
+    driver (still once) if Playwright's on-disk layout is not recognised.
+    """
+    found = _chromium_installed_on_disk()
+    if found is not None:
+        return found
     try:
         from playwright.sync_api import sync_playwright
         with sync_playwright() as p:
             path = p.chromium.executable_path
             if not path:
                 return False
-            import os
             return os.path.isfile(path)
     except Exception:
         return False

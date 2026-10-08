@@ -14,6 +14,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the typed stream (KMP), so the sequence is found anywhere, as documented
   (#100). The `auth` docstring also says that the static HTML export
   (`/html/`) is not behind the gate.
+- Export panel: deciding whether PDF export is available no longer starts the
+  Playwright driver on every rerun (0.25–0.7 s each time a book with export
+  ran, and a probable source of `TargetClosedError` at the end of `AppTest`
+  runs). It reads Playwright's files on disk (`browsers.json` revision,
+  `chromium-<rev>/INSTALLATION_COMPLETE`), once per process (#98). Installing
+  Chromium while the app runs needs a restart to show the PDF option.
 
 ## [0.7.42] — 2026-10-03 — shortauthor, project init and validate fixes
 

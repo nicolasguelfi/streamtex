@@ -86,11 +86,15 @@ class MarkerRegistry:
         self._entries = []
 
     def register(self, label: str, anchor: str, hidden: bool = False,
-                 key: str | None = None) -> int:
+                 key: str | None = None, auto: bool = False) -> int:
         idx = len(self._entries)
         entry = {"index": idx, "label": label, "anchor": anchor, "hidden": hidden}
         if key:
             entry["key"] = key
+        if auto:
+            # label generated ("Marker N"), not given: the nav widget shows the
+            # current section instead for a hidden marker (#97)
+            entry["auto"] = True
         self._entries.append(entry)
         return idx
 
@@ -120,13 +124,13 @@ def reset_marker_registry(config: MarkerConfig = None) -> None:
 
 
 def register_marker(label: str, anchor: str, hidden: bool = False,
-                    key: str | None = None) -> int:
+                    key: str | None = None, auto: bool = False) -> int:
     """Register a marker in the global registry. Requires prior init."""
     global _registry
     assert isinstance(_registry, MarkerRegistry), (
         "Marker registry is not initialized. Call reset_marker_registry first."
     )
-    return _registry.register(label, anchor, hidden=hidden, key=key)
+    return _registry.register(label, anchor, hidden=hidden, key=key, auto=auto)
 
 
 def marker_entries() -> list[dict]:
@@ -166,8 +170,13 @@ def st_marker(label: str = "", visible: bool = False, hidden: bool = False,
     Args:
         label: Marker label shown in the sidebar list and nav widget.
         visible: If True, render a visible dashed line in the content.
-        hidden: If True, the marker works for PageUp/PageDown navigation
-                but does not appear in the sidebar list or nav widget.
+        hidden: If True, the marker is absent from the popup list but stays
+                a navigation stop (PageUp/PageDown, buttons) and is counted
+                by the widget counter, which uses the global marker index
+                (``st_slide_break`` places hidden markers: the counter
+                numbers the slides). Without a label of its own, the widget
+                shows the current section — the last visible marker before
+                it.
         key: Optional stable identifier for deep links
              (``?marker=<key>`` / ``page_url(base, marker=key)``).
              Independent of the label, so it survives a translation or a
@@ -179,14 +188,15 @@ def st_marker(label: str = "", visible: bool = False, hidden: bool = False,
 
     idx = _registry.count()
 
-    if not label:
+    auto = not label
+    if auto:
         label = f"Marker {idx + 1}"
 
     # Deterministic anchor so cache-build and live-render produce the same ID
     slug = TOCRegistry.get_key_anchor(label)
     anchor = f"stx-marker-{slug}-{idx}"
 
-    _registry.register(label, anchor, hidden=hidden, key=key)
+    _registry.register(label, anchor, hidden=hidden, key=key, auto=auto)
 
     # Same offset as the JS scroll (MarkerConfig.scroll_offset): anchor jumps
     # and scripted navigation must land at the identical position.
@@ -253,6 +263,21 @@ def inject_marker_navigation(
 
     var markers = __MARKERS__;
     var visibleMarkers = markers.filter(function(m) { return !m.hidden; });
+    /* #97 — the visible entry whose section contains global index idx: the
+       last visible marker at or before idx (the first one before any). */
+    function sectionVi(idx) {
+        var at = -1;
+        for (var v = 0; v < visibleMarkers.length; v++) {
+            if (visibleMarkers[v].index <= idx) at = v;
+        }
+        return (at < 0 && visibleMarkers.length) ? 0 : at;
+    }
+    /* "4–8": the global numbers a visible popup row covers */
+    function rowRange(vi) {
+        var start = vi === 0 ? 0 : visibleMarkers[vi].index;
+        var end = vi + 1 < visibleMarkers.length ? visibleMarkers[vi + 1].index - 1 : markers.length - 1;
+        return start >= end ? String(start + 1) : (start + 1) + '\u2013' + (end + 1);
+    }
     var nextKeys = __NEXT_KEYS__;
     var prevKeys = __PREV_KEYS__;
     var OFFSET = __OFFSET__;
@@ -870,7 +895,7 @@ def inject_marker_navigation(
         row.dataset.idx = String(globalIdx);
         row.dataset.visIdx = String(vi);
         row.style.cssText = 'padding:7px 16px;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border-left:3px solid transparent;transition:background .1s;';
-        row.textContent = (globalIdx + 1) + '. ' + visibleMarkers[vi].label;
+        row.textContent = rowRange(vi) + '. ' + visibleMarkers[vi].label;
         row.onmouseenter = function() { this.style.background = 'rgba(128,128,128,.25)'; };
         row.onmouseleave = function() {
             if (parseInt(this.dataset.idx) !== currentIdx) this.style.background = 'transparent';
@@ -895,9 +920,9 @@ def inject_marker_navigation(
     function highlightPopup() {
         var items = popup.querySelectorAll('.stx-popup-item');
         var activeItem = null;
+        var activeVi = sectionVi(currentIdx);
         for (var j = 0; j < items.length; j++) {
-            var itemGlobalIdx = parseInt(items[j].dataset.idx);
-            var isActive = itemGlobalIdx === currentIdx;
+            var isActive = parseInt(items[j].dataset.visIdx) === activeVi;
             items[j].style.background = isActive ? 'rgba(128,128,128,.2)' : 'transparent';
             items[j].style.borderLeftColor = isActive ? '__LINK_ACTIVE_COLOR__' : 'transparent';
             items[j].style.fontWeight = isActive ? '600' : 'normal';
@@ -913,18 +938,22 @@ def inject_marker_navigation(
     hostDoc.addEventListener('click', outsideClick);
 
     /* --- Update UI (counter/label based on global marker index) --- */
-    function nearestVisibleLabel() {
-        for (var i = 0; i < visibleMarkers.length; i++) {
-            if (visibleMarkers[i].index >= currentIdx) return visibleMarkers[i].label;
+    /* A hidden marker without a label of its own shows its section (#97) */
+    function currentLabel() {
+        var m = markers[currentIdx];
+        if (!m) return '';
+        if (m.hidden && m.auto) {
+            var sv = sectionVi(currentIdx);
+            return sv >= 0 ? visibleMarkers[sv].label : '';
         }
-        return visibleMarkers.length ? visibleMarkers[visibleMarkers.length - 1].label : '';
+        return m.label;
     }
     function updateUI() {
         if (counterEditing) return;
         var m = markers[currentIdx];
         var padded = String(currentIdx + 1).padStart(totalDigits, '\\u2007');
         counter.textContent = padded + ' / ' + markers.length;
-        label.textContent = m ? (m.label || nearestVisibleLabel()) : '';
+        label.textContent = currentLabel();
         if (popupOpen) highlightPopup();
         /* Sync presentation footer when counter_mode="slide" */
         var fc = hostDoc.querySelector('.stx-pf-counter[data-stx-counter="slide"]');

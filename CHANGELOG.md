@@ -20,6 +20,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   runs). It reads Playwright's files on disk (`browsers.json` revision,
   `chromium-<rev>/INSTALLATION_COMPLETE`), once per process (#98). Installing
   Chromium while the app runs needs a restart to show the PDF option.
+- Marker nav widget (live app and HTML export): a hidden marker without a
+  label of its own — every `st_slide_break` stop — showed "Marker N". It now
+  shows the current section, the last visible marker before it (#97). The
+  intended fallback never ran, because the label is auto-filled, and it would
+  have picked the next section. The popup list shows the range each entry
+  covers (`4–8. Section B`), so every counter value falls inside a row, and
+  the row of the current section is highlighted. The counter, the keys and
+  the export walk are unchanged (global index, #45); the `st_marker(hidden=)`
+  docstring now says what the widget does. Marker entries carry `auto: true`
+  when the label was generated.
 
 ## [0.7.42] — 2026-10-03 — shortauthor, project init and validate fixes
 

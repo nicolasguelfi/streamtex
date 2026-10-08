@@ -391,6 +391,20 @@ _MARKER_NAV_JS = """
   // popup filters on visibility.
   var visible = markers.filter(function(m) { return !m.hidden; });
   var currentIdx = 0;  // GLOBAL marker index, like the live app
+  // #97 (same as marker.py): the visible entry whose section contains idx,
+  // and the global numbers each popup row covers ("4–8").
+  function sectionVi(idx) {
+    var at = -1;
+    for (var v = 0; v < visible.length; v++) {
+      if (visible[v].index <= idx) at = v;
+    }
+    return (at < 0 && visible.length) ? 0 : at;
+  }
+  function rowRange(vi) {
+    var start = vi === 0 ? 0 : visible[vi].index;
+    var end = vi + 1 < visible.length ? visible[vi + 1].index - 1 : markers.length - 1;
+    return start >= end ? String(start + 1) : (start + 1) + '\u2013' + (end + 1);
+  }
 
   // --- Scroll to marker ---
   function scrollTo(anchor) {
@@ -434,7 +448,7 @@ _MARKER_NAV_JS = """
     (function(globalIdx, vi) {
       var row = document.createElement('div');
       row.className = 'stx-mn-popup-item';
-      row.textContent = (globalIdx + 1) + '. ' + visible[vi].label;
+      row.textContent = rowRange(vi) + '. ' + visible[vi].label;
       row.onclick = function() { navigateTo(globalIdx); popup.style.display = 'none'; };
       popup.appendChild(row);
     })(visible[i].index, i);
@@ -463,17 +477,20 @@ _MARKER_NAV_JS = """
   });
 
   // --- UI update ---
-  function nearestVisibleLabel() {
-    for (var i = 0; i < visible.length; i++) {
-      if (visible[i].index >= currentIdx) return visible[i].label;
+  // A hidden marker without a label of its own shows its section (#97)
+  function currentLabel() {
+    var m = markers[currentIdx];
+    if (!m) return '';
+    if (m.hidden && m.auto) {
+      var sv = sectionVi(currentIdx);
+      return sv >= 0 ? visible[sv].label : '';
     }
-    return visible.length ? visible[visible.length - 1].label : '';
+    return m.label;
   }
 
   function updateUI() {
     counter.textContent = (currentIdx + 1) + ' / ' + markers.length;
-    var m = markers[currentIdx];
-    label.textContent = m ? (m.label || nearestVisibleLabel()) : '';
+    label.textContent = currentLabel();
     highlightPopup();
     // The TOC sidebar active indicator is owned by the cross-context
     // scroll-spy (stx_scroll_spy.js) — it tracks ALL TOC entry anchors
@@ -483,12 +500,9 @@ _MARKER_NAV_JS = """
 
   function highlightPopup() {
     var items = popup.querySelectorAll('.stx-mn-popup-item');
-    // Active row = the visible entry whose GLOBAL index is current; a
-    // hidden current marker lights no row (same as the live app).
-    var activeVi = -1;
-    for (var v = 0; v < visible.length; v++) {
-      if (visible[v].index === currentIdx) { activeVi = v; break; }
-    }
+    // Active row = the visible entry whose section contains the current
+    // marker, hidden or not (same as the live app, #97).
+    var activeVi = sectionVi(currentIdx);
     for (var j = 0; j < items.length; j++) {
       items[j].classList.toggle('stx-mn-active', j === activeVi);
     }

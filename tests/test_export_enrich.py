@@ -512,15 +512,15 @@ class TestMarkerNavParity:
         assert "' / ' + markers.length" in _MARKER_NAV_JS
         assert "' / ' + visible.length" not in _MARKER_NAV_JS
 
-    def test_popup_still_filters_but_numbers_globally(self):
+    def test_popup_still_filters_and_shows_ranges(self):
         from streamtex.export_enrich import _MARKER_NAV_JS
         assert "markers.filter(function(m) { return !m.hidden; })" in _MARKER_NAV_JS
-        assert "(globalIdx + 1) + '. ' + visible[vi].label" in _MARKER_NAV_JS
+        assert "rowRange(vi) + '. ' + visible[vi].label" in _MARKER_NAV_JS
 
-    def test_label_falls_back_to_nearest_visible(self):
+    def test_hidden_auto_marker_shows_its_section(self):
         from streamtex.export_enrich import _MARKER_NAV_JS
-        assert "function nearestVisibleLabel()" in _MARKER_NAV_JS
-        assert "m.label || nearestVisibleLabel()" in _MARKER_NAV_JS
+        assert "function currentLabel()" in _MARKER_NAV_JS
+        assert "m.hidden && m.auto" in _MARKER_NAV_JS
 
     def test_scroll_tracking_walks_full_list(self):
         from streamtex.export_enrich import _MARKER_NAV_JS

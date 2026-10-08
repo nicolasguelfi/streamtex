@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.43] — 2026-10-08 — Password gate, PDF check, nav widget sections
+
+Measured before release, 0.7.42 (PyPI) against this release, ten projects
+(744 blocks, each in its own environment): no block renders differently
+apart from 5 unstable by nature (a Plotly chart's random id, three POSTAIR
+blocks and one teaser block that also differ between two runs of the same
+version). One ai4se6d book times out under both versions: its diagram
+export calls kroki.io, whose rendering endpoint did not answer that day.
+
 ### Fixed
 - Password gate (`STX_PASSWORD`): a password whose beginning repeats was
   missed — with `AAB`, typing `A A A B` failed, and so did `ABAC` typed as

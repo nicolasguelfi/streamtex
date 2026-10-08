@@ -8,7 +8,7 @@ from pathlib import Path
 import click
 
 from . import _stx_toml
-from ._shared import _find_project_dir, _resolve_local_pack_dir
+from ._shared import _find_project_dir, _resolve_local_pack_dir, _resolve_pack_token
 from .console import get_console
 
 
@@ -64,6 +64,7 @@ def show_cmd(ref: str) -> None:
     if ":" not in ref:
         raise click.ClickException("Use <pack>:<name> form.")
     pack_name, kit_name = ref.split(":", 1)
+    pack_name = _resolve_pack_token(pack_name)[0]
     for p, k, path in _iter_kits():
         if p == pack_name and k == kit_name:
             console.print(f"[bold]{ref}[/bold]  ({path})")
@@ -87,6 +88,7 @@ def validate_cmd(ref: str | None) -> None:
         if ":" not in ref:
             raise click.ClickException("Use <pack>:<name> form.")
         pack_name, kit_name = ref.split(":", 1)
+        pack_name = _resolve_pack_token(pack_name)[0]
         kits = [t for t in kits if t[0] == pack_name and t[1] == kit_name]
     any_error = False
     for pack_name, kit_name, path in kits:
@@ -152,6 +154,7 @@ def install_cmd(ref: str) -> None:
     if ":" not in ref:
         raise click.ClickException("Use <pack>:<name> form.")
     pack_name, kit_name = ref.split(":", 1)
+    pack_name = _resolve_pack_token(pack_name)[0]
 
     matches = [t for t in _iter_kits() if t[0] == pack_name and t[1] == kit_name]
     if not matches:
@@ -173,6 +176,7 @@ def install_cmd(ref: str) -> None:
     if "kit" not in doc:
         import tomlkit
         doc["kit"] = tomlkit.table()
+    ref = f"{pack_name}:{kit_name}"
     doc["kit"]["use"] = ref
     _stx_toml.save(project_dir, doc)
 

@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Kit references accept either name of the pack (#31). A pack has an
+  entry-point name (`streamtex-pack-design`) and a module (`streamtex_design`);
+  `stx kit show/validate/install` accepted only the first, `stx project new
+  --kit` only the second, with a misleading "Pack not installed" error.
+  Both now accept both. `stx project new --kit` also declares the pack in
+  `stx.toml` under its entry-point name, which discovery looks up, and points
+  official packs at the `streamtex-packs` monorepo instead of a repository
+  derived from the module name. Kit references recorded in `stx.toml` use the
+  entry-point name.
+
 ## [0.7.43] — 2026-10-08 — Password gate, PDF check, nav widget sections
 
 Measured before release, 0.7.42 (PyPI) against this release, ten projects

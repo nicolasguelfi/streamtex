@@ -9,6 +9,7 @@ from pathlib import Path
 
 import click
 
+from ._shared import _resolve_pack_token
 from .console import get_console
 from .dev_config import resolve_repo_path
 from .workspace_cmd import find_workspace_root, load_stx_toml
@@ -304,14 +305,17 @@ def _resolve_kit(kit_ref: str) -> dict:
     """Resolve a kit reference and return its parsed TOML manifest.
 
     Locates the kit by importing the pack module via entry-points (Q7
-    discovery) and reading ``<pack>/kits/<kit_name>.toml``. Returns ``{}``
-    if discovery fails so the caller can fall back to a minimal scaffold.
+    discovery) and reading ``<pack>/kits/<kit_name>.toml``. ``<pack>`` may be
+    the pack name (``streamtex-pack-design``) or its module
+    (``streamtex_design``). Returns ``{}`` if discovery fails so the caller
+    can fall back to a minimal scaffold.
     """
     pack_name, kit_name = _split_kit_ref(kit_ref)
+    module_name = _resolve_pack_token(pack_name)[1]
     try:
         import importlib
         import tomllib as _tomllib
-        mod = importlib.import_module(pack_name)
+        mod = importlib.import_module(module_name)
         pack_root = os.path.dirname(mod.__file__ or "")
         kit_file = os.path.join(pack_root, "kits", f"{kit_name}.toml")
         if not os.path.isfile(kit_file):
@@ -369,10 +373,19 @@ def generate_stx_toml(
 
     if kit_ref:
         kit_pack, _kit_name = _split_kit_ref(kit_ref)
+        # Declare the pack under the name discovery looks up (its entry point),
+        # whichever of its two names the reference used.
+        kit_pack = _resolve_pack_token(kit_pack)[0]
+        kit_ref = f"{kit_pack}:{_kit_name}"
+        if kit_pack.startswith("streamtex-pack-"):
+            # The official packs live in the streamtex-packs monorepo.
+            git_ref = f"github.com/nicolasguelfi/streamtex-packs#{kit_pack}"
+        else:
+            git_ref = f"github.com/nicolasguelfi/{kit_pack.replace('_', '-')}"
         lines.append("[[packs]]")
         lines.append('type = "git"')
         lines.append(f'name = "{kit_pack}"')
-        lines.append(f'ref = "github.com/nicolasguelfi/{kit_pack.replace("_", "-")}"')
+        lines.append(f'ref = "{git_ref}"')
         lines.append('rev = "main"')
         lines.append("")
         if kit_pack not in declared_packs:
@@ -1044,7 +1057,7 @@ def new(
         console.print(f"[green]Project scaffolded:[/green] {target}")
         if kit_design_system and kit_ref:
             # Inject the kit's design system into custom/styles.py.
-            pack_module, _ = _split_kit_ref(kit_ref)
+            pack_module = _resolve_pack_token(_split_kit_ref(kit_ref)[0])[1]
             styles_py = os.path.join(target, "custom", "styles.py")
             with open(styles_py, "w", encoding="utf-8") as f:
                 f.write(

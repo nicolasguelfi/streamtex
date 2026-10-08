@@ -68,3 +68,24 @@ def _resolve_local_pack_dir(
     if not target_path.is_absolute():
         target_path = (project_dir / target_path).resolve()
     return target_name, target_path
+
+
+def _resolve_pack_token(token: str) -> tuple[str, str]:
+    """Return (pack_name, module_name) for the ``<pack>`` part of a kit reference.
+
+    A pack has two names: the entry-point name in ``streamtex.packs``
+    (``streamtex-pack-design``, what stx.toml and ``stx kit list`` show) and
+    the module it points to (``streamtex_design``, what Python imports).
+    Either is accepted. A token that matches no installed pack is returned
+    unchanged as both names, so callers keep their own "not found" message.
+    """
+    from importlib import metadata
+
+    try:
+        eps = metadata.entry_points(group="streamtex.packs")
+    except Exception:  # noqa: BLE001 — broken metadata: behave as "not installed"
+        return token, token
+    for ep in eps:
+        if token in (ep.name, ep.value):
+            return ep.name, ep.value
+    return token, token

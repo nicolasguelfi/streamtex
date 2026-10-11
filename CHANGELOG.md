@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `streamtex.deploy.stx_auth`: the login service of the server-side login
+  screen (#104), standard library only, meant to run next to nginx
+  (`auth_request`) in the deployment container. One password field;
+  the record file holds one scrypt record per line, either alone (label
+  `default`) or as `label:record`, with an optional last valid day
+  (`label:record:2027-01-31`). The session cookie is signed, expires, names
+  its site and its label; changing or removing one entry ends only its
+  sessions. `/check` answers the entry's label in `X-Stx-Label`. A site with
+  no record file is closed; `open` alone opens it.
+  The listen backlog (512 instead of the standard library's 5), HTTP/1.1
+  keep-alive and a parsed-file cache keep a browser's burst of parallel
+  requests fast (#108): 400 parallel checks, 200 at a time, now take 0.18 s,
+  the slowest 0.12 s; with the reference implementation's settings 22 of
+  them waited for connect retries (up to 7.8 s) and 2 failed. The nginx
+  configuration and the `stx deploy` commands come next.
+
 ### Fixed
 
 - Kit references accept either name of the pack (#31). A pack has an

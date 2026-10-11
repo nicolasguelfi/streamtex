@@ -26,6 +26,8 @@ class StxStyles:
     reset_bold = text.weights.normal_weight
     italic = text.decors.italic_text
     center_txt = text.alignments.center_align
+    cell_center = container.cells.center
+    """Grid cell content centered both ways (``Container.cells.center_middle``)."""
 
     reset = (text.colors.reset + BackgroundColors.reset_bg
              + text.weights.normal_weight + text.sizes.medium_size + text.alignments.left_align)

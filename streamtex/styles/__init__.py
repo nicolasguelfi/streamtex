@@ -18,7 +18,7 @@ from .text import (
 from .container import (
     BackgroundColors, Paddings, Margins, ContainerSizes,
     Flex, Layouts, Borders, Positions,
-    ListStyles, GridStyles, Container,
+    ListStyles, GridStyles, CellAlignments, Container,
 )
 
 # Visibility

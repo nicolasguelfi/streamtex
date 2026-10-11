@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `CellAlignments` (#22): nine content-alignment presets for `st_grid`
+  cells, `<horizontal>_<vertical>` (`left|center|right` × `top|middle|bottom`),
+  each a flex column so vertical positioning works inside a cell; `center`
+  = `center_middle`. Reachable as `Container.cells.*` and `s.cell_center`.
+
 ## [0.7.44] — 2026-10-11 — Server-side login screen, access control, PDF load timeout
 
 A deployed project can now be protected by a login screen run by its own

@@ -388,6 +388,68 @@ class GridStyles:
     gap_48 = Style("gap: var(--stx-gap-48, 48px);",  "grid_gap_48")
 
 
+class CellAlignments:
+    """Content alignment presets for ``st_grid`` cells (#22).
+
+    Each preset is a flex column, matching how a cell stacks its content,
+    so the vertical position works (``Layouts.vertical_center_layout`` has
+    no ``flex-direction:column`` and does not center vertically in a cell).
+    ``text-align`` follows the horizontal position for inline text.
+
+    Naming: ``<horizontal>_<vertical>``, horizontal in left / center /
+    right, vertical in top / middle / bottom; ``center`` = ``center_middle``.
+    Usable as a cell style or composed: ``Container.cells.center + Paddings...``.
+    """
+
+    left_top = Style(
+        "display:flex;flex-direction:column;"
+        "justify-content:flex-start;align-items:flex-start;",
+        "cell_left_top",
+    )
+    left_middle = Style(
+        "display:flex;flex-direction:column;"
+        "justify-content:center;align-items:flex-start;",
+        "cell_left_middle",
+    )
+    left_bottom = Style(
+        "display:flex;flex-direction:column;"
+        "justify-content:flex-end;align-items:flex-start;",
+        "cell_left_bottom",
+    )
+    center_top = Style(
+        "display:flex;flex-direction:column;"
+        "justify-content:flex-start;align-items:center;text-align:center;",
+        "cell_center_top",
+    )
+    center_middle = Style(
+        "display:flex;flex-direction:column;"
+        "justify-content:center;align-items:center;text-align:center;",
+        "cell_center_middle",
+    )
+    center_bottom = Style(
+        "display:flex;flex-direction:column;"
+        "justify-content:flex-end;align-items:center;text-align:center;",
+        "cell_center_bottom",
+    )
+    right_top = Style(
+        "display:flex;flex-direction:column;"
+        "justify-content:flex-start;align-items:flex-end;text-align:right;",
+        "cell_right_top",
+    )
+    right_middle = Style(
+        "display:flex;flex-direction:column;"
+        "justify-content:center;align-items:flex-end;text-align:right;",
+        "cell_right_middle",
+    )
+    right_bottom = Style(
+        "display:flex;flex-direction:column;"
+        "justify-content:flex-end;align-items:flex-end;text-align:right;",
+        "cell_right_bottom",
+    )
+
+    center = center_middle
+
+
 class Container:
     sizes = ContainerSizes
     bg_colors = BackgroundColors
@@ -399,3 +461,4 @@ class Container:
     lists = ListStyles
     positions = Positions
     grid = GridStyles
+    cells = CellAlignments

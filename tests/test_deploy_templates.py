@@ -196,3 +196,15 @@ class TestEntrypointLogin:
         r = _run_auth(tmp_path, STX_AUTH_LIVE="open", STX_SERVE_MODE="streamlit-only")
         assert r.returncode == 1
         assert "needs Nginx" in r.stderr
+
+    def test_service_is_restarted_after_it_stops(self, tmp_path):
+        """Found in a container: under `set -e` the loop died with the service."""
+        (tmp_path / "stx_auth.py").write_text("")
+        script = _auth_section(tmp_path)  # writes the stubs; the service then dies at once
+        (tmp_path / "bin" / "python3").write_text(f'#!/bin/bash\necho x >> "{tmp_path}/runs"\nexit 137\n')
+        script = script.replace("\nkill %1", "\nsleep 2.5\nkill %1")
+        env = {"PATH": f"{tmp_path / 'bin'}:{os.environ['PATH']}", "STX_AUTH_LIVE": "open"}
+        r = subprocess.run(["bash", "-c", script], env=env, capture_output=True, text=True, timeout=30)
+        assert r.returncode == 0, r.stderr
+        assert len(_read(tmp_path / "runs").split()) >= 2
+        assert "stx_auth stopped (exit 137), restarting" in r.stderr

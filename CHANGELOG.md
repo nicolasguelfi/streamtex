@@ -35,6 +35,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   keeps its connections to the service alive (#108) and limits form
   submissions to 50 per minute per address. `STX_SERVE_MODE=streamlit-only`
   with a login screen refuses to start, since nothing would protect the app.
+  Checked in a container built from the generated files (`nginx-light`
+  1.26.3 on Debian 13 has `auth_request` and `realip`): both faces, form,
+  cookie flags, WebSocket refused then accepted, one face's cookie refused
+  on the other, tampered cookie, open redirect, rate limit (50 then 429),
+  health open, 300 requests 100 at a time in 0.59 s, password change ending
+  only that entry's sessions, the service killed (500, back within 2 s) or
+  frozen (nothing served), and the same image without `STX_AUTH_*`
+  behaving as before.
   Projects that already have their deployment files keep them
   (`stx deploy diff` shows the difference).
 

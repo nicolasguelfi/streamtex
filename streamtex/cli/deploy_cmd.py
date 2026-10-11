@@ -371,6 +371,8 @@ def _auth_params(face: str, login: str, home: str) -> str:
     return f"""\
             proxy_http_version 1.1;
             proxy_set_header Connection "";
+            proxy_connect_timeout 2s;
+            proxy_read_timeout 10s;
             proxy_set_header Host $host;
             proxy_set_header Cookie $http_cookie;
             proxy_set_header Accept-Language $http_accept_language;
@@ -491,9 +493,12 @@ print(os.path.join(os.path.dirname(s.origin), 'deploy', 'stx_auth.py'))"
         echo "[entrypoint] Login screen on (live: $(face_state "${STX_AUTH_LIVE}")," \\
              "html: $(face_state "${STX_AUTH_HTML}"))"
         # Restarted if it stops: while it is down, nginx answers 500 (closed).
+        # The subshell inherits `set -e`: the exit code is caught, or the
+        # first stop would end the loop and leave the site closed for good.
         ( while true; do
-              STX_AUTH_ROOT="$AUTH_ROOT" python3 "$AUTH_PY"
-              echo "[entrypoint] stx_auth stopped (exit $?), restarting" >&2
+              rc=0
+              STX_AUTH_ROOT="$AUTH_ROOT" python3 "$AUTH_PY" || rc=$?
+              echo "[entrypoint] stx_auth stopped (exit $rc), restarting" >&2
               sleep 1
           done ) &
         for _ in $(seq 1 50); do

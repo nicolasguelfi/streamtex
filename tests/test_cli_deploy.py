@@ -1141,3 +1141,59 @@ def test_deploy_group_shows_status():
     result = runner.invoke(cli, ["deploy", "--help"])
     assert result.exit_code == 0
     assert "status" in result.output
+
+
+# --- #102: secrets git-ignored, .stx-version, .dockerignore ---------------
+
+
+def _git_init(proj):
+    subprocess.run(["git", "init", "-q", str(proj)], check=True)
+
+
+def _status(proj, name):
+    return next(c for c in run_preflight(str(proj), skip_tests=True, skip_lint=True) if c.name == name)
+
+
+def test_preflight_secret_files_must_be_git_ignored(tmp_path):
+    proj = _make_deploy_project(tmp_path)
+    _git_init(proj)
+    (proj / ".stx-deploy.env").write_text("COOLIFY_API_TOKEN=x\n")
+    check = _status(proj, "secrets git-ignored")
+    assert check.status == "fail" and ".stx-deploy.env" in check.message
+    (proj / ".gitignore").write_text(".stx-deploy.env\n")
+    assert _status(proj, "secrets git-ignored").status == "pass"
+    (proj / ".env").write_text("X=1\n")
+    assert _status(proj, "secrets git-ignored").status == "warn"
+
+
+def test_preflight_secret_check_outside_git(tmp_path):
+    proj = _make_deploy_project(tmp_path)
+    (proj / ".stx-passwords.toml").write_text("[default]\n")
+    assert _status(proj, "secrets git-ignored").status == "pass"
+
+
+def test_preflight_stx_version(tmp_path):
+    proj = _make_deploy_project(tmp_path)
+    (proj / ".stx-version").unlink(missing_ok=True)
+    (proj / "Dockerfile").write_text(generate_dockerfile())
+    assert _status(proj, ".stx-version").status == "fail"
+    (proj / "Dockerfile").write_text("FROM python:3.13-slim\n")
+    assert _status(proj, ".stx-version").status == "warn"
+    (proj / ".stx-version").write_text("0.7.44\n")
+    assert _status(proj, ".stx-version").status == "pass"
+
+
+def test_preflight_dockerignore(tmp_path):
+    from streamtex.cli.deploy_cmd import generate_dockerignore
+
+    proj = _make_deploy_project(tmp_path)
+    (proj / ".dockerignore").unlink(missing_ok=True)
+    assert _status(proj, ".dockerignore").status == "warn"
+    (proj / ".stx-passwords.toml").write_text("[default]\n")
+    (proj / ".dockerignore").write_text(".venv\n")
+    check = _status(proj, ".dockerignore")
+    assert check.status == "warn" and ".stx-passwords.toml" in check.message
+    (proj / ".dockerignore").write_text(generate_dockerignore())
+    assert _status(proj, ".dockerignore").status == "pass"
+    for name in (".env", ".stx-deploy.env", ".stx-passwords.toml", ".venv"):
+        assert name in generate_dockerignore().split()

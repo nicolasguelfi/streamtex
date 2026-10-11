@@ -81,6 +81,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   parent), `.env`, environment variables, `.stx-deploy.json`. `update`,
   `lock`, `unlock`, `passwd` and `auth-status` print where each credential
   came from.
+- `stx deploy preflight` checks three more things (#102): the secret files
+  (`.env`, `.stx-deploy.env`, `.stx-passwords.toml`) are ignored by git (a
+  failure for the last two, a warning for `.env`); `.stx-version`, which the
+  generated Dockerfile copies, exists; `.dockerignore` exists and excludes
+  the secret files present. `stx deploy docker/hetzner` write a
+  `.dockerignore` when there is none, and `stx deploy diff` compares it.
+- Documentation: `AI_GUIDE.md` explains `stx deploy lock`. The
+  `stx cache warmup` help no longer says to run it during the Docker build:
+  the entrypoint runs it at start-up, deliberately.
 - Kit references accept either name of the pack (#31). A pack has an
   entry-point name (`streamtex-pack-design`) and a module (`streamtex_design`);
   `stx kit show/validate/install` accepted only the first, `stx project new

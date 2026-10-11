@@ -242,11 +242,9 @@ def warmup(path):
     Executes the project's book.py in headless mode (no Streamlit server)
     to build the TOC / markers / search-index cache and persist it to disk.
 
-    Run this during Docker build so the first visitor loads instantly.
-
-    \b
-    Example (Dockerfile):
-        RUN cd /app/${FOLDER} && uv run stx cache warmup .
+    The generated entrypoint runs it at every container start, before the
+    static export, so the first visitor loads instantly (a build-time run
+    was dropped: in a multi-module repository it ran in the wrong folder).
     """
     console = get_console()
     project_dir = os.path.abspath(path)

@@ -384,6 +384,24 @@ def _auth_params(face: str, login: str, home: str) -> str:
             proxy_set_header X-Stx-Home {home};"""
 
 
+# Files that hold secrets: never in the image, never in git (#102, #104).
+SECRET_FILES = (".env", ".stx-deploy.env", ".stx-passwords.toml")
+
+
+def generate_dockerignore() -> str:
+    """Generate a ``.dockerignore``: no secrets, environments or caches in the image."""
+    return """\
+# Never in the image: secrets (Coolify token, plain passwords) and local state.
+.env
+.stx-deploy.env
+.stx-passwords.toml
+.git
+.venv
+**/__pycache__
+.stx_cache
+"""
+
+
 def generate_entrypoint() -> str:
     """Generate the container entrypoint script for dual-mode serving."""
     return """\
@@ -539,6 +557,16 @@ esac
 # ---------------------------------------------------------------------------
 
 
+def _git_ignored(project: str, name: str) -> bool:
+    """True when git ignores *name* in *project*, or *project* is not in a repository."""
+    try:
+        r = subprocess.run(["git", "-C", project, "check-ignore", "-q", name],
+                           capture_output=True, timeout=10)
+    except (subprocess.TimeoutExpired, OSError):
+        return False
+    return r.returncode != 1  # 0 ignored, 1 not ignored, 128 not a repository
+
+
 def _find_uv() -> str | None:
     """Locate the uv binary. Returns None if not found."""
     return shutil.which("uv")
@@ -613,7 +641,7 @@ def run_preflight(
         checks.append(PreflightCheck("git clean", "warn", "Could not check git status"))
 
     # 5. No sensitive files
-    sensitive_patterns = [".env", "credentials*", "*.key", "*.pem"]
+    sensitive_patterns = [*SECRET_FILES, "credentials*", "*.key", "*.pem"]
     found_sensitive: list[str] = []
     for pattern in sensitive_patterns:
         found_sensitive.extend(
@@ -631,6 +659,20 @@ def run_preflight(
     else:
         checks.append(PreflightCheck("sensitive files", "pass", "None found"))
 
+    # 5bis. Secret files ignored by git (#102): the Coolify token, plain passwords
+    unignored = []
+    for name in SECRET_FILES:
+        if os.path.isfile(os.path.join(p, name)) and not _git_ignored(p, name):
+            unignored.append(name)
+    if unignored:
+        hard = [n for n in unignored if n != ".env"]
+        checks.append(PreflightCheck(
+            "secrets git-ignored", "fail" if hard else "warn",
+            f"Not ignored by git: {', '.join(unignored)} — add to .gitignore",
+        ))
+    else:
+        checks.append(PreflightCheck("secrets git-ignored", "pass", "Yes, or none present"))
+
     # 6. static/ directory exists
     if os.path.isdir(os.path.join(p, "static")):
         checks.append(PreflightCheck("static/", "pass", "Found"))
@@ -638,10 +680,37 @@ def run_preflight(
         checks.append(PreflightCheck("static/", "warn", "Missing"))
 
     # 7. Dockerfile present
-    if os.path.isfile(os.path.join(p, "Dockerfile")):
+    dockerfile_path = os.path.join(p, "Dockerfile")
+    if os.path.isfile(dockerfile_path):
         checks.append(PreflightCheck("Dockerfile", "pass", "Found"))
     else:
         checks.append(PreflightCheck("Dockerfile", "warn", "Missing"))
+
+    # 7a. .stx-version, which the generated Dockerfile copies and checks (#102)
+    if os.path.isfile(os.path.join(p, ".stx-version")):
+        checks.append(PreflightCheck(".stx-version", "pass", "Found"))
+    else:
+        dockerfile = open(dockerfile_path, encoding="utf-8").read() if os.path.isfile(dockerfile_path) else ""
+        uses_it = ".stx-version" in dockerfile or not dockerfile
+        checks.append(PreflightCheck(
+            ".stx-version", "fail" if uses_it else "warn",
+            "Missing — the generated Dockerfile copies it (minimum streamtex version)",
+        ))
+
+    # 7b. .dockerignore keeps secrets out of a local build's image (#102)
+    dockerignore_path = os.path.join(p, ".dockerignore")
+    if os.path.isfile(dockerignore_path):
+        ignored = {ln.strip().lstrip("/") for ln in open(dockerignore_path, encoding="utf-8")}
+        leaking = [n for n in SECRET_FILES if os.path.isfile(os.path.join(p, n)) and n not in ignored]
+        if leaking:
+            checks.append(PreflightCheck(
+                ".dockerignore", "warn", f"Does not exclude {', '.join(leaking)} (COPY . . would put it in the image)"))
+        else:
+            checks.append(PreflightCheck(".dockerignore", "pass", "Found"))
+    else:
+        checks.append(PreflightCheck(
+            ".dockerignore", "warn",
+            "Missing — a local docker build would copy secrets and .venv (written by stx deploy docker/hetzner)"))
 
     # 7bis. stx.toml local packs use relative paths (G4b)
     stx_toml_path = os.path.join(p, "stx.toml")
@@ -1133,11 +1202,12 @@ def _assert_preflight(path: str, console, skip_tests: bool = True, skip_lint: bo
 
 
 def _ensure_deploy_files(path: str, console) -> None:
-    """Generate Dockerfile, nginx.conf, and entrypoint.sh if they don't exist."""
+    """Generate Dockerfile, nginx.conf, entrypoint.sh and .dockerignore if they don't exist."""
     files = {
         "Dockerfile": generate_dockerfile,
         "nginx.conf": generate_nginx_conf,
         "entrypoint.sh": generate_entrypoint,
+        ".dockerignore": generate_dockerignore,
     }
     for filename, generator in files.items():
         filepath = os.path.join(path, filename)
@@ -2767,6 +2837,7 @@ _TEMPLATES = {
     "Dockerfile": generate_dockerfile,
     "entrypoint.sh": generate_entrypoint,
     "nginx.conf": generate_nginx_conf,
+    ".dockerignore": generate_dockerignore,
 }
 
 

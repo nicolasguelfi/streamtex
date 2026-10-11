@@ -21,6 +21,7 @@ from .enums import Tags
 from .export import (
     ExportConfig,
     ExportMode,
+    apply_view_to_export_html,
     build_export_filename,
     generate_export_html,
     get_asset_collector,
@@ -232,7 +233,7 @@ def _offer_export_downloads(html: str, base_name: str,
     # widget keys change, forcing Streamlit to create fresh widgets with
     # the new default values.  Old orphaned keys are harmless.
     _cfg_str = (f"{defaults.format}|{defaults.landscape}|{defaults.print_background}|"
-                f"{defaults.page_numbers}|{defaults.scale}|{defaults.content_width}|"
+                f"{defaults.page_numbers}|{defaults.scale}|{defaults.content_width}|{defaults.zoom}|"
                 f"{defaults.margin_top}|{defaults.margin_bottom}|"
                 f"{defaults.margin_left}|{defaults.margin_right}")
     _cfg_fp = hashlib.md5(_cfg_str.encode()).hexdigest()[:6]
@@ -316,6 +317,7 @@ def _offer_export_downloads(html: str, base_name: str,
             pdf_background = defaults.print_background
             pdf_page_numbers = defaults.page_numbers
             pdf_scale = defaults.scale
+            pdf_zoom = defaults.zoom
             pdf_content_width = defaults.content_width
             m_top = _margin_mm(defaults.margin_top)
             m_bottom = _margin_mm(defaults.margin_bottom)
@@ -326,7 +328,8 @@ def _offer_export_downloads(html: str, base_name: str,
                 _cur_w = st.session_state.get(_PAGE_WIDTH_KEY, 100)
                 _cur_z = st.session_state.get(_ZOOM_KEY, 100)
                 st.markdown("**PDF layout**")
-                st.caption(f"Current view: Width {_cur_w}% · Zoom {_cur_z}%")
+                st.caption(f"Current view: Zoom {_cur_z}% (carried into the PDF, times Zoom below) · "
+                           f"Width {_cur_w}% (HTML only; the PDF uses Content width)")
                 _FORMAT_OPTIONS = [
                     "16:9", "16:10", "4:3",
                     "A4", "A3", "Letter", "Legal", "Tabloid",
@@ -372,6 +375,13 @@ def _offer_export_downloads(html: str, base_name: str,
                     key=f"_stx_pdf_scale_{_pk}",
                 )
                 pdf_scale = _pdf_scale_pct / 100.0
+                pdf_zoom = st.number_input(
+                    "Zoom (%)", min_value=10, max_value=400,
+                    value=max(10, min(400, int(defaults.zoom))), step=10,
+                    key=f"_stx_pdf_zoom_{_pk}",
+                    help="Shrinks or enlarges everything, including sizes in vw/vh; "
+                         "multiplies with the view zoom. Scale only shrinks pt/px sizes.",
+                )
                 _cw_default = max(10, min(100, defaults.content_width))
                 pdf_content_width = st.number_input(
                     "Content width (%)", min_value=10, max_value=100,
@@ -404,7 +414,14 @@ def _offer_export_downloads(html: str, base_name: str,
                             rebuild_fn()
                         st.rerun()
                 if full_book_html:
-                    effective_html = full_book_html
+                    # Built once per session with the view of that moment:
+                    # carry the current view zoom and width (#110).
+                    effective_html = apply_view_to_export_html(
+                        full_book_html,
+                        built_view=st.session_state.get(_STX_FULL_EXPORT_VIEW_KEY),
+                        page_width=f"{st.session_state.get(_PAGE_WIDTH_KEY, 100)}%",
+                        zoom=st.session_state.get(_ZOOM_KEY, 100) / 100,
+                    )
 
             if want_html:
                 # Enrich a separate copy — keep effective_html raw for PDF
@@ -464,6 +481,7 @@ def _offer_export_downloads(html: str, base_name: str,
                             margin_right=f"{m_right}mm",
                             print_background=pdf_background,
                             scale=pdf_scale,
+                            zoom=pdf_zoom,
                             content_width=pdf_content_width,
                             page_numbers=pdf_page_numbers,
                             header_template=defaults.header_template,
@@ -1612,6 +1630,7 @@ def _isolate_widget_keys():
 
 
 _STX_FULL_EXPORT_HTML_KEY = "_stx_full_export_html"
+_STX_FULL_EXPORT_VIEW_KEY = "_stx_full_export_view"  # (page_width, zoom) it was built with
 
 
 # Streamlit primitives whose DOM emission is suppressed during the
@@ -1789,6 +1808,7 @@ def _build_page_cache(module_list, toc_config, marker_config, separator,
         full_html = generate_export_html()
         if full_html:
             st.session_state[_STX_FULL_EXPORT_HTML_KEY] = full_html
+            st.session_state[_STX_FULL_EXPORT_VIEW_KEY] = (export_config.page_width, export_config.zoom)
         reset_export_buffer(ExportConfig(enabled=False))
 
     search_index = stop_collector() if use_search else None

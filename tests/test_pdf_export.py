@@ -253,31 +253,31 @@ class TestInjectContentWidthCss:
         result = _inject_content_width_css(html, 100)
         assert ".streamtex-page" in result
         assert "width: 100% !important" in result
-        assert "padding: 0.0% !important" in result
+        assert "padding: 0 0.0% !important" in result
 
     def test_80_percent_injects_padding(self):
         html = "<html><head></head><body>Test</body></html>"
         result = _inject_content_width_css(html, 80)
         assert ".streamtex-page" in result
-        assert "padding: 10.0% !important" in result
+        assert "padding: 0 10.0% !important" in result
 
     def test_60_percent_padding(self):
         html = "<html><head></head><body>Test</body></html>"
         result = _inject_content_width_css(html, 60)
-        assert "padding: 20.0% !important" in result
+        assert "padding: 0 20.0% !important" in result
 
     def test_clamped_below_10(self):
         html = "<html><head></head><body>Test</body></html>"
         result = _inject_content_width_css(html, 5)
         # Clamped to 10 → padding = 45%
-        assert "padding: 45.0% !important" in result
+        assert "padding: 0 45.0% !important" in result
 
     def test_above_100_clamped(self):
         html = "<html><head></head><body>Test</body></html>"
         result = _inject_content_width_css(html, 120)
         # Clamped to 100 → padding = 0%
         assert "width: 100% !important" in result
-        assert "padding: 0.0% !important" in result
+        assert "padding: 0 0.0% !important" in result
 
     def test_injected_before_head_close(self):
         html = "<html><head><title>T</title></head><body>B</body></html>"
@@ -612,3 +612,91 @@ class TestLoadTimeout:
         assert not report.timed_out
         assert report.pending == []
         assert report.finished >= 2
+
+
+# ---------------------------------------------------------------------------
+# #110: PDF zoom (CSS zoom on body), side-only content padding, current view
+# ---------------------------------------------------------------------------
+
+
+class TestPdfZoom:
+    def test_default_is_100_and_no_injection(self):
+        from streamtex.pdf_export import _inject_zoom_css
+        assert PdfConfig().zoom == 100
+        html = "<html><head></head><body></body></html>"
+        assert _inject_zoom_css(html, 100) == html
+
+    @pytest.mark.parametrize("zoom,css", [(70, "zoom: 0.7"), (5, "zoom: 0.1"), (999, "zoom: 4")])
+    def test_body_zoom_injected_and_clamped(self, zoom, css):
+        from streamtex.pdf_export import _inject_zoom_css
+        out = _inject_zoom_css("<html><head></head><body></body></html>", zoom)
+        assert f"body {{ {css}; }}" in out
+
+    def test_export_pdf_applies_zoom(self, monkeypatch):
+        captured = TestExportPdfBaseUrl()._run(monkeypatch, PdfConfig(zoom=70))
+        assert "body { zoom: 0.7; }" in captured["html"]
+        captured = TestExportPdfBaseUrl()._run(monkeypatch, PdfConfig())
+        assert "zoom" not in captured["html"]
+
+
+def _layout(html, width=1123):
+    """Sizes Chromium computes for the probes of *html* in print media."""
+    _chromium_or_skip()
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page(viewport={"width": width, "height": 794})
+        page.emulate_media(media="print")
+        page.set_content(html)
+        out = page.evaluate("""() => {
+            const r = id => document.getElementById(id).getBoundingClientRect();
+            return {box: r("box").width, boxh: r("box").height, bar: r("bar").width, top: r("bar").top,
+                    vwtext: r("vwtext").height, px: r("px").height};
+        }""")
+        browser.close()
+    return out
+
+
+def _probe_html(view_zoom=1.0):
+    from streamtex.export import ExportConfig, HtmlExportBuffer
+    buf = HtmlExportBuffer(ExportConfig(enabled=True, zoom=view_zoom))
+    buf.append('<div id="bar" style="height:10px;background:#0f0"></div>'
+               '<div id="vwtext" style="font-size:min(4vw,42pt);line-height:1">T</div>'
+               '<div id="px" style="font-size:20px">x</div>'
+               '<div id="box" style="width:60vw;height:30vh;background:red"></div>')
+    return buf.generate_full_html()
+
+
+class TestPdfZoomInChromium:
+    def test_zoom_70_scales_vw_vh_and_px_alike(self):
+        from streamtex.pdf_export import _inject_content_width_css, _inject_zoom_css
+        base = _layout(_inject_content_width_css(_probe_html(), 100))
+        z = _layout(_inject_zoom_css(_inject_content_width_css(_probe_html(), 100), 70))
+        for k in ("box", "boxh", "vwtext", "px"):
+            assert z[k] == pytest.approx(0.7 * base[k], rel=0.02), k
+        assert z["bar"] == pytest.approx(base["bar"], rel=0.01)  # the page still fills the width
+
+    def test_zoom_multiplies_with_the_view_zoom(self):
+        from streamtex.pdf_export import _inject_content_width_css, _inject_zoom_css
+        base = _layout(_inject_content_width_css(_probe_html(), 100))
+        z = _layout(_inject_zoom_css(_inject_content_width_css(_probe_html(0.8), 100), 70))
+        assert z["box"] == pytest.approx(0.56 * base["box"], rel=0.02)
+
+    def test_content_width_pads_sides_only(self):
+        from streamtex.pdf_export import _inject_content_width_css
+        full = _layout(_inject_content_width_css(_probe_html(), 100))
+        narrow = _layout(_inject_content_width_css(_probe_html(), 70))
+        assert narrow["bar"] == pytest.approx(0.7 * full["bar"], rel=0.02)
+        assert narrow["top"] == pytest.approx(full["top"], abs=1)  # no padding pushed it down
+
+    def test_current_view_replaces_the_build_time_view(self):
+        from streamtex.export import apply_view_to_export_html
+        built = _probe_html(1.0)
+        assert apply_view_to_export_html(built, built_view=("100%", 1.0), page_width="100%", zoom=1.0) == built
+        moved = apply_view_to_export_html(built, built_view=("100%", 1.0), page_width="100%", zoom=0.8)
+        assert moved != built
+        base, now = _layout(built), _layout(moved)
+        assert now["box"] == pytest.approx(0.8 * base["box"], rel=0.02)
+        back = apply_view_to_export_html(_probe_html(0.8), built_view=("100%", 0.8), page_width="100%", zoom=1.0)
+        assert _layout(back)["box"] == pytest.approx(base["box"], rel=0.02)

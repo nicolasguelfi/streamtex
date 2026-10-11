@@ -691,6 +691,22 @@ def export_pop_wrapper(close_tag: str) -> None:
         _buffer.pop_wrapper(close_tag)
 
 
+def apply_view_to_export_html(html: str, *, built_view: Optional[tuple] = None,
+                              page_width: str, zoom: float) -> str:
+    """Give an already generated export the current view's page width and zoom.
+
+    The full-book HTML is built once per session; when the view changed
+    since (*built_view* = ``(page_width, zoom)`` it was built with), a later
+    rule on ``.streamtex-page`` replaces the old values (#110). Blocks never
+    read the view's width or zoom, only this page rule does, so no rebuild
+    is needed. Unchanged when the view is the same.
+    """
+    if built_view is not None and tuple(built_view) == (page_width, zoom):
+        return html
+    css = f".streamtex-page {{ max-width: {page_width}; zoom: {zoom:g}; }}"
+    return html.replace("</head>", f"<style>{css}</style>\n</head>", 1)
+
+
 def generate_export_html() -> Optional[str]:
     """Return the full HTML document, or None when export is inactive."""
     if _buffer is None:

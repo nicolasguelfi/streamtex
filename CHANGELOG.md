@@ -22,9 +22,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `s.HUGE` gets its own responsive value in `default.css`: 104pt on desktop,
   69pt on tablet, 45pt on mobile, between `giant` and `Huge` (#6). It had
   none, so it stayed 96pt on every screen (equal to `s.Huge` on desktop).
+- `PdfConfig.zoom` and a "Zoom (%)" field in the PDF panel (#110): shrinks
+  or enlarges everything in the PDF, sizes in `vw`/`vh` included, as the view
+  zoom does (a CSS `zoom` on `body`). It multiplies with the view zoom the
+  export carries: view 80 % × PDF 70 % = 56 %. Measured on real PDFs: at 70 %
+  a `min(4vw, 42pt)` title, a 20px text and a 60vw × 30vh frame all measure
+  70 %, the page still fills the paper width, bookmarks and page breaks are
+  unchanged, and all served media still load. Default 100 = no change.
+  (`Scale` stays Chromium's print scale: it shrinks `pt`/`px` but keeps
+  `vw`/`vh` proportional to the page, with or without the 0.5.10 viewport
+  compensation; its docstring now says so.)
 
 ### Fixed
 
+- PDF "Document complet" / "Full document" follows the current view (#110):
+  the full-book HTML is built once per session, with the view zoom and width
+  of that moment; a later change of the view (sidebar, presentation profile)
+  never reached it. The export now gives it the current zoom and width (a
+  `.streamtex-page` rule; no rebuild, blocks never read them). The panel
+  caption says what reaches the PDF: the view zoom, times the PDF zoom; the
+  view width only reaches the HTML (the PDF uses Content width).
+- PDF "Content width" pads left and right only (#110). The padding was on
+  all four sides, and a percentage padding resolves against the width: at
+  70 % the content also moved down by 15 % of the page width (a one-page test
+  document became two pages).
 - Named sizes: the docstrings and `var()` fallbacks of `s.GIANT` … `s.tiny`
   (`styles/base.py`, `styles/text.py`) were one notch below `default.css`,
   whose desktop values are what every page shows (#6). `s.Large` was

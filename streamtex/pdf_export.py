@@ -68,7 +68,20 @@ class PdfConfig:
     """Include background colors and gradients in the PDF."""
 
     scale: float = 1.0
-    """Scale factor (0.1–2.0). 1.0 = 100%."""
+    """Chromium's print scale (0.1–2.0), like "Scale" in Chrome's print dialog.
+
+    Shrinks what is sized in ``pt``/``px`` and lets the text reflow on the
+    gained width; what is sized in ``vw``/``vh`` stays proportional to the
+    page (Chromium resolves viewport units against the printed page).  To
+    shrink everything uniformly, use :attr:`zoom`."""
+
+    zoom: int = 100
+    """Zoom of the whole document in the PDF, in percent (10–400; #110).
+
+    A CSS ``zoom`` on ``body``, so it scales ``px``, ``pt``, ``vw`` and ``vh``
+    alike, and it multiplies with the view zoom the exported HTML already
+    carries (view 80 % × PDF 70 % = 56 %).  The page still fills the paper
+    width; bookmarks and page breaks are unchanged.  ``100`` = no change."""
 
     content_width: int = 100
     """Content width as percentage of the page (10–100).
@@ -333,16 +346,32 @@ def _inject_content_width_css(html: str, content_width: int) -> str:
     cw = max(10, min(100, content_width))
     padding_pct = (100 - cw) / 2
 
+    # Left and right only (#110): a percentage padding resolves against the
+    # width, so on all four sides it also pushed the content down by the
+    # same amount (15 % of the page width at 70 %).
     css = (
         f".streamtex-page {{"
         f" max-width: 100% !important;"
         f" width: 100% !important;"
         f" margin: 0 !important;"
-        f" padding: {padding_pct:.1f}% !important;"
+        f" padding: 0 {padding_pct:.1f}% !important;"
         f" box-sizing: border-box !important;"
         f"}}"
     )
     return html.replace("</head>", f"<style>{css}</style>\n</head>")
+
+
+def _inject_zoom_css(html: str, zoom: int) -> str:
+    """Zoom the whole document by *zoom* percent (CSS ``zoom`` on ``body``).
+
+    ``body`` rather than ``.streamtex-page``: the page already carries the
+    view zoom, and zooms on nested elements multiply, where a second rule on
+    the same element would replace it.  No-op at 100.
+    """
+    z = max(10, min(400, int(zoom)))
+    if z == 100:
+        return html
+    return html.replace("</head>", f"<style>body {{ zoom: {z / 100:g}; }}</style>\n</head>")
 
 
 # ---------------------------------------------------------------------------
@@ -532,6 +561,7 @@ def export_pdf(
 
     # Inject content-width CSS if narrower than 100%
     html = _inject_content_width_css(html, cfg.content_width)
+    html = _inject_zoom_css(html, cfg.zoom)
 
     # Inject TOC headings for PDF bookmark generation
     use_outline = False

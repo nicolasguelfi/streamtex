@@ -22,8 +22,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   keep-alive and a parsed-file cache keep a browser's burst of parallel
   requests fast (#108): 400 parallel checks, 200 at a time, now take 0.18 s,
   the slowest 0.12 s; with the reference implementation's settings 22 of
-  them waited for connect retries (up to 7.8 s) and 2 failed. The nginx
-  configuration and the `stx deploy` commands come next.
+  them waited for connect retries (up to 7.8 s) and 2 failed.
+- Generated deployment files (`stx deploy`) carry the login screen, inactive
+  unless asked for. `nginx.conf` includes `/etc/nginx/stx-auth/{live,html,
+  media}.conf` on `/`, `/html/` and `/app/static/`; the entrypoint leaves
+  them empty, so routes behave as before, unless `STX_AUTH_LIVE` or
+  `STX_AUTH_HTML` is set (`open`, or the base64 of the face's record file).
+  It then writes the records, fills the snippets, starts `stx_auth` with the
+  system Python (restarted if it stops) and waits for it before nginx.
+  A face left without a value is closed; `/_stcore/health` stays open;
+  Streamlit media are protected unless `STX_AUTH_PUBLIC_MEDIA=1`; nginx
+  keeps its connections to the service alive (#108) and limits form
+  submissions to 50 per minute per address. `STX_SERVE_MODE=streamlit-only`
+  with a login screen refuses to start, since nothing would protect the app.
+  Projects that already have their deployment files keep them
+  (`stx deploy diff` shows the difference).
 
 ### Fixed
 

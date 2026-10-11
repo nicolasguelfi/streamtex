@@ -134,6 +134,10 @@ RUN chmod +x /app/entrypoint.sh
 RUN mkdir -p /app/static-html && \\
     echo 'return 302 /html/;' > /app/static-html/.nginx-redirect.conf
 
+# Login screen snippets (empty = no login); the entrypoint rewrites them.
+RUN mkdir -p /etc/nginx/stx-auth && \\
+    touch /etc/nginx/stx-auth/live.conf /etc/nginx/stx-auth/html.conf /etc/nginx/stx-auth/media.conf
+
 # STX_SERVE_MODE controls which services start (set at runtime)
 #   dual           = Nginx (:80) + Streamlit (:8501) — default
 #   static-only    = Nginx (:80) only
@@ -156,8 +160,13 @@ def generate_nginx_conf() -> str:
     Routes:
       /html/  -> static HTML export (always available)
       /       -> Streamlit app (with automatic fallback to /html/ on error)
+
+    The server-side login screen (#104) is wired in but inactive: the
+    entrypoint fills the ``/etc/nginx/stx-auth/*.conf`` snippets only when
+    ``STX_AUTH_LIVE`` or ``STX_AUTH_HTML`` is set, otherwise they stay empty
+    and the routes behave as without it.
     """
-    return """\
+    template = """\
 # StreamTeX dual-mode Nginx configuration
 # Serves both Streamlit (interactive) and static HTML exports.
 #
@@ -165,6 +174,11 @@ def generate_nginx_conf() -> str:
 #   /html/          -> static HTML export (always available)
 #   /               -> Streamlit app (with automatic fallback to /html/ on error)
 #   /_stcore/health -> proxied to Streamlit (Coolify/Traefik health check)
+#
+# Login screen (stx deploy lock --mode session): the entrypoint writes
+# /etc/nginx/stx-auth/{live,html,media}.conf. Empty = no login; otherwise
+# each one holds the auth_request lines of its face, checked by stx_auth
+# (127.0.0.1:9100). /_stcore/health always stays open for the probes.
 
 worker_processes auto;
 pid /tmp/nginx.pid;
@@ -184,9 +198,32 @@ http {
     gzip on;
     gzip_types text/html text/css application/javascript image/svg+xml application/json;
     gzip_min_length 1024;
+    server_tokens off;
+
+    # The visitor's address from Traefik, so that the login rate limit
+    # counts visitors and not the proxy.
+    set_real_ip_from 10.0.0.0/8;
+    set_real_ip_from 172.16.0.0/12;
+    set_real_ip_from 192.168.0.0/16;
+    real_ip_header X-Forwarded-For;
+    real_ip_recursive on;
+
+    # Login form submissions only: a burst of 50, then 50 per minute per address.
+    map $request_method $stx_login_key {
+        POST    $binary_remote_addr;
+        default "";
+    }
+    limit_req_zone $stx_login_key zone=stxlogin:10m rate=50r/m;
+    limit_req_status 429;
 
     upstream streamlit {
         server 127.0.0.1:8501;
+    }
+
+    # Kept-alive connections: a page load checks ~100 files at once (#108).
+    upstream stx_auth {
+        server 127.0.0.1:9100;
+        keepalive 16;
     }
 
     server {
@@ -198,11 +235,13 @@ http {
         # Exact match: /html/ redirects to the correct exported file.
         # The entrypoint writes a snippet to /app/static-html/.nginx-redirect.conf
         location = /html/ {
+            include /etc/nginx/stx-auth/html.conf;
             include /app/static-html/.nginx-redirect.conf;
         }
 
         # Prefix match: serve exported files directly
         location /html/ {
+            include /etc/nginx/stx-auth/html.conf;
             alias /app/static-html/;
             autoindex on;
             expires 1h;
@@ -226,9 +265,79 @@ http {
             add_header Content-Type text/plain;
         }
 
+        # --- Login screen (active only when the snippets are filled) ---
+
+        location = /_stx_auth_live {
+            internal;
+            proxy_pass http://stx_auth/check;
+@@LIVE_PARAMS@@
+            proxy_pass_request_body off;
+            proxy_set_header Content-Length "";
+        }
+
+        location = /_stx_auth_html {
+            internal;
+            proxy_pass http://stx_auth/check;
+@@HTML_PARAMS@@
+            proxy_pass_request_body off;
+            proxy_set_header Content-Length "";
+        }
+
+        # Without a session: the form, served at the address asked for,
+        # so that the visitor lands there after signing in.
+        location @stx_login_live {
+            rewrite ^ /login? break;
+            proxy_pass http://stx_auth;
+            proxy_method GET;
+@@LIVE_PARAMS@@
+            proxy_pass_request_body off;
+            proxy_set_header Content-Length "";
+            add_header Strict-Transport-Security "max-age=31536000" always;
+        }
+
+        location @stx_login_html {
+            rewrite ^ /login? break;
+            proxy_pass http://stx_auth;
+            proxy_method GET;
+@@HTML_PARAMS@@
+            proxy_pass_request_body off;
+            proxy_set_header Content-Length "";
+            add_header Strict-Transport-Security "max-age=31536000" always;
+        }
+
+        location = /_login {
+            limit_req zone=stxlogin burst=50 nodelay;
+            proxy_pass http://stx_auth/login;
+@@LIVE_PARAMS@@
+            add_header Strict-Transport-Security "max-age=31536000" always;
+            error_page 502 504 = @stx_off;
+        }
+
+        location = /html/_login {
+            limit_req zone=stxlogin burst=50 nodelay;
+            proxy_pass http://stx_auth/login;
+@@HTML_PARAMS@@
+            add_header Strict-Transport-Security "max-age=31536000" always;
+            error_page 502 504 = @stx_off;
+        }
+
+        location @stx_off {
+            return 404;
+        }
+
+        # Streamlit media: protected with the app unless STX_AUTH_PUBLIC_MEDIA=1.
+        location /app/static/ {
+            include /etc/nginx/stx-auth/media.conf;
+            proxy_pass http://streamlit;
+            proxy_set_header Host $host;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
         # --- Streamlit app (interactive, with WebSocket support) ---
 
         location / {
+            include /etc/nginx/stx-auth/live.conf;
             proxy_pass http://streamlit;
             proxy_http_version 1.1;
             proxy_set_header Upgrade $http_upgrade;
@@ -249,6 +358,28 @@ http {
     }
 }
 """
+    for face, login, home in (("live", "/_login", "/"), ("html", "/html/_login", "/html/")):
+        template = template.replace(f"@@{face.upper()}_PARAMS@@", _auth_params(face, login, home))
+    return template
+
+
+def _auth_params(face: str, login: str, home: str) -> str:
+    """nginx lines that describe a request to stx_auth for one face.
+
+    Every ``X-Stx-*`` header is set here, so a visitor cannot supply one.
+    """
+    return f"""\
+            proxy_http_version 1.1;
+            proxy_set_header Connection "";
+            proxy_set_header Host $host;
+            proxy_set_header Cookie $http_cookie;
+            proxy_set_header Accept-Language $http_accept_language;
+            proxy_set_header X-Original-URI $request_uri;
+            proxy_set_header X-Forwarded-Prefix "";
+            proxy_set_header X-Stx-Site {face};
+            proxy_set_header X-Stx-Cookie stx_{face};
+            proxy_set_header X-Stx-Login {login};
+            proxy_set_header X-Stx-Home {home};"""
 
 
 def generate_entrypoint() -> str:
@@ -263,6 +394,11 @@ def generate_entrypoint() -> str:
 # Env vars:
 #   FOLDER          optional subdirectory to serve (e.g. modules/my_module)
 #   STX_SERVE_MODE  dual | static-only | streamlit-only (default: dual)
+#   STX_AUTH_LIVE   login screen of the app (/): "open", or the base64 of its
+#   STX_AUTH_HTML   record file; same for the static export (/html/).
+#                   Written by `stx deploy lock --mode session`. When one is
+#                   set, a face without a value is closed.
+#   STX_AUTH_PUBLIC_MEDIA=1  leave Streamlit media (/app/static/) open
 
 set -e
 
@@ -305,6 +441,67 @@ TARGET="${BASE_NAME}/${BASE_NAME}.html"
 echo "[entrypoint] Static HTML: /html/ → ${TARGET}"
 # Nginx snippet: 302 redirect from /html/ to the correct exported file
 echo "return 302 /html/${TARGET};" > /app/static-html/.nginx-redirect.conf
+
+# --- Server-side login screen (stx deploy lock --mode session) ---
+
+AUTH_CONF=/etc/nginx/stx-auth
+AUTH_ROOT=/var/lib/stx-auth
+mkdir -p "$AUTH_CONF"
+: > "$AUTH_CONF/live.conf"; : > "$AUTH_CONF/html.conf"; : > "$AUTH_CONF/media.conf"
+
+write_face() {   # write_face <face> <value>: the face's record file, or none (closed)
+    local dir="$AUTH_ROOT/sites/$1"
+    rm -rf "$dir"; mkdir -p "$dir"
+    if [ "$2" = "open" ]; then
+        echo open > "$dir/pass"
+    elif [[ "$2" =~ ^[A-Za-z0-9+/=]+$ ]] && printf '%s' "$2" | base64 -d > "$dir/pass"; then
+        :
+    elif [ -n "$2" ]; then
+        rm -f "$dir/pass"
+        report_failure "STX_AUTH_$(echo "$1" | tr a-z A-Z) (not base64): face closed" 1
+    fi
+    [ -f "$dir/pass" ] && chmod 600 "$dir/pass"
+    return 0
+}
+
+face_state() { case "$1" in "") echo closed ;; open) echo open ;; *) echo password ;; esac; }
+
+if [ -n "${STX_AUTH_LIVE}${STX_AUTH_HTML}" ]; then
+    if [ "$MODE" = "streamlit-only" ]; then
+        echo "[entrypoint] ERROR: the login screen needs Nginx;" \\
+             "STX_SERVE_MODE=streamlit-only would leave the app open" >&2
+        exit 1
+    fi
+    write_face live "${STX_AUTH_LIVE}"
+    write_face html "${STX_AUTH_HTML}"
+    echo 'auth_request /_stx_auth_live; error_page 401 = @stx_login_live;' > "$AUTH_CONF/live.conf"
+    echo 'auth_request /_stx_auth_html; error_page 401 = @stx_login_html;' > "$AUTH_CONF/html.conf"
+    if [ "${STX_AUTH_PUBLIC_MEDIA}" != "1" ]; then
+        cp "$AUTH_CONF/live.conf" "$AUTH_CONF/media.conf"
+    fi
+    # The service ships with streamtex (standard library only): run the file
+    # with the system Python, without importing streamtex or streamlit.
+    FIND_AUTH="import importlib.util, os; s = importlib.util.find_spec('streamtex')
+print(os.path.join(os.path.dirname(s.origin), 'deploy', 'stx_auth.py'))"
+    if ! AUTH_PY=$(uv run python -c "$FIND_AUTH"); then AUTH_PY=""; fi
+    if [ ! -f "$AUTH_PY" ]; then
+        report_failure "login screen: stx_auth.py not found in streamtex (needs streamtex >= 0.7.44); site closed" 1
+        for f in live html media; do echo 'return 503;' > "$AUTH_CONF/$f.conf"; done
+    else
+        echo "[entrypoint] Login screen on (live: $(face_state "${STX_AUTH_LIVE}")," \\
+             "html: $(face_state "${STX_AUTH_HTML}"))"
+        # Restarted if it stops: while it is down, nginx answers 500 (closed).
+        ( while true; do
+              STX_AUTH_ROOT="$AUTH_ROOT" python3 "$AUTH_PY"
+              echo "[entrypoint] stx_auth stopped (exit $?), restarting" >&2
+              sleep 1
+          done ) &
+        for _ in $(seq 1 50); do
+            curl -s -o /dev/null http://127.0.0.1:9100/check && break
+            sleep 0.2
+        done
+    fi
+fi
 
 # --- Start services based on mode ---
 

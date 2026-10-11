@@ -6,11 +6,15 @@ Requires the optional ``pdf`` extra::
     playwright install chromium
 """
 
+import logging
 import re
-from dataclasses import dataclass
+import time
+from dataclasses import dataclass, field
 from enum import Enum
 from html import escape as _attr_escape
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 
 class PdfMode(Enum):
@@ -101,6 +105,41 @@ class PdfConfig:
     Empty (default) = no injection, byte-identical HTML — the historical
     behaviour.  ``book.py`` fills this automatically with the running
     server's address for the "Download as..." panel and auto-exports."""
+
+    load_timeout_ms: int = 300_000
+    """How long Chromium may take to load the document and its media before
+    printing, in milliseconds (issue #109).  ``0`` = no limit.
+
+    Past this time the PDF is printed anyway, without the media still
+    loading, and a warning names them.  A large document whose media come
+    from the running Streamlit server can need minutes (309 MB of media:
+    over 30 s, Playwright's former implicit limit)."""
+
+
+@dataclass
+class PdfLoadReport:
+    """How the document's loading went before printing (filled by ``export_pdf``)."""
+
+    elapsed_s: float = 0.0
+    """Time spent loading the document and its media."""
+
+    finished: int = 0
+    """Requests that completed (media, fonts, styles)."""
+
+    pending: list[str] = field(default_factory=list)
+    """Requests still loading when the time ran out."""
+
+    timed_out: bool = False
+    """True when ``load_timeout_ms`` ran out: the PDF lacks the pending media."""
+
+    def message(self, timeout_ms: int) -> str:
+        """A sentence for the author: what happened and which setting to raise."""
+        shown = ", ".join(self.pending[:5]) + (f" and {len(self.pending) - 5} more"
+                                                if len(self.pending) > 5 else "")
+        return (f"The media took longer than {timeout_ms / 1000:g} s to load "
+                f"({self.finished} loaded, {len(self.pending)} still loading: {shown}). "
+                "The PDF was printed without them. Raise PdfConfig(load_timeout_ms=...) "
+                "(0 = no limit), or export the current section only.")
 
 
 # ---------------------------------------------------------------------------
@@ -437,6 +476,7 @@ def export_pdf(
     output_path: Optional[str] = None,
     config: Optional[PdfConfig] = None,
     toc: Optional[list[dict]] = None,
+    report: Optional[PdfLoadReport] = None,
 ) -> bytes:
     """Export an HTML document to PDF using Playwright (Chromium headless).
 
@@ -462,6 +502,10 @@ def export_pdf(
         toc: Optional list of TOC entry dicts (from cache or ``toc_entries()``).
             Each dict must have ``key_anchor``, ``title``, and ``level`` keys.
             When provided, PDF bookmarks are generated from the TOC hierarchy.
+        report: Optional :class:`PdfLoadReport`, filled in place with the
+            loading time, the requests finished and those still pending.
+            When ``config.load_timeout_ms`` runs out, the PDF is printed
+            anyway (without the pending media) and ``report.timed_out`` is set.
 
     Returns:
         PDF content as bytes.
@@ -531,10 +575,38 @@ def export_pdf(
         w_mm, h_mm = _page_dimensions_mm(cfg.format, cfg.landscape)
         page_size_kwargs = {"width": f"{w_mm}mm", "height": f"{h_mm}mm"}
 
+    try:
+        from playwright.sync_api import TimeoutError as _LoadTimeout
+    except ImportError:  # pragma: no cover — every real playwright has it
+        _LoadTimeout = TimeoutError
+
+    rep = report if report is not None else PdfLoadReport()
     with sync_playwright() as p:
         browser = p.chromium.launch()
         page = browser.new_page(viewport={"width": viewport_w, "height": 900})
-        page.set_content(html, wait_until="networkidle")
+        pending: dict[object, str] = {}
+
+        def _started(request) -> None:
+            pending[request] = request.url
+
+        def _ended(request) -> None:
+            if pending.pop(request, None) is not None:
+                rep.finished += 1
+
+        page.on("request", _started)
+        page.on("requestfinished", _ended)
+        page.on("requestfailed", _ended)
+        t0 = time.monotonic()
+        try:
+            page.set_content(html, wait_until="networkidle", timeout=cfg.load_timeout_ms)
+        except _LoadTimeout:
+            # The document is in the page; only media are missing. Print
+            # what loaded rather than lose the whole export (issue #109).
+            rep.timed_out = True
+        rep.elapsed_s = time.monotonic() - t0
+        rep.pending = sorted(pending.values())
+        if rep.timed_out:
+            logger.warning("PDF export: %s", rep.message(cfg.load_timeout_ms))
 
         pdf_bytes = page.pdf(
             **page_size_kwargs,

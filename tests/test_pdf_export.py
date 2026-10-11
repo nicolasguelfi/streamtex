@@ -457,9 +457,13 @@ class TestExportPdfBaseUrl:
         captured = {}
 
         class _FakePage:
-            def set_content(self, html, wait_until=None):
+            def on(self, event, handler):
+                pass
+
+            def set_content(self, html, wait_until=None, timeout=None):
                 captured["html"] = html
                 captured["wait_until"] = wait_until
+                captured["timeout"] = timeout
 
             def pdf(self, **kwargs):
                 return b"%PDF-fake"
@@ -506,8 +510,105 @@ class TestExportPdfBaseUrl:
         assert "<base" not in captured["html"]
         assert captured["wait_until"] == "networkidle"
 
+    def test_load_timeout_is_passed(self, monkeypatch):
+        """#109: no implicit 30 s; the configured timeout reaches set_content."""
+        assert self._run(monkeypatch, PdfConfig())["timeout"] == 300_000
+        assert self._run(monkeypatch, PdfConfig(load_timeout_ms=0))["timeout"] == 0
+
     def test_with_base_url_tag_present(self, monkeypatch):
         captured = self._run(
             monkeypatch, PdfConfig(base_url="http://localhost:9999/"))
         assert '<head><base href="http://localhost:9999/">' in captured["html"]
         assert "app/static/media/x.png" in captured["html"]
+
+
+# ---------------------------------------------------------------------------
+# #109: a medium slower than the load timeout (real Chromium)
+# ---------------------------------------------------------------------------
+
+
+def _chromium_or_skip():
+    pytest.importorskip("playwright.sync_api")
+    from playwright.sync_api import Error, sync_playwright
+    try:
+        with sync_playwright() as p:
+            p.chromium.launch().close()
+    except Error as e:  # browser not installed
+        pytest.skip(f"Chromium not available: {e}")
+
+
+@pytest.fixture
+def slow_server():
+    """Serves /fast.png at once and /slow.png after 3 s."""
+    import http.server
+    import threading
+    import time as _time
+
+    png = bytes.fromhex("89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d49444154"
+                        "789c6360f8cf00000301010018dd8db00000000049454e44ae426082")
+
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def log_message(self, *args):
+            pass
+
+        def do_GET(self):
+            if self.path.startswith("/slow"):
+                _time.sleep(3)
+            self.send_response(200)
+            self.send_header("Content-Type", "image/png")
+            self.send_header("Content-Length", str(len(png)))
+            self.end_headers()
+            try:
+                self.wfile.write(png)
+            except (BrokenPipeError, ConnectionResetError):
+                pass
+
+    srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    srv.daemon_threads = True
+    threading.Thread(target=srv.serve_forever, kwargs={"poll_interval": 0.05}, daemon=True).start()
+    yield f"http://127.0.0.1:{srv.server_address[1]}/"
+    srv.shutdown()
+    srv.server_close()
+
+
+_SLOW_HTML = "<html><head></head><body><p>hello</p><img src='fast.png'><img src='slow.png'></body></html>"
+
+
+class TestLoadTimeout:
+    def test_short_timeout_prints_anyway_and_names_the_pending_medium(self, slow_server):
+        from streamtex.pdf_export import PdfLoadReport
+
+        _chromium_or_skip()
+        report = PdfLoadReport()
+        pdf = export_pdf(_SLOW_HTML, config=PdfConfig(base_url=slow_server, load_timeout_ms=800), report=report)
+        assert pdf.startswith(b"%PDF")
+        assert report.timed_out
+        assert any(u.endswith("/slow.png") for u in report.pending)
+        assert report.finished >= 1
+        assert 0.7 < report.elapsed_s < 3
+        msg = report.message(800)
+        assert "slow.png" in msg and "load_timeout_ms" in msg
+
+    def test_playwright_default_would_have_failed(self, slow_server):
+        """What 0.7.43 did, with a 0.8 s limit instead of 30 s: the export is lost."""
+        _chromium_or_skip()
+        from playwright.sync_api import TimeoutError as PwTimeout
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as p:
+            browser = p.chromium.launch()
+            page = browser.new_page()
+            with pytest.raises(PwTimeout):
+                page.set_content(inject_base_href(_SLOW_HTML, slow_server), wait_until="networkidle",
+                                 timeout=800)
+            browser.close()
+
+    def test_enough_time_loads_everything(self, slow_server):
+        from streamtex.pdf_export import PdfLoadReport
+
+        _chromium_or_skip()
+        report = PdfLoadReport()
+        export_pdf(_SLOW_HTML, config=PdfConfig(base_url=slow_server, load_timeout_ms=15_000), report=report)
+        assert not report.timed_out
+        assert report.pending == []
+        assert report.finished >= 2

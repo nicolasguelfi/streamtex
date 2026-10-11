@@ -222,7 +222,7 @@ def _offer_export_downloads(html: str, base_name: str,
     a rerun, allowing the PDF layout section to appear/disappear dynamically.
     The form contains only the configuration options and the Generate button.
     """
-    from .pdf_export import PdfMode, export_pdf
+    from .pdf_export import PdfLoadReport, PdfMode, export_pdf
 
     pdf_available = _is_pdf_available()
     state_key = f"_stx_export_{base_name}"
@@ -452,6 +452,7 @@ def _offer_export_downloads(html: str, base_name: str,
                 _pdf_mode = (PdfMode.PAGINATED if section_breaks == _BREAK_PAGE
                              else PdfMode.CONTINUOUS)
                 with st.spinner("Generating PDF..."):
+                    _t0 = time.monotonic()
                     try:
                         cfg = PdfConfig(
                             mode=_pdf_mode,
@@ -473,11 +474,16 @@ def _offer_export_downloads(html: str, base_name: str,
                             # an explicit author base_url wins, else the
                             # running server's own address.
                             base_url=defaults.base_url or _resolve_pdf_base_url(),
+                            load_timeout_ms=defaults.load_timeout_ms,
                         )
                         _toc = st.session_state.get(_STX_CACHE_KEY, {}).get("toc")
-                        results["pdf"] = export_pdf(effective_html, config=cfg, toc=_toc)
+                        _report = PdfLoadReport()
+                        results["pdf"] = export_pdf(effective_html, config=cfg, toc=_toc,
+                                                    report=_report)
+                        if _report.timed_out:  # shown with the download button
+                            results["pdf_warning"] = _report.message(cfg.load_timeout_ms)
                     except Exception as exc:
-                        st.error(f"PDF generation failed: {exc}")
+                        st.error(f"PDF generation failed after {time.monotonic() - _t0:.0f} s: {exc}")
             st.session_state[state_key] = results
 
         # Show download buttons from cached results
@@ -499,6 +505,8 @@ def _offer_export_downloads(html: str, base_name: str,
                 key=f"_stx_dl_html_{base_name}",
             )
         if "pdf" in results:
+            if results.get("pdf_warning"):
+                st.warning(results["pdf_warning"])
             st.download_button(
                 label="Download PDF",
                 data=results["pdf"],

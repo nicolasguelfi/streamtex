@@ -79,6 +79,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- PDF export of a large document no longer fails after 30 s (#109).
+  `export_pdf` passed no timeout to `page.set_content(..., wait_until=
+  "networkidle")`, so Playwright's implicit 30 s applied while Chromium
+  loaded every medium from the Streamlit server (CHAT1D: 309 MB, over 30 s).
+  New `PdfConfig.load_timeout_ms` (default 300 000, `0` = no limit). When it
+  runs out, the PDF is printed anyway without the media still loading, and
+  the "Download as…" panel says how many loaded, which are pending and which
+  setting to raise; a failure shows the elapsed time. `export_pdf(...,
+  report=PdfLoadReport())` exposes the same facts. Tested with real Chromium
+  against a medium slower than the timeout.
 - `stx deploy update` and the other Coolify commands find credentials kept
   in the project's `.env` (#11). Order: `.stx-deploy.env` (project, then
   parent), `.env`, environment variables, `.stx-deploy.json`. `update`,

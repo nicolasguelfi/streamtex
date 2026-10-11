@@ -215,8 +215,8 @@ class TestPredefinedStyles:
         assert "color: Blue;" in str(Colors.blue)
 
     def test_sizes_have_correct_css(self):
-        assert "--stx-medium-size, 12pt" in str(Sizes.medium_size)
-        assert "--stx-Large-size, 32pt" in str(Sizes.Large_size)
+        assert "--stx-medium-size, 16pt" in str(Sizes.medium_size)
+        assert "--stx-Large-size, 48pt" in str(Sizes.Large_size)
 
     def test_size_factory_int(self):
         s = Sizes.size(20)
@@ -253,3 +253,28 @@ class TestPredefinedStyles:
         assert "top: 10px;" in str(t)
         l = Positions.left("5%")
         assert "left: 5%;" in str(l)
+
+
+def test_named_size_fallbacks_equal_desktop_css():
+    """#6: default.css says its desktop values are the var() fallbacks too; keep them equal."""
+    import re
+    from pathlib import Path
+
+    import streamtex
+    from streamtex.styles.text import Sizes
+
+    css = (Path(streamtex.__file__).parent / "static" / "default.css").read_text()
+    start = css.index("Desktop defaults (used as fallback values")
+    root = css[start:css.index("@media", start)]
+    desktop = dict(re.findall(r"--stx-([A-Za-z]+)-size:\s*(\d+pt);", root))
+    names = ["GIANT", "Giant", "giant", "HUGE", "Huge", "huge", "LARGE", "Large", "large",
+             "big", "medium", "little", "small", "tiny"]
+    for n in names:
+        style = str(getattr(Sizes, f"{n}_size"))
+        fallback = re.search(rf"--stx-{n}-size, (\d+pt)", style).group(1)
+        assert fallback == desktop[n], f"s.{n}: fallback {fallback}, default.css {desktop[n]}"
+    # every breakpoint defines HUGE between giant and Huge
+    for block in re.findall(r"--stx-giant-size: (\d+)pt;\s*--stx-HUGE-size: (\d+)pt;\s*--stx-Huge-size: (\d+)pt;", css):
+        g, h, hu = map(int, block)
+        assert g > h > hu
+    assert len(re.findall("--stx-HUGE-size", css)) == 3

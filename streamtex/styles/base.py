@@ -37,33 +37,33 @@ class StxStyles:
     ``st_mermaid``, or ``st_tikz`` to make diagrams readable on dark pages."""
 
     GIANT = text.sizes.GIANT_size
-    """196pt"""
+    """196pt on desktop (default.css)"""
     Giant = text.sizes.Giant_size
-    """160pt"""
+    """128pt on desktop (default.css)"""
     giant = text.sizes.giant_size
-    """128pt"""
+    """112pt on desktop (default.css)"""
     HUGE = text.sizes.HUGE_size
-    """96pt"""
+    """104pt on desktop (default.css)"""
     Huge = text.sizes.Huge_size
-    """80pt"""
+    """96pt on desktop (default.css)"""
     huge = text.sizes.huge_size
-    """64pt"""
+    """80pt on desktop (default.css)"""
     LARGE = text.sizes.LARGE_size
-    """48pt"""
+    """64pt on desktop (default.css)"""
     Large = text.sizes.Large_size
-    """32pt"""
+    """48pt on desktop (default.css)"""
     large = text.sizes.large_size
-    """24pt"""
+    """32pt on desktop (default.css)"""
     big = text.sizes.big_size
-    """16pt"""
+    """24pt on desktop (default.css)"""
     medium = text.sizes.medium_size
-    """12pt"""
+    """16pt on desktop (default.css)"""
     little = text.sizes.little_size
-    """8pt"""
+    """12pt on desktop (default.css)"""
     small = text.sizes.small_size
-    """6pt"""
+    """8pt on desktop (default.css)"""
     tiny = text.sizes.tiny_size
-    """4pt"""
+    """4pt on desktop (default.css)"""
 
     # --- Indexed responsive scale (subscript access) ---
     class _IndexedScale:

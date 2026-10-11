@@ -68,6 +68,7 @@ a {
     --stx-GIANT-size: 196pt;
     --stx-Giant-size: 128pt;
     --stx-giant-size: 112pt;
+    --stx-HUGE-size: 104pt;
     --stx-Huge-size: 96pt;
     --stx-huge-size: 80pt;
     --stx-LARGE-size: 64pt;
@@ -130,6 +131,7 @@ a {
         --stx-GIANT-size: 128pt;
         --stx-Giant-size: 84pt;
         --stx-giant-size: 74pt;
+        --stx-HUGE-size: 69pt;
         --stx-Huge-size: 64pt;
         --stx-huge-size: 54pt;
         --stx-LARGE-size: 48pt;
@@ -192,6 +194,7 @@ a {
         --stx-GIANT-size: 80pt;
         --stx-Giant-size: 56pt;
         --stx-giant-size: 48pt;
+        --stx-HUGE-size: 45pt;
         --stx-Huge-size: 42pt;
         --stx-huge-size: 36pt;
         --stx-LARGE-size: 32pt;

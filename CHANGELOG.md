@@ -19,9 +19,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Chromium at 1920 px: a 6vw thumbnail gets a 9 px badge, a 40vw hero 22 px.
   Needs a definite width (`st_image`'s default `100%`); with `width="auto"`
   the box is left shrink-wrapping. Off by default, byte-identical output.
+- `s.HUGE` gets its own responsive value in `default.css`: 104pt on desktop,
+  69pt on tablet, 45pt on mobile, between `giant` and `Huge` (#6). It had
+  none, so it stayed 96pt on every screen (equal to `s.Huge` on desktop).
 
 ### Fixed
 
+- Named sizes: the docstrings and `var()` fallbacks of `s.GIANT` … `s.tiny`
+  (`styles/base.py`, `styles/text.py`) were one notch below `default.css`,
+  whose desktop values are what every page shows (#6). `s.Large` was
+  documented as 32pt and renders 48pt. Docstrings and fallbacks now equal the
+  desktop values, so nothing changes where `default.css` is loaded (app,
+  HTML and PDF exports); a test keeps them equal.
 - Image editor: the display zoom and size survive a new image version and a
   failed first load (#18). `save_version()` now carries the slot's
   `display_*` settings into the new metadata (a regeneration reset the

@@ -216,7 +216,8 @@ def _resolve_pdf_base_url() -> str:
 
 def _offer_export_downloads(html: str, base_name: str,
                             pdf_config: PdfConfig | None = None,
-                            paginated: bool = False) -> None:
+                            paginated: bool = False,
+                            html_zoom: int = 0) -> None:
     """Render a 'Download as...' expander with export options and download buttons.
 
     Format checkboxes (HTML / PDF) live **outside** the form so they trigger
@@ -288,7 +289,16 @@ def _offer_export_downloads(html: str, base_name: str,
             # ── HTML enrichment options ─────────────────────────
             enrich_nav = False
             enrich_title = ""
+            html_zoom_pct = 0
             if want_html:
+                html_zoom_pct = st.number_input(
+                    "Zoom HTML (%)", min_value=0, max_value=400,
+                    value=max(0, min(400, int(html_zoom or 0))), step=10,
+                    key=f"_stx_export_html_zoom_{_pk}_{html_zoom}",
+                    help="0 = the HTML file follows the view zoom (Settings › Zoom %). "
+                         "A value fixes the zoom of the HTML file whatever the screen "
+                         "shows; it replaces the view zoom (the PDF zoom multiplies it).",
+                )
                 st.markdown("**HTML navigation**")
                 enrich_nav = st.checkbox(
                     "Enriched navigation (TOC sidebar, markers, search)",
@@ -373,14 +383,18 @@ def _offer_export_downloads(html: str, base_name: str,
                     "Scale (%)", min_value=10, max_value=500,
                     value=_scale_default, step=10,
                     key=f"_stx_pdf_scale_{_pk}",
+                    help="Chrome's print scale: shrinks sizes in pt/px and lets the "
+                         "text reflow; sizes in vw/vh stay proportional to the page. "
+                         "To shrink everything, use Zoom.",
                 )
                 pdf_scale = _pdf_scale_pct / 100.0
                 pdf_zoom = st.number_input(
                     "Zoom (%)", min_value=10, max_value=400,
                     value=max(10, min(400, int(defaults.zoom))), step=10,
                     key=f"_stx_pdf_zoom_{_pk}",
-                    help="Shrinks or enlarges everything, including sizes in vw/vh; "
-                         "multiplies with the view zoom. Scale only shrinks pt/px sizes.",
+                    help="Shrinks or enlarges everything in the PDF, sizes in vw/vh "
+                         "included; multiplies with the view zoom (view 80 % x 70 % = 56 %). "
+                         "Scale only shrinks pt/px sizes.",
                 )
                 _cw_default = max(10, min(100, defaults.content_width))
                 pdf_content_width = st.number_input(
@@ -426,6 +440,14 @@ def _offer_export_downloads(html: str, base_name: str,
             if want_html:
                 # Enrich a separate copy — keep effective_html raw for PDF
                 html_download = effective_html
+                if html_zoom_pct:
+                    # A fixed zoom for the HTML file only (#110); the PDF
+                    # keeps the view zoom times its own Zoom.
+                    html_download = apply_view_to_export_html(
+                        html_download,
+                        page_width=f"{st.session_state.get(_PAGE_WIDTH_KEY, 100)}%",
+                        zoom=html_zoom_pct / 100,
+                    )
                 if enrich_nav:
                     try:
                         from .export_enrich import enrich_export_html
@@ -500,6 +522,9 @@ def _offer_export_downloads(html: str, base_name: str,
                                                     report=_report)
                         if _report.timed_out:  # shown with the download button
                             results["pdf_warning"] = _report.message(cfg.load_timeout_ms)
+                        _view_z = st.session_state.get(_ZOOM_KEY, 100)
+                        results["pdf_zoom_note"] = (
+                            f"PDF zoom: view {_view_z:g}% × {pdf_zoom:g}% = {_view_z * pdf_zoom / 100:g}%")
                     except Exception as exc:
                         st.error(f"PDF generation failed after {time.monotonic() - _t0:.0f} s: {exc}")
             st.session_state[state_key] = results
@@ -523,6 +548,8 @@ def _offer_export_downloads(html: str, base_name: str,
                 key=f"_stx_dl_html_{base_name}",
             )
         if "pdf" in results:
+            if results.get("pdf_zoom_note"):
+                st.caption(results["pdf_zoom_note"])
             if results.get("pdf_warning"):
                 st.warning(results["pdf_warning"])
             st.download_button(
@@ -657,7 +684,8 @@ def _st_book_impl(module_list, toc_config: TOCConfig = None, marker_config: Mark
             scale=None,
             block_args: tuple = (),
             block_kwargs: dict | None = None,
-            lang: str | None = None):
+            lang: str | None = None,
+            html_export_zoom: int = 0):
     """Generates a web page e-book from a list of block modules.
 
     :param separator: Optional module with a build() function, rendered between each block.
@@ -681,6 +709,10 @@ def _st_book_impl(module_list, toc_config: TOCConfig = None, marker_config: Mark
     :param page_width: Page width as % of browser width (default 90).
     :param zoom: Default zoom level as % (default 100).
     :param loading: If True (default), show a full-screen overlay with progress during loading.
+    :param html_export_zoom: Starting value of the "Zoom HTML (%)" field of the
+        export panel (#110). ``0`` (default) = the exported HTML follows the
+        view zoom (Settings › Zoom %); a value fixes the zoom of the HTML
+        file whatever the screen shows.
     :param scale: Optional ``ScaleConfig`` to override the indexed responsive
         font scale for this document only. When provided, an inline ``<style>``
         block is emitted after the default CSS load, redefining
@@ -926,6 +958,7 @@ def _st_book_impl(module_list, toc_config: TOCConfig = None, marker_config: Mark
                         pdf_config=pdf_config, exports=exports,
                         inspector=inspector,
                         page_width=page_width, zoom=zoom,
+                        html_export_zoom=html_export_zoom,
                         profile_names=profile_names,
                         active_profile=active_name,
                         profile_modified=_profile_modified,
@@ -1116,7 +1149,8 @@ def _st_book_impl(module_list, toc_config: TOCConfig = None, marker_config: Mark
             )
             if _show_manual:
                 with st.sidebar:
-                    _offer_export_downloads(full_html, base_name, pdf_config=pdf_config)
+                    _offer_export_downloads(full_html, base_name, pdf_config=pdf_config,
+                                            html_zoom=html_export_zoom)
 
     # --- Inspector panel (opt-in, rendered into reserved sidebar placeholder) ---
     if _inspector_placeholder is not None and st.session_state.get("_stx_inspector_open", False):
@@ -2442,7 +2476,8 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
                     profile_modified=False, all_profiles=None,
                     loading=False,
                     block_args: tuple = (),
-                    block_kwargs: dict | None = None):
+                    block_kwargs: dict | None = None,
+                    html_export_zoom: int = 0):
     """Paginated rendering — only renders one block per rerun."""
     start_time = time.time()
     logger.debug("Starting st_book (paginated)...")
@@ -2745,7 +2780,8 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
             if _show_manual:
                 with st.sidebar:
                     _offer_export_downloads(section_html, base_name,
-                                            pdf_config=pdf_config, paginated=True)
+                                            pdf_config=pdf_config, paginated=True,
+                                            html_zoom=html_export_zoom)
 
     # --- Marker navigation widget (ALL markers, cross-page aware) ---
     # Skip the widget if the current page has no markers (e.g. footer)
@@ -2823,7 +2859,7 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
 #: configuration only — nothing that reaches the content of a block.
 BOOK_DEFAULT_KEYS = frozenset({
     "paginate", "page_width", "zoom", "export", "export_title", "loading",
-    "chrome_banner", "banner_color", "doc_version", "lang",
+    "chrome_banner", "banner_color", "doc_version", "lang", "html_export_zoom",
 })
 
 

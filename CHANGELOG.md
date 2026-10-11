@@ -31,7 +31,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   unchanged, and all served media still load. Default 100 = no change.
   (`Scale` stays Chromium's print scale: it shrinks `pt`/`px` but keeps
   `vw`/`vh` proportional to the page, with or without the 0.5.10 viewport
-  compensation; its docstring now says so.)
+  compensation; its docstring and its help text now say so, and the panel
+  shows the resulting zoom next to the PDF download.)
+- "Zoom HTML (%)" in the export panel, and `st_book(html_export_zoom=…)` /
+  `[book.defaults] html_export_zoom` for its starting value (#110). `0`
+  (default) = the HTML file follows the view zoom, as before; a value fixes
+  the zoom of the HTML file whatever the screen shows (it replaces the view
+  zoom; the PDF zoom multiplies it). Screen, HTML export and PDF export can
+  now each be zoomed by hand.
 
 ### Fixed
 

@@ -17,6 +17,10 @@ from .claude_cmd import update_cmd as claude_update
 from .claude_global import global_group as claude_global_group
 from .claude_project import sync_cmd as claude_sync
 from .component_cmd import component as component_group
+from .deploy_auth_cmd import auth_status_cmd as deploy_auth_status
+from .deploy_auth_cmd import lock_cmd as deploy_lock
+from .deploy_auth_cmd import passwd_cmd as deploy_passwd
+from .deploy_auth_cmd import unlock_cmd as deploy_unlock
 from .deploy_cmd import ci_cmd as deploy_ci
 from .deploy_cmd import configure_domain_cmd as deploy_configure_domain
 from .deploy_cmd import diff_cmd as deploy_diff
@@ -166,6 +170,10 @@ deploy.add_command(deploy_secure)
 deploy.add_command(deploy_install_coolify)
 deploy.add_command(deploy_configure_domain)
 deploy.add_command(deploy_scale)
+deploy.add_command(deploy_lock)
+deploy.add_command(deploy_unlock)
+deploy.add_command(deploy_passwd)
+deploy.add_command(deploy_auth_status)
 
 
 # --- Publish subgroup ------------------------------------------------------

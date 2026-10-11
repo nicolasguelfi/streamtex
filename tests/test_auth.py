@@ -123,6 +123,28 @@ class TestGateActivation:
                 gate()
                 mock_st.stop.assert_called_once()
 
+    @pytest.mark.parametrize("env", [
+        {"STX_AUTH_LIVE": "c2NyeXB0"},                  # app face behind the login screen
+        {"STX_AUTH_HTML": "open"},                     # app face left without value: closed by nginx
+    ])
+    def test_login_screen_replaces_keypad(self, env):
+        """#104, r1: one prompt only, the server's."""
+        gate = _import_gate()
+        with patch.dict(os.environ, {"STX_PASSWORD": "stx", **env}):
+            for k in ("STX_AUTH_LIVE", "STX_AUTH_HTML"):
+                if k not in env:
+                    os.environ.pop(k, None)
+            with _patch_gate(session=_fresh_session()) as mock_st:
+                gate()
+                mock_st.stop.assert_not_called()
+
+    def test_keypad_kept_when_app_face_is_open(self):
+        gate = _import_gate()
+        with patch.dict(os.environ, {"STX_PASSWORD": "stx", "STX_AUTH_LIVE": "open", "STX_AUTH_HTML": "c2Ny"}):
+            with _patch_gate(session=_fresh_session()) as mock_st:
+                gate()
+                mock_st.stop.assert_called_once()
+
     def test_stx_gate_zero_does_not_enable(self):
         gate = _import_gate()
         with patch.dict(os.environ, {"STX_GATE": "0"}):

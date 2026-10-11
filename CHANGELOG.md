@@ -46,8 +46,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Projects that already have their deployment files keep them
   (`stx deploy diff` shows the difference).
 
+- `stx deploy lock / unlock / passwd / auth-status` (#10, #104): access
+  control of a Coolify application, through a registry of modes that other
+  modes can join (`register_auth_mode`):
+  - `session` (default of `lock`): the login screen. Passwords are read from
+    `.stx-passwords.toml` (git-ignored; a warning otherwise), per face
+    (`live`, `html`) as `"password"`, `"LABEL:pw,LABEL:pw"` or a table with an
+    optional `valid_until`; hashed on the author's machine, only the records
+    reach Coolify (`STX_AUTH_LIVE`, `STX_AUTH_HTML`, stored as literal).
+    Refused: a label twice, two labels sharing a password, more than 32
+    passwords. `--faces live` leaves `/html/` open. `passwd` re-applies the
+    file.
+  - `stx-password`: the keypad (`STX_PASSWORD`), prompted, never on the
+    command line unless given.
+  - `basic`: Coolify's HTTP Basic Authentication. Coolify's API documents
+    these fields only at creation; the command checks that the change took
+    effect and otherwise says to use the dashboard. Not yet tried against a
+    live Coolify.
+  Each change restarts the application (and its replicas) unless
+  `--no-restart`. `auth-status` lists every mode, labels and end dates,
+  never a secret. `unlock` turns off all modes, or those given.
+
+### Changed
+
+- When the login screen guards the app (`STX_AUTH_LIVE` or `STX_AUTH_HTML`
+  set, the app face not `open`), the keypad is not shown even if
+  `STX_PASSWORD` is set: one prompt only. The app log, the container log and
+  `stx deploy lock` say so.
+
 ### Fixed
 
+- `stx deploy update` and the other Coolify commands find credentials kept
+  in the project's `.env` (#11). Order: `.stx-deploy.env` (project, then
+  parent), `.env`, environment variables, `.stx-deploy.json`. `update`,
+  `lock`, `unlock`, `passwd` and `auth-status` print where each credential
+  came from.
 - Kit references accept either name of the pack (#31). A pack has an
   entry-point name (`streamtex-pack-design`) and a module (`streamtex_design`);
   `stx kit show/validate/install` accepted only the first, `stx project new

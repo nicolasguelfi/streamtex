@@ -16,10 +16,15 @@ The static HTML export (``stx export html``, the ``/html/`` route of a
 deployed container) is **not** behind this gate: export and cache warmup
 return before the gate runs. Protect ``/html/`` at the web server if needed.
 
+When the server-side login screen guards the app (``stx deploy lock --mode
+session``: ``STX_AUTH_LIVE`` or ``STX_AUTH_HTML`` set, the app face not
+``open``), the keypad is not shown: visitors are asked once, by the server.
+
 In local dev, the gate is off by default.  Set ``STX_GATE=1`` (without
 ``STX_PASSWORD``) to preview it locally with the default sequence S-T-X.
 """
 
+import logging
 import os
 
 import streamlit as st
@@ -32,6 +37,9 @@ from .styles import Style
 from .write import st_write
 
 load_dotenv()  # loads .env if present (no-op on Coolify where env vars are set directly)
+
+logger = logging.getLogger(__name__)
+_keypad_skip_logged = False
 
 # ── Session-state keys ────────────────────────────────────────────────
 
@@ -254,6 +262,17 @@ def _render_circles():
 
 # ── Main gate ─────────────────────────────────────────────────────────
 
+def _login_screen_active() -> bool:
+    """True when the server-side login screen guards the app face (#104).
+
+    The container's entrypoint closes a face left without a value, so the app
+    is guarded unless ``STX_AUTH_LIVE`` is ``open``.
+    """
+    live = os.environ.get("STX_AUTH_LIVE", "").strip()
+    html = os.environ.get("STX_AUTH_HTML", "").strip()
+    return bool(live or html) and live != "open"
+
+
 def _password_gate() -> None:
     """Block rendering until the password sequence is entered.
 
@@ -265,6 +284,12 @@ def _password_gate() -> None:
     force_gate = os.environ.get("STX_GATE", "").strip() == "1"
     if not has_password and not force_gate:
         return  # no gate in local dev
+    if _login_screen_active():
+        global _keypad_skip_logged
+        if has_password and not _keypad_skip_logged:
+            logger.warning("STX_PASSWORD ignored: the server-side login screen protects the app")
+            _keypad_skip_logged = True
+        return  # one prompt only: the server's
 
     if st.session_state.get(_AUTH_KEY):
         return  # already authenticated

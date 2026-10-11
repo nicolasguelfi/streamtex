@@ -89,6 +89,27 @@ class TestCoolifyClientFromEnv:
         assert c.url == "https://env.example.org"
         assert c.token == "envtok"
 
+    def test_from_dotenv(self, tmp_path, monkeypatch):
+        """#11: credentials kept in the project's .env are found."""
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.delenv("COOLIFY_URL", raising=False)
+        monkeypatch.delenv("COOLIFY_API_TOKEN", raising=False)
+        (tmp_path / ".env").write_text("OTHER=1\nCOOLIFY_URL=https://dot.example.org\nCOOLIFY_API_TOKEN=dottok\n")
+        c = CoolifyClient.from_env()
+        assert (c.url, c.token) == ("https://dot.example.org", "dottok")
+        assert c.sources == {"COOLIFY_URL": str(tmp_path / ".env"), "COOLIFY_API_TOKEN": str(tmp_path / ".env")}
+
+    def test_order_deploy_env_then_dotenv_then_environment(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setenv("COOLIFY_URL", "https://env.example.org")
+        monkeypatch.setenv("COOLIFY_API_TOKEN", "envtok")
+        (tmp_path / ".env").write_text("COOLIFY_API_TOKEN=dottok\n")
+        (tmp_path / ".stx-deploy.env").write_text("COOLIFY_URL=https://deploy.example.org\n")
+        c = CoolifyClient.from_env()
+        assert (c.url, c.token) == ("https://deploy.example.org", "dottok")
+        assert c.sources["COOLIFY_URL"].endswith(".stx-deploy.env")
+        assert c.sources["COOLIFY_API_TOKEN"].endswith(".env")
+
     def test_missing_raises(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
         monkeypatch.delenv("COOLIFY_URL", raising=False)

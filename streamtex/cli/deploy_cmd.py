@@ -478,6 +478,9 @@ if [ -n "${STX_AUTH_LIVE}${STX_AUTH_HTML}" ]; then
     write_face html "${STX_AUTH_HTML}"
     echo 'auth_request /_stx_auth_live; error_page 401 = @stx_login_live;' > "$AUTH_CONF/live.conf"
     echo 'auth_request /_stx_auth_html; error_page 401 = @stx_login_html;' > "$AUTH_CONF/html.conf"
+    if [ -n "${STX_PASSWORD}" ] && [ "${STX_AUTH_LIVE}" != "open" ]; then
+        echo "[entrypoint] STX_PASSWORD ignored: the login screen protects the app"
+    fi
     if [ "${STX_AUTH_PUBLIC_MEDIA}" != "1" ]; then
         cp "$AUTH_CONF/live.conf" "$AUTH_CONF/media.conf"
     fi
@@ -1549,8 +1552,8 @@ def _status_coolify(console, name: str | None) -> None:
 def _read_deploy_env(project_path: str = ".") -> dict[str, str]:
     """Read ``.stx-deploy.env`` from the project or parent directory.
 
-    Returns a dict of KEY=VALUE pairs.  Raises :class:`click.ClickException`
-    if the file cannot be found.
+    Falls back to the project's ``.env`` (#11). Returns a dict of KEY=VALUE
+    pairs.  Raises :class:`click.ClickException` if neither file is found.
     """
     from pathlib import Path
 
@@ -1561,13 +1564,15 @@ def _read_deploy_env(project_path: str = ".") -> dict[str, str]:
         Path(project_path).resolve().parent / ".stx-deploy.env",
         Path.cwd() / ".stx-deploy.env",
         Path.cwd().parent / ".stx-deploy.env",
+        Path(project_path).resolve() / ".env",
+        Path.cwd() / ".env",
     ]
     for p in candidates:
         if p.is_file():
             return _parse_env_file(p)
 
     raise click.ClickException(
-        ".stx-deploy.env not found. Run 'stx deploy setup' first."
+        ".stx-deploy.env not found (nor .env). Run 'stx deploy setup' first."
     )
 
 
@@ -1964,59 +1969,9 @@ def update_cmd(target: str | None, quick: bool, serve_mode: str | None, yes: boo
         client = CoolifyClient.from_env()
     except CoolifyError as e:
         raise click.ClickException(str(e)) from e
+    _print_credential_sources(console, client)
 
-    # Resolve target UUID
-    app_uuid = target
-    app_name = target or "(unknown)"
-
-    if target and not _looks_like_uuid(target):
-        # Try to find UUID from deploy state
-        state = load_deploy_state()
-        services = state.get("services", {})
-        for name, svc_info in services.items():
-            if isinstance(svc_info, dict) and (
-                name == target
-                or svc_info.get("subdomain") == target
-                or svc_info.get("uuid") == target
-            ):
-                app_uuid = svc_info.get("uuid")
-                app_name = name
-                break
-
-    if not target:
-        # List all services and prompt
-        try:
-            apps = client.list_apps()
-        except CoolifyError as e:
-            raise click.ClickException(str(e)) from e
-
-        if not apps:
-            raise click.ClickException("No applications found in Coolify.")
-
-        from rich.table import Table
-
-        table = Table(title="Coolify Applications")
-        table.add_column("#", style="dim")
-        table.add_column("Name", style="cyan")
-        table.add_column("Status")
-        table.add_column("UUID", style="dim")
-
-        for i, app in enumerate(apps, 1):
-            table.add_row(str(i), app.name, app.status, app.uuid)
-
-        console.print(table)
-        choice = click.prompt("Select application number", type=int)
-        if choice < 1 or choice > len(apps):
-            raise click.ClickException(f"Invalid selection: {choice}")
-        selected = apps[choice - 1]
-        app_uuid = selected.uuid
-        app_name = selected.name
-
-    if not app_uuid:
-        raise click.ClickException(
-            f"Could not resolve target '{target}'. "
-            "Provide a valid UUID, service name, or subdomain."
-        )
+    app_uuid, app_name = _resolve_target(client, target, console)
 
     action = "restart" if quick else "rebuild"
     if not yes:
@@ -2106,6 +2061,77 @@ def update_cmd(target: str | None, quick: bool, serve_mode: str | None, yes: boo
                     "[yellow]⚠ Could not resolve FQDN for smoke test — "
                     "skipping post-deploy verification.[/yellow]"
                 )
+
+
+def _resolve_target(client, target: str | None, console) -> tuple[str, str]:
+    """(uuid, name) of the Coolify application TARGET names.
+
+    TARGET can be a service name, subdomain, or Coolify UUID; without it, the
+    applications are listed and the user picks one.
+    """
+    from .coolify import CoolifyError, load_deploy_state
+
+    app_uuid = target
+    app_name = target or "(unknown)"
+
+    if target and not _looks_like_uuid(target):
+        # Try to find UUID from deploy state
+        state = load_deploy_state()
+        services = state.get("services", {})
+        for name, svc_info in services.items():
+            if isinstance(svc_info, dict) and (
+                name == target
+                or svc_info.get("subdomain") == target
+                or svc_info.get("uuid") == target
+            ):
+                app_uuid = svc_info.get("uuid")
+                app_name = name
+                break
+
+    if not target:
+        # List all services and prompt
+        try:
+            apps = client.list_apps()
+        except CoolifyError as e:
+            raise click.ClickException(str(e)) from e
+
+        if not apps:
+            raise click.ClickException("No applications found in Coolify.")
+
+        from rich.table import Table
+
+        table = Table(title="Coolify Applications")
+        table.add_column("#", style="dim")
+        table.add_column("Name", style="cyan")
+        table.add_column("Status")
+        table.add_column("UUID", style="dim")
+
+        for i, app in enumerate(apps, 1):
+            table.add_row(str(i), app.name, app.status, app.uuid)
+
+        console.print(table)
+        choice = click.prompt("Select application number", type=int)
+        if choice < 1 or choice > len(apps):
+            raise click.ClickException(f"Invalid selection: {choice}")
+        selected = apps[choice - 1]
+        app_uuid = selected.uuid
+        app_name = selected.name
+
+    if not app_uuid:
+        raise click.ClickException(
+            f"Could not resolve target '{target}'. "
+            "Provide a valid UUID, service name, or subdomain."
+        )
+
+    return app_uuid, app_name
+
+
+def _print_credential_sources(console, client) -> None:
+    """One dim line: the file (or environment) each Coolify credential came from."""
+    src = getattr(client, "sources", {}) or {}
+    if src:
+        parts = [f"{k.split('_', 1)[1].lower().replace('_', ' ')} from {v}" for k, v in sorted(src.items())]
+        console.print(f"[dim]Coolify {', '.join(parts)}[/dim]")
 
 
 def _looks_like_uuid(value: str) -> bool:

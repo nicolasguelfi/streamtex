@@ -292,6 +292,8 @@ class CoolifyClient:
     def __init__(self, url: str, token: str):
         self.url = url.rstrip("/")
         self.token = token
+        # Where from_env found each credential (shown by the CLI, #11).
+        self.sources: dict[str, str] = {}
 
     # ── Factory ────────────────────────────────────────────────────────
 
@@ -299,36 +301,45 @@ class CoolifyClient:
     def from_env(cls, env_path: str | Path | None = None) -> "CoolifyClient":
         """Create a client from ``.stx-deploy.env`` or environment variables.
 
-        Search order:
+        Search order, each value taken from the first place that has it:
         1. Explicit *env_path*
         2. ``.stx-deploy.env`` in current directory
         3. ``.stx-deploy.env`` in workspace root (parent of current dir)
-        4. ``COOLIFY_URL`` and ``COOLIFY_API_TOKEN`` environment variables
-        5. Read from ``.stx-deploy.json`` infrastructure section
+        4. ``.env`` in current directory (#11)
+        5. ``COOLIFY_URL`` and ``COOLIFY_API_TOKEN`` environment variables
+        6. Read from ``.stx-deploy.json`` infrastructure section
 
+        ``client.sources`` records where each value was found.
         Raises :class:`CoolifyError` if credentials cannot be found.
         """
         coolify_url = None
         coolify_token = None
+        sources: dict[str, str] = {}
 
-        # Try .stx-deploy.env files
+        # Try .stx-deploy.env files, then the project's .env
         candidates = []
         if env_path:
             candidates.append(Path(env_path))
         candidates.extend([
             Path.cwd() / ".stx-deploy.env",
             Path.cwd().parent / ".stx-deploy.env",
+            Path.cwd() / ".env",
         ])
 
         for p in candidates:
             if p.is_file():
                 env_vars = _parse_env_file(p)
-                coolify_url = coolify_url or env_vars.get("COOLIFY_URL")
-                coolify_token = coolify_token or env_vars.get("COOLIFY_API_TOKEN")
+                if not coolify_url and env_vars.get("COOLIFY_URL"):
+                    coolify_url, sources["COOLIFY_URL"] = env_vars["COOLIFY_URL"], str(p)
+                if not coolify_token and env_vars.get("COOLIFY_API_TOKEN"):
+                    coolify_token, sources["COOLIFY_API_TOKEN"] = env_vars["COOLIFY_API_TOKEN"], str(p)
                 if coolify_url and coolify_token:
                     break
 
         # Fallback to environment variables
+        for key in ("COOLIFY_URL", "COOLIFY_API_TOKEN"):
+            if key not in sources and os.environ.get(key):
+                sources[key] = "environment"
         coolify_url = coolify_url or os.environ.get("COOLIFY_URL")
         coolify_token = coolify_token or os.environ.get("COOLIFY_API_TOKEN")
 
@@ -342,8 +353,8 @@ class CoolifyClient:
                     data = json.loads(json_path.read_text(encoding="utf-8"))
                     infra = data.get("infrastructure", {})
                     coolify = infra.get("coolify", {})
-                    if not coolify_url:
-                        coolify_url = coolify.get("url")
+                    if not coolify_url and coolify.get("url"):
+                        coolify_url, sources["COOLIFY_URL"] = coolify["url"], str(json_path)
                     break
 
         # Fallback token from .env in streamtex repo
@@ -354,22 +365,25 @@ class CoolifyClient:
             ]:
                 if dotenv_path.is_file():
                     env_vars = _parse_env_file(dotenv_path)
-                    coolify_token = coolify_token or env_vars.get("COOLIFY_API_TOKEN")
-                    if coolify_token:
+                    if env_vars.get("COOLIFY_API_TOKEN"):
+                        coolify_token = env_vars["COOLIFY_API_TOKEN"]
+                        sources["COOLIFY_API_TOKEN"] = str(dotenv_path)
                         break
 
         if not coolify_url:
             raise CoolifyError(
-                "Coolify URL not found. Set COOLIFY_URL in .stx-deploy.env "
+                "Coolify URL not found. Set COOLIFY_URL in .stx-deploy.env or .env, "
                 "or run: stx deploy setup"
             )
         if not coolify_token:
             raise CoolifyError(
-                "Coolify API token not found. Set COOLIFY_API_TOKEN in .stx-deploy.env "
+                "Coolify API token not found. Set COOLIFY_API_TOKEN in .stx-deploy.env or .env, "
                 "or run: stx deploy setup"
             )
 
-        return cls(coolify_url, coolify_token)
+        client = cls(coolify_url, coolify_token)
+        client.sources = sources
+        return client
 
     # ── Applications ───────────────────────────────────────────────────
 
@@ -517,14 +531,19 @@ class CoolifyClient:
         """Get environment variables for an application."""
         return self._get(f"/api/v1/applications/{uuid}/envs")
 
-    def set_env_var(self, uuid: str, key: str, value: str, is_build: bool = False) -> dict:
+    def set_env_var(
+        self, uuid: str, key: str, value: str, is_build: bool = False, is_literal: bool = False,
+    ) -> dict:
         """Create or update an environment variable on an application.
 
         Uses POST to create; on 409 (already exists), falls back to PATCH.
+        *is_literal* stores the value as written (no ``$`` interpolation).
         """
         body: dict = {"key": key, "value": value}
         if is_build:
             body["is_build_time"] = True
+        if is_literal:
+            body["is_literal"] = True
         try:
             return self._post(f"/api/v1/applications/{uuid}/envs", body=body)
         except CoolifyError as e:
@@ -532,7 +551,23 @@ class CoolifyClient:
                 return self._patch(f"/api/v1/applications/{uuid}/envs", body=body)
             raise
 
+    def delete_env_var(self, uuid: str, key: str) -> int:
+        """Delete every environment variable named *key* (preview copies too).
+
+        Returns how many were deleted.
+        """
+        deleted = 0
+        for env in self.get_env_vars(uuid):
+            if env.get("key") == key and env.get("uuid"):
+                self._delete(f"/api/v1/applications/{uuid}/envs/{env['uuid']}")
+                deleted += 1
+        return deleted
+
     # ── Application management ────────────────────────────────────────
+
+    def get_app_raw(self, uuid: str) -> dict:
+        """The application as the API returns it (every field)."""
+        return self._get(f"/api/v1/applications/{uuid}")
 
     def create_app(
         self,

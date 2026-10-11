@@ -34,6 +34,11 @@ _BADGE_BASE_CSS = (
     "pointer-events:none; z-index:2;"
 )
 
+# Opt-in proportional pill (#55): sized on the IMAGE width (container query
+# units resolve against the media box, declared a size container).
+_BADGE_PROPORTIONAL_CSS = _BADGE_BASE_CSS.replace(
+    "padding:2px 8px; font-size:12px;", "padding:0.15em 0.6em; font-size:clamp(9px, 7cqw, 22px);")
+
 # margin declarations carrying an ``auto`` value (centering).  They must be
 # transferred from the media style onto the wrapper — an auto margin left on
 # the media alone stops centering once the media is boxed in a wrapper.
@@ -51,12 +56,21 @@ class MediaOverlay:
         overrides it in cascade order) — e.g. a project convention.
     :param aria_label: Accessible disclosure text (e.g. AI-transparency
         wording, art. 50 AI Act); emitted as ``aria-label`` when non-empty.
+    :param proportional: Size the badge on the image rather than the
+        viewport (#55): the media box becomes a size container and the
+        default pill uses ``clamp(9px, 7cqw, 22px)``, so a thumbnail and a
+        hero get proportionate badges; ``cqw`` also works in ``css``. Needs
+        a definite width (``st_image``'s default ``100%`` or an explicit
+        one): with ``width="auto"`` the box is left as is (a size container
+        cannot shrink-wrap its image) and ``cqw`` falls back to the viewport.
+        Off by default: output byte-identical to earlier versions.
     """
 
     text: str
     position: str = "bottom-right"
     css: str = ""
     aria_label: str = ""
+    proportional: bool = False
 
     def __post_init__(self):
         if self.position not in _POSITION_CSS:
@@ -74,7 +88,8 @@ def build_overlay_span(overlay: MediaOverlay) -> str:
     guarantees the badge never intercepts clicks (link wrapping stays fully
     functional).
     """
-    badge_css = f"position:absolute; {_POSITION_CSS[overlay.position]} {_BADGE_BASE_CSS}"
+    base = _BADGE_PROPORTIONAL_CSS if overlay.proportional else _BADGE_BASE_CSS
+    badge_css = f"position:absolute; {_POSITION_CSS[overlay.position]} {base}"
     if overlay.css:
         badge_css = f"{badge_css} {overlay.css}"
     aria_attr = (
@@ -122,6 +137,8 @@ def wrap_media_overlay(
             f"position:relative; display:inline-block; width:{box_width}; "
             f"max-width:100%; line-height:0;"
         )
+    if overlay.proportional and box_width not in ("auto", "fit-content"):
+        box_css = f"{box_css} container-type:inline-size;"
     return (
         f'<span class="stx-media-box" style="{box_css}">'
         f"{inner_html}{build_overlay_span(overlay)}</span>"

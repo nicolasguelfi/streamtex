@@ -13,6 +13,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   cells, `<horizontal>_<vertical>` (`left|center|right` × `top|middle|bottom`),
   each a flex column so vertical positioning works inside a cell; `center`
   = `center_middle`. Reachable as `Container.cells.*` and `s.cell_center`.
+- `MediaOverlay(proportional=True)` (#55): the badge is sized on the image,
+  not the viewport. The media box becomes a size container and the default
+  pill uses `clamp(9px, 7cqw, 22px)`; `cqw` also works in `css`. Measured in
+  Chromium at 1920 px: a 6vw thumbnail gets a 9 px badge, a 40vw hero 22 px.
+  Needs a definite width (`st_image`'s default `100%`); with `width="auto"`
+  the box is left shrink-wrapping. Off by default, byte-identical output.
 
 ## [0.7.44] — 2026-10-11 — Server-side login screen, access control, PDF load timeout
 

@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.44] — 2026-10-11 — Server-side login screen, access control, PDF load timeout
+
+A deployed project can now be protected by a login screen run by its own
+nginx (#104): one sign-in per browser for every tab, on both the app and
+its static export, with labelled passwords hashed on the author's machine.
+`stx deploy lock / unlock / passwd / auth-status` manage it, with the keypad
+and Coolify's HTTP Basic Authentication as two other modes (#10). Checked in
+a container built from the generated files. Rendering code is unchanged
+apart from the keypad's skip rule and the PDF panel's messages.
+
 ### Added
 
 - `streamtex.deploy.stx_auth`: the login service of the server-side login

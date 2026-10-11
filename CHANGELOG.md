@@ -33,6 +33,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   falling back to `.streamlit/config.toml` (#20, first part). Today both hold
   the same values, so exports do not change; a runtime light/dark toggle
   (the rest of #20) will only have to write the session.
+- Generated Dockerfile: projects whose code calls `st_tikz` get LaTeX
+  (`texlive-latex-base/-recommended/-extra`, `texlive-pictures`, `dvisvgm`,
+  `ghostscript`) so TikZ renders in the container instead of "LaTeX not
+  found" (#17, first part). Measured on Debian 13: without
+  `texlive-latex-extra`, `standalone.cls` is missing; the set adds about
+  540 MB, to those projects only. Checked by building an image and compiling
+  a TikZ picture to SVG inside it.
 
 ## [0.7.44] — 2026-10-11 — Server-side login screen, access control, PDF load timeout
 

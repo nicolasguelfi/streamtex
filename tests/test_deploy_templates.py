@@ -208,3 +208,35 @@ class TestEntrypointLogin:
         assert r.returncode == 0, r.stderr
         assert len(_read(tmp_path / "runs").split()) >= 2
         assert "stx_auth stopped (exit 137), restarting" in r.stderr
+
+
+# ---------------------------------------------------------------------------
+# #17: LaTeX in the image only for projects that use st_tikz
+# ---------------------------------------------------------------------------
+
+
+def _tikz_condition() -> str:
+    d = generate_dockerfile()
+    line = next(ln for ln in d.splitlines() if "st_tikz" in ln and ln.startswith("RUN if grep"))
+    return line[len("RUN if "):line.index("; then")].strip()
+
+
+@pytest.mark.parametrize("files,expected", [
+    ({"blocks/bck_diagram.py": "stx.st_tikz(r'\\draw (0,0) -- (1,1);')"}, True),
+    ({"book.py": "import streamtex as stx\n", ".venv/lib/streamtex/tikz.py": "def st_tikz(): ..."}, False),
+    ({"notes/readme.md": "st_tikz is nice"}, False),
+])
+def test_dockerfile_installs_latex_only_for_tikz_projects(tmp_path, files, expected):
+    for rel, text in files.items():
+        p = tmp_path / rel
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(text)
+    r = subprocess.run(["bash", "-c", _tikz_condition()], cwd=tmp_path)
+    assert (r.returncode == 0) is expected
+
+
+def test_dockerfile_latex_packages_measured():
+    d = generate_dockerfile()
+    # standalone.cls lives in texlive-latex-extra: without it latex stops (measured on Debian 13)
+    for pkg in ("texlive-latex-extra", "texlive-pictures", "dvisvgm", "ghostscript"):
+        assert pkg in d

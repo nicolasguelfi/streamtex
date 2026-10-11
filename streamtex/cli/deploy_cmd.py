@@ -113,6 +113,16 @@ sys.exit(1) if i < r else sys.exit(0)" || \\
 # Copy project files
 COPY . .
 
+# LaTeX for st_tikz (latex -> dvisvgm), only when the project's code uses it
+# (#17): about 540 MB. The image's own .venv also mentions st_tikz, hence
+# --exclude-dir.
+RUN if grep -rqs --include='*.py' --exclude-dir=.venv "st_tikz" . ; then \\
+        apt-get update && apt-get install -y --no-install-recommends \\
+            texlive-latex-base texlive-latex-recommended texlive-latex-extra \\
+            texlive-pictures dvisvgm ghostscript \\
+        && rm -rf /var/lib/apt/lists/* ; \\
+    fi
+
 # Install any [[packs]] type="local" declared in stx.toml with a relative path.
 # Absolute paths are skipped — handle them upstream via `stx deploy preflight`
 # or by promoting the pack to git (`stx component promote`).

@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.45] — 2026-10-11 — Zoom for PDF and HTML exports, grid cell alignments, named sizes
+
+Screen, HTML export and PDF export can each be zoomed by hand (#110): a
+PDF "Zoom (%)" that shrinks everything, `vw`/`vh` included, and multiplies
+with the view zoom; a "Zoom HTML (%)" for the exported file; the full
+document now follows the current view. Measured on real PDFs. Also grid
+cell alignment presets (#22), image-proportional badges (#55), the image
+editor zoom fix (#18), LaTeX in the image for TikZ projects (#17) and named
+sizes whose Python docs now match what the CSS shows (#6).
+
 ### Added
 
 - `CellAlignments` (#22): nine content-alignment presets for `st_grid`

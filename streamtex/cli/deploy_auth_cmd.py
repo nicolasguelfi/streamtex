@@ -296,6 +296,15 @@ class StxPasswordMode(AuthMode):
 
 
 class BasicMode(AuthMode):
+    """Coolify's HTTP Basic Authentication.
+
+    Coolify's OpenAPI lists these fields only for creation, but its PATCH
+    accepts them (Coolify 4.0.0-beta.468, tried 2026-10-11). Turning it off
+    sends only ``is_http_basic_auth_enabled=false``: Coolify refuses an empty
+    user name or password, so the stored pair stays, inactive. The result is
+    read back, in case another Coolify ignores the change.
+    """
+
     name = "basic"
     level = "proxy"
     summary = "Coolify's HTTP Basic Authentication (browser pop-up, one user)"

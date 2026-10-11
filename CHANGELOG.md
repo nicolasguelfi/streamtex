@@ -59,10 +59,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     file.
   - `stx-password`: the keypad (`STX_PASSWORD`), prompted, never on the
     command line unless given.
-  - `basic`: Coolify's HTTP Basic Authentication. Coolify's API documents
-    these fields only at creation; the command checks that the change took
-    effect and otherwise says to use the dashboard. Not yet tried against a
-    live Coolify.
+  - `basic`: Coolify's HTTP Basic Authentication. Coolify's OpenAPI lists
+    these fields only at creation, but its PATCH accepts them: tried on
+    Coolify 4.0.0-beta.468 (one application, without restart, then turned
+    off). The command reads the result back and, if a Coolify ignores the
+    change, says to use the dashboard. `unlock` only turns it off: Coolify
+    refuses an empty user name or password, so the pair stays stored,
+    inactive.
   Each change restarts the application (and its replicas) unless
   `--no-restart`. `auth-status` lists every mode, labels and end dates,
   never a secret. `unlock` turns off all modes, or those given.

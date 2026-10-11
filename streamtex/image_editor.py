@@ -473,17 +473,17 @@ def _load_display_from_metadata(name: str, prefix: str) -> None:
     """Load persisted display settings from metadata JSON into session_state.
 
     Called once per session — if session_state already has values, skip.
+    A load that fails is retried on the next run (#18): the flag is set
+    only once the metadata was read, or found absent.
     """
     init_key = f"{prefix}_initialized"
     if st.session_state.get(init_key):
         return
-    st.session_state[init_key] = True
 
     try:
         from .ai.history import get_current_metadata
         meta = get_current_metadata(name)
         if meta:
-            # logger.warning("[DIAG:LOAD] '%s' zoom=%s width=%s", name, meta.display_zoom, meta.display_width)
             if meta.display_zoom is not None:
                 st.session_state.setdefault(f"{prefix}_zoom", meta.display_zoom)
             if meta.display_width is not None:
@@ -492,12 +492,11 @@ def _load_display_from_metadata(name: str, prefix: str) -> None:
                 st.session_state.setdefault(f"{prefix}_height", meta.display_height)
             if meta.display_keep_ratio is not None:
                 st.session_state.setdefault(f"{prefix}_keep_ratio", meta.display_keep_ratio)
+        st.session_state[init_key] = True
     except Exception:
-        # Best-effort load: if no metadata file exists yet, or it is unreadable,
-        # the image renders with its default display settings (no zoom/width
-        # restoration). Not surfaced to the user — saved settings are an
-        # enhancement, not a correctness requirement.
-        pass
+        # Best-effort load: the image renders with its default display
+        # settings this run, and the load is tried again on the next one.
+        logger.debug("Display settings of '%s' not loaded; will retry", name, exc_info=True)
 
 
 def _persist_display_to_metadata(name: str, prefix: str) -> None:
@@ -508,11 +507,11 @@ def _persist_display_to_metadata(name: str, prefix: str) -> None:
 
         current = get_current(name)
         if not current:
-            logger.warning("[DIAG:PERSIST] '%s' get_current() returned None — cannot persist zoom", name)
+            logger.warning("Display settings of '%s' not saved: no current image", name)
             return
         meta = get_current_metadata(name)
         if not meta:
-            logger.warning("[DIAG:PERSIST] '%s' get_current_metadata() returned None — cannot persist zoom", name)
+            logger.warning("Display settings of '%s' not saved: no metadata", name)
             return
 
         meta.display_zoom = st.session_state.get(f"{prefix}_zoom")
@@ -521,9 +520,8 @@ def _persist_display_to_metadata(name: str, prefix: str) -> None:
         meta.display_keep_ratio = st.session_state.get(f"{prefix}_keep_ratio", True)
         json_path = metadata_path_for(current)
         save_metadata(meta, json_path)
-        logger.warning("[DIAG:PERSIST] '%s' saved display_zoom=%s to %s", name, meta.display_zoom, json_path)
     except Exception:
-        logger.warning("[DIAG:PERSIST] '%s' EXCEPTION in _persist_display_to_metadata", name, exc_info=True)
+        logger.warning("Display settings of '%s' not saved", name, exc_info=True)
 
 
 def _render_display_tab(*, name, width, height, key_base):

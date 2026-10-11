@@ -273,3 +273,49 @@ class TestProviderModels:
         from streamtex.ai.providers.registry import get_available_models
 
         assert get_available_models("unknown") == []
+
+
+# ---------------------------------------------------------------------------
+# #18: the display zoom survives a new version and a failed first load
+# ---------------------------------------------------------------------------
+
+
+def test_new_version_keeps_display_settings(managed_dir, sample_image):
+    from streamtex.ai.metadata import metadata_path_for, save_metadata
+
+    current = save_version("hero", sample_image, managed_dir=managed_dir)
+    meta = get_current_metadata("hero", managed_dir=managed_dir)
+    meta.display_zoom, meta.display_width, meta.display_keep_ratio = 150, "60%", False
+    save_metadata(meta, metadata_path_for(current))
+    save_version("hero", sample_image, managed_dir=managed_dir, source_type="ai_generated", prompt="new")
+    meta2 = get_current_metadata("hero", managed_dir=managed_dir)
+    assert meta2.version == 2
+    assert (meta2.display_zoom, meta2.display_width, meta2.display_keep_ratio) == (150, "60%", False)
+
+
+def test_failed_display_load_is_retried(monkeypatch):
+    from types import SimpleNamespace
+    from unittest.mock import MagicMock
+
+    import streamtex.ai.history as history
+    from streamtex import image_editor
+
+    fake_st = MagicMock()
+    fake_st.session_state = {}
+    monkeypatch.setattr(image_editor, "st", fake_st)
+    calls = {"n": 0}
+
+    def flaky(name):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise OSError("metadata not readable yet")
+        return SimpleNamespace(display_zoom=140, display_width=None, display_height=None,
+                               display_keep_ratio=True)
+
+    monkeypatch.setattr(history, "get_current_metadata", flaky)
+    image_editor._load_display_from_metadata("hero", "p")
+    assert "p_zoom" not in fake_st.session_state and not fake_st.session_state.get("p_initialized")
+    image_editor._load_display_from_metadata("hero", "p")
+    assert fake_st.session_state["p_zoom"] == 140 and fake_st.session_state["p_initialized"]
+    image_editor._load_display_from_metadata("hero", "p")
+    assert calls["n"] == 2  # loaded once, then skipped

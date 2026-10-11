@@ -111,6 +111,13 @@ def save_version(
         base_image=base_image,
         revised_prompt=revised_prompt,
     )
+    if existing_meta:
+        # The display settings belong to the slot, not to one image: a new
+        # version keeps the author's zoom and size (#18).
+        meta.display_zoom = existing_meta.display_zoom
+        meta.display_width = existing_meta.display_width
+        meta.display_height = existing_meta.display_height
+        meta.display_keep_ratio = existing_meta.display_keep_ratio
     save_metadata(meta, current_json)
 
     return current

@@ -20,6 +20,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Needs a definite width (`st_image`'s default `100%`); with `width="auto"`
   the box is left shrink-wrapping. Off by default, byte-identical output.
 
+### Fixed
+
+- Image editor: the display zoom and size survive a new image version and a
+  failed first load (#18). `save_version()` now carries the slot's
+  `display_*` settings into the new metadata (a regeneration reset the
+  zoom), and the editor retries a load that failed instead of marking it
+  done. The `[DIAG:…]` warning lines left by 0.6.8 are gone (one fired on
+  every save).
+
 ## [0.7.44] — 2026-10-11 — Server-side login screen, access control, PDF load timeout
 
 A deployed project can now be protected by a login screen run by its own

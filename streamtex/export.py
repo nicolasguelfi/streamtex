@@ -465,8 +465,12 @@ class HtmlExportBuffer:
         body = self.get_body_html()
         css = _load_default_css()
         c = self.config
-        bg = c.theme_bg or _get_theme_color("theme.backgroundColor", "#fff")
-        text = c.theme_text or _get_theme_color("theme.textColor", "#333")
+        # ExportConfig > the session's theme (kept by st_book, as the PDF
+        # uses it; a runtime light/dark toggle will write there, #20) > config.
+        bg = (c.theme_bg or _session_theme_color("_stx_theme_bg")
+              or _get_theme_color("theme.backgroundColor", "#fff"))
+        text = (c.theme_text or _session_theme_color("_stx_theme_text")
+                or _get_theme_color("theme.textColor", "#333"))
         link = c.theme_primary or _get_theme_color("theme.primaryColor", "#1155cc")
         zoom_css = f"  zoom: {c.zoom};\n" if c.zoom != 1.0 else ""
         return (
@@ -550,6 +554,15 @@ def _escape_lang(lang: str | None) -> str:
     if isinstance(lang, str) and re.fullmatch(r"[A-Za-z]{2,8}(-[A-Za-z0-9]{1,8})*", lang):
         return lang
     return "en"
+
+
+def _session_theme_color(key: str) -> str | None:
+    """A theme colour ``st_book`` keeps in session state, or None (no session)."""
+    try:
+        value = st.session_state.get(key)
+    except Exception:  # noqa: BLE001 — outside a Streamlit session
+        return None
+    return value if isinstance(value, str) and value else None
 
 
 def _get_theme_color(option: str, fallback: str) -> str:

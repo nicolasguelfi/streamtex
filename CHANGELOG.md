@@ -28,6 +28,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   zoom), and the editor retries a load that failed instead of marking it
   done. The `[DIAG:…]` warning lines left by 0.6.8 are gone (one fired on
   every save).
+- HTML export reads the theme colours `st_book` keeps in session state
+  (`_stx_theme_bg`, `_stx_theme_text`), as the PDF already did, before
+  falling back to `.streamlit/config.toml` (#20, first part). Today both hold
+  the same values, so exports do not change; a runtime light/dark toggle
+  (the rest of #20) will only have to write the session.
 
 ## [0.7.44] — 2026-10-11 — Server-side login screen, access control, PDF load timeout
 

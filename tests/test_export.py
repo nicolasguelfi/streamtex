@@ -76,6 +76,40 @@ class TestThemeInExport:
         # Without override, falls back to _get_theme_color defaults
         assert "background:" in html
 
+    def test_session_theme_used_when_no_override(self, monkeypatch):
+        """#20: the theme st_book keeps in session (a toggle will write there) reaches the export."""
+        import streamtex.export as export_mod
+
+        class _St:
+            session_state = {"_stx_theme_bg": "#101010", "_stx_theme_text": "#eeeeee"}
+
+            @staticmethod
+            def get_option(name):
+                return None
+
+        monkeypatch.setattr(export_mod, "st", _St)
+        html = HtmlExportBuffer(ExportConfig(enabled=True)).generate_full_html()
+        assert "background: #101010" in html and "color: #eeeeee" in html
+        # An explicit ExportConfig colour still wins.
+        html = HtmlExportBuffer(ExportConfig(enabled=True, theme_bg="#abcdef")).generate_full_html()
+        assert "background: #abcdef" in html and "color: #eeeeee" in html
+
+    def test_no_session_falls_back_to_config(self, monkeypatch):
+        import streamtex.export as export_mod
+
+        class _NoSession:
+            @property
+            def session_state(self):
+                raise RuntimeError("no Streamlit session")
+
+            @staticmethod
+            def get_option(name):
+                return {"theme.backgroundColor": "#222222", "theme.textColor": "#dddddd"}.get(name)
+
+        monkeypatch.setattr(export_mod, "st", _NoSession())
+        html = HtmlExportBuffer(ExportConfig(enabled=True)).generate_full_html()
+        assert "background: #222222" in html and "color: #dddddd" in html
+
     def test_primary_color_override(self):
         cfg = ExportConfig(enabled=True, theme_primary="#4da6ff")
         buf = HtmlExportBuffer(cfg)

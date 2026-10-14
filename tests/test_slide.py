@@ -2,6 +2,7 @@
 
 from unittest.mock import MagicMock, patch
 
+from streamtex.marker import MarkerRoles
 from streamtex.slide import (
     _BREAK_AFTER_KEY,
     _BREAK_BEFORE_KEY,
@@ -206,7 +207,8 @@ class TestStSlideBreak:
             st_slide_break()
             mock_marker.assert_called_once()
             _, kwargs = mock_marker.call_args
-            assert kwargs.get("hidden") is True
+            assert kwargs.get("roles") == MarkerRoles.HIDDEN
+            assert kwargs.get("_origin") == "break"
 
     def test_no_marker_when_disabled(self):
         cfg = SlideBreakConfig(marker=False)
@@ -220,20 +222,20 @@ class TestStSlideBreak:
         with patch("streamtex.slide._render"), \
              patch("streamtex.slide.st_marker") as mock_marker:
             st_slide_break(marker_label="Visible", config=cfg)
-            mock_marker.assert_called_once_with("Visible", hidden=False)
+            mock_marker.assert_called_once_with("Visible", roles=MarkerRoles.NAMED, _origin="break")
 
     def test_marker_hidden_per_call_override(self):
         cfg = SlideBreakConfig(marker_hidden=True)
         with patch("streamtex.slide._render"), \
              patch("streamtex.slide.st_marker") as mock_marker:
             st_slide_break(marker_label="Override", config=cfg, marker_hidden=False)
-            mock_marker.assert_called_once_with("Override", hidden=False)
+            mock_marker.assert_called_once_with("Override", roles=MarkerRoles.NAMED, _origin="break")
 
     def test_marker_hidden_default_is_true(self):
         with patch("streamtex.slide._render"), \
              patch("streamtex.slide.st_marker") as mock_marker:
             st_slide_break(marker_label="Default")
-            mock_marker.assert_called_once_with("Default", hidden=True)
+            mock_marker.assert_called_once_with("Default", roles=MarkerRoles.HIDDEN, _origin="break")
 
     def test_custom_config_applies(self):
         cfg = SlideBreakConfig(
@@ -273,7 +275,7 @@ class TestStSlideBreak:
         with patch("streamtex.slide._render"), \
              patch("streamtex.slide.st_marker") as mock_marker:
             st_slide_break(marker_label="Section 2")
-            mock_marker.assert_called_once_with("Section 2", hidden=True)
+            mock_marker.assert_called_once_with("Section 2", roles=MarkerRoles.HIDDEN, _origin="break")
 
     def test_default_config_full_mode_renders_two_elements(self):
         with patch("streamtex.slide._render") as mock_render, \

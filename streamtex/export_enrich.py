@@ -11,6 +11,7 @@ import re
 from pathlib import Path
 
 from .export import _get_theme_color
+from .marker import _MARKER_ROLES_JS
 
 # Path to the cross-context scroll-spy script.  Same file is used by the
 # live runtime via :mod:`streamtex.marker_runtime`.  Loading at import
@@ -385,31 +386,21 @@ _MARKER_NAV_JS = """
 (function() {
   var markers = __MARKERS__;
   if (!markers.length) return;
-  // App parity (#45): keyboard/buttons walk the FULL marker list —
-  // st_marker(hidden=True) contract: absent from the popup, ALWAYS a
-  // navigation stop (marker.py navigateTo is the reference).  Only the
-  // popup filters on visibility.
-  var visible = markers.filter(function(m) { return !m.hidden; });
-  var currentIdx = 0;  // GLOBAL marker index, like the live app
-  // #97 (same as marker.py): the visible entry whose section contains idx,
-  // and the global numbers each popup row covers ("4–8").
-  function sectionVi(idx) {
-    var at = -1;
-    for (var v = 0; v < visible.length; v++) {
-      if (visible[v].index <= idx) at = v;
-    }
-    return (at < 0 && visible.length) ? 0 : at;
-  }
-  function rowRange(vi) {
-    var start = vi === 0 ? 0 : visible[vi].index;
-    var end = vi + 1 < visible.length ? visible[vi + 1].index - 1 : markers.length - 1;
-    return start >= end ? String(start + 1) : (start + 1) + '\u2013' + (end + 1);
-  }
-
+  // App parity (#45, #116): the same role code as the live widget
+  // (marker._MARKER_ROLES_JS): keys and buttons walk the stops, the popup
+  // lists the listed markers, currentIdx is a POSITION in markers.
+  var currentIdx = 0;
+__ROLES_JS__
   // --- Scroll to marker ---
   function scrollTo(anchor) {
     var el = document.getElementById(anchor);
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  // One document: past the first/last stop, stay.
+  function stepBy(delta) {
+    var target = stepTarget(currentIdx, delta);
+    if (target !== null) navigateTo(target);
   }
 
   function navigateTo(idx) {
@@ -427,7 +418,7 @@ _MARKER_NAV_JS = """
   var prevBtn = document.createElement('button');
   prevBtn.textContent = '\\u25C0';
   prevBtn.title = 'Previous (PageUp)';
-  prevBtn.onclick = function() { navigateTo(currentIdx - 1); };
+  prevBtn.onclick = function() { stepBy(-1); };
 
   var counter = document.createElement('span');
   counter.className = 'stx-mn-counter';
@@ -436,7 +427,7 @@ _MARKER_NAV_JS = """
   var nextBtn = document.createElement('button');
   nextBtn.textContent = '\\u25B6';
   nextBtn.title = 'Next (PageDown)';
-  nextBtn.onclick = function() { navigateTo(currentIdx + 1); };
+  nextBtn.onclick = function() { stepBy(1); };
 
   var label = document.createElement('span');
   label.className = 'stx-mn-label';
@@ -444,19 +435,19 @@ _MARKER_NAV_JS = """
   // --- Popup list ---
   var popup = document.createElement('div');
   popup.className = 'stx-mn-popup';
-  for (var i = 0; i < visible.length; i++) {
+  for (var i = 0; i < listedMarkers.length; i++) {
     (function(globalIdx, vi) {
       var row = document.createElement('div');
       row.className = 'stx-mn-popup-item';
-      row.textContent = rowRange(vi) + '. ' + visible[vi].label;
+      row.textContent = rowText(vi);
       row.onclick = function() { navigateTo(globalIdx); popup.style.display = 'none'; };
       popup.appendChild(row);
-    })(visible[i].index, i);
+    })(listedMarkers[i].index, i);
   }
 
   counter.onclick = function(e) {
     e.stopPropagation();
-    if (!visible.length) return;  // all-hidden deck: no empty popup
+    if (!listedMarkers.length) return;  // nothing listed: no empty popup
     // The CSS default is display:none while the INLINE style starts
     // empty — comparing to 'none' made the first click a no-op (it
     // "closed" an already-closed popup).  Compare to 'block' instead.
@@ -477,19 +468,8 @@ _MARKER_NAV_JS = """
   });
 
   // --- UI update ---
-  // A hidden marker without a label of its own shows its section (#97)
-  function currentLabel() {
-    var m = markers[currentIdx];
-    if (!m) return '';
-    if (m.hidden && m.auto) {
-      var sv = sectionVi(currentIdx);
-      return sv >= 0 ? visible[sv].label : '';
-    }
-    return m.label;
-  }
-
   function updateUI() {
-    counter.textContent = (currentIdx + 1) + ' / ' + markers.length;
+    counter.textContent = stopNumber() + ' / ' + stops.length;
     label.textContent = currentLabel();
     highlightPopup();
     // The TOC sidebar active indicator is owned by the cross-context
@@ -500,8 +480,8 @@ _MARKER_NAV_JS = """
 
   function highlightPopup() {
     var items = popup.querySelectorAll('.stx-mn-popup-item');
-    // Active row = the visible entry whose section contains the current
-    // marker, hidden or not (same as the live app, #97).
+    // Active row = the listed entry whose section contains the current
+    // position, listed or not (same as the live app, #97).
     var activeVi = sectionVi(currentIdx);
     for (var j = 0; j < items.length; j++) {
       items[j].classList.toggle('stx-mn-active', j === activeVi);
@@ -515,9 +495,9 @@ _MARKER_NAV_JS = """
     var tag = (e.target.tagName || '').toLowerCase();
     if (tag === 'input' || tag === 'textarea') return;
     if (e.key === 'PageDown' || e.key === 'ArrowRight' || e.key === 'ArrowDown') {
-      e.preventDefault(); navigateTo(currentIdx + 1);
+      e.preventDefault(); stepBy(1);
     } else if (e.key === 'PageUp' || e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
-      e.preventDefault(); navigateTo(currentIdx - 1);
+      e.preventDefault(); stepBy(-1);
     } else if (e.key === 'Escape') {
       popup.style.display = 'none';
     }
@@ -554,8 +534,9 @@ _MARKER_NAV_JS = """
   // --- Init ---
   updateUI();
 
-  // Deep-link hook (see _DEEPLINK_JS): select the bar entry for a GLOBAL
-  // marker index without scrolling (the caller already scrolled).
+  // Deep-link hook (see _DEEPLINK_JS): set the position to a marker (stop
+  // or not) without scrolling (the caller already scrolled); the counter
+  // then shows the stop of its slide.
   window.__stxMarkerNavigateTo = function(globalIdx) {
     if (globalIdx >= 0 && globalIdx < markers.length) {
       currentIdx = globalIdx;
@@ -593,6 +574,8 @@ _DEEPLINK_JS = r"""
     var i;
     for (i = 0; i < markers.length; i++) if (markers[i].key && markers[i].key === ref) return markers[i];
     for (i = 0; i < markers.length; i++) if (markers[i].anchor === ref) return markers[i];
+    // a TOC heading attached to a marker (#116): its anchor leads to that marker
+    for (i = 0; i < markers.length; i++) if (markers[i].toc_anchor === ref) return markers[i];
     var slug = slugOf(ref);
     for (i = 0; i < markers.length; i++) {
       if (markerSlug(markers[i]) === slug || slugOf(markers[i].label) === slug) return markers[i];
@@ -845,6 +828,13 @@ def _build_theme_vars_css() -> str:
     )
 
 
+def _marker_nav_script(markers: list[dict]) -> str:
+    """The export marker bar script for *markers* (all entries, with roles)."""
+    return (_MARKER_NAV_JS
+            .replace("__ROLES_JS__", _MARKER_ROLES_JS)
+            .replace("__MARKERS__", json.dumps(markers, ensure_ascii=False)))
+
+
 def enrich_export_html(
     raw_html: str,
     toc: list[dict] | None = None,
@@ -934,9 +924,7 @@ def enrich_export_html(
 
     # --- Build JS block ---
     if has_markers:
-        marker_js = _MARKER_NAV_JS.replace(
-            "__MARKERS__", json.dumps(markers, ensure_ascii=False)
-        )
+        marker_js = _marker_nav_script(markers)
         extra_js_parts.append(marker_js)
     if has_markers or has_toc:
         _toc_pages = [

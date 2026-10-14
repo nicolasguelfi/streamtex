@@ -42,7 +42,8 @@ def find_marker(markers: Sequence[Mapping[str, Any]], ref: str) -> Optional[Mapp
     """Return the first marker entry matching *ref*, or ``None``.
 
     Match order: explicit ``key`` (language-independent, set by
-    ``st_marker(key=...)``), exact anchor, then the slug of the label —
+    ``st_marker(key=...)``), exact anchor, the anchor of the TOC heading
+    attached to the marker (#116), then the slug of the label —
     either as the ``stx-marker-<slug>-<idx>`` anchor prefix or as the slug
     of the label itself (auto markers bridged from TOC headings).
     """
@@ -54,6 +55,10 @@ def find_marker(markers: Sequence[Mapping[str, Any]], ref: str) -> Optional[Mapp
             return m
     for m in markers:
         if m.get("anchor") == ref:
+            return m
+    for m in markers:
+        # a TOC heading attached to a marker (#116): its anchor leads there
+        if m.get("toc_anchor") == ref:
             return m
     slug = TOCRegistry.get_key_anchor(ref)
     if not slug:

@@ -1,10 +1,9 @@
-"""Nav widget: section label of hidden markers and popup ranges (#97).
+"""Nav widget: section label of unlisted markers and popup ranges (#97, #116).
 
-The functions are run with node, extracted from the live widget
-(marker.py) and from the HTML export nav (export_enrich.py)."""
+The role code shared by the live widget (marker.py) and the HTML export
+nav (export_enrich.py) is run with node."""
 
 import json
-import re
 import shutil
 import subprocess
 
@@ -37,46 +36,38 @@ def _deck():
     return m
 
 
-def _functions(js: str, names, visible_var: str) -> str:
-    out = []
-    for n in names:
-        # from "function name(" to the closing brace at the same indentation
-        mt = re.search(r"^([ \t]*)function " + n + r"\(.*?\n\1\}\n", js, re.S | re.M)
-        assert mt, n
-        out.append(mt.group(0))
-    return "\n".join(out).replace("\\\\u2013", "\\u2013")
-
-
-def _run(js_funcs: str, visible_var: str, markers, body: str):
-    prog = (f"var markers = {json.dumps(markers)};\n"
-            f"var {visible_var} = markers.filter(function(m) {{ return !m.hidden; }});\n"
-            f"var currentIdx = 0;\n{js_funcs}\n{body}")
+def _run(markers, body: str):
+    """Run *body* with node after the shared role code (#116)."""
+    prog = (f"var markers = {json.dumps(markers)};\nvar currentIdx = 0;\n"
+            f"{mk._MARKER_ROLES_JS}\n{body}")
     r = subprocess.run(["node", "-e", prog], capture_output=True, text=True)
     assert r.returncode == 0, r.stderr
     return json.loads(r.stdout)
 
 
-def _source_of_widget():
-    import inspect
-    src = inspect.getsource(mk)
-    start = src.index("var visibleMarkers = markers.filter")
-    return src[start:]
+def _source(which: str) -> str:
+    if which == "export":
+        from streamtex.export_enrich import _marker_nav_script
+        return _marker_nav_script([{"index": 0, "label": "A", "anchor": "a0"}])
+    from unittest.mock import patch
+    mk.reset_marker_registry(mk.MarkerConfig())
+    mk._registry.reset()
+    mk.register_marker("A", "a0")
+    with patch("streamtex.marker.st.iframe") as frame:
+        mk.inject_marker_navigation()
+    return frame.call_args[0][0]
 
 
 @pytest.mark.parametrize("which", ["live", "export"])
 def test_labels_and_ranges(which):
-    if which == "live":
-        js, vis = _source_of_widget(), "visibleMarkers"
-    else:
-        from streamtex.export_enrich import _MARKER_NAV_JS as js
-        vis = "visible"
-    funcs = _functions(js, ["sectionVi", "rowRange", "currentLabel"], vis)
-    body = (f"var labels = []; for (var i = 0; i < markers.length; i++) "
-            f"{{ currentIdx = i; labels.push(currentLabel()); }}\n"
-            f"var ranges = []; for (var v = 0; v < {vis}.length; v++) ranges.push(rowRange(v));\n"
-            f"var active = []; for (var i = 0; i < markers.length; i++) active.push(sectionVi(i));\n"
-            f"console.log(JSON.stringify({{labels: labels, ranges: ranges, active: active}}));")
-    out = _run(funcs, vis, _deck(), body)
+    # both widgets run the one role code
+    assert mk._MARKER_ROLES_JS in _source(which)
+    body = ("var labels = []; for (var i = 0; i < markers.length; i++) "
+            "{ currentIdx = i; labels.push(currentLabel()); }\n"
+            "var ranges = []; for (var v = 0; v < listedMarkers.length; v++) ranges.push(rowRange(v));\n"
+            "var active = []; for (var i = 0; i < markers.length; i++) active.push(sectionVi(i));\n"
+            "console.log(JSON.stringify({labels: labels, ranges: ranges, active: active}));")
+    out = _run(_deck(), body)
     assert out["labels"] == ["Intro", "Intro", "Intro", "Section B", "Section B", "Section B",
                              "Named hidden", "Section B", "Section C", "Section C"]
     assert out["ranges"] == ["1–3", "4–8", "9–10"]
@@ -84,12 +75,9 @@ def test_labels_and_ranges(which):
 
 
 def test_hidden_stops_before_first_title_take_the_first_title():
-    from streamtex.export_enrich import _MARKER_NAV_JS as js
-    funcs = _functions(js, ["sectionVi", "rowRange", "currentLabel"], "visible")
     deck = [{"index": 0, "label": "Marker 1", "anchor": "a0", "hidden": True, "auto": True},
             {"index": 1, "label": "Only", "anchor": "a1", "hidden": False}]
-    out = _run(funcs, "visible", deck,
-               "currentIdx = 0; console.log(JSON.stringify([currentLabel(), rowRange(0)]));")
+    out = _run(deck, "currentIdx = 0; console.log(JSON.stringify([currentLabel(), rowRange(0)]));")
     assert out == ["Only", "1–2"]
 
 

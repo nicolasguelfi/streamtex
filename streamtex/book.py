@@ -30,7 +30,17 @@ from .export import (
     set_cache_building,
 )
 from .loading import inject_loading_overlay, remove_loading_overlay, update_loading_progress
-from .marker import MarkerConfig, inject_marker_navigation, marker_count, marker_entries, reset_marker_registry
+from .marker import (
+    MarkerConfig,
+    inject_marker_navigation,
+    is_listed,
+    is_stop,
+    marker_entries,
+    marker_slide_boundary,
+    normalize_marker_entries,
+    reset_marker_registry,
+    stop_count,
+)
 from .marker_runtime import inject_marker_runtime
 from .pdf_export import PdfConfig
 from .presentation import get_presentation_config, st_presentation_footer
@@ -1064,6 +1074,7 @@ def _st_book_impl(module_list, toc_config: TOCConfig = None, marker_config: Mark
         # Block-level horizontal CSS override (Phase 2)
         _inject_block_horizontal_css(_block_sp)
 
+        marker_slide_boundary()     # each entry opens a slide (#116 §4.6)
         try:
             st_include(module, *_block_args, _inspector_config=inspector, **_block_kwargs)
         finally:
@@ -1130,7 +1141,7 @@ def _st_book_impl(module_list, toc_config: TOCConfig = None, marker_config: Mark
     _pres_cfg = get_presentation_config()
     if _pres_cfg is not None and _pres_cfg.footer:
         if _pres_cfg.counter_mode == "slide":
-            _total = marker_count() or len(module_list)
+            _total = stop_count() or len(module_list)
         else:
             _total = len(module_list)
         st_presentation_footer(current_slide=1, total_slides=_total, config=_pres_cfg)
@@ -1217,11 +1228,25 @@ def build_ToC_sidebar_placeholder(has_markers=False, has_search=False):
             return toc_sidebar, None, search_js_placeholder
 
 
+def _toc_dot_anchors(markers: list[dict]) -> set[str]:
+    """TOC anchors that carry the "●" dot: those linked to a stop (#116).
+
+    The same rule in continuous and paginated mode.
+    """
+    anchors = set()
+    for m in markers:
+        if is_stop(m):
+            anchors.add(m["anchor"])
+            if m.get("toc_anchor"):
+                anchors.add(m["toc_anchor"])
+    return anchors
+
+
 def populate_toc(toc_sidebar: Delta, toc_block: Delta = None, toc_content_style: Style = None,
                  block_index: dict[int, str] = None, search_js_placeholder=None,
                  max_level: int | None = None, toc_config: TOCConfig | None = None):
     toc_entry_list = toc_entries()
-    marker_anchors = {m['anchor'] for m in marker_entries()}
+    marker_anchors = _toc_dot_anchors(marker_entries())
     indent_char = "&nbsp;"
 
     with toc_sidebar.container():
@@ -1284,7 +1309,7 @@ def populate_toc(toc_sidebar: Delta, toc_block: Delta = None, toc_content_style:
 
 
 def populate_markers_sidebar(markers_placeholder: Delta, block_index: dict[int, str] = None):
-    entries = [e for e in marker_entries() if not e.get("hidden")]
+    entries = [e for e in marker_entries() if is_listed(e)]
     if not entries:
         return
     with markers_placeholder.container():
@@ -1530,6 +1555,8 @@ def _load_file_cache(cache_path: str, expected_hash: str) -> dict | None:
         si = data.get("search_index")
         if isinstance(si, dict):
             data["search_index"] = {int(k): v for k, v in si.items()}
+        # marker entries of an older library: give them their roles (#116)
+        normalize_marker_entries(data.get("markers") or [])
         logger.debug("Loaded page cache from %s", cache_path)
         return data
     except Exception:
@@ -1552,22 +1579,42 @@ def _save_file_cache(cache_path: str, cache: dict) -> None:
 def _get_page_titles(cache, total):
     """Extract page title for each page.
 
-    When markers are available, numbering is derived from the global marker
-    index (consistent with the sidebar Markers tab and the floating bar).
-    Falls back to TOC section numbers when no markers are configured.
+    When markers are available (#116): (1) the first listed marker of the
+    page, numbered by its global index; else (2) the label of the listed
+    marker whose row covers the page's first stop (a row begun on an earlier
+    page); else the page stays unnamed. Falls back to TOC section titles when
+    the module has no marker at all.
     """
     titles = [f"Section {i + 1}" for i in range(total)]
 
     # Prefer marker-based titles (matches sidebar Markers tab & floating bar)
     markers = cache.get("markers", [])
     if markers:
+        named = set()
         for entry in markers:
-            if entry.get("hidden"):
+            if not is_listed(entry):
                 continue
             marker_num = entry["index"] + 1
             idx = entry.get("page_idx", 0)
-            if idx < total and titles[idx].startswith("Section "):
+            if idx < total and idx not in named:
                 titles[idx] = f"{marker_num} {entry['label']}"
+                named.add(idx)
+        # (2) pages whose stops all continue a row begun earlier
+        first_stop = {}
+        for entry in markers:
+            if is_stop(entry):
+                first_stop.setdefault(entry.get("page_idx", 0), entry)
+        for idx, stop in first_stop.items():
+            if idx >= total or idx in named:
+                continue
+            row = None
+            for entry in markers:
+                if entry["index"] > stop["index"]:
+                    break
+                if is_listed(entry):
+                    row = entry
+            if row is not None:
+                titles[idx] = row["label"]
         return titles
 
     # Fallback: TOC titles (includes section number from register_entry)
@@ -1786,6 +1833,7 @@ def _build_page_cache(module_list, toc_config, marker_config, separator,
                 if _block_sp.top is not None:
                     st_space("v", _block_sp.top)
                 mark_block_top_injected()
+                marker_slide_boundary()     # each entry opens a slide (#116)
 
                 if _warmup_mode:
                     try:
@@ -1933,7 +1981,7 @@ def _build_paginated_sidebar(cache, current_page, total, toc_config, marker_conf
                 st.rerun()
 
         has_markers = (marker_config is not None
-                       and any(not e.get("hidden") for e in cache.get("markers", [])))
+                       and any(is_listed(e) for e in cache.get("markers", [])))
 
         if has_markers:
             tab_markers, tab_toc = st.tabs(["Markers", "Contents"])
@@ -1943,8 +1991,7 @@ def _build_paginated_sidebar(cache, current_page, total, toc_config, marker_conf
 
         # --- TOC ---
         cached_toc = cache.get("toc", [])
-        marker_anchors = {m["anchor"] for m in cache.get("markers", [])
-                          if not m.get("hidden")}
+        marker_anchors = _toc_dot_anchors(cache.get("markers", []))
         indent_char = "&nbsp;"
         effective_max_level = _resolve_sidebar_max_level(toc_config, paginated=True)
 
@@ -2000,7 +2047,7 @@ def _build_paginated_sidebar(cache, current_page, total, toc_config, marker_conf
             # first marker on the current page carries the active colour.
             marker_active_done = False
             for entry in cache.get("markers", []):
-                if entry.get("hidden"):
+                if not is_listed(entry):
                     continue
                 marker_num = entry["index"] + 1
                 page_idx = entry.get("page_idx", 0)
@@ -2210,7 +2257,7 @@ def _inject_paginated_nav_js(current_page, total, marker_config,
         if (navigating || currentPage <= 0) return;
         var pp = currentPage - 1;
         hostWin._stxMarkerStartIdx =
-            pageFirstMarker[pp] !== undefined ? pageFirstMarker[pp] : 0;
+            pageFirstMarker[pp] !== undefined ? pageFirstMarker[pp] : null;
         navigateToPage(pp);
     }
     function nextClick() {
@@ -2225,7 +2272,7 @@ def _inject_paginated_nav_js(current_page, total, marker_config,
             np = currentPage + 1;
         }
         hostWin._stxMarkerStartIdx =
-            pageFirstMarker[np] !== undefined ? pageFirstMarker[np] : 0;
+            pageFirstMarker[np] !== undefined ? pageFirstMarker[np] : null;
         navigateToPage(np);
     }
 
@@ -2289,7 +2336,7 @@ def _inject_paginated_nav_js(current_page, total, marker_config,
                     if (!bannerNextActive || navigating) return;
                     var np = currentPage >= lastNamedPage ? 0 : currentPage + 1;
                     hostWin._stxMarkerStartIdx =
-                        pageFirstMarker[np] !== undefined ? pageFirstMarker[np] : 0;
+                        pageFirstMarker[np] !== undefined ? pageFirstMarker[np] : null;
                     navigateToPage(np);
                 }, 400);
             }
@@ -2323,7 +2370,7 @@ def _inject_paginated_nav_js(current_page, total, marker_config,
                     if (navigating || !isAtTop()) return;
                     var pp = currentPage - 1;
                     hostWin._stxMarkerStartIdx =
-                        pageFirstMarker[pp] !== undefined ? pageFirstMarker[pp] : 0;
+                        pageFirstMarker[pp] !== undefined ? pageFirstMarker[pp] : null;
                     navigateToPage(pp);
                 }, 400);
             }
@@ -2377,7 +2424,7 @@ def _inject_paginated_nav_js(current_page, total, marker_config,
                 return;
             }
             hostWin._stxMarkerStartIdx =
-                pageFirstMarker[np] !== undefined ? pageFirstMarker[np] : 0;
+                pageFirstMarker[np] !== undefined ? pageFirstMarker[np] : null;
             navigateToPage(np);
         } else if (direction === 'prev') {
             var pp;
@@ -2387,7 +2434,7 @@ def _inject_paginated_nav_js(current_page, total, marker_config,
                 pp = lastNamedPage;  /* Loop back to last page */
             }
             hostWin._stxMarkerStartIdx =
-                pageLastMarker[pp] !== undefined ? pageLastMarker[pp] : -1;
+                pageLastMarker[pp] !== undefined ? pageLastMarker[pp] : null;
             navigateToPage(pp);
         }
     };
@@ -2412,7 +2459,7 @@ def _inject_paginated_nav_js(current_page, total, marker_config,
         hostWin._stxPendingPage = null;
         if (pend !== currentPage && pend >= 0 && pend < totalPages) {
             hostWin._stxMarkerStartIdx =
-                pageFirstMarker[pend] !== undefined ? pageFirstMarker[pend] : 0;
+                pageFirstMarker[pend] !== undefined ? pageFirstMarker[pend] : null;
             navigateToPage(pend);
         }
     }
@@ -2431,7 +2478,7 @@ def _inject_paginated_nav_js(current_page, total, marker_config,
         /* Set marker start index for the target page so the
            floating marker widget initialises on the right marker */
         hostWin._stxMarkerStartIdx =
-            pageFirstMarker[p] !== undefined ? pageFirstMarker[p] : 0;
+            pageFirstMarker[p] !== undefined ? pageFirstMarker[p] : null;
         navigateToPage(p);
     }
     hostDoc.addEventListener('click', linkClick, true);
@@ -2628,13 +2675,7 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
             for entry in cache["markers"]:
                 if entry.get("page_idx", 0) >= current_page:
                     break
-                registry._entries.append({
-                    "index": entry["index"],
-                    "label": entry["label"],
-                    "anchor": entry["anchor"],
-                    "hidden": entry.get("hidden", False),
-                    "page": entry.get("page_idx", 0),
-                })
+                registry._entries.append(dict(entry, page=entry.get("page_idx", 0)))
 
     # Pre-seed bibliography cited keys from cache so only_cited=True works
     if cache.get("cited_keys"):
@@ -2668,6 +2709,7 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
     mark_block_top_injected()
     _inject_block_horizontal_css(_pg_block_sp)
 
+    marker_slide_boundary()     # each entry opens a slide (#116)
     try:
         st_include(module_list[current_page], *block_args,
                    _inspector_config=inspector, **block_kwargs)
@@ -2739,19 +2781,13 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
             for entry in cache["markers"]:
                 if entry.get("page_idx", 0) <= current_page:
                     continue
-                registry._entries.append({
-                    "index": entry["index"],
-                    "label": entry["label"],
-                    "anchor": entry["anchor"],
-                    "hidden": entry.get("hidden", False),
-                    "page": entry.get("page_idx", 0),
-                })
+                registry._entries.append(dict(entry, page=entry.get("page_idx", 0)))
 
     # --- Presentation footer (auto-rendered when PresentationConfig is active) ---
     _pres_cfg = get_presentation_config()
     if _pres_cfg is not None and _pres_cfg.footer:
         if _pres_cfg.counter_mode == "slide":
-            _pres_total = marker_count() or total
+            _pres_total = stop_count() or total
         else:
             _pres_total = total
         st_presentation_footer(
@@ -2807,6 +2843,8 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
         page_first = {}
         page_last = {}
         for entry in cache["markers"]:
+            if not is_stop(entry):
+                continue
             pg = entry.get("page_idx", 0)
             if pg not in page_first:
                 page_first[pg] = entry["index"]

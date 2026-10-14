@@ -7,6 +7,65 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `MarkerRoles` (#116): every marker has three independent roles — **stop**
+  (the arrows, keys and the counter `n / N` stop here), **listed** (☰ popup,
+  Markers tab, paginated page titles) and **in TOC** (linked to a TOC entry).
+  All eight combinations are valid, e.g. a TOC entry that is a stop but not
+  listed, a list entry inside a scrolling slide that costs no arrow press, or
+  an anchor kept only for a deep link. Constants `MarkerRoles.NAMED`,
+  `.HIDDEN`, `.ANCHOR`; exported from `streamtex`.
+- `st_marker(..., stop=, listed=, toc_lvl=, roles=)`: `toc_lvl` registers a
+  TOC entry and the marker takes its anchor (no heading rendered). `hidden=`
+  stays as the shortcut for "stop, not listed". Contradictions raise
+  `ValueError`; `roles=` mixed with the keywords raises `TypeError`.
+- `st_write(..., marker=)` accepts a `MarkerRoles` (the heading's own marker
+  with exactly those roles, e.g. `MarkerRoles.HIDDEN`) and `"attach"` (link
+  the TOC entry to the marker that opens the slide, keeping its roles: one
+  stop per slide in a deck). `marker=` without `toc_lvl` now warns.
+- `st_slide_break(..., marker=)` and `SlideBreakConfig.marker` accept
+  `True`, `False` or a `MarkerRoles`.
+- `MarkerConfig.toc_marker_roles`: roles of the automatic heading markers,
+  one for all levels or a dict per level.
+- Registry entries carry `stop`, `listed`, `toc`, `toc_anchor`,
+  `toc_level`, `stop_index` and `origin`; `hidden` is derived (`stop and not
+  listed`) and kept for tools reading the page cache. Helpers `is_stop`,
+  `is_listed`, `stop_entries`, `stop_count`, `listed_entries`, `stop_of`.
+
+### Changed
+
+- Every surface reads the roles instead of `hidden`: arrows, keys, ◀ ▶ and
+  the counter walk the **stops**; the popup, the Markers tab and the page
+  titles show the **listed** markers; the TOC "●" dot marks entries linked to
+  a stop, with the same rule in continuous and paginated mode (they
+  differed). The live widget and the HTML export bar share one copy of this
+  code. Existing modules keep the same stops and the same marker list: all
+  markers of 0.7.45 are stops, so the counter does not change (measured on
+  10 projects, including the 142 slides of PROMPT4UL-slides: identical
+  registries).
+- An automatic heading stop (`auto_marker_on_toc`) added to a slide opened
+  by `st_slide_break` or `st_slide` that already has its stop raises a
+  warning saying what to write (`marker="attach"` or `marker=False`): the
+  book mixes heading stops (documents) with slide stops (decks). Nothing is
+  merged behind the author's back (measured: no warning on the 10 projects).
+- Paginated page titles: a page whose stops all continue a marker-list row
+  begun on an earlier page takes that row's label instead of staying
+  "Section N".
+- Page ↔ marker map of paginated books: first and last **stop** of each
+  page; a page with markers but no stop syncs on the nearest marker instead
+  of jumping to the first one.
+- The paginated pre-seed and post-seed copy every field of the cached
+  entries (`key` and `auto` were dropped). Older page caches are normalised
+  on load.
+- Deep links (`?marker=`, `#anchor`) also resolve the anchor of a TOC
+  heading attached to a marker.
+
+### Fixed
+
+- In `SlideBreakMode.HIDDEN` with `fullscreen=True`, the break marker
+  ignored `marker_hidden` (it was always unlisted).
+
 ## [0.7.45] — 2026-10-11 — Zoom for PDF and HTML exports, grid cell alignments, named sizes
 
 Screen, HTML export and PDF export can each be zoomed by hand (#110): a

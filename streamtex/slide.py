@@ -7,7 +7,7 @@ from typing import Optional
 import streamlit as st
 
 from .export import _render
-from .marker import st_marker
+from .marker import MarkerRoles, marker_slide_boundary, st_marker
 from .spacing import (
     Spacing,
     consume_block_top_injected,
@@ -80,12 +80,16 @@ class SlideBreakConfig:
     opacity: float = 0.5
     """Rule opacity from 0.0 (invisible) to 1.0 (fully opaque)."""
 
-    marker: bool = True
-    """Create a navigation marker so PageDown stops at this break."""
+    marker: bool | MarkerRoles = True
+    """The break's navigation marker. ``True`` = a stop, listed unless
+    ``marker_hidden``; ``False`` = no marker (the break still starts a new
+    slide); a ``MarkerRoles`` = exactly these roles (its ``toc_lvl`` needs a
+    ``marker_label``)."""
 
     marker_hidden: bool = True
-    """When True, the marker is hidden (counter only, not in popup).
-    When False, the marker is visible in the popup marker list."""
+    """Shortcut for the *listed* role when ``marker`` is ``True``: True = a
+    stop that is not listed (counter only, not in the popup), False = also
+    listed in the marker list."""
 
     fullscreen: bool = False
     """When True, force space='100vh' so each slide fills the viewport."""
@@ -281,6 +285,8 @@ def st_slide_break(
     spacing: Optional[Spacing] = None,
     zoom: Optional[int] = None,
     marker_hidden: Optional[bool] = None,
+    *,
+    marker: bool | MarkerRoles | None = None,
 ) -> None:
     """Presentation section break: styled rule + viewport spacer + marker.
 
@@ -302,12 +308,20 @@ def st_slide_break(
               percentage for all content until the next slide break.
               ``100`` = normal, ``75`` = 75%, ``150`` = 150%.
               When both *zoom* and *spacing.zoom* are set, *zoom* wins.
-        marker_hidden: Per-call override for marker visibility.  When
-              ``None`` (the default), uses ``config.marker_hidden``.
+        marker_hidden: Per-call override for the *listed* role of a
+              ``True`` marker.  When ``None`` (the default), uses
+              ``config.marker_hidden``.
+        marker: Per-call marker, wins over ``config.marker``: ``True``,
+              ``False`` (no marker) or a ``MarkerRoles`` (see
+              ``SlideBreakConfig.marker``).
+
+    Every call starts a new slide, with or without a marker (#116 §4.6).
     """
     from .space import st_space
 
     cfg, enabled = _effective_config(config)
+    marker_slide_boundary("break")
+    roles = _break_marker_roles(cfg, marker, marker_hidden)
 
     # Deactivate horizontal spacing and zoom from the previous section
     set_section_horizontal(None)
@@ -336,8 +350,8 @@ def st_slide_break(
 
     if not enabled or cfg.mode == SlideBreakMode.HIDDEN:
         # Even when hidden, fullscreen marker is still needed for navigation
-        if cfg.fullscreen and cfg.marker:
-            st_marker(marker_label, hidden=True)
+        if cfg.fullscreen and roles is not None:
+            st_marker(marker_label, roles=roles, _origin="break")
         # Still inject section.top after the break (even if visual is hidden)
         if not consume_block_top_injected() and effective_spacing.top is not None:
             st_space("v", effective_spacing.top)
@@ -367,9 +381,8 @@ def st_slide_break(
         _render(f'<hr class="stx-slide-break-rule" style="{rule_css}">')
     if show_spacer:
         _render(f'<div class="stx-slide-break-spacer" style="{spacer_css}"></div>')
-    if cfg.marker and cfg.mode != SlideBreakMode.HIDDEN:
-        _hidden = marker_hidden if marker_hidden is not None else cfg.marker_hidden
-        st_marker(marker_label, hidden=_hidden)
+    if roles is not None and cfg.mode != SlideBreakMode.HIDDEN:
+        st_marker(marker_label, roles=roles, _origin="break")
 
     # Inject section.top after the break visual (space before next section)
     # Skip if block.top was already injected for this block (first break)
@@ -378,6 +391,18 @@ def st_slide_break(
 
     # Activate section-level horizontal spacing for subsequent _render() calls
     _activate_section_horizontal(effective_spacing)
+
+
+def _break_marker_roles(cfg: SlideBreakConfig, marker: bool | MarkerRoles | None,
+                        marker_hidden: Optional[bool]) -> Optional[MarkerRoles]:
+    """The roles of a break's marker, ``None`` for no marker (#116 §4.4)."""
+    m = cfg.marker if marker is None else marker
+    if m is False:
+        return None
+    if isinstance(m, MarkerRoles):
+        return m
+    hidden = cfg.marker_hidden if marker_hidden is None else marker_hidden
+    return MarkerRoles(stop=True, listed=not hidden)
 
 
 # ---------------------------------------------------------------------------
@@ -474,7 +499,9 @@ def st_slide(cut: bool = False, style: Optional[_Style] = None):
     from .container import st_block
 
     if cut:
-        st_slide_break()
+        st_slide_break()        # a slide boundary itself
+    else:
+        marker_slide_boundary("slide")
     box = get_slide_container()
     with st_block(box + style if style is not None else box):
         yield

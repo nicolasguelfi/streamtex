@@ -4,7 +4,7 @@ import base64
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
+from typing import ClassVar, Optional
 
 import streamlit as st
 
@@ -21,6 +21,49 @@ if _LOGO_TINY_PATH.exists():
     _LOGO_B64 = base64.b64encode(_LOGO_TINY_PATH.read_bytes()).decode()
 
 
+@dataclass(frozen=True)
+class MarkerRoles:
+    """The three independent roles of a navigation marker (#116).
+
+    - ``stop``: the arrows, the next/prev keys and the counter ``n / N``
+      stop here;
+    - ``listed``: the marker appears in the marker list (☰ popup, sidebar
+      Markers tab, paginated page titles);
+    - ``toc_lvl``: the marker is linked to a table-of-contents entry at that
+      level (``"1"``, ``"2"``, ``"+1"``, ``"-1"`` … as ``st_write(toc_lvl=)``);
+      ``None`` = not in the TOC.
+
+    Whatever its roles, every marker keeps its DOM anchor and its deep link
+    (``?marker=<key-or-slug>``). The eight combinations are all valid::
+
+        MarkerRoles()                          # stop, listed  (st_marker("X"))
+        MarkerRoles.HIDDEN                     # stop, not listed (hidden=True)
+        MarkerRoles(stop=False)                # listed, no arrow press
+        MarkerRoles.ANCHOR                     # anchor + deep link only
+        MarkerRoles(listed=False, toc_lvl="2") # TOC entry, stop, not listed
+
+    Accepted by ``st_marker(roles=)``, ``st_write(marker=)`` (without
+    ``toc_lvl``: the heading decides the level), ``st_slide_break(marker=)``,
+    ``SlideBreakConfig.marker`` and ``MarkerConfig.toc_marker_roles``.
+    """
+
+    stop: bool = True
+    listed: bool = True
+    toc_lvl: str | None = None
+
+    NAMED: ClassVar["MarkerRoles"]
+    """Stop and listed: today's ``st_marker("X")``."""
+    HIDDEN: ClassVar["MarkerRoles"]
+    """Stop, not listed: ``st_marker(hidden=True)`` and the break markers."""
+    ANCHOR: ClassVar["MarkerRoles"]
+    """Neither a stop nor listed: an anchor and a deep link only."""
+
+
+MarkerRoles.NAMED = MarkerRoles(stop=True, listed=True)
+MarkerRoles.HIDDEN = MarkerRoles(stop=True, listed=False)
+MarkerRoles.ANCHOR = MarkerRoles(stop=False, listed=False)
+
+
 @dataclass
 class MarkerConfig:
     """Configuration for the marker navigation system.
@@ -34,7 +77,23 @@ class MarkerConfig:
 
     auto_marker_on_toc: int | bool = False
     """Bridge TOC headings to markers automatically.
-    True = all levels, int N = up to level N, False = disabled."""
+    True = all levels, int N = up to level N, False = disabled.
+    Decides *which levels* get a marker; ``toc_marker_roles`` decides its roles."""
+
+    toc_marker_roles: MarkerRoles | dict[int, MarkerRoles] = MarkerRoles.NAMED
+    """Roles of the markers created automatically from TOC headings
+    (``auto_marker_on_toc``). A dict maps a resolved TOC level to its roles
+    (missing levels: ``MarkerRoles.NAMED``). Example:
+    ``{1: MarkerRoles.NAMED, 2: MarkerRoles.HIDDEN}`` — level-1 headings
+    listed, level-2 headings stops but not listed. Any ``toc_lvl`` they carry
+    is ignored: the heading decides its level.
+
+    Automatic heading markers are for *documents*, where the headings give
+    the stops. In a *deck*, where each slide has its own stop (its break or
+    its marker), write ``auto_marker_on_toc=0`` and link a heading to its
+    slide with ``st_write(..., marker="attach")``: an automatic heading stop
+    in a slide opened by a break or ``st_slide`` that already has its stop
+    raises a warning saying so (#116)."""
 
     nav_position: str = "bottom-right"
     """Widget position: ``"bottom-right"`` or ``"bottom-center"``."""
@@ -74,35 +133,198 @@ class MarkerConfig:
     the first section of a block (reached by a page change, which resets
     the scroll to 0) is unaffected.  The asymmetry is the visible symptom."""
 
+    def roles_for_level(self, level: int) -> MarkerRoles:
+        """Roles of an automatic TOC marker at resolved *level*."""
+        roles = self.toc_marker_roles
+        if isinstance(roles, dict):
+            roles = roles.get(level, MarkerRoles.NAMED)
+        return roles
+
 
 class MarkerRegistry:
-    """Registry that collects markers during a book render pass."""
+    """Registry that collects markers during a book render pass.
+
+    Each entry carries its three roles (#116): ``stop``, ``listed`` and
+    ``toc`` (with ``toc_anchor`` / ``toc_level``), its ``stop_index`` (rank
+    among the stops, ``None`` for a non-stop), its ``origin`` (``"marker"``,
+    ``"break"`` or ``"toc"``) and ``hidden`` — derived, ``stop and not
+    listed``, kept for the tools that read it from the page cache.
+    """
 
     def __init__(self, config: MarkerConfig):
         self.config = config
         self._entries: list[dict] = []
+        # Number of entries when the current slide began (#116 §4.6): the
+        # entries from this position on are "in the current slide". A
+        # position rather than a counter, so it stays right after the
+        # paginated pre-seed appended the earlier pages' entries.
+        self._slide_start = 0
+        # What opened the current slide: "entry", "break" or "slide"
+        self._slide_opener = "entry"
 
     def reset(self) -> None:
         self._entries = []
+        self._slide_start = 0
+        self._slide_opener = "entry"
+
+    def slide_boundary(self, opener: str = "entry") -> None:
+        """A new slide begins: book ``"entry"``, ``"break"``, ``st_slide`` (``"slide"``)."""
+        self._slide_start = len(self._entries)
+        self._slide_opener = opener
+
+    def slide_stop(self) -> dict | None:
+        """The stop of the current slide when a break or ``st_slide`` opened it.
+
+        ``None`` in a slide opened by a book entry (a document's page), or
+        when the slide has no stop yet.
+        """
+        if self._slide_opener == "entry":
+            return None
+        for e in self._entries[self._slide_start:]:
+            if e.get("stop"):
+                return e
+        return None
+
+    def _next_stop_index(self) -> int:
+        for e in reversed(self._entries):
+            if e.get("stop_index") is not None:
+                return e["stop_index"] + 1
+        return 0
 
     def register(self, label: str, anchor: str, hidden: bool = False,
-                 key: str | None = None, auto: bool = False) -> int:
+                 key: str | None = None, auto: bool = False, *,
+                 stop: bool | None = None, listed: bool | None = None,
+                 toc_anchor: str | None = None, toc_level: int | None = None,
+                 origin: str = "marker") -> int:
+        if stop is None:
+            stop = True
+        if listed is None:
+            listed = not hidden
         idx = len(self._entries)
-        entry = {"index": idx, "label": label, "anchor": anchor, "hidden": hidden}
+        entry = {"index": idx, "label": label, "anchor": anchor,
+                 "hidden": stop and not listed,
+                 "stop": stop, "listed": listed, "toc": toc_anchor is not None,
+                 "stop_index": self._next_stop_index() if stop else None,
+                 "origin": origin}
+        if toc_anchor is not None:
+            entry["toc_anchor"] = toc_anchor
+            entry["toc_level"] = toc_level
         if key:
             entry["key"] = key
         if auto:
             # label generated ("Marker N"), not given: the nav widget shows the
-            # current section instead for a hidden marker (#97)
+            # current section instead for an unlisted marker (#97)
             entry["auto"] = True
         self._entries.append(entry)
         return idx
+
+    def attach_target(self) -> dict | None:
+        """The marker ``st_write(marker="attach")`` links to (#116 §4.7), or ``None``.
+
+        The most recent marker, if it was registered in the current slide,
+        was placed by ``st_marker`` or by a break (not by another heading)
+        and is not in the TOC yet.
+        """
+        if not self._entries or len(self._entries) <= self._slide_start:
+            return None
+        m = self._entries[-1]
+        if m.get("origin") not in ("marker", "break") or m.get("toc"):
+            return None
+        return m
+
+    def attach_toc(self, entry: dict, label: str, toc_anchor: str, toc_level: int) -> None:
+        """Link a TOC heading to *entry* instead of adding a marker.
+
+        Only the *in TOC* role is added: the marker keeps its stop and
+        listed roles, its anchor, and its label unless that was generated.
+        """
+        entry["toc"] = True
+        entry["toc_anchor"] = toc_anchor
+        entry["toc_level"] = toc_level
+        if entry.get("auto"):
+            entry["label"] = label
+            del entry["auto"]
 
     def get_entries(self) -> list[dict]:
         return list(self._entries)
 
     def count(self) -> int:
         return len(self._entries)
+
+
+# ---------------------------------------------------------------------------
+# Roles of an entry — the only readers of stop / listed (#116)
+# ---------------------------------------------------------------------------
+
+def is_stop(entry: dict) -> bool:
+    """True if the arrows stop at this marker."""
+    return entry.get("stop", True)
+
+
+def is_listed(entry: dict) -> bool:
+    """True if the marker appears in the marker list."""
+    return entry.get("listed", not entry.get("hidden", False))
+
+
+def normalize_marker_entries(entries: list[dict]) -> list[dict]:
+    """Give entries of an older page cache (``hidden`` only) their roles, in place.
+
+    ``stop=True``, ``listed=not hidden``, ``toc=False``, and the
+    ``stop_index`` sequence. Entries that already carry roles are kept.
+    """
+    rank = 0
+    for e in entries:
+        if "stop" not in e:
+            e["stop"] = True
+            e["listed"] = not e.get("hidden", False)
+            e.setdefault("toc", False)
+            e.setdefault("origin", "marker")
+            e["stop_index"] = rank if e["stop"] else None
+        e["hidden"] = e["stop"] and not e["listed"]
+        if e.get("stop_index") is not None:
+            rank = e["stop_index"] + 1
+    return entries
+
+
+def _entries_or_registry(entries: list[dict] | None) -> list[dict]:
+    return marker_entries() if entries is None else entries
+
+
+def stop_entries(entries: list[dict] | None = None) -> list[dict]:
+    """The stops, in module order (the registry when *entries* is None)."""
+    return [e for e in _entries_or_registry(entries) if is_stop(e)]
+
+
+def stop_count(entries: list[dict] | None = None) -> int:
+    """Number of stops: the ``N`` of the counter ``n / N``."""
+    return len(stop_entries(entries))
+
+
+def listed_entries(entries: list[dict] | None = None) -> list[dict]:
+    """The listed markers, in module order: the rows of the marker list."""
+    return [e for e in _entries_or_registry(entries) if is_listed(e)]
+
+
+def stop_of(entry: dict, entries: list[dict] | None = None) -> int | None:
+    """0-based stop index of the slide *entry* sits in.
+
+    Its own ``stop_index`` if it is a stop; otherwise the stop index of the
+    last stop before it in module order; otherwise ``0`` if the module has
+    stops (the marker precedes the first one); ``None`` without any stop.
+    """
+    entries = _entries_or_registry(entries)
+    pos = entry.get("index", 0)
+    rank = None
+    seen = 0
+    for e in entries:
+        if not is_stop(e):
+            continue
+        if e.get("index", 0) <= pos:
+            rank = seen
+        seen += 1
+    if rank is None and seen:
+        return 0
+    return rank
 
 
 # ---------------------------------------------------------------------------
@@ -124,13 +346,47 @@ def reset_marker_registry(config: MarkerConfig = None) -> None:
 
 
 def register_marker(label: str, anchor: str, hidden: bool = False,
-                    key: str | None = None, auto: bool = False) -> int:
-    """Register a marker in the global registry. Requires prior init."""
+                    key: str | None = None, auto: bool = False, **roles) -> int:
+    """Register a marker in the global registry. Requires prior init.
+
+    *roles*: the keyword-only role fields of :meth:`MarkerRegistry.register`
+    (``stop``, ``listed``, ``toc_anchor``, ``toc_level``, ``origin``).
+    """
     global _registry
     assert isinstance(_registry, MarkerRegistry), (
         "Marker registry is not initialized. Call reset_marker_registry first."
     )
-    return _registry.register(label, anchor, hidden=hidden, key=key, auto=auto)
+    return _registry.register(label, anchor, hidden=hidden, key=key, auto=auto, **roles)
+
+
+def marker_slide_boundary(opener: str = "entry") -> None:
+    """Record that a new slide begins: book ``"entry"``, ``"break"``, ``"slide"``.
+
+    ``marker="attach"`` links a heading only to a marker of the current slide
+    (#116 §4.7). ``st_include`` is not a boundary. No-op without a registry.
+    """
+    if _registry is not None:
+        _registry.slide_boundary(opener)
+
+
+def marker_slide_stop() -> dict | None:
+    """The stop of a slide opened by a break or ``st_slide`` (see ``MarkerRegistry``)."""
+    if _registry is None:
+        return None
+    return _registry.slide_stop()
+
+
+def marker_attach_target() -> dict | None:
+    """The marker a TOC heading may attach to, or ``None`` (see ``MarkerRegistry``)."""
+    if _registry is None:
+        return None
+    return _registry.attach_target()
+
+
+def marker_attach_toc(entry: dict, label: str, toc_anchor: str, toc_level: int) -> None:
+    """Link a TOC heading to *entry* (see :meth:`MarkerRegistry.attach_toc`)."""
+    assert isinstance(_registry, MarkerRegistry)
+    _registry.attach_toc(entry, label, toc_anchor, toc_level)
 
 
 def marker_entries() -> list[dict]:
@@ -161,29 +417,96 @@ def get_marker_config() -> Optional[MarkerConfig]:
 # Public API — st_marker()
 # ---------------------------------------------------------------------------
 
-def st_marker(label: str = "", visible: bool = False, hidden: bool = False,
-              key: str | None = None) -> None:
+def resolve_marker_roles(hidden: bool | None = None, stop: bool | None = None,
+                         listed: bool | None = None, toc_lvl: str | None = None,
+                         roles: MarkerRoles | None = None) -> MarkerRoles:
+    """The roles of an ``st_marker`` call from its shortcuts (#116 §4.4).
+
+    ``roles=`` and the role keywords are exclusive (``TypeError``);
+    ``hidden=True`` is ``stop=True, listed=False`` and ``hidden=False`` is
+    ``listed=True`` — a contradiction raises ``ValueError``.
+    """
+    if roles is not None:
+        given = [n for n, v in (("hidden", hidden), ("stop", stop),
+                                ("listed", listed), ("toc_lvl", toc_lvl)) if v is not None]
+        if given:
+            raise TypeError(f"st_marker(): roles= cannot be combined with {', '.join(given)}=")
+        return roles
+    if hidden is True and listed is True:
+        raise ValueError("st_marker(): hidden=True contradicts listed=True")
+    if hidden is True and stop is False:
+        raise ValueError("st_marker(): hidden=True contradicts stop=False "
+                         "(hidden means a stop that is not listed)")
+    if hidden is False and listed is False:
+        raise ValueError("st_marker(): hidden=False contradicts listed=False")
+    if listed is None:
+        listed = not hidden if hidden is not None else True
+    return MarkerRoles(stop=True if stop is None else stop, listed=listed, toc_lvl=toc_lvl)
+
+
+def st_marker(label: str = "", visible: bool = False, hidden: bool | None = None,
+              key: str | None = None, *, stop: bool | None = None,
+              listed: bool | None = None, toc_lvl: str | None = None,
+              roles: MarkerRoles | None = None, _origin: str = "marker") -> None:
     """Place a navigation marker in the content.
 
-    No-op if the marker registry has not been initialized (backward compat).
+    A marker has three independent roles (#116, :class:`MarkerRoles`):
+
+    =========  ==========  =========  ==============================================
+    stop       listed      in TOC     call
+    =========  ==========  =========  ==============================================
+    ✓          ✓           –          ``st_marker("X")`` (the default)
+    ✓          –           –          ``st_marker("X", hidden=True)``
+    –          ✓           –          ``st_marker("Part B", stop=False)``
+    –          –           –          ``st_marker(key="ex-3", stop=False, listed=False)``
+    ✓          ✓           ✓          ``st_marker("Prompting", toc_lvl="1")``
+    ✓          –           ✓          ``st_marker("X", hidden=True, toc_lvl="2")``
+    –          ✓           ✓          ``st_marker("Part B", stop=False, toc_lvl="+1")``
+    –          –           ✓          ``st_marker("Annex", stop=False, listed=False, toc_lvl="1")``
+    =========  ==========  =========  ==============================================
+
+    Whatever its roles, the marker keeps its DOM anchor and its deep link.
+    No-op if the marker registry has not been initialized (backward compat),
+    except that ``toc_lvl`` still registers the TOC entry and its anchor.
 
     Args:
-        label: Marker label shown in the sidebar list and nav widget.
-        visible: If True, render a visible dashed line in the content.
-        hidden: If True, the marker is absent from the popup list but stays
-                a navigation stop (PageUp/PageDown, buttons) and is counted
-                by the widget counter, which uses the global marker index
-                (``st_slide_break`` places hidden markers: the counter
-                numbers the slides). Without a label of its own, the widget
-                shows the current section — the last visible marker before
-                it.
+        label: Marker label shown in the marker list and the nav widget.
+        visible: If True, draw a dashed line with the label in the content.
+                 Unrelated to *listed*: an unlisted marker can be visible
+                 and a listed one is invisible by default.
+        hidden: Shortcut: ``True`` = a stop that is not listed (the counter
+                still counts it; ``st_slide_break`` places such markers),
+                ``False`` = listed. Without a label of its own, an unlisted
+                marker shows the current section in the widget.
         key: Optional stable identifier for deep links
              (``?marker=<key>`` / ``page_url(base, marker=key)``).
              Independent of the label, so it survives a translation or a
              rewording; without it the deep link falls back to the label
              slug (``"Electricity"`` -> ``electricity``).
+        stop: ``False`` = the arrows and the counter skip this marker
+              (default ``True``).
+        listed: ``False`` = absent from the marker list (default ``True``).
+        toc_lvl: Also register a TOC entry at this level (``"1"``,
+                 ``"+1"`` … as ``st_write``); the marker takes the entry's
+                 anchor, so the TOC link and the marker share one target. No
+                 heading is rendered. Needs a label.
+        roles: All three roles at once; exclusive with *hidden*, *stop*,
+               *listed* and *toc_lvl*.
     """
+    r = resolve_marker_roles(hidden=hidden, stop=stop, listed=listed,
+                             toc_lvl=toc_lvl, roles=roles)
+    if r.toc_lvl is not None and not label:
+        raise ValueError("st_marker(): a TOC entry needs a label (toc_lvl given without label)")
+
+    toc_anchor = toc_level = None
+    if r.toc_lvl is not None:
+        from .toc import register_toc_entry
+        toc_anchor, _number, toc_level = register_toc_entry(label, r.toc_lvl)
+
     if _registry is None:
+        if toc_anchor is not None:
+            # the TOC link still needs its target
+            _render(f'<div id="{toc_anchor}" style="height: 0; overflow: hidden;"></div>')
         return
 
     idx = _registry.count()
@@ -193,10 +516,14 @@ def st_marker(label: str = "", visible: bool = False, hidden: bool = False,
         label = f"Marker {idx + 1}"
 
     # Deterministic anchor so cache-build and live-render produce the same ID
-    slug = TOCRegistry.get_key_anchor(label)
-    anchor = f"stx-marker-{slug}-{idx}"
+    if toc_anchor is not None:
+        anchor = toc_anchor
+    else:
+        slug = TOCRegistry.get_key_anchor(label)
+        anchor = f"stx-marker-{slug}-{idx}"
 
-    _registry.register(label, anchor, hidden=hidden, key=key, auto=auto)
+    _registry.register(label, anchor, key=key, auto=auto, stop=r.stop, listed=r.listed,
+                       toc_anchor=toc_anchor, toc_level=toc_level, origin=_origin)
 
     # Same offset as the JS scroll (MarkerConfig.scroll_offset): anchor jumps
     # and scripted navigation must land at the identical position.
@@ -214,6 +541,95 @@ def st_marker(label: str = "", visible: bool = False, hidden: bool = False,
         html = f'<div id="{anchor}" class="streamtex-marker" data-marker-index="{idx}" style="{style}"></div>'
 
     _render(html)
+
+
+# ---------------------------------------------------------------------------
+# Marker roles in JS — shared by the live widget and the HTML export bar
+# ---------------------------------------------------------------------------
+
+#: Needs ``markers`` (every entry, in module order) and ``currentIdx`` (a
+#: *position*: an index into ``markers``). The arrows walk ``stops``, the
+#: popup lists ``listedMarkers`` (#116). One copy, so the two widgets cannot
+#: drift apart (#45, #97).
+_MARKER_ROLES_JS = r"""
+    function isStop(m) { return m.stop !== undefined ? m.stop : true; }
+    function isListed(m) { return m.listed !== undefined ? m.listed : !m.hidden; }
+    var stops = markers.filter(isStop);
+    var listedMarkers = markers.filter(isListed);
+    /* 0-based stop index of the slide position idx sits in: the last stop
+       at or before idx, 0 before the first stop, -1 without any stop. */
+    function stopOf(idx) {
+        var at = -1;
+        for (var s = 0; s < stops.length; s++) {
+            if (stops[s].index <= idx) at = s; else break;
+        }
+        return (at < 0 && stops.length) ? 0 : at;
+    }
+    function lastStopBefore(idx) {
+        var at = -1;
+        for (var s = 0; s < stops.length; s++) {
+            if (stops[s].index < idx) at = s; else break;
+        }
+        return at;
+    }
+    /* Position reached by |delta| arrow presses from position idx: next =
+       the first stop after it, prev = the last stop before it.  null when
+       no stop lies that way (the caller crosses the page boundary). */
+    function stepTarget(idx, delta) {
+        var pos = idx, moved = false;
+        for (var k = 0; k < Math.abs(delta); k++) {
+            var nxt = null, s;
+            if (delta > 0) {
+                for (s = 0; s < stops.length; s++) {
+                    if (stops[s].index > pos) { nxt = stops[s].index; break; }
+                }
+            } else {
+                for (s = stops.length - 1; s >= 0; s--) {
+                    if (stops[s].index < pos) { nxt = stops[s].index; break; }
+                }
+            }
+            if (nxt === null) break;
+            pos = nxt; moved = true;
+        }
+        return moved ? pos : null;
+    }
+    /* #97: the listed row whose section contains position idx: the last
+       listed marker at or before idx (the first one before any). */
+    function sectionVi(idx) {
+        var at = -1;
+        for (var v = 0; v < listedMarkers.length; v++) {
+            if (listedMarkers[v].index <= idx) at = v;
+        }
+        return (at < 0 && listedMarkers.length) ? 0 : at;
+    }
+    /* "4–8": the stop numbers a popup row covers (row 0 from 1, #97) */
+    function rowRange(vi) {
+        if (!stops.length) return '';
+        var start = vi === 0 ? 0 : stopOf(listedMarkers[vi].index);
+        var end = vi + 1 < listedMarkers.length
+            ? lastStopBefore(listedMarkers[vi + 1].index) : stops.length - 1;
+        return start >= end ? String(start + 1) : (start + 1) + '–' + (end + 1);
+    }
+    function rowText(vi) {
+        var r = rowRange(vi);
+        return (r ? r + '. ' : '') + listedMarkers[vi].label;
+    }
+    /* An unlisted marker without a label of its own shows its section (#97) */
+    function currentLabel() {
+        var m = markers[currentIdx];
+        if (!m) return '';
+        if (!isListed(m) && m.auto) {
+            var sv = sectionVi(currentIdx);
+            return sv >= 0 ? listedMarkers[sv].label : '';
+        }
+        return m.label;
+    }
+    /* The counter's n: the stop of the current position ("–" without stops) */
+    function stopNumber() {
+        var s = stopOf(currentIdx);
+        return s < 0 ? '–' : String(s + 1);
+    }
+"""
 
 
 # ---------------------------------------------------------------------------
@@ -262,26 +678,11 @@ def inject_marker_navigation(
     var hostWin = hostDoc.defaultView || parent;
 
     var markers = __MARKERS__;
-    var visibleMarkers = markers.filter(function(m) { return !m.hidden; });
-    /* #97 — the visible entry whose section contains global index idx: the
-       last visible marker at or before idx (the first one before any). */
-    function sectionVi(idx) {
-        var at = -1;
-        for (var v = 0; v < visibleMarkers.length; v++) {
-            if (visibleMarkers[v].index <= idx) at = v;
-        }
-        return (at < 0 && visibleMarkers.length) ? 0 : at;
-    }
-    /* "4–8": the global numbers a visible popup row covers */
-    function rowRange(vi) {
-        var start = vi === 0 ? 0 : visibleMarkers[vi].index;
-        var end = vi + 1 < visibleMarkers.length ? visibleMarkers[vi + 1].index - 1 : markers.length - 1;
-        return start >= end ? String(start + 1) : (start + 1) + '\u2013' + (end + 1);
-    }
+    var currentIdx = 0;   /* a POSITION in markers, stop or not */
+__ROLES_JS__
     var nextKeys = __NEXT_KEYS__;
     var prevKeys = __PREV_KEYS__;
     var OFFSET = __OFFSET__;
-    var currentIdx = 0;
     var _navigating = false;
     var _initialized = false;
     var popupOpen = __POPUP_OPEN__;
@@ -445,7 +846,17 @@ def inject_marker_navigation(
     }
     function step(delta) {
         if (!_initialized) { queueStep(delta); return; }
-        navigateTo(currentIdx + delta);
+        stepBy(delta);
+    }
+    /* |delta| arrow presses: from stop to stop; past the first/last stop,
+       the paginated book turns the page (_stxMarkerBoundary). */
+    function stepBy(delta) {
+        var target = stepTarget(currentIdx, delta);
+        if (target === null) {
+            if (hostWin._stxMarkerBoundary) hostWin._stxMarkerBoundary(delta > 0 ? 'next' : 'prev');
+            return;
+        }
+        navigateTo(target);
     }
     function replayPendingStep() {
         var p = hostWin._stxPendingStep;
@@ -461,7 +872,7 @@ def inject_marker_navigation(
             hostWin._stxPendingStep = { n: p.n, t: Date.now() };
             return;
         }
-        navigateTo(currentIdx + p.n);
+        stepBy(p.n);
     }
 
     /* ================================================================
@@ -514,7 +925,7 @@ def inject_marker_navigation(
     btnPrev.onclick = function() { step(-1); };
 
     /* Fixed-width counter (global marker index) — click to jump */
-    var totalDigits = String(markers.length).length;
+    var totalDigits = String(stops.length).length;
     var counterWidth = (totalDigits * 2 + 3) + 'ch';
     var counter = hostDoc.createElement('span');
     counter.style.cssText = 'min-width:' + counterWidth + ';text-align:center;display:inline-block;font-variant-numeric:tabular-nums;cursor:pointer;';
@@ -523,13 +934,13 @@ def inject_marker_navigation(
     var counterInput = hostDoc.createElement('input');
     counterInput.type = 'number';
     counterInput.min = '1';
-    counterInput.max = String(markers.length);
+    counterInput.max = String(stops.length);
     counterInput.style.cssText = 'width:' + counterWidth + ';text-align:center;background:rgba(255,255,255,.15);color:#eee;border:1px solid rgba(255,255,255,.3);border-radius:4px;font-size:13px;font-variant-numeric:tabular-nums;outline:none;display:none;-moz-appearance:textfield;';
     var counterEditing = false;
 
     function showCounterInput() {
         counterEditing = true;
-        counterInput.value = String(currentIdx + 1);
+        counterInput.value = stopNumber();
         counter.style.display = 'none';
         counterInput.style.display = 'inline-block';
         counterInput.focus();
@@ -542,8 +953,8 @@ def inject_marker_navigation(
     }
     function commitCounterInput() {
         var n = parseInt(counterInput.value, 10);
-        if (n >= 1 && n <= markers.length) {
-            navigateTo(n - 1);
+        if (n >= 1 && n <= stops.length) {
+            navigateTo(stops[n - 1].index);
         }
         hideCounterInput();
     }
@@ -888,14 +1299,14 @@ def inject_marker_navigation(
     popup.style.cssText = 'display:none;position:absolute;bottom:calc(100% + 8px);right:0;background:rgba(30,30,30,.95);color:#eee;border-radius:12px;padding:6px 0;min-width:240px;max-width:350px;max-height:400px;overflow-y:auto;box-shadow:0 4px 20px rgba(0,0,0,.5);backdrop-filter:blur(8px);font-size:12px;touch-action:auto;-webkit-overflow-scrolling:touch;';
     if (typeof _stxPopup !== 'undefined') _stxPopup = popup;  /* link to drag filter */
 
-    for (var vi = 0; vi < visibleMarkers.length; vi++) {
-        var globalIdx = visibleMarkers[vi].index;
+    for (var vi = 0; vi < listedMarkers.length; vi++) {
+        var globalIdx = listedMarkers[vi].index;
         var row = hostDoc.createElement('div');
         row.className = 'stx-popup-item';
         row.dataset.idx = String(globalIdx);
         row.dataset.visIdx = String(vi);
         row.style.cssText = 'padding:7px 16px;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border-left:3px solid transparent;transition:background .1s;';
-        row.textContent = rowRange(vi) + '. ' + visibleMarkers[vi].label;
+        row.textContent = rowText(vi);
         row.onmouseenter = function() { this.style.background = 'rgba(128,128,128,.25)'; };
         row.onmouseleave = function() {
             if (parseInt(this.dataset.idx) !== currentIdx) this.style.background = 'transparent';
@@ -937,27 +1348,17 @@ def inject_marker_navigation(
     }
     hostDoc.addEventListener('click', outsideClick);
 
-    /* --- Update UI (counter/label based on global marker index) --- */
-    /* A hidden marker without a label of its own shows its section (#97) */
-    function currentLabel() {
-        var m = markers[currentIdx];
-        if (!m) return '';
-        if (m.hidden && m.auto) {
-            var sv = sectionVi(currentIdx);
-            return sv >= 0 ? visibleMarkers[sv].label : '';
-        }
-        return m.label;
-    }
+    /* --- Update UI (counter = the stop of the current position) --- */
     function updateUI() {
         if (counterEditing) return;
         var m = markers[currentIdx];
-        var padded = String(currentIdx + 1).padStart(totalDigits, '\\u2007');
-        counter.textContent = padded + ' / ' + markers.length;
+        var padded = stopNumber().padStart(totalDigits, '\\u2007');
+        counter.textContent = padded + ' / ' + stops.length;
         label.textContent = currentLabel();
         if (popupOpen) highlightPopup();
         /* Sync presentation footer when counter_mode="slide" */
         var fc = hostDoc.querySelector('.stx-pf-counter[data-stx-counter="slide"]');
-        if (fc) fc.textContent = 'Slide ' + (currentIdx + 1) + ' / ' + markers.length;
+        if (fc) fc.textContent = 'Slide ' + stopNumber() + ' / ' + stops.length;
     }
 
     /* --- Keyboard handler --- */
@@ -976,7 +1377,7 @@ def inject_marker_navigation(
                 if (e.currentTarget !== hostDoc) queueStep(delta);
                 return false;
             }
-            navigateTo(currentIdx + delta); return false;
+            stepBy(delta); return false;
         }
         if (!_initialized) return;
         if (e.key === 'Escape' && popupOpen) {
@@ -1113,6 +1514,7 @@ def inject_marker_navigation(
 
     # Replace placeholders
     js_body = (js_body
+        .replace('__ROLES_JS__', _MARKER_ROLES_JS)
         .replace('__MARKERS__', json.dumps(entries))
         .replace('__NEXT_KEYS__', json.dumps(config.next_keys))
         .replace('__PREV_KEYS__', json.dumps(config.prev_keys))

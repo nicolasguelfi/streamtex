@@ -63,7 +63,7 @@ try:
     from .toc import reset_toc_registry, toc_entries, TOCConfig, NumberingMode
 
     # Marker Navigation
-    from .marker import st_marker, MarkerConfig
+    from .marker import st_marker, MarkerConfig, MarkerRoles
     from .deeplink import page_url
 
     # Section spacing
@@ -262,6 +262,7 @@ __all__ = [
     "LinkConfig",
     "ListStyle",
     "MarkerConfig",
+    "MarkerRoles",
     "MediaOverlay",
     "ModelCapabilities",
     "NumberingMode",

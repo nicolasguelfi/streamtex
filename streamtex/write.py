@@ -1,10 +1,17 @@
 import textwrap
 import warnings
-from typing import Optional
+from typing import Literal, Optional, Union
 
 from .enums import Tag, Tags
 from .export import _render
-from .marker import get_marker_config, register_marker
+from .marker import (
+    MarkerRoles,
+    get_marker_config,
+    marker_attach_target,
+    marker_attach_toc,
+    marker_slide_stop,
+    register_marker,
+)
 from .spacing import Spacing, consume_block_top_injected, resolve_section_spacing
 from .styles import StxStyles, Style
 from .toc import register_toc_entry
@@ -15,7 +22,7 @@ def st_write(
     *args, style: Style = StxStyles.none, tag: Tag = Tags.span,
     link:str="", no_link_decor:bool=False, hover:bool=True,
     toc_lvl: Optional[str] = None, label: str = "",
-    marker: Optional[bool] = None,
+    marker: Union[bool, MarkerRoles, Literal["attach"], None] = None,
     spacing: Optional[Spacing] = None,
     breaks: bool = True ):
     """
@@ -30,6 +37,13 @@ def st_write(
     :param toc_lvl: A numeric string that may start with '+' or '-' (e.g. '1', '-1' or '+1')
         denoting the toc level of this content. This allows the text to be part of a hierarchical TOC.
     :param label: An optional label to use for the TOC entry. If not provided, a truncated version of `txt` is used.
+    :param marker: The navigation marker of a TOC heading (needs ``toc_lvl``; see :class:`MarkerRoles`):
+        ``None`` (default) = a marker with ``MarkerConfig.toc_marker_roles`` when ``auto_marker_on_toc``
+        covers the level (documents: the headings give the stops), else none; ``True`` = the heading
+        declares its own stop
+        (stop, listed); ``False`` = no marker; ``MarkerRoles(...)`` = its own marker with exactly
+        these roles plus *in TOC* (e.g. ``MarkerRoles.HIDDEN``: a TOC entry and a stop, not listed);
+        ``"attach"`` = link the TOC entry to the marker that opens the slide, keeping its roles.
     :param breaks: If True (default), newlines in text are converted to ``<br>`` for visible line breaks.
         If False, all newlines and ``<br>`` tags are removed (collapsed to spaces) — useful when
         source code is split across lines for readability but should render as a single line.
@@ -48,7 +62,13 @@ def st_write(
     - st_write("click this ", (s.blue, "link", "https://google.com"))
     """
 
-    # Warn if spacing is passed without toc_lvl (no-op)
+    # Warn if marker / spacing is passed without toc_lvl (no-op)
+    if marker is not None and toc_lvl is None:
+        warnings.warn(
+            "st_write(marker=...) has no effect without toc_lvl: "
+            "only a TOC heading carries a marker.",
+            stacklevel=2,
+        )
     if spacing is not None and toc_lvl is None:
         warnings.warn(
             "st_write(spacing=...) has no effect without toc_lvl. "
@@ -133,9 +153,16 @@ def _parse_args(*args, style: Style = StxStyles.none, no_link_decor:bool=False, 
     return container_style, final_txt
 
 def _handle_toc(final_txt: str, toc_lvl: Optional[str] = None, label: str = "",
-                marker: Optional[bool] = None, spacing: Optional[Spacing] = None):
+                marker: Union[bool, MarkerRoles, str, None] = None,
+                spacing: Optional[Spacing] = None):
         # --- 3. Handle ToC Registration ---
     key_anchor = ""
+    if isinstance(marker, MarkerRoles) and marker.toc_lvl is not None:
+        raise ValueError("st_write(marker=MarkerRoles(toc_lvl=...)): the heading's own "
+                         "toc_lvl decides the TOC entry; leave MarkerRoles.toc_lvl unset")
+    if isinstance(marker, str) and marker != "attach":
+        raise ValueError(f"st_write(marker={marker!r}): expected None, True, False, "
+                         "a MarkerRoles or 'attach'")
     if toc_lvl:
         # If no label is provided, generate a truncated label from the text. This ensures TOC entries are descriptive
         # but not overly long, avoiding clutter in the TOC.
@@ -151,15 +178,7 @@ def _handle_toc(final_txt: str, toc_lvl: Optional[str] = None, label: str = "",
         # Bridge TOC → Marker (opt-in)
         marker_cfg = get_marker_config()
         if marker_cfg is not None and marker is not False:
-            auto = marker_cfg.auto_marker_on_toc
-            should_mark = (
-                marker is True
-                or (auto is True)
-                or (isinstance(auto, int) and resolved_lvl <= auto)
-            )
-            if should_mark:
-                register_marker(label, key_anchor)
-
+            if _bridge_toc_marker(marker_cfg, marker, label, key_anchor, resolved_lvl):
                 # Inject section.top before the title (Phase 1b)
                 # Skip if block.top was already injected (first break in block)
                 if not consume_block_top_injected():
@@ -169,3 +188,52 @@ def _handle_toc(final_txt: str, toc_lvl: Optional[str] = None, label: str = "",
                         st_space("v", effective.top)
 
     return final_txt, key_anchor
+
+
+def _bridge_toc_marker(cfg, marker, label: str, key_anchor: str, level: int) -> bool:
+    """Give a TOC heading its marker (#116 §4.4, §4.7).
+
+    Returns True when the heading creates its marker: the caller then
+    injects ``section.top`` as in 0.7.45. Nothing is attached unless the
+    author writes ``marker="attach"``.
+    """
+    def own(roles: MarkerRoles) -> None:
+        register_marker(label, key_anchor, stop=roles.stop, listed=roles.listed,
+                        toc_anchor=key_anchor, toc_level=level, origin="toc")
+
+    if marker is True:
+        own(MarkerRoles.NAMED)                      # declares its own stop
+        return True
+    if isinstance(marker, MarkerRoles):
+        own(marker)
+        return True
+    if marker == "attach":
+        target = marker_attach_target()
+        if target is not None:
+            marker_attach_toc(target, label, key_anchor, level)
+            return False
+        warnings.warn(
+            f"st_write(marker='attach'): no marker opens the slide of {label!r}; "
+            "the heading gets its own marker",
+            stacklevel=4,
+        )
+        own(cfg.roles_for_level(level))
+        return True
+    # marker is None: automatic, when the level is covered
+    auto = cfg.auto_marker_on_toc
+    if not ((auto is True) or (isinstance(auto, int) and level <= auto)):
+        return False
+    roles = cfg.roles_for_level(level)
+    slide_stop = marker_slide_stop() if roles.stop else None
+    if slide_stop is not None:
+        # a deck's slide (opened by a break or st_slide) already has its stop:
+        # the book mixes heading stops (documents) with slide stops (decks)
+        warnings.warn(
+            f"The heading {label!r} adds a second navigation stop to a slide that "
+            f"already has one ({slide_stop['label']!r}): write marker=\"attach\" to "
+            "link the heading to the slide, or marker=False (or auto_marker_on_toc=0 "
+            "in a deck).",
+            stacklevel=4,
+        )
+    own(roles)
+    return True

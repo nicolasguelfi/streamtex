@@ -64,7 +64,9 @@ class TestMarkerRegistry:
         assert idx == 0
         entries = reg.get_entries()
         assert len(entries) == 1
-        assert entries[0] == {"index": 0, "label": "Intro", "anchor": "anchor-1", "hidden": False}
+        assert entries[0] == {"index": 0, "label": "Intro", "anchor": "anchor-1", "hidden": False,
+                              "stop": True, "listed": True, "toc": False, "stop_index": 0,
+                              "origin": "marker"}
 
     def test_register_multiple(self):
         reg = MarkerRegistry(MarkerConfig())

@@ -487,40 +487,50 @@ class TestDeepLinkJs:
 
 
 class TestMarkerNavParity:
-    """App-parity contract for the export marker bar (#45).
+    """App-parity contract for the export marker bar (#45, #116).
 
-    st_marker(hidden=True) = absent from the popup, ALWAYS a navigation
-    stop.  The live app (marker.py) is the reference semantics; these
-    tests pin the generated JS to it.
+    Keys and buttons walk the stops, the popup lists the listed markers,
+    the counter counts the stops. The role code is the live widget's own
+    (``marker._MARKER_ROLES_JS``); these tests pin the export to it.
     """
 
-    def test_guard_is_full_list(self):
-        from streamtex.export_enrich import _MARKER_NAV_JS
-        # The ENTRY guard keys on the full list (the bar exists for an
-        # all-hidden deck): it must come before `visible` is even built.
-        # (A later `!visible.length` guard exists for the popup only.)
-        entry_guard = _MARKER_NAV_JS.index("if (!markers.length) return;")
-        assert entry_guard < _MARKER_NAV_JS.index("var visible")
+    @staticmethod
+    def _script(markers=None):
+        from streamtex.export_enrich import _marker_nav_script
+        return _marker_nav_script(markers or [{"index": 0, "label": "A", "anchor": "a0"}])
 
-    def test_navigation_walks_full_list(self):
+    def test_guard_is_full_list(self):
+        js = self._script()
+        # the bar exists as soon as there is a marker, listed or not
+        assert js.index("if (!markers.length) return;") < js.index("var stops")
+
+    def test_shares_the_live_role_code(self):
+        from streamtex.marker import _MARKER_ROLES_JS
+        assert _MARKER_ROLES_JS in self._script()
+        assert "__ROLES_JS__" not in self._script()
+
+    def test_navigation_walks_stops(self):
         from streamtex.export_enrich import _MARKER_NAV_JS
         assert "if (idx >= markers.length) idx = markers.length - 1;" in _MARKER_NAV_JS
         assert "scrollTo(markers[idx].anchor);" in _MARKER_NAV_JS
+        assert "var target = stepTarget(currentIdx, delta);" in _MARKER_NAV_JS
+        assert "navigateTo(currentIdx + 1)" not in _MARKER_NAV_JS
 
-    def test_counter_is_global(self):
+    def test_counter_counts_stops(self):
         from streamtex.export_enrich import _MARKER_NAV_JS
-        assert "' / ' + markers.length" in _MARKER_NAV_JS
-        assert "' / ' + visible.length" not in _MARKER_NAV_JS
+        assert "stopNumber() + ' / ' + stops.length" in _MARKER_NAV_JS
+        assert "' / ' + markers.length" not in _MARKER_NAV_JS
 
-    def test_popup_still_filters_and_shows_ranges(self):
-        from streamtex.export_enrich import _MARKER_NAV_JS
-        assert "markers.filter(function(m) { return !m.hidden; })" in _MARKER_NAV_JS
-        assert "rowRange(vi) + '. ' + visible[vi].label" in _MARKER_NAV_JS
+    def test_popup_lists_listed_markers_with_ranges(self):
+        js = self._script()
+        assert "var listedMarkers = markers.filter(isListed);" in js
+        assert "row.textContent = rowText(vi);" in js
+        assert "m.hidden" not in js.replace("!m.hidden", "")
 
-    def test_hidden_auto_marker_shows_its_section(self):
-        from streamtex.export_enrich import _MARKER_NAV_JS
-        assert "function currentLabel()" in _MARKER_NAV_JS
-        assert "m.hidden && m.auto" in _MARKER_NAV_JS
+    def test_unlisted_auto_marker_shows_its_section(self):
+        js = self._script()
+        assert "function currentLabel()" in js
+        assert "!isListed(m) && m.auto" in js
 
     def test_scroll_tracking_walks_full_list(self):
         from streamtex.export_enrich import _MARKER_NAV_JS
@@ -533,7 +543,6 @@ class TestMarkerNavParity:
         assert "visible[i].index === globalIdx" not in _MARKER_NAV_JS
 
     def test_generated_js_parses(self):
-        import json
         import shutil
         import subprocess
         import tempfile
@@ -541,7 +550,6 @@ class TestMarkerNavParity:
 
         import pytest
 
-        from streamtex.export_enrich import _MARKER_NAV_JS
         if not shutil.which("node"):
             pytest.skip("node not available")
         markers = [
@@ -549,7 +557,8 @@ class TestMarkerNavParity:
             {"index": 1, "label": "", "anchor": "a1", "hidden": True},
             {"index": 2, "label": "B", "anchor": "a2", "hidden": False},
         ]
-        js = _MARKER_NAV_JS.replace("__MARKERS__", json.dumps(markers))
+        from streamtex.export_enrich import _marker_nav_script
+        js = _marker_nav_script(markers)
         with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False) as f:
             f.write(js)
             p = f.name

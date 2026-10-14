@@ -234,6 +234,11 @@ build/
 .ruff_cache/
 # Render caches written by builds and `stx validate --build`
 .stx_cache/
+# Secrets: deployment credentials and passwords (stx deploy preflight
+# refuses to deploy while one of them is not ignored)
+.env
+.stx-deploy.env
+.stx-passwords.toml
 
 # Claude profile — managed by stx claude install/update, not git
 .claude/*

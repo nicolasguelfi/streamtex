@@ -1156,6 +1156,7 @@ def _status(proj, name):
 
 def test_preflight_secret_files_must_be_git_ignored(tmp_path):
     proj = _make_deploy_project(tmp_path)
+    (proj / ".gitignore").write_text("__pycache__/\n")   # an older project: secrets not listed
     _git_init(proj)
     (proj / ".stx-deploy.env").write_text("COOLIFY_API_TOKEN=x\n")
     check = _status(proj, "secrets git-ignored")

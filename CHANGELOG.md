@@ -132,6 +132,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The navigation bar names what the ☰ list names: every unlisted marker —
+  hidden, or with no role left (`st_include(markers=False)`) — shows its
+  section, the listed row it sits in. A hidden marker with a label of its
+  own used to show that label.
+
 - Every surface reads the roles instead of `hidden`: arrows, keys, ◀ ▶ and
   the counter walk the **stops**; the popup, the Markers tab and the page
   titles show the **listed** markers; the TOC "●" dot marks entries linked to
@@ -222,11 +227,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   slide, also when the second press must stay inside the new page.
   A page change whose hidden page button is missing no longer leaves the
   navigation blocked.
-- `stx deploy auth-status` takes `--path`, like `lock`, `unlock` and
-  `passwd`. The help of `stx deploy diff` names `.dockerignore`; the
+- The help of `stx deploy diff` names `.dockerignore`; the
   `stx validate` warning on a local streamtex source names
   `UV_NO_SOURCES_PACKAGE=streamtex`, which production uses. The 0.7.42 entry
   below said `stx project init`; the command is `stx project new`.
+- `stx validate --build` now opens a new slide at each entry, as
+  `st_book` does: a heading at the start of an entry was taken as a second
+  stop of the previous entry's last slide (a false deck warning).
+- The `.gitignore` written by `stx project new` ignores the secret files
+  `stx deploy preflight` checks (`.env`, `.stx-deploy.env`,
+  `.stx-passwords.toml`): a new project passes preflight.
 - `enrich_export_html(markers=…)` given entries that did not come from the
   page cache (no roles, no numbers) showed popup rows without numbers; it
   now gives them their roles and slide numbers itself (#116, #117).
@@ -413,8 +423,9 @@ apart from the keypad's skip rule and the PDF panel's messages.
   (`.env`, `.stx-deploy.env`, `.stx-passwords.toml`) are ignored by git (a
   failure for the last two, a warning for `.env`); `.stx-version`, which the
   generated Dockerfile copies, exists; `.dockerignore` exists and excludes
-  the secret files present. `stx deploy docker/hetzner` write a
-  `.dockerignore` when there is none, and `stx deploy diff` compares it.
+  the secret files present. `stx deploy docker` and `stx deploy huggingface`
+  write a `.dockerignore` when there is none (with the other deployment
+  files; `stx deploy hetzner` writes none), and `stx deploy diff` compares it.
 - Documentation: `AI_GUIDE.md` explains `stx deploy lock`. The
   `stx cache warmup` help no longer says to run it during the Docker build:
   the entrypoint runs it at start-up, deliberately.

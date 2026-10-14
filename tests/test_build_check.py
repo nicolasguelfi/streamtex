@@ -257,3 +257,25 @@ def test_build_uses_the_project_environment(tmp_path, monkeypatch):
     r = CliRunner().invoke(cli, ["validate", "--build", "--timeout", "120"])
     assert str(p / ".venv" / "bin" / "python") in r.output.replace("\n", "")
     assert "bck_boom: NameError" in r.output              # the books did run with it
+
+
+def test_each_entry_opens_a_slide_as_in_st_book(tmp_path, monkeypatch):
+    """The build check resets the slide between entries like st_book (#116): an
+    entry that opens with a heading is not a second stop of the previous slide."""
+    p = tmp_path / "deck"
+    (p / "blocks").mkdir(parents=True)
+    (p / "blocks" / "__init__.py").write_text("")
+    (p / "blocks" / "bck_a.py").write_text(
+        "from streamtex import st_slide_break, st_write\ndef build(**_):\n"
+        "    st_write('a')\n    st_slide_break()\n    st_write('the slide the break opened')\n")
+    (p / "blocks" / "bck_b.py").write_text(
+        "from streamtex import st_write\ndef build(**_):\n    st_write('B', toc_lvl='1')\n")
+    (p / "book.py").write_text(textwrap.dedent("""
+        import streamtex as stx
+        import blocks.bck_a as a, blocks.bck_b as b
+        stx.st_book([a, b], toc_config=stx.TOCConfig(),
+                    marker_config=stx.MarkerConfig(auto_marker_on_toc=1))
+    """))
+    monkeypatch.setenv("PYTHONWARNINGS", "error::UserWarning")   # the deck warning becomes an error
+    r = run_book(p / "book.py", timeout=60)
+    assert r.book_error is None and r.errors == [], r.errors

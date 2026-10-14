@@ -691,7 +691,9 @@ class TestRolesJs:
         out = _node("var l = [], a = []; for (var i = 0; i < markers.length; i++) { currentIdx = i;"
                     " l.push(currentLabel()); a.push(sectionVi(i)); }"
                     " console.log(JSON.stringify([l, a]));")
-        assert out == [["Title", "Part B", "Part B", "deep", "Next"], [0, 1, 1, 1, 2]]
+        # an unlisted marker, named or not, shows its section: the bar names
+        # what the ☰ list names (board etat r1)
+        assert out == [["Title", "Part B", "Part B", "Part B", "Next"], [0, 1, 1, 1, 2]]
 
     def test_no_stop_at_all(self):
         out = _node("console.log(JSON.stringify([stopNumber(), stops.length, rowText(0),"

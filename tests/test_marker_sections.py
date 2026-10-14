@@ -70,7 +70,7 @@ def test_labels_and_ranges(which):
             "console.log(JSON.stringify({labels: labels, ranges: ranges, active: active}));")
     out = _run(_deck(), body)
     assert out["labels"] == ["Intro", "Intro", "Intro", "Section B", "Section B", "Section B",
-                             "Named hidden", "Section B", "Section C", "Section C"]
+                             "Section B", "Section B", "Section C", "Section C"]
     assert out["ranges"] == ["1–3. Intro", "4–8. Section B", "9–10. Section C"]
     assert out["active"] == [0, 0, 0, 1, 1, 1, 1, 1, 2, 2]
 

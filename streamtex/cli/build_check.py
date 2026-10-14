@@ -99,7 +99,7 @@ def _check_book(module_list, toc_config=None, marker_config=None, *args, block_a
     if lang is not None:  # same rule as st_book(lang=…)
         from streamtex.i18n import current_lang
         block_kwargs = {"lang": current_lang() if lang == "auto" else lang, **(block_kwargs or {})}
-    from streamtex.marker import reset_marker_registry
+    from streamtex.marker import marker_slide_boundary, reset_marker_registry
     from streamtex.toc import reset_toc_registry
 
     try:
@@ -120,6 +120,7 @@ def _check_book(module_list, toc_config=None, marker_config=None, *args, block_a
             res["errors"].append([name, "NoBuild", "no build() function", ""])
             continue
         res["blocks"] += 1
+        marker_slide_boundary()     # each entry opens a slide, as in st_book (#116)
         try:
             # through st_include, so an include cycle is named from the entry (#119)
             _book.st_include(m, *block_args, **(block_kwargs or {}))

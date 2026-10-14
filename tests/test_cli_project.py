@@ -823,3 +823,9 @@ def test_validate_check_primary_unique_fails_on_duplicates(tmp_path):
     checks = validate_project(str(proj))
     unique = [c for c in checks if c.name == "primary pack unique"]
     assert unique and unique[0].status == "fail"
+
+
+def test_generate_gitignore_ignores_the_secret_files_preflight_checks():
+    from streamtex.cli.deploy_cmd import SECRET_FILES
+    lines = generate_gitignore().splitlines()
+    assert all(name in lines for name in SECRET_FILES)

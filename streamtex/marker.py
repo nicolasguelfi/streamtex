@@ -729,11 +729,12 @@ _MARKER_ROLES_JS = r"""
         var m = listedMarkers[vi];
         return (m.row_text ? m.row_text + '. ' : '') + m.label;
     }
-    /* An unlisted marker without a label of its own shows its section (#97) */
+    /* The bar names what the ☰ list names: an unlisted marker (hidden, or
+       with no role at all) shows its section, the listed row it sits in */
     function currentLabel() {
         var m = markers[currentIdx];
         if (!m) return '';
-        if (!isListed(m) && m.auto) {
+        if (!isListed(m)) {
             var sv = sectionVi(currentIdx);
             return sv >= 0 ? listedMarkers[sv].label : '';
         }

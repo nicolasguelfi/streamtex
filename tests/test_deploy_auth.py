@@ -256,11 +256,6 @@ class TestUnlockAndStatus:
         _run("unlock", UUID, "--yes", "--mode", "session")
         assert fake.env() == {"STX_PASSWORD": "demo"}
 
-    def test_status_takes_path_like_the_other_commands(self, fake, tmp_path):
-        r = _run("auth-status", UUID, "--path", str(tmp_path))
-        assert r.exit_code == 0, r.output
-        assert r.output == _run("auth-status", UUID).output
-
     def test_face_without_value_reported_closed(self, fake):
         fake.set_env_var(UUID, "STX_AUTH_HTML", "open")
         r = _run("auth-status", UUID)

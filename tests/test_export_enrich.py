@@ -527,10 +527,10 @@ class TestMarkerNavParity:
         assert "row.textContent = rowText(vi);" in js
         assert "m.hidden" not in js.replace("!m.hidden", "")
 
-    def test_unlisted_auto_marker_shows_its_section(self):
+    def test_unlisted_marker_shows_its_section(self):
         js = self._script()
         assert "function currentLabel()" in js
-        assert "!isListed(m) && m.auto" in js
+        assert "if (!isListed(m)) {" in js
 
     def test_scroll_tracking_walks_full_list(self):
         from streamtex.export_enrich import _MARKER_NAV_JS

@@ -854,17 +854,20 @@ __ROLES_JS__
         return false;
     }
 
-    /* --- Persistent key guard (host realm, installed once per window) ---
+    /* --- Persistent guards (host realm, installed once per window) ---
        Chromium neuters every listener registered by an iframe's script as
-       soon as that iframe navigates or is removed (verified 2026-09), so
-       this instance's keyHandler dies with its iframe: between Streamlit
-       replacing the previous widget iframe and this script running,
-       nobody listens and a key is lost.  The guard is created AND
-       registered through hostWin.eval, so it belongs to the host
-       document's own realm and survives every re-injection.  It queues a
-       next/prev key into hostWin._stxPendingStep whenever no initialised
-       instance is live (flag + frame connectivity) and steps aside
-       otherwise.  Literals below mirror PENDING_STEP_CAP / _TTL_MS.   */
+       soon as Streamlit starts replacing that iframe — while the widget it
+       drew is still on screen and the instance still looks initialised
+       (measured 2026-10: a click 120 ms into a page change reached no
+       handler).  No flag tells a live instance from a dying one, so the
+       host-document keys and the ◀ ▶ clicks are ALWAYS taken by guards
+       created AND registered through hostWin.eval (they belong to the host
+       document's own realm and survive every re-injection).  A guard
+       queues the press in hostWin._stxPendingStep, then asks the current
+       instance to consume it (hostWin._stxMarkerConsume): a live instance
+       steps at once; a dying, not yet initialised or page-turning one
+       leaves it queued, and the instance that lands replays it.  One press
+       = one slide.  Literals below mirror PENDING_STEP_CAP / _TTL_MS.   */
     hostWin._stxMarkerKeys = { next: nextKeys, prev: prevKeys };
     hostWin._stxMarkerInitialized = false;
     hostWin._stxMarkerFrame = window.frameElement || null;
@@ -877,36 +880,33 @@ __ROLES_JS__
             var tag = (e.target.tagName || '').toUpperCase();
             if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT'
                 || e.target.isContentEditable) return;
-            var fr = window._stxMarkerFrame;
-            if (window._stxMarkerInitialized && fr && fr.isConnected) return;
             var keys = window._stxMarkerKeys, match = window._stxMarkerMatchKey;
             if (!keys || !match) return;
             var delta = match(e, keys.next) ? 1 : (match(e, keys.prev) ? -1 : 0);
             if (!delta) return;
-            e.preventDefault(); e.stopPropagation();
+            e.preventDefault(); e.stopImmediatePropagation();
             var now = Date.now(), p = window._stxPendingStep;
             var n = (p && (now - p.t) < 3000) ? p.n : 0;
             n = Math.max(-2, Math.min(2, n + delta));
             window._stxPendingStep = { n: n, t: now };
+            try { if (window._stxMarkerConsume) window._stxMarkerConsume(); } catch (err) {}
         }).toString() + ')');
         hostWin.eval("document.addEventListener('keydown', window._stxMarkerKeyGuard, true)");
     }
-    /* The same guard for the ◀ ▶ buttons: the widget stays on screen while
-       its iframe is being replaced, but its onclick died with the iframe,
-       so a click in that window did nothing.  The guard queues it.      */
+    /* The same guard for the ◀ ▶ buttons (their onclick is the fallback
+       when no guard is installed).                                       */
     if (!hostWin._stxMarkerClickGuard) {
         hostWin._stxMarkerClickGuard = hostWin.eval('(' + (function(e) {
             var b = e.target && e.target.closest
                 && e.target.closest('#streamtex-marker-nav [data-stx-step]');
             if (!b) return;
-            var fr = window._stxMarkerFrame;
-            if (window._stxMarkerInitialized && fr && fr.isConnected) return;
             e.preventDefault(); e.stopPropagation();
             var delta = parseInt(b.getAttribute('data-stx-step'), 10);
             var now = Date.now(), p = window._stxPendingStep;
             var n = (p && (now - p.t) < 3000) ? p.n : 0;
             n = Math.max(-2, Math.min(2, n + delta));
             window._stxPendingStep = { n: n, t: now };
+            try { if (window._stxMarkerConsume) window._stxMarkerConsume(); } catch (err) {}
         }).toString() + ')');
         hostWin.eval("document.addEventListener('click', window._stxMarkerClickGuard, true)");
     }
@@ -1012,6 +1012,8 @@ __ROLES_JS__
         }
         stepBy(p.n);
     }
+    /* Called by the host guards after they queue a press (see above). */
+    hostWin._stxMarkerConsume = function() { if (_initialized) replayPendingStep(); };
 
     /* ================================================================
        NAV WIDGET — fixed-width counter + popup marker list

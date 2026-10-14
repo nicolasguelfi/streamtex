@@ -213,11 +213,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   files as part of the cache key; they are a snapshot checked on reuse (#120).
 - In `SlideBreakMode.HIDDEN` with `fullscreen=True`, the break marker
   ignored `marker_hidden` (it was always unlisted).
-- Paginated app: a second ◀ / ▶ click made while the previous page change
-  was loading was lost — the bar stayed on screen but its handlers had died
-  with the iframe Streamlit was replacing. A guard on the page itself (like
-  the one for the keys) now queues the click, and the new page replays it:
-  two clicks always move two slides.
+- Paginated app: a ◀ / ▶ click or an arrow key pressed while a page change
+  was loading could be lost — the bar stayed on screen and still looked
+  ready, but its handlers had died with the iframe Streamlit was replacing.
+  Every press is now taken by guards that live in the page itself: they
+  queue it and the current bar consumes it at once; a bar that is going
+  away leaves it queued and the bar that lands replays it. One press = one
+  slide, also when the second press must stay inside the new page.
+  A page change whose hidden page button is missing no longer leaves the
+  navigation blocked.
 - `stx deploy auth-status` takes `--path`, like `lock`, `unlock` and
   `passwd`. The help of `stx deploy diff` names `.dockerignore`; the
   `stx validate` warning on a local streamtex source names

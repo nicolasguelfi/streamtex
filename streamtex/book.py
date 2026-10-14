@@ -2782,11 +2782,12 @@ def _inject_paginated_nav_js(current_page, total, marker_config,
             return;
         }
         if (targetPage === currentPage) return;
-        navigating = true;          /* block further signals */
-        hostWin._stxScrollReset = true;
         findNavButtons();
         var btn = navButtons[targetPage];
-        if (btn) btn.click();
+        if (!btn) return;           /* nothing in flight: no flag left set */
+        navigating = true;          /* block further signals */
+        hostWin._stxScrollReset = true;
+        btn.click();
     }
 
     /* -- Find the real scroll container --

@@ -37,7 +37,8 @@ def _deck():
 
 
 def _run(markers, body: str):
-    """Run *body* with node after the shared role code (#116)."""
+    """Run *body* with node after the shared role code (#116), numbers from Python (#117)."""
+    markers = mk.annotate_marker_numbers([dict(m) for m in markers])
     prog = (f"var markers = {json.dumps(markers)};\nvar currentIdx = 0;\n"
             f"{mk._MARKER_ROLES_JS}\n{body}")
     r = subprocess.run(["node", "-e", prog], capture_output=True, text=True)
@@ -64,21 +65,23 @@ def test_labels_and_ranges(which):
     assert mk._MARKER_ROLES_JS in _source(which)
     body = ("var labels = []; for (var i = 0; i < markers.length; i++) "
             "{ currentIdx = i; labels.push(currentLabel()); }\n"
-            "var ranges = []; for (var v = 0; v < listedMarkers.length; v++) ranges.push(rowRange(v));\n"
+            "var ranges = []; for (var v = 0; v < listedMarkers.length; v++) ranges.push(rowText(v));\n"
             "var active = []; for (var i = 0; i < markers.length; i++) active.push(sectionVi(i));\n"
             "console.log(JSON.stringify({labels: labels, ranges: ranges, active: active}));")
     out = _run(_deck(), body)
     assert out["labels"] == ["Intro", "Intro", "Intro", "Section B", "Section B", "Section B",
                              "Named hidden", "Section B", "Section C", "Section C"]
-    assert out["ranges"] == ["1–3", "4–8", "9–10"]
+    assert out["ranges"] == ["1–3. Intro", "4–8. Section B", "9–10. Section C"]
     assert out["active"] == [0, 0, 0, 1, 1, 1, 1, 1, 2, 2]
 
 
 def test_hidden_stops_before_first_title_take_the_first_title():
+    """#97 label rule kept; row 0 starts at its own number (#117, author decision)."""
     deck = [{"index": 0, "label": "Marker 1", "anchor": "a0", "hidden": True, "auto": True},
             {"index": 1, "label": "Only", "anchor": "a1", "hidden": False}]
-    out = _run(deck, "currentIdx = 0; console.log(JSON.stringify([currentLabel(), rowRange(0)]));")
-    assert out == ["Only", "1–2"]
+    out = _run(deck, "currentIdx = 0; console.log(JSON.stringify([currentLabel(), rowText(0),"
+                     " sectionVi(0)]));")
+    assert out == ["Only", "2. Only", 0]
 
 
 def test_registry_flags_generated_labels_only():

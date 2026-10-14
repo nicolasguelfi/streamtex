@@ -56,7 +56,9 @@ class PresentationConfig:
     counter_mode: str = "bloc"
     """Counter display mode in the footer:
     - ``"bloc"``: shows "Bloc 3 / 12" (section/module count, default)
-    - ``"slide"``: shows "Slide 37 / 282" (marker-based, synced with floating bar)
+    - ``"slide"``: shows "Slide 37 / 282": the slide number over the number
+      of stops of the module — the same numbers as the floating widget's
+      counter (#117). Without any stop, falls back to the page count.
     """
 
     footer_height: str = "48px"

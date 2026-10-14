@@ -32,10 +32,12 @@ from .export import (
 from .loading import inject_loading_overlay, remove_loading_overlay, update_loading_progress
 from .marker import (
     MarkerConfig,
+    annotate_marker_numbers,
     inject_marker_navigation,
     is_listed,
     is_stop,
     marker_entries,
+    marker_row_text,
     marker_slide_boundary,
     normalize_marker_entries,
     reset_marker_registry,
@@ -1116,6 +1118,10 @@ def _st_book_impl(module_list, toc_config: TOCConfig = None, marker_config: Mark
     # Stop collector and get search index
     block_index = stop_collector() if use_search else None
 
+    # One number per marker, for every surface (#117)
+    if marker_config is not None:
+        annotate_marker_numbers(marker_entries())
+
     # Generate Toc at appropriate position
     if use_toc_block and toc_pos == len(module_list):
         toc_block = st_toc(toc_title_style)
@@ -1140,11 +1146,11 @@ def _st_book_impl(module_list, toc_config: TOCConfig = None, marker_config: Mark
     # Presentation footer (auto-rendered when PresentationConfig is active)
     _pres_cfg = get_presentation_config()
     if _pres_cfg is not None and _pres_cfg.footer:
-        if _pres_cfg.counter_mode == "slide":
-            _total = stop_count() or len(module_list)
-        else:
-            _total = len(module_list)
-        st_presentation_footer(current_slide=1, total_slides=_total, config=_pres_cfg)
+        _n = stop_count() if _pres_cfg.counter_mode == "slide" else 0
+        # "slide": slide 1 over the stops (#117); the widget then keeps it
+        # in sync. Without stops, or in "bloc" mode: the entries.
+        st_presentation_footer(current_slide=1, total_slides=_n or len(module_list),
+                               config=_pres_cfg)
 
     # Offer export downloads when export is active
     if is_export_active():
@@ -1309,27 +1315,27 @@ def populate_toc(toc_sidebar: Delta, toc_block: Delta = None, toc_content_style:
 
 
 def populate_markers_sidebar(markers_placeholder: Delta, block_index: dict[int, str] = None):
-    entries = [e for e in marker_entries() if is_listed(e)]
+    entries = [e for e in annotate_marker_numbers(marker_entries()) if is_listed(e)]
     if not entries:
         return
     with markers_placeholder.container():
         if block_index is not None:
             # Search-enabled: single st.markdown block with data-stx-block attributes
             parts = []
-            for i, entry in enumerate(entries):
+            for entry in entries:
                 block_attr = f' data-stx-block="{entry.get("block_idx", 0)}"'
                 parts.append(
                     f'<div{block_attr} style="overflow:hidden;text-overflow:ellipsis;'
                     f'white-space:nowrap;padding:1px 0;font-size:14px;">'
-                    f'<a href="#{entry["anchor"]}">{i + 1}. {entry["label"]}</a></div>'
+                    f'<a href="#{entry["anchor"]}">{marker_row_text(entry)}</a></div>'
                 )
             parts.append('<div style="height:40px;"></div>')
             st.markdown("\n".join(parts), unsafe_allow_html=True)
         else:
-            for i, entry in enumerate(entries):
+            for entry in entries:
                 st.html(
                     f'<span style="overflow:hidden;text-overflow:ellipsis;text-wrap:nowrap;word-wrap:normal;">'
-                    f'<a href="#{entry["anchor"]}">{i + 1}. {entry["label"]}</a></span>'
+                    f'<a href="#{entry["anchor"]}">{marker_row_text(entry)}</a></span>'
                 )
 
 
@@ -1556,7 +1562,8 @@ def _load_file_cache(cache_path: str, expected_hash: str) -> dict | None:
         if isinstance(si, dict):
             data["search_index"] = {int(k): v for k, v in si.items()}
         # marker entries of an older library: give them their roles (#116)
-        normalize_marker_entries(data.get("markers") or [])
+        # and their numbers (#117)
+        annotate_marker_numbers(normalize_marker_entries(data.get("markers") or []))
         logger.debug("Loaded page cache from %s", cache_path)
         return data
     except Exception:
@@ -1576,11 +1583,33 @@ def _save_file_cache(cache_path: str, cache: dict) -> None:
         logger.debug("Failed to save file cache.", exc_info=True)
 
 
+def _footer_first_slide(markers: list[dict], page: int, initial_marker: int | None) -> int:
+    """The slide number the footer shows on its first paint (#117).
+
+    The deep-linked marker's number; else the first stop of *page*; else the
+    last stop before the page; else 1. *markers* carry ``number``.
+    """
+    if initial_marker is not None:
+        for e in markers:
+            if e.get("index") == initial_marker and e.get("number"):
+                return e["number"]
+    before = None
+    for e in markers:
+        if not is_stop(e) or not e.get("number"):
+            continue
+        pg = e.get("page_idx", 0)
+        if pg == page:
+            return e["number"]
+        if pg < page:
+            before = e["number"]
+    return before or 1
+
+
 def _get_page_titles(cache, total):
     """Extract page title for each page.
 
     When markers are available (#116): (1) the first listed marker of the
-    page, numbered by its global index; else (2) the label of the listed
+    page, with its slide number (#117); else (2) the label of the listed
     marker whose row covers the page's first stop (a row begun on an earlier
     page); else the page stays unnamed. Falls back to TOC section titles when
     the module has no marker at all.
@@ -1594,10 +1623,10 @@ def _get_page_titles(cache, total):
         for entry in markers:
             if not is_listed(entry):
                 continue
-            marker_num = entry["index"] + 1
+            num = entry.get("number")
             idx = entry.get("page_idx", 0)
             if idx < total and idx not in named:
-                titles[idx] = f"{marker_num} {entry['label']}"
+                titles[idx] = f"{num} {entry['label']}" if num else entry["label"]
                 named.add(idx)
         # (2) pages whose stops all continue a row begun earlier
         first_stop = {}
@@ -1895,6 +1924,9 @@ def _build_page_cache(module_list, toc_config, marker_config, separator,
 
     search_index = stop_collector() if use_search else None
 
+    if marker_config:
+        annotate_marker_numbers(marker_entries())     # #117
+
     # Store navigation data for CLI export enrichment (sidebar, markers, search)
     if export_config is not None:
         st.session_state["_stx_export_nav"] = {
@@ -2049,7 +2081,7 @@ def _build_paginated_sidebar(cache, current_page, total, toc_config, marker_conf
             for entry in cache.get("markers", []):
                 if not is_listed(entry):
                     continue
-                marker_num = entry["index"] + 1
+                row = marker_row_text(entry)     # same text as the popup (#117)
                 page_idx = entry.get("page_idx", 0)
                 if page_idx == current_page:
                     active_style = (
@@ -2059,12 +2091,12 @@ def _build_paginated_sidebar(cache, current_page, total, toc_config, marker_conf
                     marker_active_done = True
                     link = (
                         f'<a href="#{entry["anchor"]}"{active_style}>'
-                        f'{marker_num}. {entry["label"]}</a>'
+                        f'{row}</a>'
                     )
                 else:
                     link = (
                         f'<a href="#stx-goto-{page_idx}" class="stx-page-link">'
-                        f'{marker_num}. {entry["label"]}</a>'
+                        f'{row}</a>'
                     )
                 block_attr = f' data-stx-block="{page_idx}"' if show_search else ''
                 marker_parts.append(
@@ -2782,19 +2814,25 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
                 if entry.get("page_idx", 0) <= current_page:
                     continue
                 registry._entries.append(dict(entry, page=entry.get("page_idx", 0)))
+    if marker_config is not None:
+        # one number per marker, the live entries of this page included (#117)
+        annotate_marker_numbers(marker_entries())
 
     # --- Presentation footer (auto-rendered when PresentationConfig is active) ---
     _pres_cfg = get_presentation_config()
     if _pres_cfg is not None and _pres_cfg.footer:
-        if _pres_cfg.counter_mode == "slide":
-            _pres_total = stop_count() or total
+        _n = stop_count() if _pres_cfg.counter_mode == "slide" else 0
+        if _n:
+            # first paint = the slide the widget will start on (#117)
+            _first = _footer_first_slide(cache.get("markers", []), current_page,
+                                         st.session_state.get(_STX_INITIAL_MARKER_KEY))
+            st_presentation_footer(current_slide=_first, total_slides=_n, config=_pres_cfg)
         else:
-            _pres_total = total
-        st_presentation_footer(
-            current_slide=current_page + 1,
-            total_slides=_pres_total,
-            config=_pres_cfg,
-        )
+            st_presentation_footer(
+                current_slide=current_page + 1,
+                total_slides=total,
+                config=_pres_cfg,
+            )
 
     # --- Export downloads (BEFORE marker navigation) ---
     # The export panel creates sidebar widgets (expander, form, checkboxes).

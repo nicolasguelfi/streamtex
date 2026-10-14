@@ -28,6 +28,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `True`, `False` or a `MarkerRoles`.
 - `MarkerConfig.toc_marker_roles`: roles of the automatic heading markers,
   one for all levels or a dict per level.
+- One number per marker, its **slide number** (#117): stops are numbered
+  1…N in module order, any other marker takes the number of the slide it
+  sits in. `annotate_marker_numbers` computes it once in Python (`number`,
+  and `row_end` / `row_text` for listed markers); the live widget and the
+  HTML export read it instead of recomputing ranges.
+- `?slide=<n>` deep link (#117): opens the slide the counter calls n, in the
+  paginated app and in the HTML export. `page_url(base, slide=n)` builds it;
+  precedence `marker` > `slide` > `page`, in the link and in the reader.
 - Registry entries carry `stop`, `listed`, `toc`, `toc_anchor`,
   `toc_level`, `stop_index` and `origin`; `hidden` is derived (`stop and not
   listed`) and kept for tools reading the page cache. Helpers `is_stop`,
@@ -60,6 +68,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   on load.
 - Deep links (`?marker=`, `#anchor`) also resolve the anchor of a TOC
   heading attached to a marker.
+- Numbers on every surface (#117): the continuous Markers tab shows slide
+  numbers and ranges (it renumbered 1…k), the paginated tab shows the same
+  range as the popup (`4–8. Section B`, it showed `4.` alone), and the first
+  popup row starts at its marker's own number, no longer at 1 (the #97
+  rule is revised; stops before the first listed marker still highlight that
+  row and show its label). The counter and the footer count stops; with no
+  #116 feature in use every marker is a stop, so their values do not change.
+- The paginated footer (`counter_mode="slide"`) paints the slide number from
+  the start: the deep-linked marker's, else the page's first stop, else the
+  last stop before the page (it showed the page number until the widget
+  started, and kept it on pages without markers).
 
 ### Fixed
 

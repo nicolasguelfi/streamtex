@@ -604,6 +604,13 @@ _DEEPLINK_JS = r"""
     var q = new URLSearchParams(window.location.search);
     var ref = (q.get('marker') || '').trim();
     var m = ref ? findMarker(ref) : null;
+    if (!m) {                                             /* ?slide=<n>: stop n (#117) */
+      var n = pageNumber(q.get('slide')), seen = 0;
+      for (var i = 0; !m && !isNaN(n) && i < markers.length; i++) {
+        if (markers[i].stop === false) continue;
+        if (++seen === n) m = markers[i];
+      }
+    }
     if (!m) {
       var p = pageNumber(q.get('page'));                  /* 1-based */
       if (!isNaN(p) && p >= 1) m = firstOfPage(p - 1);

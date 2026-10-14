@@ -286,6 +286,49 @@ def normalize_marker_entries(entries: list[dict]) -> list[dict]:
     return entries
 
 
+def annotate_marker_numbers(entries: list[dict] | None = None) -> list[dict]:
+    """Write the number every surface shows into each entry, in place (#117).
+
+    One number per marker: its **slide number**. Stops are numbered 1…N in
+    module order (``stop_index + 1``); any other marker takes the number of
+    the slide it sits in (the last stop before it, or 1 before the first
+    stop; ``None`` without any stop). Listed entries also get their row of
+    the marker list: ``row_end`` (the last stop before the next listed
+    marker, or N) and ``row_text`` (``"4–8"``, or ``"9"`` when the row holds
+    one slide; ``""`` without any stop). The popup, the Markers tab, the page
+    titles, the counter and the footer all read these fields.
+    """
+    entries = _entries_or_registry(entries)
+    n_stops = sum(1 for e in entries if is_stop(e))
+    seen = 0
+    for e in entries:
+        if is_stop(e):
+            seen += 1
+            e["number"] = seen
+        else:
+            e["number"] = seen if seen else (1 if n_stops else None)
+    listed = [e for e in entries if is_listed(e)]
+    for i, e in enumerate(listed):
+        start = e["number"]
+        if start is None:
+            e["row_end"], e["row_text"] = None, ""
+            continue
+        if i + 1 < len(listed):
+            nxt = listed[i + 1].get("index", 0)
+            end = sum(1 for x in entries if is_stop(x) and x.get("index", 0) < nxt)
+        else:
+            end = n_stops
+        e["row_end"] = end
+        e["row_text"] = str(start) if end <= start else f"{start}–{end}"
+    return entries
+
+
+def marker_row_text(entry: dict) -> str:
+    """The text of a marker-list row: ``"4–8. Section B"`` (popup and Markers tab)."""
+    rt = entry.get("row_text")
+    return f"{rt}. {entry['label']}" if rt else entry["label"]
+
+
 def _entries_or_registry(entries: list[dict] | None) -> list[dict]:
     return marker_entries() if entries is None else entries
 
@@ -565,13 +608,6 @@ _MARKER_ROLES_JS = r"""
         }
         return (at < 0 && stops.length) ? 0 : at;
     }
-    function lastStopBefore(idx) {
-        var at = -1;
-        for (var s = 0; s < stops.length; s++) {
-            if (stops[s].index < idx) at = s; else break;
-        }
-        return at;
-    }
     /* Position reached by |delta| arrow presses from position idx: next =
        the first stop after it, prev = the last stop before it.  null when
        no stop lies that way (the caller crosses the page boundary). */
@@ -602,17 +638,11 @@ _MARKER_ROLES_JS = r"""
         }
         return (at < 0 && listedMarkers.length) ? 0 : at;
     }
-    /* "4–8": the stop numbers a popup row covers (row 0 from 1, #97) */
-    function rowRange(vi) {
-        if (!stops.length) return '';
-        var start = vi === 0 ? 0 : stopOf(listedMarkers[vi].index);
-        var end = vi + 1 < listedMarkers.length
-            ? lastStopBefore(listedMarkers[vi + 1].index) : stops.length - 1;
-        return start >= end ? String(start + 1) : (start + 1) + '–' + (end + 1);
-    }
+    /* "4–8. Section B": the row computed in Python
+       (marker.annotate_marker_numbers), the same text as the Markers tab */
     function rowText(vi) {
-        var r = rowRange(vi);
-        return (r ? r + '. ' : '') + listedMarkers[vi].label;
+        var m = listedMarkers[vi];
+        return (m.row_text ? m.row_text + '. ' : '') + m.label;
     }
     /* An unlisted marker without a label of its own shows its section (#97) */
     function currentLabel() {
@@ -624,8 +654,11 @@ _MARKER_ROLES_JS = r"""
         }
         return m.label;
     }
-    /* The counter's n: the stop of the current position ("–" without stops) */
+    /* The counter's n: the slide number of the current position, computed
+       in Python (#117); "–" without stops */
     function stopNumber() {
+        var m = markers[currentIdx];
+        if (m && m.number != null) return String(m.number);
         var s = stopOf(currentIdx);
         return s < 0 ? '–' : String(s + 1);
     }
@@ -656,6 +689,7 @@ def inject_marker_navigation(
     entries = marker_entries()
     if not entries:
         return
+    annotate_marker_numbers(entries)
 
     config = get_marker_config()
     if config is None:

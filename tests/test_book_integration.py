@@ -177,9 +177,10 @@ class TestFileCache:
         assert loaded is not None
         assert loaded["hash"] == "h1"
         assert loaded["toc"] == cache["toc"]
-        # an older entry (hidden only) gets its roles on load (#116)
+        # an older entry (hidden only) gets its roles (#116) and numbers (#117) on load
         assert loaded["markers"] == [dict(cache["markers"][0], stop=True, listed=True,
-                                          toc=False, origin="marker", stop_index=0)]
+                                          toc=False, origin="marker", stop_index=0,
+                                          number=1, row_end=1, row_text="1")]
         # search_index keys are restored as ints
         assert loaded["search_index"] == {0: "some text"}
 

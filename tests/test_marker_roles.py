@@ -631,7 +631,9 @@ class TestBookHelpers:
 
     def test_page_titles(self):
         from streamtex.book import _get_page_titles
-        assert _get_page_titles(self._cache(), 4) == ["1 Intro", "Section 2", "Sub", "Section 4"]
+        cache = self._cache()
+        mk.annotate_marker_numbers(cache["markers"])
+        assert _get_page_titles(cache, 4) == ["1 Intro", "Section 2", "Sub", "Section 4"]
 
 
 # ---------------------------------------------------------------------------
@@ -650,6 +652,7 @@ DECK = [
 
 
 def _node(body, markers=DECK):
+    markers = mk.annotate_marker_numbers([dict(m) for m in markers])
     prog = (f"var markers = {json.dumps(markers)};\nvar currentIdx = 0;\n"
             f"{mk._MARKER_ROLES_JS}\n{body}")
     r = subprocess.run(["node", "-e", prog], capture_output=True, text=True)

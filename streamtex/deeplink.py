@@ -1,13 +1,15 @@
 """Deep links into a paginated book — open a deck at a given page or marker.
 
-Two URL parameters are honoured by ``st_book(paginate=True)`` on the first
+Three URL parameters are honoured by ``st_book(paginate=True)`` on the first
 run of a session (and by the static HTML export, client-side):
 
 - ``?marker=<key-or-slug>`` — the stable ``key=`` given to ``st_marker()``,
   or the slug of the marker label (``"Electricity"`` → ``electricity``);
+- ``?slide=<n>`` — the slide number shown by the counter ``n / N`` (#117),
+  1-based;
 - ``?page=<n>`` — a 1-based page number.
 
-``?marker=`` wins over ``?page=`` when both are present. Invalid values are
+Precedence: ``?marker=`` > ``?slide=`` > ``?page=``. Invalid values are
 ignored (the book opens on page 1); no other parameter is read or modified,
 so a project's own ``?lang=`` travels untouched.
 
@@ -24,6 +26,7 @@ from .toc import TOCRegistry
 #: Query-string parameter names.
 PAGE_PARAM = "page"
 MARKER_PARAM = "marker"
+SLIDE_PARAM = "slide"
 
 _MARKER_PREFIX = "stx-marker-"
 
@@ -72,6 +75,20 @@ def find_marker(markers: Sequence[Mapping[str, Any]], ref: str) -> Optional[Mapp
     return None
 
 
+def find_slide(markers: Sequence[Mapping[str, Any]], n: int) -> Optional[Mapping[str, Any]]:
+    """Return the stop numbered *n* (1-based slide number), or ``None``."""
+    if n < 1:
+        return None
+    seen = 0
+    for m in markers:
+        if not m.get("stop", True):
+            continue
+        seen += 1
+        if seen == n:
+            return m
+    return None
+
+
 def resolve_initial_page(params: Mapping[str, Any],
                          markers: Sequence[Mapping[str, Any]],
                          total: int) -> tuple[int, Optional[int]]:
@@ -92,6 +109,13 @@ def resolve_initial_page(params: Mapping[str, Any],
             # target: fall through to ?page= rather than land somewhere else.
             if 0 <= page < total:
                 return page, int(m.get("index", 0))
+    raw = _first(params.get(SLIDE_PARAM))
+    if raw and raw.isdigit():
+        m = find_slide(markers, int(raw))
+        if m is not None:
+            page = int(m.get("page_idx", 0) or 0)
+            if 0 <= page < total:
+                return page, int(m.get("index", 0))
     raw = _first(params.get(PAGE_PARAM))
     if raw:
         try:
@@ -104,28 +128,36 @@ def resolve_initial_page(params: Mapping[str, Any],
 
 
 def page_url(base: str, *, marker: Optional[str] = None,
-             page: Optional[int] = None, **params: Any) -> str:
+             page: Optional[int] = None, slide: Optional[int] = None,
+             **params: Any) -> str:
     """Build a deep link into a paginated book.
 
     Merges ``marker`` / ``page`` (and any extra keyword, e.g. ``lang="fr"``)
     into the query string of *base*, keeping the parameters *base* already
     carries — a hub can wrap a link produced by its own ``with_lang()``.
-    ``page`` is 1-based. The fragment of *base* is preserved. A deep link
-    already present in *base* is kept unless ``marker`` / ``page`` replaces it.
+    ``page`` is 1-based; ``slide`` is the 1-based slide number of the counter
+    (#117). When several are given, the same precedence as the reader
+    applies: ``marker`` > ``slide`` > ``page``. The fragment of *base* is
+    preserved. A deep link already present in *base* is kept unless one of
+    them replaces it.
 
     >>> page_url("https://x/waves?lang=en", marker="electricity")
     'https://x/waves?lang=en&marker=electricity'
     """
     scheme, netloc, path, query, fragment = urlsplit(base)
-    replacing = bool(marker) or page is not None
+    replacing = bool(marker) or page is not None or slide is not None
     items = [(k, v) for k, v in parse_qsl(query, keep_blank_values=True)
              if k not in params
-             and not (replacing and k in (MARKER_PARAM, PAGE_PARAM))]
+             and not (replacing and k in (MARKER_PARAM, PAGE_PARAM, SLIDE_PARAM))]
     for k, v in params.items():
         if v is not None:
             items.append((k, str(v)))
     if marker:
         items.append((MARKER_PARAM, str(marker)))
+    elif slide is not None:
+        if int(slide) < 1:
+            raise ValueError("page_url: slide is 1-based (>= 1)")
+        items.append((SLIDE_PARAM, str(int(slide))))
     elif page is not None:
         if int(page) < 1:
             raise ValueError("page_url: page is 1-based (>= 1)")

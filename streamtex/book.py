@@ -1347,7 +1347,29 @@ def st_toc(toc_title_style):
     return toc_block
 
 
-def st_include(block_file_module, *args, _inspector_config=None, **kwargs):
+def st_include(block_file_module, *args, markers=True, _inspector_config=None, **kwargs):
+    """Render another block's ``build()`` in place, like ``\\input``.
+
+    ``markers`` changes the roles of every marker the included ``build()``
+    places — its own ``st_marker`` calls, its breaks' markers, its headings'
+    markers, at any depth of nested inclusions (#113):
+
+    =================  ===============================================
+    ``True``           unchanged (default)
+    ``False``          no stop, not listed (each marker keeps its
+                       anchor and its deep link)
+    ``"hidden"``       stops kept, none listed
+    ``{"stop": …, "listed": …, "toc": False}``  each key forces that role;
+                       ``"toc": False`` also drops the TOC entries
+    =================  ===============================================
+
+    Nested inclusions inherit the override; on a conflict the outer one
+    wins. The layout never changes: rules, spacers, spacing and content are
+    rendered identically. ``markers`` is not passed to ``build()``.
+    """
+    from .marker import include_role_override, normalize_markers_arg
+
+    normalize_markers_arg(markers)          # ValueError before anything renders
     if not block_file_module:
         st.markdown(":red-background[Block module is None — not found]")
         return
@@ -1367,7 +1389,8 @@ def st_include(block_file_module, *args, _inspector_config=None, **kwargs):
         render_edit_button(short_name, _inspector_config)
 
     try:
-        block_file_module.build(*args, **kwargs)
+        with include_role_override(markers):
+            block_file_module.build(*args, **kwargs)
     except Exception as e:
         st.markdown(f":red-background[Error in block '{module_name}': {e}]")
         raise

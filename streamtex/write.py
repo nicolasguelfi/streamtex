@@ -6,11 +6,13 @@ from .enums import Tag, Tags
 from .export import _render
 from .marker import (
     MarkerRoles,
+    effective_roles,
     get_marker_config,
     marker_attach_target,
     marker_attach_toc,
     marker_slide_stop,
     register_marker,
+    toc_suppressed,
 )
 from .spacing import Spacing, consume_block_top_injected, resolve_section_spacing
 from .styles import StxStyles, Style
@@ -163,6 +165,11 @@ def _handle_toc(final_txt: str, toc_lvl: Optional[str] = None, label: str = "",
     if isinstance(marker, str) and marker != "attach":
         raise ValueError(f"st_write(marker={marker!r}): expected None, True, False, "
                          "a MarkerRoles or 'attach'")
+    if toc_lvl and toc_suppressed():
+        # st_include(markers={"toc": False}) (#113): no TOC entry, no number;
+        # a marker the heading would carry keeps its stop / listed roles
+        key_anchor = _heading_marker_without_toc(final_txt, label, marker, toc_lvl)
+        return final_txt, key_anchor
     if toc_lvl:
         # If no label is provided, generate a truncated label from the text. This ensures TOC entries are descriptive
         # but not overly long, avoiding clutter in the TOC.
@@ -198,7 +205,8 @@ def _bridge_toc_marker(cfg, marker, label: str, key_anchor: str, level: int) -> 
     author writes ``marker="attach"``.
     """
     def own(roles: MarkerRoles) -> None:
-        register_marker(label, key_anchor, stop=roles.stop, listed=roles.listed,
+        stop, listed = effective_roles(roles.stop, roles.listed)    # st_include(markers=)
+        register_marker(label, key_anchor, stop=stop, listed=listed,
                         toc_anchor=key_anchor, toc_level=level, origin="toc")
 
     if marker is True:
@@ -224,7 +232,7 @@ def _bridge_toc_marker(cfg, marker, label: str, key_anchor: str, level: int) -> 
     if not ((auto is True) or (isinstance(auto, int) and level <= auto)):
         return False
     roles = cfg.roles_for_level(level)
-    slide_stop = marker_slide_stop() if roles.stop else None
+    slide_stop = marker_slide_stop() if effective_roles(roles.stop, roles.listed)[0] else None
     if slide_stop is not None:
         # a deck's slide (opened by a break or st_slide) already has its stop:
         # the book mixes heading stops (documents) with slide stops (decks)
@@ -237,3 +245,36 @@ def _bridge_toc_marker(cfg, marker, label: str, key_anchor: str, level: int) -> 
         )
     own(roles)
     return True
+
+
+def _heading_marker_without_toc(final_txt: str, label: str, marker, toc_lvl: str) -> str:
+    """A heading inside ``st_include(markers={"toc": False})`` (#113).
+
+    It registers no TOC entry. The marker it would have carried (``True``, a
+    ``MarkerRoles``, or the automatic one when ``auto_marker_on_toc`` covers
+    the absolute level it asks for) keeps its stop / listed roles under a
+    marker anchor, returned as the heading's element id. ``"attach"`` has
+    nothing to link. Returns ``""`` when no marker is placed.
+    """
+    cfg = get_marker_config()
+    if cfg is None or marker is False or marker == "attach":
+        return ""
+    if marker is True:
+        roles = MarkerRoles.NAMED
+    elif isinstance(marker, MarkerRoles):
+        roles = marker
+    else:
+        from . import toc as _toc
+        lvl = _toc.toc.resolve_level(toc_lvl) if _toc.toc is not None else 1
+        auto = cfg.auto_marker_on_toc
+        if not ((auto is True) or (isinstance(auto, int) and lvl <= auto)):
+            return ""
+        roles = cfg.roles_for_level(lvl)
+    from .marker import marker_count
+    from .toc import TOCRegistry
+    if not label:
+        label = strip_html(final_txt)[:73]
+    anchor = f"stx-marker-{TOCRegistry.get_key_anchor(label)}-{marker_count()}"
+    stop, listed = effective_roles(roles.stop, roles.listed)
+    register_marker(label, anchor, stop=stop, listed=listed, origin="toc")
+    return anchor

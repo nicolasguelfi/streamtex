@@ -2,6 +2,9 @@
 
 import base64
 import json
+from collections.abc import Mapping
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import ClassVar, Optional
@@ -329,6 +332,82 @@ def marker_row_text(entry: dict) -> str:
     return f"{rt}. {entry['label']}" if rt else entry["label"]
 
 
+# ---------------------------------------------------------------------------
+# Role override of an inclusion — st_include(markers=…) (#113)
+# ---------------------------------------------------------------------------
+
+#: The role override active while an included ``build()`` runs: ``{"stop":
+#: bool, "listed": bool, "toc": False}``, each key forcing that role. A
+#: ``ContextVar`` and not a global: each Streamlit script run has its own.
+_INCLUDE_ROLE_OVERRIDE: ContextVar[Mapping[str, bool] | None] = ContextVar(
+    "stx_include_role_override", default=None)
+
+_OVERRIDE_KEYS = ("stop", "listed", "toc")
+
+
+def normalize_markers_arg(markers) -> dict[str, bool]:
+    """``st_include(markers=…)`` as a role override; ``ValueError`` if invalid.
+
+    ``True`` = ``{}`` (unchanged), ``False`` = ``{"stop": False, "listed":
+    False}``, ``"hidden"`` = ``{"listed": False}``, or a mapping of
+    ``"stop"`` / ``"listed"`` / ``"toc"`` to ``bool`` (``"toc": True`` is
+    refused: an inclusion cannot invent a TOC level).
+    """
+    if markers is True:
+        return {}
+    if markers is False:
+        return {"stop": False, "listed": False}
+    if markers == "hidden":
+        return {"listed": False}
+    if isinstance(markers, Mapping):
+        out = {}
+        for k, v in markers.items():
+            if k not in _OVERRIDE_KEYS:
+                raise ValueError(f"st_include(markers=…): unknown role {k!r}; "
+                                 f"allowed: {', '.join(_OVERRIDE_KEYS)}")
+            if not isinstance(v, bool):
+                raise ValueError(f"st_include(markers=…): {k!r} must be True or False, got {v!r}")
+            if k == "toc" and v:
+                raise ValueError("st_include(markers={'toc': True}): a TOC entry needs a level; "
+                                 "only 'toc': False is allowed")
+            out[k] = v
+        return out
+    raise ValueError(f"st_include(markers={markers!r}): expected True, False, 'hidden' or a "
+                     "mapping of 'stop' / 'listed' / 'toc' to bool")
+
+
+@contextmanager
+def include_role_override(markers):
+    """Apply ``st_include(markers=…)`` to every marker placed inside (#113).
+
+    Nested inclusions inherit it; on a conflict the **outer** inclusion wins
+    (the composing block decides). Restored even if ``build()`` raises.
+    """
+    new = normalize_markers_arg(markers)
+    outer = _INCLUDE_ROLE_OVERRIDE.get() or {}
+    token = _INCLUDE_ROLE_OVERRIDE.set({**new, **outer})
+    try:
+        yield
+    finally:
+        _INCLUDE_ROLE_OVERRIDE.reset(token)
+
+
+def role_override() -> Mapping[str, bool]:
+    """The role override of the inclusion being rendered (``{}`` outside any)."""
+    return _INCLUDE_ROLE_OVERRIDE.get() or {}
+
+
+def effective_roles(stop: bool, listed: bool) -> tuple[bool, bool]:
+    """*stop* / *listed* after the inclusion override. The anchor always stays."""
+    o = role_override()
+    return o.get("stop", stop), o.get("listed", listed)
+
+
+def toc_suppressed() -> bool:
+    """True inside ``st_include(markers={"toc": False})``: no TOC entry is registered."""
+    return role_override().get("toc") is False
+
+
 def _entries_or_registry(entries: list[dict] | None) -> list[dict]:
     return marker_entries() if entries is None else entries
 
@@ -541,8 +620,9 @@ def st_marker(label: str = "", visible: bool = False, hidden: bool | None = None
     if r.toc_lvl is not None and not label:
         raise ValueError("st_marker(): a TOC entry needs a label (toc_lvl given without label)")
 
+    stop_, listed_ = effective_roles(r.stop, r.listed)     # st_include(markers=) (#113)
     toc_anchor = toc_level = None
-    if r.toc_lvl is not None:
+    if r.toc_lvl is not None and not toc_suppressed():
         from .toc import register_toc_entry
         toc_anchor, _number, toc_level = register_toc_entry(label, r.toc_lvl)
 
@@ -565,7 +645,7 @@ def st_marker(label: str = "", visible: bool = False, hidden: bool | None = None
         slug = TOCRegistry.get_key_anchor(label)
         anchor = f"stx-marker-{slug}-{idx}"
 
-    _registry.register(label, anchor, key=key, auto=auto, stop=r.stop, listed=r.listed,
+    _registry.register(label, anchor, key=key, auto=auto, stop=stop_, listed=listed_,
                        toc_anchor=toc_anchor, toc_level=toc_level, origin=_origin)
 
     # Same offset as the JS scroll (MarkerConfig.scroll_offset): anchor jumps

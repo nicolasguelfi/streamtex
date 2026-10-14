@@ -67,6 +67,12 @@ class TOCRegistry:
         self.current_level = 1
         self.numbers = []
 
+    def resolve_level(self, level: str) -> int:
+        """The level an entry at *level* would get, without registering it."""
+        if level.startswith("+") or level.startswith("-"):
+            return max(self.current_level + int(level), 1)
+        return max(int(level), 1)
+
     def register_entry(self, label: str, level: str):
         """
         Registers an entry and returns a unique ID (slug) for the anchor.

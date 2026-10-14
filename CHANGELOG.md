@@ -33,6 +33,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   sits in. `annotate_marker_numbers` computes it once in Python (`number`,
   and `row_end` / `row_text` for listed markers); the live widget and the
   HTML export read it instead of recomputing ranges.
+- `st_include(block, markers=…)` (#113): the roles of every marker the
+  included `build()` places — its `st_marker` calls, its breaks' markers,
+  its headings' markers, at any depth. `True` (default, unchanged), `False`
+  (no stop, not listed; each marker keeps its anchor and deep link),
+  `"hidden"` (stops kept, none listed), or a mapping of `"stop"` /
+  `"listed"` / `"toc"` (`"toc": False` drops the TOC entries). Nested
+  inclusions inherit it; the outer inclusion wins. The layout never changes.
+  Invalid values raise `ValueError` before `build()` runs. `markers` is now
+  a reserved keyword of `st_include` (not passed to `build()`; no block of
+  the library, the manuals, the trainings or the lab takes it).
 - `?slide=<n>` deep link (#117): opens the slide the counter calls n, in the
   paginated app and in the HTML export. `page_url(base, slide=n)` builds it;
   precedence `marker` > `slide` > `page`, in the link and in the reader.

@@ -23,10 +23,13 @@ from .browser import st_chrome_banner
 from .code import add_wrap_all_option
 from .enums import Tags
 from .export import (
+    PAGE_SENTINEL,
     ExportConfig,
     ExportMode,
     apply_view_to_export_html,
     build_export_filename,
+    export_insert_root,
+    export_root_position,
     generate_export_html,
     get_asset_collector,
     is_export_active,
@@ -77,6 +80,15 @@ logger = logging.getLogger(__name__)
 
 # Warmup mode flag — set by CLI ``stx cache warmup`` for headless cache build.
 _warmup_mode = False
+
+#: Set by ``stx export html`` for a paginated export (#106): the cache build
+#: marks where each page starts in the export buffer.
+_export_page_sentinels = False
+
+#: The HTML export mode the module asks for: "continuous", "paginated" or
+#: "both" (#106) — set by st_book, read by ``stx export html``.
+_html_export_mode = "continuous"
+HTML_EXPORT_MODES = ("continuous", "paginated", "both")
 
 # Optional ExportConfig for headless export — set by CLI ``stx export html``.
 # When set (not None) during warmup, _warmup_build_cache will activate the
@@ -687,6 +699,7 @@ def _st_book_impl(module_list, toc_config: TOCConfig = None, marker_config: Mark
             exports: list[ExportConfig] | None = None,
             paginate: bool = False,
             paginate_by="entry",
+            html_export_mode="continuous",
             view_modes: list[ViewMode] | None = None,
             banner_color: str = "rgba(211, 47, 47, 0.8)",
             banner: BannerConfig = None,
@@ -723,6 +736,10 @@ def _st_book_impl(module_list, toc_config: TOCConfig = None, marker_config: Mark
         TOC, exports and PDF are the same for every value; only the pages and
         ``?page=`` numbers change (``?marker=<key>`` is the durable link).
         ``st_include(..., page=True | False)`` overrides it locally.
+    :param html_export_mode: What ``stx export html`` writes (#106):
+        ``"continuous"`` (default) one file; ``"paginated"`` one file per page
+        of the page map; ``"both"`` the two, with a button in the navigation
+        bar that opens the same slide in the other mode.
     :param view_modes: Optional list of allowed ViewMode values.
         When a single mode is given, the View radio is hidden and
         the document is locked to that mode.  Defaults to both modes.
@@ -754,6 +771,11 @@ def _st_book_impl(module_list, toc_config: TOCConfig = None, marker_config: Mark
         in ``block_kwargs`` wins. ``None`` (default) forwards nothing.
     """
     _pagewalk.set_paginate_by(paginate_by)      # ValueError on a wrong value (#121)
+    if html_export_mode not in HTML_EXPORT_MODES:
+        raise ValueError(f"html_export_mode must be one of {', '.join(HTML_EXPORT_MODES)} "
+                         f"— got {html_export_mode!r}")
+    global _html_export_mode
+    _html_export_mode = html_export_mode       # read by stx export html (#106)
     if lang is not None:
         from .i18n import current_lang
 
@@ -2203,14 +2225,27 @@ def _suppress_cache_build_dom():
             setattr(st, attr, val)
 
 
-def _assign_tree_pages(walk, entry_idx: int, pages: list[dict], collector) -> None:
+def _assign_tree_pages(walk, entry_idx: int, pages: list[dict], collector,
+                       entry_name: str = "", entry_pos=None) -> None:
     """Close the dry walk of one entry: its pages and the page of what it registered (#121)."""
     starts, local = walk.assign()
     base = len(pages)
     if starts:
-        pages.extend({"entry": entry_idx, "start": list(p)} for p in starts)
+        for p in starts:
+            node = walk.nodes.get(tuple(p), {})
+            parent = walk.nodes.get(tuple(p)[:-1], {}) if len(p) > 1 else {"name": entry_name}
+            pages.append({"entry": entry_idx, "start": list(p), "block": node.get("name", entry_name),
+                          "parent": parent.get("name", entry_name)})
     else:
-        pages.append({"entry": entry_idx, "start": []})
+        pages.append({"entry": entry_idx, "start": [], "block": entry_name, "parent": ""})
+    if _export_page_sentinels:
+        # where each page starts in the export (#106): the entry's start, then
+        # the end of the previous page-starting inclusion; a start inside an
+        # open container cannot be cut and stays with the previous page
+        positions = [entry_pos] + [walk.exit_pos.get(tuple(p)) for p in starts[:-1]]
+        for j in range(len(positions) - 1, -1, -1):
+            if positions[j] is not None:
+                export_insert_root(positions[j], PAGE_SENTINEL.format(n=base + j))
     markers = marker_entries()
     tocs = toc_entries() if _toc_mod.toc is not None else []
     stops: set[int] = set()
@@ -2287,7 +2322,9 @@ def _build_page_cache(module_list, toc_config, marker_config, separator,
 
                 if collector is not None:
                     collector.set_block(base)
-                walk = _pagewalk.DryWalk(_mode, collector) if _mode != _pagewalk.ENTRY else None
+                _entry_pos = export_root_position() if _export_page_sentinels else None
+                walk = (_pagewalk.DryWalk(_mode, collector, export_root_position if _export_page_sentinels else None)
+                        if _mode != _pagewalk.ENTRY else None)
                 walk_token = _pagewalk.activate(walk) if walk is not None else None
 
                 # Block spacing: inject block.top + set flag
@@ -2317,12 +2354,15 @@ def _build_page_cache(module_list, toc_config, marker_config, separator,
                 reset_block_spacing()
 
                 # The entry's pages, and the page of everything it registered
+                _ename = getattr(module, "__name__", str(module))
                 if walk is not None:
-                    _assign_tree_pages(walk, i, pages, collector)
+                    _assign_tree_pages(walk, i, pages, collector, _ename, _entry_pos)
                     if collector is not None:
                         collector.set_block(len(pages) - 1)
                 else:
-                    pages.append({"entry": i, "start": []})
+                    pages.append({"entry": i, "start": [], "block": _ename, "parent": ""})
+                    if _export_page_sentinels and _entry_pos is not None:
+                        export_insert_root(_entry_pos, PAGE_SENTINEL.format(n=base))
 
                 # Tag new TOC entries with their page index
                 if toc_config:
@@ -3405,7 +3445,7 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
 #: The book settings ``[book.defaults]`` of ``stx.toml`` may provide. Book
 #: configuration only — nothing that reaches the content of a block.
 BOOK_DEFAULT_KEYS = frozenset({
-    "paginate", "paginate_by", "page_width", "zoom", "export", "export_title", "loading",
+    "paginate", "paginate_by", "html_export_mode", "page_width", "zoom", "export", "export_title", "loading",
     "chrome_banner", "banner_color", "doc_version", "lang", "html_export_zoom",
 })
 

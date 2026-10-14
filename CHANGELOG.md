@@ -96,6 +96,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   call `stx.set_slide_container(<design system box>)` in `book.py`, then
   make the helper an alias, `from streamtex import st_slide as slide` — no
   block file changes, no visual change.
+- Paginated HTML export (#106): `stx export html --html-mode continuous |
+  paginated | both`, or the module setting `st_book(html_export_mode=…)`
+  (also a `[book.defaults]` key of `stx.toml`). One file per page of the
+  page map of #121 (`paginate_by`), in `<base>/pages/`: each file holds
+  only its page (and requests only its images), the whole module's table of
+  contents (links to other pages open that file at the heading; the
+  entries of the page are marked) and the global search index; the arrows
+  walk the stops across files, one press per slide; `?marker=`, `?slide=`,
+  `?page=` and `#anchor` open the right file. File names carry no number:
+  the page's block, a repeated block qualified by its section
+  (`exercice-1-la-question-directe--bck_title_bravo.html`). `paginated`
+  turns `<base>.html` into an entry file that sends every link to its page;
+  `both` keeps the continuous file and adds a "Continuous view / Paginated
+  view" button to the navigation bar of every file, which opens the same
+  slide in the other mode. No rule at the head of a page file, as in the
+  app. Measured on PROMPT4UL-slides (FR and EN): 63 files, the same 142
+  slides in the same order as the continuous file, the same 70-entry table
+  of contents in every file.
 - `?slide=<n>` deep link (#117): opens the slide the counter calls n, in the
   paginated app and in the HTML export. `page_url(base, slide=n)` builds it;
   precedence `marker` > `slide` > `page`, in the link and in the reader.
@@ -176,6 +194,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- HTML export navigation bar: an arrow press could repeat the previous
+  slide — the scroll tracker read the position while the animated scroll
+  was still running (it was paused for a fixed 400 ms); it now waits for the
+  end of the scroll. At the bottom of a short document the last slides,
+  which cannot reach the top, keep their position (#106).
 - A changed `book.py` (e.g. `MarkerConfig`, `TOCConfig`) did not invalidate
   the page cache when the entries live outside `<book dir>/blocks/` (#120).
 - The `watch.py` and `_compute_cache_hash` docstrings described the watched

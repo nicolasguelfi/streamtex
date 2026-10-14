@@ -735,7 +735,7 @@ def test_deeplink_to_a_non_stop_sets_the_position():
     """)
     markers = [dict(e, key="deep") if e["label"] == "deep" else e for e in DECK]
     bar = _marker_nav_script(markers)
-    deeplink = _DEEPLINK_JS.replace("__MARKERS__", json.dumps(markers)).replace("__TOC__", "[]")
+    deeplink = _DEEPLINK_JS.replace("__MARKERS__", json.dumps(markers)).replace("__TOC__", "[]").replace("__PAGE_NAV__", "null")
     # expose the bar's counter: the last span created is the label; find the counter by class
     prog = (dom + bar.replace("var counter = document.createElement('span');",
                               "var counter = document.createElement('span'); window.__counter = counter;")

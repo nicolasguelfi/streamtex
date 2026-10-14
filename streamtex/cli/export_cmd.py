@@ -98,8 +98,12 @@ def resolve_export_lang(lang_option: str | None) -> str:
 @click.option("--suffix", default="",
               help="Suffix appended to the output basename (e.g. '-fr' gives "
                    "<project>-fr.html) so one directory can hold several languages.")
+@click.option("--html-mode", type=click.Choice(["continuous", "paginated", "both"]),
+              default=None,
+              help="continuous (one file), paginated (one file per page of the page map) "
+                   "or both. Defaults to st_book(html_export_mode=…) of the module.")
 def export_html(path, output, asset_mode, title, no_nav, theme_mode, theme_bg, theme_text,
-                lang, suffix):
+                lang, suffix, html_mode):
     """Generate static HTML from a StreamTeX project without a Streamlit server.
 
     Exports a fully navigable HTML document with sidebar TOC, floating
@@ -114,6 +118,7 @@ def export_html(path, output, asset_mode, title, no_nav, theme_mode, theme_bg, t
         stx export html --no-nav .
         STX_LANG=fr stx export html --suffix -fr .     # <html lang="fr">, deck-fr.html
         stx export html --lang fr --output ./out/fr .
+        stx export html --html-mode both .              # continuous + one file per page
     """
     from ..export import AssetCollector, AssetMode, ExportConfig
 
@@ -186,6 +191,8 @@ def export_html(path, output, asset_mode, title, no_nav, theme_mode, theme_bg, t
         from streamtex import book as _book_mod
         _book_mod._warmup_mode = True
         _book_mod._warmup_export_config = export_cfg
+        _book_mod._export_page_sentinels = True        # where pages start (#106)
+        _book_mod._html_export_mode = "continuous"
 
         t0 = time.time()
         try:
@@ -204,12 +211,14 @@ def export_html(path, output, asset_mode, title, no_nav, theme_mode, theme_bg, t
         finally:
             _book_mod._warmup_mode = False
             _book_mod._warmup_export_config = None
+            _book_mod._export_page_sentinels = False
             os.chdir(original_cwd)
 
         # Retrieve the captured HTML and nav data while session_state is the mock dict
         import streamlit as st
         full_html = st.session_state.get(_book_mod._STX_FULL_EXPORT_HTML_KEY)
         nav_data = st.session_state.get("_stx_export_nav")
+        _cache_data = st.session_state.get(_book_mod._STX_CACHE_KEY) or {}
 
     elapsed = time.time() - t0
 
@@ -221,18 +230,44 @@ def export_html(path, output, asset_mode, title, no_nav, theme_mode, theme_bg, t
         )
         raise SystemExit(1)
 
-    # Enrich HTML with navigation (sidebar TOC, marker bar, search)
-    if not no_nav and nav_data:
+    from ..export import strip_page_sentinels
+    from ..export_paginate import build_entry_html, build_page_documents, to_subfolder
+
+    mode = html_mode or _book_mod._html_export_mode
+    raw_html = full_html
+    full_html = strip_page_sentinels(raw_html)           # the continuous document
+
+    # Derive the base name from the project directory
+    base_name = os.path.basename(project_dir).replace("stx_manual_", "") + suffix
+    output_dir = os.path.abspath(output)
+    nav_toc = (nav_data or {}).get("toc") or []
+    nav_markers = (nav_data or {}).get("markers") or []
+
+    # The paginated files (#106): one per page of the module's page map
+    paged = None
+    if mode in ("paginated", "both"):
+        pages = _cache_data.get("pages") or []
+        paged = build_page_documents(raw_html, pages, nav_toc) if pages else None
+        if paged is None:
+            console.print("[red]Error:[/] no page map in the page cache: cannot paginate.")
+            raise SystemExit(1)
+    pages_dir_name = "pages" if use_external else f"{base_name}-pages"
+
+    def _enrich(html_in, page_nav=None):
+        if no_nav or not nav_data:
+            return html_in
         from ..export_enrich import enrich_export_html
-        _cache_data = st.session_state.get("_stx_page_cache", {})
-        full_html = enrich_export_html(
-            full_html,
-            toc=nav_data.get("toc"),
-            markers=nav_data.get("markers"),
+        return enrich_export_html(
+            html_in,
+            toc=nav_toc,
+            markers=nav_markers,
             search_index=nav_data.get("search_index"),
             doc_version=_cache_data.get("doc_version", ""),
             lib_version=_cache_data.get("lib_version", ""),
+            page_nav=page_nav,
         )
+
+    if not no_nav and nav_data:
         features = []
         if nav_data.get("toc"):
             features.append("TOC sidebar")
@@ -242,10 +277,6 @@ def export_html(path, output, asset_mode, title, no_nav, theme_mode, theme_bg, t
             features.append("search")
         if features:
             console.print(f"[green]\u2713 Navigation:[/] {', '.join(features)}")
-
-    # Derive the base name from the project directory
-    base_name = os.path.basename(project_dir).replace("stx_manual_", "") + suffix
-    output_dir = os.path.abspath(output)
 
     # Materialise served media (configure_image_path) so the export is
     # self-contained — headless: resolve against the project dir (#48).
@@ -262,10 +293,48 @@ def export_html(path, output, asset_mode, title, no_nav, theme_mode, theme_bg, t
         finally:
             os.chdir(cwd)
 
-    # Write to disk — create a fresh AssetCollector to extract data URIs
-    # (the global one was reset by _build_page_cache after capturing HTML)
+    collector = AssetCollector() if use_external else None
+    folder = Path(output_dir) / base_name if use_external else Path(output_dir)
+    continuous_name = f"{base_name}.html"
+
+    # Page files first: they register their assets in the shared collector
+    if paged is not None:
+        files_by_page, docs = paged
+        pages_dir = folder / pages_dir_name
+        pages_dir.mkdir(parents=True, exist_ok=True)
+        other = f"../{continuous_name}" if mode == "both" else None
+        for fname, doc, here in docs:
+            doc = _enrich(doc, {"mode": "paginated", "files": files_by_page, "here": here,
+                                "prefix": "", "other": other})
+            doc = _materialize(doc, collector)
+            if collector is not None:
+                doc = to_subfolder(collector.rewrite_html(doc))
+            (pages_dir / fname).write_text(doc, encoding="utf-8")
+        console.print(f"[green]\u2713 Paginated:[/] {len(docs)} page file(s) in [cyan]{pages_dir}[/]")
+
+    if mode == "paginated":
+        # the entry file keeps today's address and sends every link to its page
+        folder.mkdir(parents=True, exist_ok=True)
+        entry = build_entry_html(paged[0], f"{pages_dir_name}/", nav_markers, nav_toc,
+                                 title or export_cfg.page_title, export_cfg.lang)
+        html_path = folder / continuous_name
+        html_path.write_text(entry, encoding="utf-8")
+        if collector is not None:
+            for asset in collector.assets.values():
+                target = folder / asset.relative_path
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(asset.data)
+        console.print(f"[green]Done[/] in {elapsed:.1f}s — entry file [cyan]{html_path}[/]")
+        return
+
+    page_nav = ({"mode": "continuous", "files": paged[0], "here": None,
+                 "prefix": f"{pages_dir_name}/", "other": f"{pages_dir_name}/"}
+                if paged is not None else None)
+    full_html = _enrich(full_html, page_nav)
+
+    # Write to disk — the collector extracts data URIs (the global one was
+    # reset by _build_page_cache after capturing HTML)
     if use_external:
-        collector = AssetCollector()
         full_html = _materialize(full_html, collector)
         html_path = collector.write_to_disk(full_html, output_dir, base_name)
         asset_count = len(collector.assets)
@@ -278,7 +347,7 @@ def export_html(path, output, asset_mode, title, no_nav, theme_mode, theme_bg, t
         full_html = _materialize(full_html, None)
         out_dir = Path(output_dir)
         out_dir.mkdir(parents=True, exist_ok=True)
-        html_path = out_dir / f"{base_name}.html"
+        html_path = out_dir / continuous_name
         html_path.write_text(full_html, encoding="utf-8")
         console.print(
             f"[green]Done[/] in {elapsed:.1f}s — "

@@ -242,6 +242,7 @@ body.stx-sidebar-resizing .streamtex-page { transition: none !important; }
   border-radius: 6px; padding: 6px 10px; cursor: pointer;
   font-size: 18px; line-height: 1;
 }
+.stx-toc-entry.stx-on-page { border-left: 2px solid currentColor; padding-left: 4px; }
 .stx-sidebar-hidden .stx-sidebar-toggle { display: block; }
 
 /* Sidebar transition */
@@ -268,8 +269,17 @@ if _LOGO_TINY_PATH.exists():
 
 
 def _build_sidebar_html(toc: list[dict], has_search: bool = False,
-                        doc_version: str = "", lib_version: str = "") -> str:
-    """Build the sidebar TOC HTML from cache data."""
+                        doc_version: str = "", lib_version: str = "",
+                        page_nav: dict | None = None) -> str:
+    """Build the sidebar TOC HTML from cache data.
+
+    In a paginated export file (*page_nav*, #106) the table of contents is the
+    whole module's: an entry of another page links to ``<file>#<anchor>``, the
+    entries of this page stay ``#<anchor>`` and are marked ``stx-on-page``.
+    """
+    here = set((page_nav or {}).get("here") or [])
+    files = (page_nav or {}).get("files") or []
+    prefix = (page_nav or {}).get("prefix", "")
     parts = ['<nav id="stx-sidebar" class="stx-export-sidebar">']
     # Header: collapse button + "Powered with StreamTeX" logo
     _logo_img = ""
@@ -299,9 +309,16 @@ def _build_sidebar_html(toc: list[dict], has_search: bool = False,
         title = entry.get("title", "")
         lvl_class = f"stx-toc-l{min(level, 4)}"
         block_idx = entry.get("block_idx", entry.get("page_idx", 0))
+        href, on_page = f"#{anchor}", ""
+        if here:
+            page = entry.get("page_idx", 0)
+            if page in here:
+                on_page = " stx-on-page"
+            elif page < len(files):
+                href = f"{prefix}{files[page]}#{anchor}"
         parts.append(
-            f'<div class="stx-toc-entry {lvl_class}" data-stx-block="{block_idx}">'
-            f'<a href="#{anchor}">{title}</a></div>'
+            f'<div class="stx-toc-entry {lvl_class}{on_page}" data-stx-block="{block_idx}">'
+            f'<a href="{href}">{title}</a></div>'
         )
     # Version footer
     if doc_version:
@@ -376,6 +393,7 @@ _MARKER_NAV_CSS = """
 #stx-marker-nav .stx-mn-popup-item.stx-mn-active {
   border-left: 3px solid #42D0F3; padding-left: 11px;
 }
+#stx-marker-nav .stx-mn-switch { font-size: 11px; padding: 2px 8px; border-radius: 6px; }
 @media (max-width: 600px) {
   #stx-marker-nav { bottom: 12px; right: 12px; padding: 6px 10px; gap: 4px; }
   #stx-marker-nav .stx-mn-label { display: none; }
@@ -390,6 +408,9 @@ _MARKER_NAV_JS = """
   // (marker._MARKER_ROLES_JS): keys and buttons walk the stops, the popup
   // lists the listed markers, currentIdx is a POSITION in markers.
   var currentIdx = 0;
+  // Paginated export (#106): files of the page map, this file's pages, the
+  // other mode's file; null in a plain continuous export.
+  var PAGE_NAV = __PAGE_NAV__;
 __ROLES_JS__
   // --- Scroll to marker ---
   function scrollTo(anchor) {
@@ -404,6 +425,13 @@ __ROLES_JS__
   }
 
   function navigateTo(idx) {
+    if (PAGE_NAV && PAGE_NAV.mode === 'paginated' && markers[idx]
+        && !document.getElementById(markers[idx].anchor)) {
+      // the stop is in another page file: open it there
+      location.href = PAGE_NAV.prefix + PAGE_NAV.files[markers[idx].page_idx || 0]
+        + '#' + markers[idx].anchor;
+      return;
+    }
     if (idx < 0) idx = 0;
     if (idx >= markers.length) idx = markers.length - 1;
     currentIdx = idx;
@@ -460,6 +488,29 @@ __ROLES_JS__
   nav.appendChild(nextBtn);
   nav.appendChild(label);
   nav.appendChild(popup);
+
+  // "both" (#106): open the same slide in the other mode
+  if (PAGE_NAV && PAGE_NAV.other) {
+    var sw = document.createElement('button');
+    sw.className = 'stx-mn-switch';
+    sw.textContent = PAGE_NAV.mode === 'paginated' ? 'Continuous view' : 'Paginated view';
+    sw.title = 'Open this slide in the ' + sw.textContent.toLowerCase();
+    sw.onclick = function() {
+      var m = markers[currentIdx] || markers[0];
+      if (PAGE_NAV.mode === 'paginated') {
+        location.href = PAGE_NAV.other + '#' + m.anchor;
+      } else {
+        location.href = PAGE_NAV.other + PAGE_NAV.files[m.page_idx || 0] + '#' + m.anchor;
+      }
+    };
+    nav.insertBefore(sw, label);
+  }
+  // in a page file, start on the first marker of the page
+  if (PAGE_NAV && PAGE_NAV.mode === 'paginated') {
+    for (var pi = 0; pi < markers.length; pi++) {
+      if (document.getElementById(markers[pi].anchor)) { currentIdx = pi; break; }
+    }
+  }
   document.body.appendChild(nav);
 
   // Close popup on outside click
@@ -507,16 +558,34 @@ __ROLES_JS__
   var scrollTimer;
   var navigating = false;
   var origNavigateTo = navigateTo;
+  // The tracker stays off until the animated scroll has really ended
+  // (scrollend), else a reading taken mid-animation puts the position
+  // back on the previous slide and the next press repeats it (#106).
+  var navTimer = null;
+  function navDone() { navigating = false; clearTimeout(navTimer); }
   navigateTo = function(idx) {
     navigating = true;
     origNavigateTo(idx);
-    setTimeout(function() { navigating = false; }, 400);
+    clearTimeout(navTimer);
+    navTimer = setTimeout(navDone, 1500);
   };
+  window.addEventListener('scrollend', function() { if (navigating) setTimeout(navDone, 50); });
 
   window.addEventListener('scroll', function() {
     if (navigating) return;
     clearTimeout(scrollTimer);
     scrollTimer = setTimeout(function() {
+      // At the bottom of a short document (a page file, #106) the last
+      // slides cannot reach the top: keep the current one while it is in
+      // view, or the next arrow press would repeat it.
+      var doc = document.documentElement;
+      if (window.innerHeight + window.scrollY >= doc.scrollHeight - 2) {
+        var cur = markers[currentIdx] && document.getElementById(markers[currentIdx].anchor);
+        if (cur) {
+          var r = cur.getBoundingClientRect();
+          if (r.top >= 0 && r.top < window.innerHeight) return;
+        }
+      }
       var best = -1, bestDist = Infinity;
       for (var i = 0; i < markers.length; i++) {
         var el = document.getElementById(markers[i].anchor);
@@ -555,6 +624,7 @@ _DEEPLINK_JS = r"""
 (function() {
   var markers = __MARKERS__;
   var toc = __TOC__;
+  var PAGE_NAV = __PAGE_NAV__;
   if (!markers.length && !toc.length) return;
   var stxMarkerRe = /^stx-marker-(.+)-\d+$/;
 
@@ -591,7 +661,7 @@ _DEEPLINK_JS = r"""
     }
     for (i = 0; i < toc.length; i++) {
       if ((toc[i].page_idx || 0) === n && toc[i].key_anchor) {
-        return { anchor: toc[i].key_anchor, index: -1 };
+        return { anchor: toc[i].key_anchor, index: -1, page_idx: n };
       }
     }
     return null;
@@ -628,6 +698,11 @@ _DEEPLINK_JS = r"""
   function goTo(m) {
     if (!m) return;
     var el = document.getElementById(m.anchor);
+    if (!el && PAGE_NAV && PAGE_NAV.mode === 'paginated' && m.page_idx !== undefined) {
+      // another page file of a paginated export (#106)
+      location.replace(PAGE_NAV.prefix + PAGE_NAV.files[m.page_idx] + '#' + m.anchor);
+      return;
+    }
     if (!el) return;
     el.scrollIntoView({ behavior: 'instant', block: 'start' });
     var nav = window.__stxMarkerNavigateTo;
@@ -835,10 +910,11 @@ def _build_theme_vars_css() -> str:
     )
 
 
-def _marker_nav_script(markers: list[dict]) -> str:
+def _marker_nav_script(markers: list[dict], page_nav: dict | None = None) -> str:
     """The export marker bar script for *markers* (all entries, with roles)."""
     return (_MARKER_NAV_JS
             .replace("__ROLES_JS__", _MARKER_ROLES_JS)
+            .replace("__PAGE_NAV__", json.dumps(page_nav, ensure_ascii=False))
             .replace("__MARKERS__", json.dumps(markers, ensure_ascii=False)))
 
 
@@ -849,8 +925,14 @@ def enrich_export_html(
     search_index: dict | None = None,
     doc_version: str = "",
     lib_version: str = "",
+    page_nav: dict | None = None,
 ) -> str:
     """Transform raw export HTML into a fully navigable static document.
+
+    *page_nav* (#106): in a paginated export, ``{"mode": "paginated", "files":
+    [file per page], "here": [pages of this file], "prefix": "",
+    "other": "../<continuous>.html" or None}``; in the continuous file of a
+    "both" export, ``{"mode": "continuous", "files": …, "other": "pages/"}``.
 
     Injects:
     - Sidebar TOC with anchor links (Prop A)
@@ -926,12 +1008,13 @@ def enrich_export_html(
     # --- Build and inject sidebar HTML after <body> ---
     if has_toc:
         sidebar_html = _build_sidebar_html(toc, has_search=has_search,
-                                           doc_version=doc_version, lib_version=lib_version)
+                                           doc_version=doc_version, lib_version=lib_version,
+                                           page_nav=page_nav)
         raw_html = raw_html.replace("<body>", "<body>\n" + sidebar_html, 1)
 
     # --- Build JS block ---
     if has_markers:
-        marker_js = _marker_nav_script(markers)
+        marker_js = _marker_nav_script(markers, page_nav)
         extra_js_parts.append(marker_js)
     if has_markers or has_toc:
         _toc_pages = [
@@ -940,6 +1023,7 @@ def enrich_export_html(
         ]
         extra_js_parts.append(_DEEPLINK_JS
             .replace("__MARKERS__", json.dumps(markers or [], ensure_ascii=False))
+            .replace("__PAGE_NAV__", json.dumps(page_nav, ensure_ascii=False))
             .replace("__TOC__", json.dumps(_toc_pages, ensure_ascii=False)))
 
     if has_search:

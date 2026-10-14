@@ -224,7 +224,7 @@ def test_export_deeplink_by_slide():
         URLSearchParams.prototype.get = function(k) {
           var m = new RegExp('[?&]' + k + '=([^&]*)').exec(this.q); return m ? m[1] : null; };
     """)
-    js = dom + _DEEPLINK_JS.replace("__MARKERS__", json.dumps(e)).replace("__TOC__", "[]") \
+    js = dom + _DEEPLINK_JS.replace("__MARKERS__", json.dumps(e)).replace("__TOC__", "[]").replace("__PAGE_NAV__", "null") \
         + "\nconsole.log(JSON.stringify(scrolled));"
     r = subprocess.run(["node", "-e", js], capture_output=True, text=True)
     assert r.returncode == 0, r.stderr

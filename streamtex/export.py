@@ -673,6 +673,31 @@ def get_asset_collector() -> Optional[AssetCollector]:
     return _asset_collector
 
 
+#: Page sentinels in the export (#106): ``<!--stx-page:N-->`` marks where
+#: page N of the page map starts, so a paginated HTML export can cut the
+#: document. Only inserted when a paginated export is requested.
+PAGE_SENTINEL = "<!--stx-page:{n}-->"
+_PAGE_SENTINEL_RE = re.compile(r"<!--stx-page:(\d+)-->\n?")
+
+
+def export_root_position() -> Optional[int]:
+    """Number of top-level fragments, or ``None`` inside an open wrapper / no buffer."""
+    if _buffer is None or len(_buffer._stack) != 1:
+        return None
+    return len(_buffer._stack[0])
+
+
+def export_insert_root(pos: int, html: str) -> None:
+    """Insert *html* as a top-level fragment at *pos* (page sentinels)."""
+    if _buffer is not None:
+        _buffer._stack[0].insert(pos, html)
+
+
+def strip_page_sentinels(html: str) -> str:
+    """The document without its page sentinels (the continuous export)."""
+    return _PAGE_SENTINEL_RE.sub("", html)
+
+
 def export_append(html: str) -> None:
     """Append *html* to the buffer (no-op when export is inactive)."""
     if _buffer is not None:

@@ -130,13 +130,15 @@ class _Walk:
 class DryWalk(_Walk):
     """Records one entry during the cache build."""
 
-    def __init__(self, mode, collector=None):
+    def __init__(self, mode, collector=None, buffer_pos=None):
         super().__init__()
         self.mode = mode
         self.nodes: dict[tuple, dict] = {}
         self.events: list[tuple] = []
         self.collector = collector
         self._seg = 0
+        self._buffer_pos = buffer_pos
+        self.exit_pos: dict[tuple, int | None] = {}   # export position after each inclusion (#106)
 
     def _segment(self) -> None:
         if self.collector is not None:
@@ -163,6 +165,8 @@ class DryWalk(_Walk):
     def end(self, path) -> None:
         self.nodes[path]["children"] = self._pop()
         self.events.append(("exit", path))
+        if self._buffer_pos is not None:
+            self.exit_pos[path] = self._buffer_pos()
         self._segment()
 
     # --- registrations ----------------------------------------------------

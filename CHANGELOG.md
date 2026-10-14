@@ -123,8 +123,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   precedence `marker` > `slide` > `page`, in the link and in the reader.
 - Registry entries carry `stop`, `listed`, `toc`, `toc_anchor`,
   `toc_level`, `stop_index` and `origin`; `hidden` is derived (`stop and not
-  listed`) and kept for tools reading the page cache. Helpers `is_stop`,
-  `is_listed`, `stop_entries`, `stop_count`, `listed_entries`, `stop_of`.
+  listed`) and kept for tools reading the page cache. Helpers in
+  `streamtex.marker`: `is_stop`, `is_listed`, `stop_entries`, `stop_count`,
+  `listed_entries`, `stop_of`.
+
+- `CellAlignments` and `PdfLoadReport` are exported by `streamtex`
+  (`stx.CellAlignments`, `stx.PdfLoadReport`), like `PdfConfig`.
 
 ### Changed
 
@@ -214,6 +218,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with the iframe Streamlit was replacing. A guard on the page itself (like
   the one for the keys) now queues the click, and the new page replays it:
   two clicks always move two slides.
+- `stx deploy auth-status` takes `--path`, like `lock`, `unlock` and
+  `passwd`. The help of `stx deploy diff` names `.dockerignore`; the
+  `stx validate` warning on a local streamtex source names
+  `UV_NO_SOURCES_PACKAGE=streamtex`, which production uses. The 0.7.42 entry
+  below said `stx project init`; the command is `stx project new`.
 - `enrich_export_html(markers=…)` given entries that did not come from the
   page cache (no roles, no numbers) showed popup rows without numbers; it
   now gives them their roles and slide numbers itself (#116, #117).
@@ -471,7 +480,7 @@ with a `shortauthor` field.
   project-mode pilot on all-trainings (board `s2`). `uv run stx validate` is
   unchanged (it already ran in the project's environment). The interpreter used
   is printed on the "Build" line.
-- `stx project init` writes a `.gitignore` that also ignores a `.venv` *link*
+- `stx project new` writes a `.gitignore` that also ignores a `.venv` *link*
   (the old `.venv/` rule only matched a real directory, so the link to
   `~/.venvs/<project>` showed up as an untracked file in every such project),
   ignores `.stx_cache/` (render caches written by builds) and keeps

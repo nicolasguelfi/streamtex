@@ -35,7 +35,7 @@ try:
     __version__ = _pkg_version("streamtex")
 
     # Core style system
-    from .styles import Style, ListStyle, StyleGrid, StxStyles, theme
+    from .styles import CellAlignments, Style, ListStyle, StyleGrid, StxStyles, theme
 
     # Indexed responsive font scale (Layer 1 API)
     from .styles.scale import ScaleConfig, ScaleCurve, compute_scale, emit_scale_css
@@ -111,7 +111,7 @@ try:
     from .hover_tooltip import st_hover_tooltip
 
     # PDF Export (requires optional 'pdf' extra)
-    from .pdf_export import PdfConfig, PdfMode, export_pdf
+    from .pdf_export import PdfConfig, PdfLoadReport, PdfMode, export_pdf
 
     # Export-aware widget wrappers
     from .export_widgets import (
@@ -270,6 +270,7 @@ __all__ = [
     "NumberingMode",
     "PageLayout",
     "PdfConfig",
+    "PdfLoadReport",
     "PdfMode",
     "PresentationConfig",
     "PresentationProfile",
@@ -286,6 +287,7 @@ __all__ = [
     "Spacing",
     "SpacingConfig",
     "StxStyles",
+    "CellAlignments",
     "Style",
     "StyleGrid",
     "TOCConfig",

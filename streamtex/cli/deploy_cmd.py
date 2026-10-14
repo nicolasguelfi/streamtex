@@ -2854,8 +2854,8 @@ _TEMPLATES = {
 @click.command("diff")
 @click.argument("path", default=".")
 def diff_cmd(path: str) -> None:
-    """Show how the project's Dockerfile / entrypoint.sh / nginx.conf differ
-    from the current StreamTeX templates (nothing is written).
+    """Show how the project's Dockerfile / entrypoint.sh / nginx.conf /
+    .dockerignore differ from the current StreamTeX templates (nothing is written).
 
     `stx deploy` only generates these files when they are missing, so a
     project keeps its own copy — and its forks of it. This is how to see them.

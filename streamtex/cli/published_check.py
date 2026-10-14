@@ -93,7 +93,7 @@ def version_problems(project_dir: Path) -> list[VersionProblem]:
     if source and source != "registry":
         out.append(VersionProblem(
             "warning", f"uv.lock takes streamtex from a local source ({source}); production "
-                       "(uv sync --no-sources) installs the published wheel — check the blocks against it "
+                       "(UV_NO_SOURCES_PACKAGE=streamtex) installs the published wheel — check the blocks against it "
                        "with `stx validate --build --published`"))
     return out
 

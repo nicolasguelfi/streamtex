@@ -495,11 +495,12 @@ def passwd_cmd(target, path, no_restart, yes, faces, file_name, section):
 
 @click.command("auth-status")
 @click.argument("target", required=False, default=None)
-def auth_status_cmd(target):
+@click.option("--path", default=".", show_default=True, help="Project directory (for .stx-passwords.toml).")
+def auth_status_cmd(target, path):
     """Show every access-control mode of a deployed application (never a secret)."""
     from rich.table import Table
 
-    ctx = _context(target, ".", {})
+    ctx = _context(target, path, {})
     env = ctx.env()
     table = Table(title=f"Access control for {ctx.name}")
     table.add_column("Mode", style="cyan")

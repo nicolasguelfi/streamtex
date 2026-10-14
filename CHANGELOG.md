@@ -209,6 +209,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   files as part of the cache key; they are a snapshot checked on reuse (#120).
 - In `SlideBreakMode.HIDDEN` with `fullscreen=True`, the break marker
   ignored `marker_hidden` (it was always unlisted).
+- Paginated app: a second ◀ / ▶ click made while the previous page change
+  was loading was lost — the bar stayed on screen but its handlers had died
+  with the iframe Streamlit was replacing. A guard on the page itself (like
+  the one for the keys) now queues the click, and the new page replays it:
+  two clicks always move two slides.
+- `enrich_export_html(markers=…)` given entries that did not come from the
+  page cache (no roles, no numbers) showed popup rows without numbers; it
+  now gives them their roles and slide numbers itself (#116, #117).
 
 ## [0.7.45] — 2026-10-11 — Zoom for PDF and HTML exports, grid cell alignments, named sizes
 

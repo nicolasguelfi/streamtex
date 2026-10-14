@@ -11,7 +11,7 @@ import re
 from pathlib import Path
 
 from .export import _get_theme_color
-from .marker import _MARKER_ROLES_JS
+from .marker import _MARKER_ROLES_JS, annotate_marker_numbers, normalize_marker_entries
 
 # Path to the cross-context scroll-spy script.  Same file is used by the
 # live runtime via :mod:`streamtex.marker_runtime`.  Loading at import
@@ -954,6 +954,11 @@ def enrich_export_html(
     """
     if not raw_html:
         return raw_html
+
+    if markers and any("number" not in m for m in markers):
+        # entries that did not come through the page cache: give them their
+        # roles and the numbers every surface shows (#116, #117)
+        markers = annotate_marker_numbers(normalize_marker_entries([dict(m) for m in markers]))
 
     has_toc = bool(toc)
     has_markers = bool(markers)

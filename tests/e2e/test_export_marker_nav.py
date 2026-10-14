@@ -26,10 +26,10 @@ VIEWPORT = {"width": 1280, "height": 720}
 
 MARKERS = [
     {"index": 0, "label": "Vis zero", "anchor": "a0", "hidden": False},
-    {"index": 1, "label": "", "anchor": "a1", "hidden": True, "key": "sub-one"},
-    {"index": 2, "label": "", "anchor": "a2", "hidden": True},
+    {"index": 1, "label": "", "anchor": "a1", "hidden": True, "auto": True, "key": "sub-one"},
+    {"index": 2, "label": "", "anchor": "a2", "hidden": True, "auto": True},
     {"index": 3, "label": "Vis three", "anchor": "a3", "hidden": False},
-    {"index": 4, "label": "", "anchor": "a4", "hidden": True},
+    {"index": 4, "label": "", "anchor": "a4", "hidden": True, "auto": True},
     {"index": 5, "label": "Vis five", "anchor": "a5", "hidden": False},
 ]
 
@@ -165,31 +165,32 @@ def test_bar_buttons_share_keyboard_traversal(browser, export_page):
     page.close()
 
 
-def test_label_between_visibles_shows_nearest_visible(browser, export_page):
-    """On a hidden stop the label shows the next visible marker's label."""
+def test_label_on_hidden_stop_shows_its_section(browser, export_page):
+    """On an unlabelled hidden stop the label shows its section: the last
+    listed marker before it (#97, as in the app)."""
     page = _open(browser, export_page.as_uri())
     page.keyboard.press("PageDown")  # -> a1 (hidden, label "")
     _wait_at(page, "a1", "2 / 6")
-    assert _label(page) == "Vis three"
+    assert _label(page) == "Vis zero"
     page.close()
 
 
-def test_popup_lists_visible_only_numbered_globally(browser, export_page):
-    """(b) Popup: 3 rows, global numbers 1. / 4. / 6."""
+def test_popup_lists_visible_only_as_slide_ranges(browser, export_page):
+    """(b) Popup: 3 rows, each the range of slides of its section (#117)."""
     page = _open(browser, export_page.as_uri())
     _open_popup(page)
     rows = page.locator("#stx-marker-nav .stx-mn-popup-item")
     assert rows.count() == 3
     texts = [rows.nth(i).text_content().strip() for i in range(3)]
-    assert texts == ["1. Vis zero", "4. Vis three", "6. Vis five"]
+    assert texts == ["1–3. Vis zero", "4–5. Vis three", "6. Vis five"]
     page.close()
 
 
-def test_popup_click_navigates_to_global_index(browser, export_page):
+def test_popup_click_navigates_to_its_slide(browser, export_page):
     page = _open(browser, export_page.as_uri())
     _open_popup(page)
     page.locator("#stx-marker-nav .stx-mn-popup-item",
-                 has_text="4. Vis three").click()
+                 has_text="4–5. Vis three").click()
     _wait_at(page, "a3", "4 / 6")
     page.close()
 

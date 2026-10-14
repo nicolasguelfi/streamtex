@@ -891,6 +891,25 @@ __ROLES_JS__
         }).toString() + ')');
         hostWin.eval("document.addEventListener('keydown', window._stxMarkerKeyGuard, true)");
     }
+    /* The same guard for the ◀ ▶ buttons: the widget stays on screen while
+       its iframe is being replaced, but its onclick died with the iframe,
+       so a click in that window did nothing.  The guard queues it.      */
+    if (!hostWin._stxMarkerClickGuard) {
+        hostWin._stxMarkerClickGuard = hostWin.eval('(' + (function(e) {
+            var b = e.target && e.target.closest
+                && e.target.closest('#streamtex-marker-nav [data-stx-step]');
+            if (!b) return;
+            var fr = window._stxMarkerFrame;
+            if (window._stxMarkerInitialized && fr && fr.isConnected) return;
+            e.preventDefault(); e.stopPropagation();
+            var delta = parseInt(b.getAttribute('data-stx-step'), 10);
+            var now = Date.now(), p = window._stxPendingStep;
+            var n = (p && (now - p.t) < 3000) ? p.n : 0;
+            n = Math.max(-2, Math.min(2, n + delta));
+            window._stxPendingStep = { n: n, t: now };
+        }).toString() + ')');
+        hostWin.eval("document.addEventListener('click', window._stxMarkerClickGuard, true)");
+    }
 
     /* --- Find marker element --- */
     function findMarkerElement(anchor) {
@@ -1041,6 +1060,7 @@ __ROLES_JS__
     btnPrev.style.cssText = btnStyle;
     btnPrev.onmouseenter = function() { this.style.background = btnHover; };
     btnPrev.onmouseleave = function() { this.style.background = 'none'; };
+    btnPrev.setAttribute('data-stx-step', '-1');
     btnPrev.onclick = function() { step(-1); };
 
     /* Fixed-width counter (global marker index) — click to jump */
@@ -1090,6 +1110,7 @@ __ROLES_JS__
     btnNext.style.cssText = btnStyle;
     btnNext.onmouseenter = function() { this.style.background = btnHover; };
     btnNext.onmouseleave = function() { this.style.background = 'none'; };
+    btnNext.setAttribute('data-stx-step', '1');
     btnNext.onclick = function() { step(1); };
 
     var btnList = hostDoc.createElement('button');

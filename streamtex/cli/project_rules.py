@@ -184,7 +184,18 @@ def deprecated_config(project_dir: Path) -> list[str]:
             data = tomllib.load(f)
     except (OSError, tomllib.TOMLDecodeError):
         return []
-    return [f"[{k}] — {why}" for k, why in DEPRECATED_SECTIONS.items() if k in data]
+    out = [f"[{k}] — {why}" for k, why in DEPRECATED_SECTIONS.items() if k in data]
+    packs = data.get("packs")
+    for entry in packs if isinstance(packs, list) else []:
+        ref = entry.get("ref") if isinstance(entry, dict) else None
+        if entry.get("type") == "git" and isinstance(ref, str) and "#" in ref:
+            from streamtex.core.discovery import split_git_ref
+
+            fixed = split_git_ref(entry)
+            out.append(f'[[packs]] {entry.get("name") or ref}: ref = "{ref}" is the old form, read as '
+                       f'ref = "{fixed["ref"]}" + subdirectory = "{fixed.get("subdirectory", "")}" — '
+                       "write these two keys (the form `stx pack add` writes)")
+    return out
 
 
 def stx_toml_section_problems(project_dir: Path) -> list[str]:

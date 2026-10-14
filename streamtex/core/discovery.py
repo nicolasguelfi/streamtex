@@ -116,10 +116,32 @@ def _read_stx_toml(stx_toml_path: Path | None) -> dict[str, Any]:
         return tomllib.load(fh) or {}
 
 
+def split_git_ref(entry: dict[str, Any]) -> dict[str, Any]:
+    """Return a copy of a ``[[packs]]`` entry with a git ``ref`` fragment moved out.
+
+    The canonical git entry is ``ref = "host/owner/repo"`` plus
+    ``subdirectory = "<dir>"`` (what ``stx pack add`` writes). ``stx install``
+    and ``stx project new --kit`` up to 0.7.45 wrote the old form
+    ``ref = "host/owner/repo#<dir>"``, which uv cannot fetch; it is read as
+    ``ref`` + ``subdirectory`` (``#subdirectory=<dir>`` too). An explicit
+    ``subdirectory`` key wins over the fragment. Other entries are returned as is.
+    """
+    out = dict(entry)
+    ref = out.get("ref")
+    if out.get("type") != "git" or not isinstance(ref, str) or "#" not in ref:
+        return out
+    base, frag = ref.split("#", 1)
+    frag = frag.removeprefix("subdirectory=").strip("/")
+    out["ref"] = base
+    if frag and not out.get("subdirectory"):
+        out["subdirectory"] = frag
+    return out
+
+
 def _stx_toml_packs(data: dict[str, Any]) -> list[contracts.StxTomlPackEntry]:
     raw = data.get("packs") or []
     if isinstance(raw, list):
-        return [entry for entry in raw if isinstance(entry, dict)]
+        return [split_git_ref(entry) for entry in raw if isinstance(entry, dict)]
     return []
 
 
@@ -196,7 +218,9 @@ def discover_packs(
         name = entry.get("name") or ""
         if not name:
             # git / pypi packs may omit name — derive from ref when possible
-            ref = entry.get("ref") or entry.get("constraint") or "<unnamed>"
+            # (a monorepo pack is named after its subdirectory, as `stx pack add` does)
+            ref = (entry.get("subdirectory") or entry.get("ref")
+                   or entry.get("constraint") or "<unnamed>")
             name = ref.rstrip("/").split("/")[-1]
         if trace is not None:
             trace.append(TraceEntry(name, "declared"))

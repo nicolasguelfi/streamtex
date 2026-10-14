@@ -94,6 +94,23 @@ def test_discover_drift_install(tmp_path: Path):
     assert any("PR002" in iss for iss in drift[0].issues)
 
 
+def test_discover_reads_old_fragment_ref_without_name(tmp_path: Path):
+    """``ref = "repo#dir"`` (old form) is read as ref + subdirectory; an unnamed
+    monorepo pack takes its subdirectory's name, as `stx pack add` names it."""
+    _write_stx_toml(
+        tmp_path / "stx.toml",
+        """\
+        [[packs]]
+        type = "git"
+        ref = "github.com/x/monorepo#nonexistent-sub-pack"
+        """,
+    )
+    (pack,) = [p for p in discovery.discover_packs(tmp_path / "stx.toml") if p.declared]
+    assert pack.name == "nonexistent-sub-pack"
+    assert pack.stx_toml_entry["ref"] == "github.com/x/monorepo"
+    assert pack.stx_toml_entry["subdirectory"] == "nonexistent-sub-pack"
+
+
 def test_discover_no_stx_toml_returns_only_indirect():
     """No stx.toml — anything found via entry points becomes 'indirect'."""
     packs = discovery.discover_packs(None)

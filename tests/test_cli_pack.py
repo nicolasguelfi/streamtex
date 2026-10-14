@@ -235,6 +235,56 @@ def test_pack_sync_writes_git_source_with_subdirectory(tmp_path: Path):
     assert "streamtex-pack-design" in pyproject.split("dependencies", 1)[1]
 
 
+_SOURCE_LINES = ('git = "https://github.com/nicolasguelfi/streamtex-packs"',
+                 'subdirectory = "streamtex-pack-design"', 'rev = "pack-design-v0.3.0"')
+
+
+@pytest.mark.parametrize("ref", [
+    "github.com/nicolasguelfi/streamtex-packs#streamtex-pack-design",
+    "github.com/nicolasguelfi/streamtex-packs#subdirectory=streamtex-pack-design",
+])
+def test_pack_sync_reads_the_old_fragment_form(tmp_path: Path, ref: str):
+    """`stx install` up to 0.7.45 wrote ``ref = "repo#dir"``: sync gives the uv source
+    of the canonical form (ref + subdirectory), not a ``…#dir`` git URL uv cannot fetch."""
+    project = _make_project(tmp_path)
+    (project / "stx.toml").write_text(
+        '[project]\nname = "demo"\n\n[[packs]]\ntype = "git"\nname = "streamtex-pack-design"\n'
+        f'ref = "{ref}"\nrev = "pack-design-v0.3.0"\n'
+    )
+    result = _run(["pack", "sync"], project)
+    assert result.exit_code == 0, result.output
+    pyproject = (project / "pyproject.toml").read_text()
+    assert "#" not in pyproject.split("[tool.uv.sources]", 1)[1]
+    for line in _SOURCE_LINES:
+        assert line in pyproject
+
+
+def test_install_default_design_pack_syncs_to_a_valid_source(tmp_path: Path):
+    from streamtex.cli import _stx_toml
+    from streamtex.cli.install_cmd import _DEFAULT_DESIGN_PACK
+
+    project = _make_project(tmp_path)
+    _stx_toml.add_pack(project, {"type": "git", **_DEFAULT_DESIGN_PACK})
+    assert _run(["pack", "sync"], project).exit_code == 0
+    pyproject = (project / "pyproject.toml").read_text()
+    for line in _SOURCE_LINES:
+        assert line in pyproject
+
+
+def test_split_git_ref():
+    from streamtex.core.discovery import split_git_ref
+
+    old = {"type": "git", "name": "p", "ref": "github.com/o/r#pk", "rev": "v1"}
+    assert split_git_ref(old) == {"type": "git", "name": "p", "ref": "github.com/o/r",
+                                  "subdirectory": "pk", "rev": "v1"}
+    assert split_git_ref({"type": "git", "ref": "github.com/o/r#subdirectory=a/pk"})["subdirectory"] == "a/pk"
+    # an explicit subdirectory key wins over the fragment
+    assert split_git_ref({"type": "git", "ref": "h/o/r#x", "subdirectory": "y"})["subdirectory"] == "y"
+    new = {"type": "git", "ref": "github.com/o/r", "subdirectory": "pk"}
+    assert split_git_ref(new) == new
+    assert split_git_ref({"type": "local", "path": "a#b"}) == {"type": "local", "path": "a#b"}
+
+
 def test_pack_sync_writes_git_source_with_rev(tmp_path: Path):
     project = _make_project(tmp_path)
     _run(["pack", "add", "git:github.com/foo/bar@v1.0.0"], project)

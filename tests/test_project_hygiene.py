@@ -70,3 +70,15 @@ def test_validate_prints_stx_toml_section_warnings(tmp_path, monkeypatch):
     r = CliRunner().invoke(cli, ["validate"])
     assert "banner_colour" in r.output and r.exit_code == 1, r.output
     assert "[book.defaults]" in r.output
+
+
+def test_deprecated_config_names_the_old_pack_ref_form(tmp_path):
+    (tmp_path / "stx.toml").write_text(
+        '[project]\nname = "p"\n\n[[packs]]\ntype = "git"\nname = "streamtex-pack-design"\n'
+        'ref = "github.com/nicolasguelfi/streamtex-packs#streamtex-pack-design"\n\n'
+        '[[packs]]\ntype = "git"\nname = "ok"\nref = "github.com/o/r"\nsubdirectory = "ok"\n'
+    )
+    msgs = deprecated_config(tmp_path)
+    assert len(msgs) == 1
+    assert msgs[0].startswith("[[packs]] streamtex-pack-design:")
+    assert 'subdirectory = "streamtex-pack-design"' in msgs[0]

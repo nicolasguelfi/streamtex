@@ -86,5 +86,6 @@ def test_design_pack_skipped_when_stx_toml_missing(tmp_path):
 
 def test_default_design_pack_is_the_monorepo_release():
     """The archived streamtex-design repository is no longer the default (audit2)."""
-    assert _DEFAULT_DESIGN_PACK["ref"] == "github.com/nicolasguelfi/streamtex-packs#streamtex-pack-design"
+    assert _DEFAULT_DESIGN_PACK["ref"] == "github.com/nicolasguelfi/streamtex-packs"
+    assert _DEFAULT_DESIGN_PACK["subdirectory"] == "streamtex-pack-design"
     assert _DEFAULT_DESIGN_PACK["rev"].startswith("pack-design-v")

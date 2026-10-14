@@ -35,9 +35,12 @@ def save(project_dir: Path, doc: tomlkit.TOMLDocument) -> None:
 
 
 def list_packs(project_dir: Path) -> list[dict[str, Any]]:
+    """The ``[[packs]]`` entries, a git ``ref#<dir>`` read as ``ref`` + ``subdirectory``."""
+    from streamtex.core.discovery import split_git_ref
+
     doc = load(project_dir)
     raw = doc.get("packs") or []
-    return [dict(entry) for entry in raw if isinstance(entry, dict)]
+    return [split_git_ref(dict(entry)) for entry in raw if isinstance(entry, dict)]
 
 
 def add_pack(project_dir: Path, entry: dict[str, Any]) -> None:

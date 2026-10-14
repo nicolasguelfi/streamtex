@@ -382,15 +382,18 @@ def generate_stx_toml(
         # whichever of its two names the reference used.
         kit_pack = _resolve_pack_token(kit_pack)[0]
         kit_ref = f"{kit_pack}:{_kit_name}"
+        subdir = None
         if kit_pack.startswith("streamtex-pack-"):
             # The official packs live in the streamtex-packs monorepo.
-            git_ref = f"github.com/nicolasguelfi/streamtex-packs#{kit_pack}"
+            git_ref, subdir = "github.com/nicolasguelfi/streamtex-packs", kit_pack
         else:
             git_ref = f"github.com/nicolasguelfi/{kit_pack.replace('_', '-')}"
         lines.append("[[packs]]")
         lines.append('type = "git"')
         lines.append(f'name = "{kit_pack}"')
         lines.append(f'ref = "{git_ref}"')
+        if subdir:
+            lines.append(f'subdirectory = "{subdir}"')
         lines.append('rev = "main"')
         lines.append("")
         if kit_pack not in declared_packs:

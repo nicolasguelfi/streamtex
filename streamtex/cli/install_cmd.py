@@ -722,7 +722,8 @@ def _install_is_interactive() -> bool:
 # repository is archived; its last release was v0.1.0).
 _DEFAULT_DESIGN_PACK = {
     "name": "streamtex-pack-design",
-    "ref": "github.com/nicolasguelfi/streamtex-packs#streamtex-pack-design",
+    "ref": "github.com/nicolasguelfi/streamtex-packs",
+    "subdirectory": "streamtex-pack-design",
     "rev": "pack-design-v0.3.0",
 }
 
@@ -765,6 +766,7 @@ def _add_default_design_pack(
                 "type": "git",
                 "name": _DEFAULT_DESIGN_PACK["name"],
                 "ref": _DEFAULT_DESIGN_PACK["ref"],
+                "subdirectory": _DEFAULT_DESIGN_PACK["subdirectory"],
                 "rev": _DEFAULT_DESIGN_PACK["rev"],
             },
         )

@@ -93,7 +93,8 @@ def test_project_new_kit_accepts_both_names(fake_pack, tmp_path, token):
     data = tomllib.loads((tmp_path / "demo" / "stx.toml").read_text())
     pack = next(p for p in data["packs"] if p["type"] == "git")
     assert pack["name"] == PACK
-    assert pack["ref"] == f"github.com/nicolasguelfi/streamtex-packs#{PACK}"
+    assert pack["ref"] == "github.com/nicolasguelfi/streamtex-packs"
+    assert pack["subdirectory"] == PACK
     assert data["kit"]["ref"] == f"{PACK}:demo"
     assert data["design_system"]["ref"] == "dark"
     styles = (tmp_path / "demo" / "custom" / "styles.py").read_text()

@@ -249,6 +249,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `CellAlignments.left_top`, `left_middle` and `left_bottom` now set
   `text-align:left`, like the `center_*` and `right_*` presets set theirs: in
   a centered page a "left" cell showed its text centered (#22).
+- `stx install` (design pack added by default since 0.7.41) and
+  `stx project new --kit streamtex-pack-…` wrote a monorepo pack as
+  `ref = "github.com/nicolasguelfi/streamtex-packs#streamtex-pack-design"`;
+  `stx pack sync` turned it into a git URL ending in `#streamtex-pack-design`
+  and `uv lock` failed ("not valid: is this a git repository?"). Both now
+  write `ref` + `subdirectory`, the form `stx pack add` writes. Every reader
+  of `[[packs]]` (`stx pack sync`, discovery, `stx component`) reads the old
+  form as `ref` + `subdirectory`, so the projects created since 0.7.41 work
+  unchanged; `stx validate` lists it under Hygiene as deprecated.
+- `stx pack sync` printed "apply  changes": `[tool.uv.sources]` was read as
+  console markup.
 - A library installed editable (development checkout, `stx dev link`) keeps
   its version number while its code changes, so the page cache could serve
   titles, markers and TOC built by older code. When the library is imported

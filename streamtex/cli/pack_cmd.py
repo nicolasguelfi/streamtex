@@ -338,7 +338,7 @@ def sync_cmd() -> None:
                 console.print(f"  pyproject dependency ensured for {spec}")
         except Exception as exc:  # noqa: BLE001 — surface but don't crash sync
             console.print(f"[red]sync error on {name}: {exc}[/red]")
-    console.print("[green]Sync complete (run `uv sync` to apply [tool.uv.sources] changes).[/green]")
+    console.print("[green]Sync complete (run `uv sync` to apply \\[tool.uv.sources] changes).[/green]")
 
 
 @pack.command("info")

@@ -43,6 +43,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Invalid values raise `ValueError` before `build()` runs. `markers` is now
   a reserved keyword of `st_include` (not passed to `build()`; no block of
   the library, the manuals, the trainings or the lab takes it).
+- `st_sequence(items, *args, separator="break", markers=True, **kwargs)`
+  (#118): include blocks in order with the standard break between two — the
+  module's break settings, no marker (each item brings its own) — never
+  before the first, never after the last. `separator` can also be `None`, a
+  `SlideBreakConfig` or a block. Arguments reach every item's `build()`.
+- `st_include(..., break_before=)` (#118): `True` draws the standard break
+  before the block, a `SlideBreakConfig` that break, in the host's context.
+  `break_before` is a reserved keyword of `st_include`.
 - `?slide=<n>` deep link (#117): opens the slide the counter calls n, in the
   paginated app and in the HTML export. `page_url(base, slide=n)` builds it;
   precedence `marker` > `slide` > `page`, in the link and in the reader.
@@ -89,6 +97,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the start: the deep-linked marker's, else the page's first stop, else the
   last stop before the page (it showed the page number until the widget
   started, and kept it on pages without markers).
+
+- In the HTML export, the break the library draws between two book entries
+  uses the module's break settings (`set_slide_break_config`) like every
+  other break; it used the library defaults (rule margins 5em). Measured on
+  PROMPT4UL-slides: the 62 breaks between entries now match the 78 inside
+  blocks (55 px instead of 183 px at 1920 × 1080); the rest of the export is
+  byte-identical, the app and the PDF page breaks are unchanged (#118).
 
 ### Fixed
 

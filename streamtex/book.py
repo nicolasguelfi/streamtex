@@ -1347,8 +1347,15 @@ def st_toc(toc_title_style):
     return toc_block
 
 
-def st_include(block_file_module, *args, markers=True, _inspector_config=None, **kwargs):
+def st_include(block_file_module, *args, markers=True, break_before=False,
+               _inspector_config=None, **kwargs):
     """Render another block's ``build()`` in place, like ``\\input``.
+
+    ``break_before`` (#118): ``True`` draws the standard break (the module's
+    break settings, no marker) before the block; a ``SlideBreakConfig`` draws
+    that break, used as given (its ``marker`` included); ``False`` (default)
+    draws nothing. The break belongs to the host: this inclusion's
+    ``markers`` does not apply to it.
 
     ``markers`` changes the roles of every marker the included ``build()``
     places — its own ``st_marker`` calls, its breaks' markers, its headings'
@@ -1365,11 +1372,16 @@ def st_include(block_file_module, *args, markers=True, _inspector_config=None, *
 
     Nested inclusions inherit the override; on a conflict the outer one
     wins. The layout never changes: rules, spacers, spacing and content are
-    rendered identically. ``markers`` is not passed to ``build()``.
+    rendered identically. ``markers`` and ``break_before`` are not passed to
+    ``build()``.
     """
     from .marker import include_role_override, normalize_markers_arg
+    from .slide import SlideBreakConfig
 
     normalize_markers_arg(markers)          # ValueError before anything renders
+    if not (isinstance(break_before, (bool, SlideBreakConfig))):
+        raise TypeError(f"st_include(break_before={break_before!r}): expected True, False "
+                        "or a SlideBreakConfig")
     if not block_file_module:
         st.markdown(":red-background[Block module is None — not found]")
         return
@@ -1380,6 +1392,14 @@ def st_include(block_file_module, *args, markers=True, _inspector_config=None, *
         return
 
     module_name = getattr(block_file_module, '__name__', str(block_file_module))
+
+    # The break before the block, in the host's context (#118)
+    if break_before is True:
+        from .slide import _standard_break
+        _standard_break()
+    elif isinstance(break_before, SlideBreakConfig):
+        from .slide import st_slide_break
+        st_slide_break(config=break_before)
 
     # Inspector edit button (opt-in)
     # Uses st.html() directly (not _render()), so never appears in exported HTML.
@@ -1394,6 +1414,49 @@ def st_include(block_file_module, *args, markers=True, _inspector_config=None, *
     except Exception as e:
         st.markdown(f":red-background[Error in block '{module_name}': {e}]")
         raise
+
+
+_BREAK = "break"
+
+
+def st_sequence(items, *args, separator=_BREAK, markers=True, **kwargs) -> None:
+    """Include several blocks in order, a break between two, none at the ends (#118).
+
+    The body of a *list block*::
+
+        ITEMS = [bck_intro, bck_detail, bck_list_examples]
+
+        def build(*args, **kwargs):
+            st_sequence(ITEMS, *args, **kwargs)
+
+    :param items: blocks (objects with ``build()``), included in this order.
+    :param separator: what goes between two items: ``"break"`` (default) the
+        standard break — the module's break settings, no marker (each item
+        brings its own); a ``SlideBreakConfig`` — that break; ``None`` —
+        nothing; a block — its ``build()``, as ``st_book(separator=…)``.
+        Never before the first item, never after the last.
+    :param markers: passed to every item's ``st_include`` (#113); the breaks
+        have no marker.
+    :param args, kwargs: passed to every item's ``build()`` (and to a
+        separator block's), at any depth of nested lists.
+    """
+    from .slide import SlideBreakConfig
+
+    if separator == _BREAK:
+        brk = True
+    elif separator is None:
+        brk = False
+    elif isinstance(separator, SlideBreakConfig):
+        brk = separator
+    elif hasattr(separator, "build"):
+        brk = False
+    else:
+        raise TypeError(f"st_sequence(separator={separator!r}): expected 'break', None, "
+                        "a SlideBreakConfig or a block")
+    for i, item in enumerate(items):
+        if i and brk is False and separator is not None:
+            st_include(separator, *args, **kwargs)
+        st_include(item, *args, markers=markers, break_before=brk if i else False, **kwargs)
 
 
 # ---------------------------------------------------------------------------
@@ -1930,8 +1993,9 @@ def _build_page_cache(module_list, toc_config, marker_config, separator,
                 # page-break-after, not a navigation marker (which would pollute
                 # the marker registry with phantom entries).
                 if export_config is not None and i < len(module_list) - 1:
-                    from .slide import SlideBreakConfig, st_slide_break
-                    st_slide_break(config=SlideBreakConfig(marker=False))
+                    # the module's own break settings, as every other break (#118)
+                    from .slide import _standard_break
+                    _standard_break()
 
         hidden.empty()
     finally:

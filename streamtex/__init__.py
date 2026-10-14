@@ -57,7 +57,7 @@ try:
     from .banner import BannerConfig, BannerMode
 
     # Book orchestration
-    from .book import st_book, st_include, st_toc, load_css
+    from .book import st_book, st_include, st_sequence, st_toc, load_css
 
     # Table of Contents
     from .toc import reset_toc_registry, toc_entries, TOCConfig, NumberingMode
@@ -407,6 +407,7 @@ __all__ = [
     "st_presentation_footer",
     "st_refs",
     "st_scatter_chart",
+    "st_sequence",
     "st_slide",
     "st_slide_break",
     "st_space",

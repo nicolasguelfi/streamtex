@@ -393,6 +393,18 @@ def st_slide_break(
     _activate_section_horizontal(effective_spacing)
 
 
+def _standard_break() -> None:
+    """The standard break between two included items (#118): no marker.
+
+    The module's break settings (``set_slide_break_config``, read at call
+    time) and the sidebar options apply as to any break; it starts a new
+    slide but places no stop — the next item brings its own marker. Used by
+    ``st_include(break_before=True)``, ``st_sequence`` and, in exports,
+    between two book entries.
+    """
+    st_slide_break(marker=False)
+
+
 def _break_marker_roles(cfg: SlideBreakConfig, marker: bool | MarkerRoles | None,
                         marker_hidden: Optional[bool]) -> Optional[MarkerRoles]:
     """The roles of a break's marker, ``None`` for no marker (#116 §4.4)."""

@@ -17,7 +17,7 @@ from .marker import (
 from .spacing import Spacing, consume_block_top_injected, resolve_section_spacing
 from .styles import StxStyles, Style
 from .toc import register_toc_entry
-from .utils import contain_link, strip_html
+from .utils import contain_link, plain_label
 
 
 def st_write(
@@ -178,7 +178,7 @@ def _handle_toc(final_txt: str, toc_lvl: Optional[str] = None, label: str = "",
         # but not overly long, avoiding clutter in the TOC.
         if not label:
             label_length = 73
-            clean_label = strip_html(final_txt)  # Remove HTML tags to generate a clean label
+            clean_label = plain_label(final_txt)  # tags removed, one line
             label = (clean_label[:label_length] + '..') if len(clean_label) > label_length else clean_label
 
         # Generate the opening and closing TOC tags for the specified level and label.
@@ -276,7 +276,7 @@ def _heading_marker_without_toc(final_txt: str, label: str, marker, toc_lvl: str
     from .marker import marker_count
     from .toc import TOCRegistry
     if not label:
-        label = strip_html(final_txt)[:73]
+        label = plain_label(final_txt)[:73]
     anchor = f"stx-marker-{TOCRegistry.get_key_anchor(label)}-{marker_count()}"
     stop, listed = effective_roles(roles.stop, roles.listed)
     register_marker(label, anchor, stop=stop, listed=listed, origin="toc")

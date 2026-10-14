@@ -278,3 +278,12 @@ def test_paginated_cache_matches_live():
     keys = ("label", "anchor", "stop", "listed", "toc", "stop_index", "number")
     assert [{k: e[k] for k in keys} for e in live] == \
            [{k: e[k] for k in keys} for e in cached[1:4]]
+
+
+def test_heading_on_two_lines_keeps_a_space_in_toc_and_anchor():
+    """A newline in a heading is a line break on screen and a space in its
+    TOC title, its marker label and its anchor."""
+    st_write("Données professionnelles pour\nla conception", toc_lvl="1")
+    (t,) = toc_entries()
+    assert t["title"].endswith("Données professionnelles pour la conception")
+    assert t["key_anchor"].endswith("pour-la-conception")

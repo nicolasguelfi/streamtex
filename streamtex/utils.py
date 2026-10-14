@@ -24,6 +24,7 @@ from .link_preview import inject_link_preview_scaffold  # noqa: F401
 
 
 _STRIP_HTML_RE = re.compile(r'<.*?>')
+_BR_RE = re.compile(r'<br\s*/?>', re.IGNORECASE)
 
 # Monotonic counter — avoids os.urandom syscall from uuid4 on every call.
 # Thread-safe under CPython GIL (next() on itertools.count is atomic).
@@ -31,8 +32,17 @@ _key_counter = itertools.count()
 
 
 def strip_html(html_string):
-    """Remove all HTML tags from a string and return plain text."""
-    return _STRIP_HTML_RE.sub('', html_string)
+    """Remove all HTML tags from a string and return plain text.
+
+    A line break (``<br>``, which ``st_write`` makes of a ``\\n``) becomes a
+    space, so the words on both sides stay apart.
+    """
+    return _STRIP_HTML_RE.sub('', _BR_RE.sub(' ', html_string))
+
+
+def plain_label(html_string):
+    """The text of *html_string* on one line: tags removed, white space collapsed."""
+    return " ".join(strip_html(html_string).split())
 
 
 def generate_key(prefix: str = "block"):

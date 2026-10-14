@@ -237,6 +237,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `.gitignore` written by `stx project new` ignores the secret files
   `stx deploy preflight` checks (`.env`, `.stx-deploy.env`,
   `.stx-passwords.toml`): a new project passes preflight.
+- A heading written on two lines (`"Prompt Engineering\n& Persona"`) lost
+  the space between its two lines in its TOC title, its marker label, the
+  search index and its anchor (`…-pourla-conception`): a line break now
+  counts as a space. **The anchor of such a heading changes**
+  (`…-pour-la-conception`): an `#anchor` link to the old one opens the page
+  without scrolling to the heading; `?marker=` links are not affected.
 - `enrich_export_html(markers=…)` given entries that did not come from the
   page cache (no roles, no numbers) showed popup rows without numbers; it
   now gives them their roles and slide numbers itself (#116, #117).

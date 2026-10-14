@@ -169,3 +169,9 @@ class TestMimeType:
 
     def test_unsupported(self):
         assert get_mime_type("file.xyz") is None
+
+
+def test_strip_html_keeps_words_apart_at_a_line_break():
+    assert strip_html("pour<br>la conception") == "pour la conception"
+    assert strip_html("a<br/>b<BR />c") == "a b c"
+    assert _utils.plain_label("Prompt Engineering <br>& Persona") == "Prompt Engineering & Persona"

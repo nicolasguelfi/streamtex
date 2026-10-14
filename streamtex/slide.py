@@ -106,18 +106,39 @@ class SlideBreakConfig:
 _config: SlideBreakConfig = SlideBreakConfig()
 
 
-def set_slide_break_config(config: SlideBreakConfig) -> None:
-    """Set the global slide break configuration.
+def _in_session() -> bool:
+    """True inside a Streamlit script run (a viewer's session)."""
+    try:
+        from streamlit.runtime.scriptrunner import get_script_run_ctx
+        return get_script_run_ctx(suppress_warning=True) is not None
+    except Exception:  # noqa: BLE001 — bare mode / Streamlit drift
+        return False
 
-    Call once in your project's helpers.py or book.py to customize
-    all st_slide_break() calls project-wide.
+
+_BREAK_CONFIG_KEY = "_stx_slide_break_config"
+
+
+def set_slide_break_config(config: SlideBreakConfig) -> None:
+    """Set the slide break configuration of the module.
+
+    Call once in ``book.py`` (it runs at every rerun of every session).
+    Stored per session (#122): two modules, or two sessions, served by one
+    process never overwrite each other. Outside a session (tests, the
+    ``stx`` CLIs) a process-wide fallback is used.
     """
     global _config
-    _config = config
+    if _in_session():
+        st.session_state[_BREAK_CONFIG_KEY] = config
+    else:
+        _config = config
 
 
 def get_slide_break_config() -> SlideBreakConfig:
-    """Return the current global slide break config."""
+    """Return the slide break config of this session (else the process-wide one)."""
+    if _in_session():
+        cfg = st.session_state.get(_BREAK_CONFIG_KEY)
+        if cfg is not None:
+            return cfg
     return _config
 
 
@@ -188,14 +209,14 @@ def add_slide_break_options(
     :param container: Streamlit container to render into (default: sidebar).
     """
     if default_mode is None:
-        default_mode = _config.mode
+        default_mode = get_slide_break_config().mode
     if default_before is None:
-        default_before = _parse_space_vh(_config.space_before)
+        default_before = _parse_space_vh(get_slide_break_config().space_before)
     if default_after is None:
         if default_space is not None:
             default_after = default_space
         else:
-            default_after = _parse_space_vh(_config.space)
+            default_after = _parse_space_vh(get_slide_break_config().space)
 
     if _BREAK_ENABLED_KEY not in st.session_state:
         st.session_state[_BREAK_ENABLED_KEY] = default_enabled
@@ -248,7 +269,7 @@ def _effective_config(
     Returns ``(effective_config, enabled)`` where *enabled* is False when
     the sidebar toggle is off.
     """
-    cfg = config or _config
+    cfg = config or get_slide_break_config()
     enabled_val = st.session_state.get(_BREAK_ENABLED_KEY)
     if enabled_val is None:
         # No sidebar widget active — use config as-is
@@ -287,6 +308,8 @@ def st_slide_break(
     marker_hidden: Optional[bool] = None,
     *,
     marker: bool | MarkerRoles | None = None,
+    _marker_key: Optional[str] = None,
+    _force_marker: bool = False,
 ) -> None:
     """Presentation section break: styled rule + viewport spacer + marker.
 
@@ -356,8 +379,8 @@ def st_slide_break(
 
     if not enabled or cfg.mode == SlideBreakMode.HIDDEN:
         # Even when hidden, fullscreen marker is still needed for navigation
-        if cfg.fullscreen and roles is not None:
-            st_marker(marker_label, roles=roles, _origin="break")
+        if roles is not None and (cfg.fullscreen or _force_marker):
+            st_marker(marker_label, key=_marker_key, roles=roles, _origin="break")
         # Still inject section.top after the break (even if visual is hidden)
         if not consume_block_top_injected() and effective_spacing.top is not None:
             st_space("v", effective_spacing.top)
@@ -387,8 +410,8 @@ def st_slide_break(
         _render(f'<hr class="stx-slide-break-rule" style="{rule_css}">')
     if show_spacer:
         _render(f'<div class="stx-slide-break-spacer" style="{spacer_css}"></div>')
-    if roles is not None and cfg.mode != SlideBreakMode.HIDDEN:
-        st_marker(marker_label, roles=roles, _origin="break")
+    if roles is not None and (cfg.mode != SlideBreakMode.HIDDEN or _force_marker):
+        st_marker(marker_label, key=_marker_key, roles=roles, _origin="break")
 
     # Inject section.top after the break visual (space before next section)
     # Skip if block.top was already injected for this block (first break)
@@ -477,49 +500,127 @@ SLIDE_CONTAINER = _Style(
 )
 
 _slide_container: Optional[_Style] = None
+_CONTAINER_KEY = "_stx_slide_container"
 
 
 def set_slide_container(style: Optional[_Style]) -> None:
-    """Set the container every :func:`st_slide` uses (``None`` = ``SLIDE_CONTAINER``).
+    """Set the box every :func:`st_slide` uses (``None`` = ``SLIDE_CONTAINER``).
 
-    A book-level setting, called once in ``book.py`` — typically with the
-    design system's own container::
+    One line in ``book.py``, before ``st_book``, with the design system's box::
 
-        stx.set_slide_container(s.project.containers.slide_center)
+        stx.set_slide_container(DS.containers.slide_center)
+
+    Stored per session (#122): ``book.py`` runs at every rerun of every
+    session, so each session gets its module's box, and two modules served
+    by one process do not overwrite each other. Outside a session (tests,
+    the ``stx`` CLIs) a process-wide fallback is used. The marker and TOC
+    registries, the spacing state and the export buffer stay process-wide.
     """
     global _slide_container
-    _slide_container = style
+    if _in_session():
+        if style is None:
+            st.session_state.pop(_CONTAINER_KEY, None)
+        else:
+            st.session_state[_CONTAINER_KEY] = style
+    else:
+        _slide_container = style
 
 
 def get_slide_container() -> _Style:
+    if _in_session():
+        style = st.session_state.get(_CONTAINER_KEY)
+        if style is not None:
+            return style
     return _slide_container if _slide_container is not None else SLIDE_CONTAINER
 
 
+def _slide_marker(marker, key, roles) -> tuple[str, Optional[MarkerRoles]] | None:
+    """``(label, roles)`` of the slide's explicit marker, ``None`` if none (#122)."""
+    if marker is False:
+        if key is not None or roles is not None:
+            raise ValueError("st_slide: marker=False places no marker; key= and roles= need one")
+        return None
+    if marker is None and key is None and roles is None:
+        return None
+    if isinstance(marker, MarkerRoles):
+        if roles is not None:
+            raise TypeError("st_slide: give the roles once (marker=MarkerRoles or roles=)")
+        marker, roles = True, marker
+    label = marker if isinstance(marker, str) else ""
+    if roles is None:
+        # a labelled marker is listed (st_marker("X")); an unlabelled one is the
+        # break's usual stop, not listed
+        roles = MarkerRoles.NAMED if label else MarkerRoles.HIDDEN
+    return label, roles
+
+
 @_contextmanager
-def st_slide(cut: bool = False, style: Optional[_Style] = None):
-    """One slide of a block: a break before it if *cut*, then its container.
+def st_slide(cut: bool = False, style: Optional[_Style] = None, *,
+             marker=None, key: Optional[str] = None, roles: Optional[MarkerRoles] = None,
+             box: bool = True, zoom: Optional[int] = None,
+             spacing: Optional[Spacing] = None, config: Optional[SlideBreakConfig] = None):
+    """One slide of a block: a break before it if *cut*, its marker, then its box.
 
-    It adds nothing else: the title, the marker, the zoom, the alignment and
-    every size stay written in the block, slide by slide, so that any slide
-    can be specialised at any time. It writes exactly the two calls a block
-    would write by hand::
+    It adds nothing else: the title, the zoom of the content, the alignment
+    and every size stay written in the block, slide by slide::
 
-        with st_slide():                 # the first slide of the block
+        with st_slide():                          # the first slide of a block
             ...
-        with st_slide(cut=True):         # a break, then the slide
+        with st_slide(cut=True, marker="RAG"):    # a break, its listed marker, the slide
             ...
-        with st_slide(cut=True, style=Style("min-height: 60vh;", "short")):
-            ...                          # this slide only
+        with st_slide(cut=True, style=s.project.containers.slide_top):
+            ...                                   # this slide only: top-aligned
+
+    The three forms of a block are written with it: **S** (the default, each
+    slide in the module's box), **B** (inside a composite: free content cut
+    by breaks, ``with st_slide(cut=True, box=False):``) and **D** (a slide
+    taller than the screen that scrolls: ``with st_slide(marker="X",
+    box=False):``).
 
     :param cut: ``True`` = ``st_slide_break()`` before the slide.
-    :param style: a ``Style`` added (``+``) to the container for this slide.
+    :param style: a ``Style`` added (``+``) to the box for this slide.
+    :param marker: the slide's own marker — at most one per slide (#116
+        roles): ``None`` (default) as before (with *cut*, the break places
+        its usual marker; without, none); ``False`` no marker (the break
+        still draws its rule and spacer); ``True`` a stop, not listed;
+        ``"Label"`` a stop, listed, with that label. With *cut* it takes the
+        place of the break's marker; without, it is placed before the box.
+        An explicit marker is placed whatever the break mode or the sidebar.
+    :param key: the marker's stable deep-link key (as ``st_marker(key=)``).
+    :param roles: the marker's roles (as ``st_marker(roles=)``), e.g.
+        ``MarkerRoles.HIDDEN`` or ``MarkerRoles(listed=False, toc_lvl="2")``.
+    :param box: ``False`` = no box, the content flows (forms B and D).
+    :param zoom, spacing, config: settings of the break (``cut=True`` only),
+        as ``st_slide_break`` takes them.
     """
     from .container import st_block
 
+    if not box and style is not None:
+        raise ValueError("st_slide: style= is added to the slide box; with box=False there is none")
+    if not cut and (zoom is not None or spacing is not None or config is not None):
+        raise ValueError("st_slide: zoom=, spacing= and config= set the break before the slide; "
+                         "they need cut=True (use st_zoom inside the slide)")
+    explicit = _slide_marker(marker, key, roles)
+
     if cut:
-        st_slide_break()        # a slide boundary itself
+        if marker is None and explicit is None and zoom is None and spacing is None and config is None:
+            st_slide_break()        # a slide boundary itself (the 0.7.37 call)
+        else:
+            if explicit is not None:
+                label, r = explicit
+                brk_marker, force = r, True
+            else:
+                label, brk_marker, force = "", (False if marker is False else None), False
+            st_slide_break(marker_label=label, config=config, spacing=spacing, zoom=zoom,
+                           marker=brk_marker, _marker_key=key, _force_marker=force)
     else:
         marker_slide_boundary("slide")
-    box = get_slide_container()
-    with st_block(box + style if style is not None else box):
+        if explicit is not None:
+            label, r = explicit
+            st_marker(label, key=key, roles=r)
+    if not box:
+        yield
+        return
+    container = get_slide_container()
+    with st_block(container + style if style is not None else container):
         yield

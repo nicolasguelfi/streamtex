@@ -83,6 +83,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   override `st_include(..., page=True | False)`; `paginate_by` is a
   `[book.defaults]` key. Measured in a browser on the lab: a page change
   takes 278 ms (median) in `"leaf"` against 426 ms in `"entry"`.
+- `st_slide(..., marker=, key=, roles=, box=, zoom=, spacing=, config=)` (#122),
+  the single slide construction. `marker=` gives the slide its one marker
+  (`None` as before, `False` none, `True` a stop not listed, `"Label"` a
+  listed stop; `key=` and `roles=` as `st_marker`): with `cut=True` it takes
+  the place of the break's marker, without it comes before the box, and it
+  is placed whatever the break mode or the sidebar. `zoom=` / `spacing=` /
+  `config=` reach the break (they need `cut=True`, else `ValueError`).
+  `box=False` writes slides without a box (form D, a scrolling slide; form
+  B inside a composite). Existing calls render as before.
+  **Migration note for projects with their own `slide(cut, style)` helper:**
+  call `stx.set_slide_container(<design system box>)` in `book.py`, then
+  make the helper an alias, `from streamtex import st_slide as slide` — no
+  block file changes, no visual change.
 - `?slide=<n>` deep link (#117): opens the slide the counter calls n, in the
   paginated app and in the HTML export. `page_url(base, slide=n)` builds it;
   precedence `marker` > `slide` > `page`, in the link and in the reader.
@@ -154,6 +167,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the old files under the entries' parent directory are orphans
   (`rm -r <entries parent>/.stx_cache`). `stx cache warmup` and
   `stx run --set --fresh` now act on the file the app reads.
+
+- `set_slide_container` and `set_slide_break_config` are stored per session
+  (#122): two modules or two sessions served by one process no longer
+  overwrite each other. Outside a session (tests, `stx` CLIs) the
+  process-wide value is used as before. The marker and TOC registries, the
+  spacing state and the export buffer stay process-wide.
 
 ### Fixed
 

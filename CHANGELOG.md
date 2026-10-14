@@ -51,6 +51,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `st_include(..., break_before=)` (#118): `True` draws the standard break
   before the block, a `SlideBreakConfig` that break, in the host's context.
   `break_before` is a reserved keyword of `st_include`.
+- `IncludeCycleError` (#119): a block that includes itself, directly or
+  through other blocks, is refused at the first re-entry with
+  `Include cycle: lists.a → lists.b → lists.a. …` (`err.chain`, `err.stack`),
+  before anything of it is drawn — instead of a `RecursionError` after
+  hundreds of markers. The include stack is keyed by file, so a reloaded
+  block or one imported under two names is still recognised. Including the
+  same block several times in a row stays allowed.
 - `?slide=<n>` deep link (#117): opens the slide the counter calls n, in the
   paginated app and in the HTML export. `page_url(base, slide=n)` builds it;
   precedence `marker` > `slide` > `page`, in the link and in the reader.
@@ -104,6 +111,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   PROMPT4UL-slides: the 62 breaks between entries now match the 78 inside
   blocks (55 px instead of 183 px at 1920 × 1080); the rest of the export is
   byte-identical, the app and the PDF page breaks are unchanged (#118).
+
+- One red message per block error, shown by the innermost `st_include`
+  (an error at depth n showed n messages) (#119).
+- `stx export html` and `stx cache warmup` fail with exit code 1 on an
+  include cycle instead of silently skipping the entry; other block errors
+  are still logged and skipped. The paginated app shows the cycle with
+  `st.error` and saves no page cache. `stx validate --build` runs each entry
+  through `st_include`, so a cycle is named from the entry (#119).
 
 ### Fixed
 

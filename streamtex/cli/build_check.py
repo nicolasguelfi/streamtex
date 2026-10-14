@@ -121,7 +121,8 @@ def _check_book(module_list, toc_config=None, marker_config=None, *args, block_a
             continue
         res["blocks"] += 1
         try:
-            m.build(*block_args, **(block_kwargs or {}))
+            # through st_include, so an include cycle is named from the entry (#119)
+            _book.st_include(m, *block_args, **(block_kwargs or {}))
         except Exception as e:
             res["errors"].append([name, type(e).__name__, str(e)[:300],
                                   traceback.format_exc(limit=-2)[-900:]])

@@ -278,6 +278,13 @@ def warmup(path):
                  {"__name__": "__main__", "__file__": book_py})
         except SystemExit:
             pass  # st.set_page_config may call sys.exit in some edge cases
+        except Exception as e:
+            from streamtex.book import IncludeCycleError
+            if not isinstance(e, IncludeCycleError):
+                raise
+            # a block includes itself: nothing is written (#119)
+            console.print(f"[red]Error:[/] {e}")
+            raise SystemExit(1) from None
         finally:
             _book_mod._warmup_mode = False
             os.chdir(original_cwd)

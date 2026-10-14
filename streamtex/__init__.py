@@ -57,7 +57,7 @@ try:
     from .banner import BannerConfig, BannerMode
 
     # Book orchestration
-    from .book import st_book, st_include, st_sequence, st_toc, load_css
+    from .book import st_book, st_include, st_sequence, st_toc, load_css, IncludeCycleError
 
     # Table of Contents
     from .toc import reset_toc_registry, toc_entries, TOCConfig, NumberingMode
@@ -257,6 +257,7 @@ __all__ = [
     "GSheetError",
     "GSheetSource",
     "ImageMetadata",
+    "IncludeCycleError",
     "InspectorConfig",
     "LazyBlockRegistry",
     "LinkConfig",

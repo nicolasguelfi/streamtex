@@ -7,6 +7,7 @@ import json
 import logging
 import os
 import time
+from contextvars import ContextVar
 
 import streamlit as st
 from streamlit.delta_generator import DeltaGenerator as Delta
@@ -1347,6 +1348,45 @@ def st_toc(toc_title_style):
     return toc_block
 
 
+class IncludeCycleError(RuntimeError):
+    """A block includes itself, directly or through other blocks (#119).
+
+    ``chain``: the display names of the cycle, first == last
+    (``("lists.a", "lists.b", "lists.a")``); ``stack``: every inclusion in
+    progress when it was detected, outermost first.
+    """
+
+    def __init__(self, chain: tuple[str, ...], stack: tuple[str, ...]):
+        self.chain = chain
+        self.stack = stack
+        super().__init__(
+            f"Include cycle: {' → '.join(chain)}. A block cannot include itself, directly "
+            "or through other blocks: remove one of these st_include calls.")
+
+
+#: The inclusions in progress, outermost first: ``(key, display name)``. The
+#: key is the block's real file path, so a block reloaded into a new object
+#: or imported under two names is still the same block. A ``ContextVar``:
+#: each Streamlit script run has its own.
+_INCLUDE_STACK: ContextVar[tuple[tuple[object, str], ...]] = ContextVar(
+    "stx_include_stack", default=())
+
+
+def _include_frame(block) -> tuple[object, str]:
+    path = getattr(block, "__file__", None)
+    key = os.path.realpath(path) if path else ("id", id(block))
+    return key, getattr(block, "__name__", None) or repr(block)
+
+
+def _check_include_cycle(stack, frame) -> None:
+    """Raise :class:`IncludeCycleError` if *frame* is already in progress."""
+    keys = [k for k, _ in stack]
+    if frame[0] in keys:
+        i = keys.index(frame[0])
+        names = tuple(n for _, n in stack)
+        raise IncludeCycleError(names[i:] + (frame[1],), names)
+
+
 def st_include(block_file_module, *args, markers=True, break_before=False,
                _inspector_config=None, **kwargs):
     """Render another block's ``build()`` in place, like ``\\input``.
@@ -1374,6 +1414,12 @@ def st_include(block_file_module, *args, markers=True, break_before=False,
     wins. The layout never changes: rules, spacers, spacing and content are
     rendered identically. ``markers`` and ``break_before`` are not passed to
     ``build()``.
+
+    A block cannot include itself, directly or through other blocks: the
+    re-entry raises :class:`IncludeCycleError` naming the chain, before
+    anything of it is drawn (#119). Including the same block several times
+    in a row is fine. An error in ``build()`` shows one red message, at the
+    innermost inclusion, and propagates.
     """
     from .marker import include_role_override, normalize_markers_arg
     from .slide import SlideBreakConfig
@@ -1393,27 +1439,43 @@ def st_include(block_file_module, *args, markers=True, break_before=False,
 
     module_name = getattr(block_file_module, '__name__', str(block_file_module))
 
-    # The break before the block, in the host's context (#118)
-    if break_before is True:
-        from .slide import _standard_break
-        _standard_break()
-    elif isinstance(break_before, SlideBreakConfig):
-        from .slide import st_slide_break
-        st_slide_break(config=break_before)
-
-    # Inspector edit button (opt-in)
-    # Uses st.html() directly (not _render()), so never appears in exported HTML.
-    if _inspector_config and _inspector_config.enabled:
-        from .inspector import render_edit_button
-        short_name = module_name.rsplit('.', 1)[-1]
-        render_edit_button(short_name, _inspector_config)
-
+    # No cycle (#119): checked before anything of this inclusion is drawn
+    frame = _include_frame(block_file_module)
+    stack = _INCLUDE_STACK.get()
+    _check_include_cycle(stack, frame)
+    token = _INCLUDE_STACK.set(stack + (frame,))
     try:
+        # The break before the block, in the host's context (#118)
+        if break_before is True:
+            from .slide import _standard_break
+            _standard_break()
+        elif isinstance(break_before, SlideBreakConfig):
+            from .slide import st_slide_break
+            st_slide_break(config=break_before)
+
+        # Inspector edit button (opt-in)
+        # Uses st.html() directly (not _render()), so never appears in exported HTML.
+        if _inspector_config and _inspector_config.enabled:
+            from .inspector import render_edit_button
+            short_name = module_name.rsplit('.', 1)[-1]
+            render_edit_button(short_name, _inspector_config)
+
         with include_role_override(markers):
             block_file_module.build(*args, **kwargs)
     except Exception as e:
-        st.markdown(f":red-background[Error in block '{module_name}': {e}]")
+        # One red message per error: the innermost inclusion shows it (#119)
+        if not getattr(e, "_stx_reported", False):
+            if isinstance(e, IncludeCycleError):
+                st.markdown(f":red-background[{e}]")
+            else:
+                st.markdown(f":red-background[Error in block '{module_name}': {e}]")
+            try:
+                e._stx_reported = True
+            except AttributeError:
+                pass
         raise
+    finally:
+        _INCLUDE_STACK.reset(token)
 
 
 _BREAK = "break"
@@ -1953,6 +2015,8 @@ def _build_page_cache(module_list, toc_config, marker_config, separator,
                 if _warmup_mode:
                     try:
                         st_include(module, *block_args, **block_kwargs)
+                    except IncludeCycleError:
+                        raise           # never skipped: the export would miss it (#119)
                     except Exception:
                         name = getattr(module, '__name__', str(module))
                         logger.warning("Warmup: block %s raised — skipping.", name)
@@ -2718,12 +2782,17 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
             )
         # Progress callback for loading overlay
         _progress_cb = update_loading_progress if loading else None
-        _build_page_cache(module_list, toc_config, marker_config,
-                          separator, cache_hash,
-                          export_config=_cache_export_cfg,
-                          progress_callback=_progress_cb,
-                          block_args=block_args,
-                          block_kwargs=block_kwargs)
+        try:
+            _build_page_cache(module_list, toc_config, marker_config,
+                              separator, cache_hash,
+                              export_config=_cache_export_cfg,
+                              progress_callback=_progress_cb,
+                              block_args=block_args,
+                              block_kwargs=block_kwargs)
+        except IncludeCycleError as e:
+            # the DOM is suppressed during the build: show it now (#119)
+            st.error(str(e))
+            raise
         cache = st.session_state[_STX_CACHE_KEY]
         # Persist to disk for future sessions
         if cache_path:

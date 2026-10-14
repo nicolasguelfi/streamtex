@@ -58,6 +58,7 @@ try:
 
     # Book orchestration
     from .book import st_book, st_include, st_sequence, st_toc, load_css, IncludeCycleError
+    from .book import set_include_reload
 
     # Table of Contents
     from .toc import reset_toc_registry, toc_entries, TOCConfig, NumberingMode
@@ -363,6 +364,7 @@ __all__ = [
     "set_block_helper_config",
     "set_block_spacing",
     "set_gsheet_config",
+    "set_include_reload",
     "set_link_config",
     "set_presentation_config",
     "set_slide_break_config",

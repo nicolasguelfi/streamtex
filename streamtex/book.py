@@ -6,7 +6,9 @@ import importlib.resources as resources
 import json
 import logging
 import os
+import threading
 import time
+import weakref
 from contextvars import ContextVar
 
 import streamlit as st
@@ -1372,6 +1374,69 @@ _INCLUDE_STACK: ContextVar[tuple[tuple[object, str], ...]] = ContextVar(
     "stx_include_stack", default=())
 
 
+# ---------------------------------------------------------------------------
+# Fresh code for included blocks (#120)
+# ---------------------------------------------------------------------------
+
+_INCLUDE_RELOAD = True
+_INCLUDED: dict[str, tuple] = {}          # real path -> (weakref to the module, mtime of its code)
+_INCLUDED_LOCK = threading.Lock()
+
+
+def set_include_reload(enabled: bool) -> None:
+    """Re-execute a block reached through ``st_include`` when its file changed (default on).
+
+    The environment variable ``STX_INCLUDE_RELOAD=0`` turns it off and wins
+    over this setting. Off, the file is still watched by the page cache.
+    """
+    global _INCLUDE_RELOAD
+    _INCLUDE_RELOAD = bool(enabled)
+
+
+def _include_reload_enabled() -> bool:
+    env = os.environ.get("STX_INCLUDE_RELOAD")
+    if env is not None and env.strip() != "":
+        return env.strip() not in ("0", "false", "False", "no")
+    return _INCLUDE_RELOAD
+
+
+def _refresh_included(block) -> None:
+    """Watch an included block's file and give it fresh code (#120).
+
+    First sight of the file, or another object for a known file (Streamlit
+    evicted and re-imported it, a registry re-executed it): recorded. Same
+    object, file changed: the file is executed again **in place**, in the
+    same module object, so every holder (a list block's ``ITEMS``, the
+    entries given to ``st_book``) sees the new ``build()``. A failure is
+    raised and the old mtime kept, so the next run retries.
+    """
+    path = getattr(block, "__file__", None)
+    if not path or not os.path.isfile(path):
+        return
+    key = os.path.realpath(path)
+    try:
+        mtime = os.path.getmtime(key)
+    except OSError:
+        return
+    from .watch import watch_file
+    if not _include_reload_enabled():
+        watch_file(key)
+        return
+    with _INCLUDED_LOCK:
+        rec = _INCLUDED.get(key)
+        known = rec is not None and rec[0]() is block
+        if not known or rec[1] == mtime:
+            if not known:
+                _INCLUDED[key] = (weakref.ref(block), mtime)
+            watch_file(key, mtime if not known else rec[1])
+            return
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(block.__name__, key)
+        spec.loader.exec_module(block)          # same object: every holder sees it
+        _INCLUDED[key] = (weakref.ref(block), mtime)
+        watch_file(key, mtime)
+
+
 def _include_frame(block) -> tuple[object, str]:
     path = getattr(block, "__file__", None)
     key = os.path.realpath(path) if path else ("id", id(block))
@@ -1415,6 +1480,11 @@ def st_include(block_file_module, *args, markers=True, break_before=False,
     rendered identically. ``markers`` and ``break_before`` are not passed to
     ``build()``.
 
+    The block's file is watched by the page cache, and a block whose file
+    changed is executed again in place, so reloading the page is enough —
+    for blocks reached through ``st_include``, in any directory (#120;
+    ``set_include_reload(False)`` or ``STX_INCLUDE_RELOAD=0`` to turn it off).
+
     A block cannot include itself, directly or through other blocks: the
     re-entry raises :class:`IncludeCycleError` naming the chain, before
     anything of it is drawn (#119). Including the same block several times
@@ -1431,6 +1501,18 @@ def st_include(block_file_module, *args, markers=True, break_before=False,
     if not block_file_module:
         st.markdown(":red-background[Block module is None — not found]")
         return
+
+    # Fresh code and a watched file for every included block (#120)
+    try:
+        _refresh_included(block_file_module)
+    except Exception as e:
+        name = getattr(block_file_module, '__name__', str(block_file_module))
+        st.markdown(f":red-background[Error in block '{name}': {e}]")
+        try:
+            e._stx_reported = True
+        except AttributeError:
+            pass
+        raise
 
     mod_path = getattr(block_file_module, '__file__', None) or getattr(block_file_module, '__name__', '?')
     if not hasattr(block_file_module, 'build'):
@@ -1577,19 +1659,55 @@ def _watched_snapshot() -> dict:
     return watched_snapshot()
 
 
+def _find_book_file() -> str | None:
+    """The module's ``book.py``: the innermost ``__main__`` script on the call stack (#120).
+
+    Streamlit runs the script as ``__main__`` with its ``__file__``; the
+    ``stx`` CLIs execute ``book.py`` the same way. Library and tool files
+    (anything under ``sys.prefix``, ``site-packages``) are skipped, so a test
+    runner's ``__main__`` is never taken for a book. ``None`` if there is none.
+    """
+    import sys
+    f = sys._getframe(1)
+    prefix = os.path.realpath(sys.prefix)
+    while f is not None:
+        g = f.f_globals
+        path = g.get("__file__")
+        if g.get("__name__") == "__main__" and isinstance(path, str) and path.endswith(".py"):
+            real = os.path.realpath(path)
+            if "site-packages" not in real and not real.startswith(prefix + os.sep):
+                return os.path.abspath(path)
+        f = f.f_back
+    return None
+
+
+def _anchor_dir(module_list, book_file: str | None) -> str | None:
+    """The directory the page cache belongs to: the book's, else the entries' parent."""
+    if book_file:
+        return os.path.dirname(os.path.abspath(book_file))
+    for m in module_list:
+        fpath = getattr(m, '__file__', None)
+        if fpath:
+            return os.path.dirname(os.path.dirname(os.path.abspath(fpath)))
+    return None
+
+
 def _compute_cache_hash(module_list, block_args: tuple = (),
-                        block_kwargs: dict | None = None):
+                        block_kwargs: dict | None = None, book_file: str | None = None):
     """Return a hash that changes when the module list or file contents change.
 
     The hash incorporates:
     - Module names (detects add/remove/reorder)
-    - File modification times (detects content edits)
-    - book.py, every custom/**/*.py, blocks/helpers.py and the helper modules
-      next to the blocks (detects config changes, #53)
+    - File modification times of the entries (detects content edits)
+    - the module's own files: its ``book.py``, every ``custom/**/*.py`` and
+      ``blocks/helpers.py`` next to it (*book_file*, #120; without it, next to
+      the entries' parent directory as before), and the helper modules next
+      to the entries (detects config changes, #53)
 
-    Data files read through ``stx.load_*`` / ``watch_file`` are NOT part of
-    the hash (the registry is empty until the blocks have run): the cache
-    stores their mtimes under ``"watched"`` and is discarded when one changed.
+    Blocks reached through ``st_include`` and data files read through
+    ``stx.load_*`` / ``watch_file`` are NOT part of the hash (they are known
+    only once the blocks have run): the cache stores their mtimes as its
+    ``"watched"`` snapshot and is discarded as soon as one changed.
     - streamtex library version (detects library upgrades)
     - A fingerprint of ``block_args`` / ``block_kwargs`` when non-empty, so a
       document built with ``block_kwargs={"lang": "fr"}`` never reuses the
@@ -1612,9 +1730,9 @@ def _compute_cache_hash(module_list, block_args: tuple = (),
         if first_file:
             break
     if first_file:
-        project_dir = os.path.dirname(os.path.dirname(os.path.abspath(first_file)))
+        project_dir = _anchor_dir(module_list, book_file)
         ancillary = [
-            os.path.join(project_dir, "book.py"),
+            os.path.abspath(book_file) if book_file else os.path.join(project_dir, "book.py"),
             os.path.join(project_dir, "custom", "styles.py"),
             os.path.join(project_dir, "blocks", "helpers.py"),
         ]
@@ -1669,10 +1787,13 @@ _STX_FILE_CACHE_NAME = "page_cache.json"
 
 
 def _resolve_cache_path(module_list, block_args: tuple = (),
-                        block_kwargs: dict | None = None) -> str | None:
-    """Return the path to the persistent cache file for this project.
+                        block_kwargs: dict | None = None,
+                        book_file: str | None = None) -> str | None:
+    """Return the path to the persistent cache file for this module.
 
-    The cache lives in ``<project>/.stx_cache/page_cache.json``. When
+    The cache lives next to the module's ``book.py`` (*book_file*, #120):
+    ``<book dir>/.stx_cache/page_cache.json`` — for the standard layout the
+    same place as before (the parent of ``blocks/``). When
     ``block_args`` / ``block_kwargs`` are forwarded to the blocks, the file
     name carries their fingerprint — ``page_cache-<fp8>.json`` — so that one
     cache per variant (one per language, typically) coexists on disk instead
@@ -1682,8 +1803,7 @@ def _resolve_cache_path(module_list, block_args: tuple = (),
     for m in module_list:
         fpath = getattr(m, '__file__', None)
         if fpath:
-            # blocks/ is one level below the project root
-            project_dir = os.path.dirname(os.path.dirname(os.path.abspath(fpath)))
+            project_dir = _anchor_dir(module_list, book_file)
             fp = _block_kwargs_fingerprint(block_args, block_kwargs)
             stem, ext = os.path.splitext(_STX_FILE_CACHE_NAME)
             name = f"{stem}-{fp}{ext}" if fp else _STX_FILE_CACHE_NAME
@@ -2118,8 +2238,9 @@ def _warmup_build_cache(module_list, toc_config, marker_config, separator,
     When ``_warmup_export_config`` is set, the export buffer is activated
     so the full-book HTML is captured in session_state alongside the cache.
     """
-    cache_hash = _compute_cache_hash(module_list, block_args, block_kwargs)
-    cache_path = _resolve_cache_path(module_list, block_args, block_kwargs)
+    book_file = _find_book_file()                      # the cache belongs to it (#120)
+    cache_hash = _compute_cache_hash(module_list, block_args, block_kwargs, book_file)
+    cache_path = _resolve_cache_path(module_list, block_args, block_kwargs, book_file)
     # Use the export config if set by CLI ``stx export html``, otherwise disable
     export_cfg = _warmup_export_config
     if export_cfg is not None:
@@ -2742,8 +2863,9 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
     effective_zoom = st.session_state.get(_ZOOM_KEY, zoom) / 100
 
     # --- Cache management (3-tier: session → file → full rebuild) ---
-    cache_hash = _compute_cache_hash(module_list, block_args, block_kwargs)
-    cache_path = _resolve_cache_path(module_list, block_args, block_kwargs)
+    book_file = _find_book_file()                      # the cache belongs to it (#120)
+    cache_hash = _compute_cache_hash(module_list, block_args, block_kwargs, book_file)
+    cache_path = _resolve_cache_path(module_list, block_args, block_kwargs, book_file)
 
     # Tier 1: session_state (instant — survives intra-session reruns)
     cache = st.session_state.get(_STX_CACHE_KEY)

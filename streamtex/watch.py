@@ -12,9 +12,13 @@ restart. Use these instead::
     stx.watch_file(HERE / "other.csv")             # read it yourself, but invalidate on change
 
 Each call returns the cached value while the file's mtime and size are
-unchanged, re-reads it otherwise, and registers the file: its mtime enters
-the page-cache key (``book._compute_cache_hash``) and is checked again when a
-persisted cache is loaded after a restart. Reloading the page is enough.
+unchanged, re-reads it otherwise, and registers the file. The registered
+files are not part of the page-cache key (``book._compute_cache_hash``,
+computed before any block runs): their mtimes are stored with the cache as
+its ``"watched"`` snapshot, and the cache is discarded — in the session or
+when a persisted cache is loaded after a restart — as soon as one of them
+changed. Every block reached through ``st_include`` is registered the same
+way (#120). Reloading the page is enough.
 """
 
 from __future__ import annotations
@@ -27,7 +31,7 @@ from pathlib import Path
 from typing import Any
 
 _lock = threading.Lock()
-_WATCHED: dict[str, None] = {}                      # insertion-ordered set of abs paths
+_WATCHED: dict[str, float | None] = {}              # abs path -> mtime of what ran (None: read it)
 _CACHE: dict[tuple[str, str], tuple[tuple[float, int], Any]] = {}
 
 
@@ -40,11 +44,17 @@ def _stamp(path: str) -> tuple[float, int]:
     return (st.st_mtime, st.st_size)
 
 
-def watch_file(path: str | os.PathLike) -> str:
-    """Register *path*: its changes invalidate the page cache. Returns the abs path."""
+def watch_file(path: str | os.PathLike, mtime: float | None = None) -> str:
+    """Register *path*: its changes invalidate the page cache. Returns the abs path.
+
+    *mtime*: the modification time of the content that was actually used
+    (``st_include`` passes the mtime of the code it ran), stored in the
+    snapshot instead of the time read at snapshot time — an edit made while
+    the cache was being built then invalidates the next run.
+    """
     p = _key(path)
     with _lock:
-        _WATCHED[p] = None
+        _WATCHED[p] = mtime
     return p
 
 
@@ -56,7 +66,12 @@ def watched_files() -> list[str]:
 def watched_snapshot() -> dict[str, float]:
     """``{path: mtime}`` of every registered file (``-1`` when missing)."""
     out: dict[str, float] = {}
-    for p in watched_files():
+    with _lock:
+        items = list(_WATCHED.items())
+    for p, used in items:
+        if used is not None:
+            out[p] = used
+            continue
         try:
             out[p] = os.path.getmtime(p)
         except OSError:

@@ -58,6 +58,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   hundreds of markers. The include stack is keyed by file, so a reloaded
   block or one imported under two names is still recognised. Including the
   same block several times in a row stays allowed.
+- Hot reload of included blocks (#120): every block reached through
+  `st_include`, in any directory and at any depth (`_atomic/` blocks
+  included), is watched by the page cache and, when its file changed,
+  executed again in place — the same module object, so a list block's
+  `ITEMS` and the entries given to `st_book` see the new code. Reloading
+  the page is enough, with no server restart, no `sys.modules` purge and no
+  `rev` key in `block_kwargs` (measured on a real Streamlit 1.57 server:
+  Streamlit alone keeps the old code of a block outside the script folder).
+  A failing file is reported once and retried after the fix. Opt-out:
+  `stx.set_include_reload(False)` or `STX_INCLUDE_RELOAD=0`.
 - `?slide=<n>` deep link (#117): opens the slide the counter calls n, in the
   paginated app and in the HTML export. `page_url(base, slide=n)` builds it;
   precedence `marker` > `slide` > `page`, in the link and in the reader.
@@ -120,8 +130,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `st.error` and saves no page cache. `stx validate --build` runs each entry
   through `st_include`, so a cycle is named from the entry (#119).
 
+- The page cache belongs to the module's `book.py` (#120): it is written to
+  `<book dir>/.stx_cache/` and its key includes that `book.py` and its
+  `custom/**/*.py`. For the standard layout (blocks in `<book dir>/blocks/`)
+  nothing changes. For other layouts (entries in a shared `content/` or
+  `lists/` directory) each module gets its own cache — modules no longer
+  overwrite each other's — and one cold rebuild happens after the upgrade;
+  the old files under the entries' parent directory are orphans
+  (`rm -r <entries parent>/.stx_cache`). `stx cache warmup` and
+  `stx run --set --fresh` now act on the file the app reads.
+
 ### Fixed
 
+- A changed `book.py` (e.g. `MarkerConfig`, `TOCConfig`) did not invalidate
+  the page cache when the entries live outside `<book dir>/blocks/` (#120).
+- The `watch.py` and `_compute_cache_hash` docstrings described the watched
+  files as part of the cache key; they are a snapshot checked on reuse (#120).
 - In `SlideBreakMode.HIDDEN` with `fullscreen=True`, the break marker
   ignored `marker_hidden` (it was always unlisted).
 

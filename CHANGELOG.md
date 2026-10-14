@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.46] — 2026-10-14 — Marker roles, slide numbers, composing by atoms
+
+Every marker has three independent roles — stop, listed, in TOC (#116) —
+and one number, the slide number every surface shows (#117). Blocks are
+composed from atoms: `st_include(markers=, break_before=)` (#113, #118),
+`st_sequence`, include cycles reported (#119), hot reload of included blocks
+and the project modules they import (#120), pages that follow the
+composition tree (#121), `st_slide` break settings (#122) and a paginated
+HTML export (#106). Arrow presses made while a page loads are queued and
+replayed. The anchor of a heading written on two lines changes (its line
+break is now a space). Also: `CellAlignments.left_*` align text left,
+`stx install` writes the design pack in a form `stx pack sync` can use.
+
 ### Added
 
 - `MarkerRoles` (#116): every marker has three independent roles — **stop**

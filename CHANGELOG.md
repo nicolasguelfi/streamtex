@@ -62,7 +62,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `st_include`, in any directory and at any depth (`_atomic/` blocks
   included), is watched by the page cache and, when its file changed,
   executed again in place — the same module object, so a list block's
-  `ITEMS` and the entries given to `st_book` see the new code. Reloading
+  `ITEMS` and the entries given to `st_book` see the new code. The project
+  modules those blocks import, at any depth (`shared/`, a pack outside
+  `site-packages`; not the standard library, installed packages, StreamTeX
+  or Streamlit), are watched too: a changed one is executed again in place,
+  then every module and block that imports it. Reloading
   the page is enough, with no server restart, no `sys.modules` purge and no
   `rev` key in `block_kwargs` (measured on a real Streamlit 1.57 server:
   Streamlit alone keeps the old code of a block outside the script folder).

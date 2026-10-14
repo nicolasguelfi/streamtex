@@ -165,6 +165,151 @@ class TestReload:
 
 
 # ---------------------------------------------------------------------------
+# Project modules imported by included blocks (#120, extended)
+# ---------------------------------------------------------------------------
+
+USER = """
+RUNS = globals().get("RUNS", 0) + 1
+from {pkg}.helper import VALUE
+SEEN = []
+def build():
+    SEEN.append(VALUE)
+"""
+
+
+@pytest.fixture
+def project(tmp_path):
+    """``<pkg>/helper.py`` (VALUE) and ``<pkg>/bck_a.py``, ``<pkg>/bck_b.py`` that import it."""
+    pkg = f"pk120h{_bump.n}"
+    root = tmp_path / pkg
+    root.mkdir()
+    (root / "__init__.py").write_text("")
+    (root / "helper.py").write_text('VALUE = "h1"\n')
+    for b in ("bck_a", "bck_b"):
+        (root / f"{b}.py").write_text(USER.format(pkg=pkg))
+    sys.path.insert(0, str(tmp_path))
+    bm._INCLUDED.clear()
+    set_include_reload(True)
+    try:
+        with patch("streamtex.book.st"):
+            yield (root, importlib.import_module(f"{pkg}.bck_a"), importlib.import_module(f"{pkg}.bck_b"))
+    finally:
+        sys.path.remove(str(tmp_path))
+        for n in [n for n in sys.modules if n.split(".")[0] == pkg]:
+            del sys.modules[n]
+        bm._INCLUDED.clear()
+        set_include_reload(True)
+
+
+class TestImportedModules:
+    def test_changed_helper_reaches_the_block(self, project):
+        root, a, _ = project
+        st_include(a)
+        _bump(root / "helper.py", 'VALUE = "h2"\n')
+        st_include(a)
+        assert a.SEEN == ["h2"] and a.RUNS == 2      # SEEN restarts with the new code
+
+    def test_every_importer_runs_again(self, project):
+        root, a, b = project
+        st_include(a)
+        st_include(b)
+        _bump(root / "helper.py", 'VALUE = "h2"\n')
+        st_include(a)
+        st_include(b)                           # the helper was refreshed through bck_a
+        assert b.SEEN == ["h2"] and (a.RUNS, b.RUNS) == (2, 2)
+
+    def test_unchanged_helper_runs_nothing(self, project):
+        root, a, _ = project
+        helper = sys.modules[a.__name__.rsplit(".", 1)[0] + ".helper"]
+        st_include(a)
+        st_include(a)
+        assert a.RUNS == 1 and not hasattr(helper, "RUNS")
+
+    def test_helper_of_a_helper(self, project):
+        root, a, _ = project
+        pkg = root.name
+        (root / "palette.py").write_text('RED = "r1"\n')
+        _bump(root / "helper.py", f"from {pkg}.palette import RED\nVALUE = RED\n")
+        importlib.reload(sys.modules[f"{pkg}.helper"])
+        importlib.reload(a)
+        st_include(a)
+        _bump(root / "palette.py", 'RED = "r2"\n')
+        st_include(a)
+        assert a.SEEN[-1] == "r2"
+
+    def test_helper_and_block_are_watched(self, project):
+        root, a, _ = project
+        st_include(a)
+        watched = [os.path.realpath(x) for x in watch.watched_files()]
+        assert os.path.realpath(root / "helper.py") in watched
+        snap = bm._watched_snapshot()
+        _bump(root / "helper.py")
+        assert not watch.snapshot_is_current(snap)
+
+    def test_helper_reimported_as_a_new_object(self, project):
+        root, a, _ = project
+        name = a.__name__.rsplit(".", 1)[0] + ".helper"
+        st_include(a)
+        _bump(root / "helper.py", 'VALUE = "h2"\n')
+        del sys.modules[name]                   # e.g. Streamlit evicted it
+        importlib.import_module(name)
+        st_include(a)
+        assert a.SEEN[-1] == "h2"
+
+    def test_broken_helper_raises_then_retries(self, project):
+        root, a, _ = project
+        st_include(a)
+        _bump(root / "helper.py", "VALUE = (\n")
+        with pytest.raises(SyntaxError):
+            st_include(a)
+        _bump(root / "helper.py", 'VALUE = "h3"\n')
+        st_include(a)
+        assert a.SEEN[-1] == "h3"
+
+    def test_import_cycle_between_helpers(self, project):
+        root, a, _ = project
+        pkg = root.name
+        (root / "c1.py").write_text(f"from {pkg} import c2\nX = 1\n")
+        (root / "c2.py").write_text(f"from {pkg} import c1\nY = 2\n")
+        _bump(root / "helper.py", f"from {pkg} import c1\nVALUE = 'h'\n")
+        importlib.reload(sys.modules[f"{pkg}.helper"])
+        importlib.reload(a)
+        st_include(a)
+        _bump(root / "c2.py", f"from {pkg} import c1\nY = 3\n")
+        st_include(a)
+        assert sys.modules[f"{pkg}.c2"].Y == 3
+
+    def test_opt_out_leaves_helpers_alone(self, project):
+        root, a, _ = project
+        st_include(a)
+        set_include_reload(False)
+        _bump(root / "helper.py", 'VALUE = "h2"\n')
+        st_include(a)
+        assert a.SEEN == ["h1", "h1"]
+
+    def test_installed_and_library_modules_are_not_the_project(self):
+        import json as stdlib_json
+
+        import streamlit
+
+        import streamtex
+        assert bm._project_file(stdlib_json) is None
+        assert bm._project_file(streamtex) is None and bm._project_file(streamlit) is None
+        assert bm._project_file(pytest) is None
+        assert bm._project_file(None) is None
+        assert bm._project_file(sys.modules[__name__]) is not None
+
+    def test_relative_imports_are_resolved(self, tmp_path):
+        p = tmp_path / "m.py"
+        p.write_text("from . import helper\nfrom .sub import x, y\nfrom ..up import z\nimport a.b\n")
+        mod = type(sys)("pk.m")
+        mod.__package__ = "pk"
+        names = bm._imported_names(mod, str(p), os.path.getmtime(p))
+        assert set(names) == {"pk", "pk.helper", "pk.sub", "pk.sub.x", "pk.sub.y", "a.b"}
+
+
+
+# ---------------------------------------------------------------------------
 # Part C: the cache belongs to the module's book.py
 # ---------------------------------------------------------------------------
 

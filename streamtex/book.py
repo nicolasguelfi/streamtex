@@ -1,13 +1,19 @@
+import ast
 import contextlib
 import copy
 import functools
 import hashlib
 import importlib.resources as resources
+import importlib.util
+import itertools
 import json
 import logging
 import os
+import sys
+import sysconfig
 import threading
 import time
+import types
 import weakref
 from contextvars import ContextVar
 
@@ -1413,15 +1419,21 @@ _INCLUDE_STACK: ContextVar[tuple[tuple[object, str], ...]] = ContextVar(
 # ---------------------------------------------------------------------------
 
 _INCLUDE_RELOAD = True
-_INCLUDED: dict[str, tuple] = {}          # real path -> (weakref to the module, mtime of its code)
-_INCLUDED_LOCK = threading.Lock()
+#: real path -> (weakref to the module, mtime of its code, generation, {project import: its generation then})
+_INCLUDED: dict[str, tuple] = {}
+_INCLUDED_LOCK = threading.RLock()
+_GENERATION = itertools.count(1)          # bumped each time a module gets new code
+_IMPORTS: dict[str, tuple[float, tuple[str, ...]]] = {}   # real path -> (mtime, module names it imports)
+_NOT_PROJECT = ("streamtex", "streamlit")
 
 
 def set_include_reload(enabled: bool) -> None:
     """Re-execute a block reached through ``st_include`` when its file changed (default on).
 
+    The project modules the block imports are followed too: when one changed,
+    it is executed again, then every module and block that imports it.
     The environment variable ``STX_INCLUDE_RELOAD=0`` turns it off and wins
-    over this setting. Off, the file is still watched by the page cache.
+    over this setting. Off, the block's file is still watched by the page cache.
     """
     global _INCLUDE_RELOAD
     _INCLUDE_RELOAD = bool(enabled)
@@ -1434,41 +1446,133 @@ def _include_reload_enabled() -> bool:
     return _INCLUDE_RELOAD
 
 
+@functools.lru_cache(maxsize=1)
+def _installed_roots() -> tuple[str, ...]:
+    paths = sysconfig.get_paths()
+    roots = {os.path.realpath(paths[k]) for k in ("stdlib", "platstdlib", "purelib", "platlib") if paths.get(k)}
+    return tuple(r.rstrip(os.sep) + os.sep for r in roots)
+
+
+def _project_file(mod) -> str | None:
+    """The real path of a module written by the project, else ``None``.
+
+    Not the project's: the standard library, installed packages
+    (``site-packages``), StreamTeX and Streamlit, and modules without a
+    ``.py`` source.
+    """
+    if not isinstance(mod, types.ModuleType):
+        return None
+    if (getattr(mod, "__name__", None) or "").partition(".")[0] in _NOT_PROJECT:
+        return None
+    path = getattr(mod, "__file__", None)
+    if not path or not path.endswith(".py"):
+        return None
+    key = os.path.realpath(path)
+    parts = key.split(os.sep)
+    if key.startswith(_installed_roots()) or "site-packages" in parts or "dist-packages" in parts:
+        return None
+    return key
+
+
+def _imported_names(mod, key: str, mtime: float) -> tuple[str, ...]:
+    """The module names a file imports (``import`` / ``from … import``), read once per mtime."""
+    hit = _IMPORTS.get(key)
+    if hit is not None and hit[0] == mtime:
+        return hit[1]
+    try:
+        with open(key, "rb") as f:
+            tree = ast.parse(f.read(), key)
+    except (OSError, SyntaxError, ValueError):
+        return ()                               # running the file reports the error
+    package = getattr(mod, "__package__", None) or ""
+    names: list[str] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            names += [a.name for a in node.names]
+        elif isinstance(node, ast.ImportFrom):
+            try:
+                base = importlib.util.resolve_name("." * node.level + (node.module or ""), package)
+            except (ImportError, ValueError):
+                continue
+            names.append(base)
+            names += [f"{base}.{a.name}" for a in node.names if a.name != "*"]   # submodules
+    out = tuple(dict.fromkeys(names))
+    _IMPORTS[key] = (mtime, out)
+    return out
+
+
+def _exec_in_place(mod, key: str) -> None:
+    spec = importlib.util.spec_from_file_location(mod.__name__, key)
+    spec.loader.exec_module(mod)                # same object: every holder sees it
+
+
+def _refresh_module(mod, key: str, seen: set[str]) -> int | None:
+    """Bring *mod* up to date with its file and its project imports; its generation.
+
+    The project modules it imports are brought up to date first. First sight
+    of the file: recorded (generation 0). Another object for a known file
+    (Streamlit evicted and re-imported it, a registry re-executed it):
+    recorded under a new generation, so its importers run again. Same
+    object: executed again **in place** when its file changed or when one of
+    its project imports got new code since it last ran. A failure is raised
+    and the old record kept, so the next run retries.
+    """
+    from .watch import watch_file
+    try:
+        mtime = os.path.getmtime(key)
+    except OSError:
+        return None
+    deps: dict[str, int] = {}
+    for name in _imported_names(mod, key, mtime):
+        dkey = _project_file(sys.modules.get(name))
+        if dkey is None or dkey == key:
+            continue
+        if dkey in seen:                        # already done in this walk, or an import cycle
+            rec = _INCLUDED.get(dkey)
+            if rec is not None:
+                deps[dkey] = rec[2]
+            continue
+        seen.add(dkey)
+        gen = _refresh_module(sys.modules[name], dkey, seen)
+        if gen is not None:
+            deps[dkey] = gen
+    rec = _INCLUDED.get(key)
+    if rec is None or rec[0]() is not mod:
+        gen = 0 if rec is None else next(_GENERATION)
+        _INCLUDED[key] = (weakref.ref(mod), mtime, gen, deps)
+        watch_file(key, mtime)
+        return gen
+    stale = rec[1] != mtime or any(rec[3].get(k, g) != g for k, g in deps.items())
+    if not stale:
+        _INCLUDED[key] = (rec[0], rec[1], rec[2], {**rec[3], **deps})
+        watch_file(key, rec[1])
+        return rec[2]
+    _exec_in_place(mod, key)
+    gen = next(_GENERATION)
+    _INCLUDED[key] = (weakref.ref(mod), mtime, gen, deps)
+    watch_file(key, mtime)
+    return gen
+
+
 def _refresh_included(block) -> None:
     """Watch an included block's file and give it fresh code (#120).
 
-    First sight of the file, or another object for a known file (Streamlit
-    evicted and re-imported it, a registry re-executed it): recorded. Same
-    object, file changed: the file is executed again **in place**, in the
-    same module object, so every holder (a list block's ``ITEMS``, the
-    entries given to ``st_book``) sees the new ``build()``. A failure is
-    raised and the old mtime kept, so the next run retries.
+    The block and the project modules it imports, at any depth (``shared/``,
+    a pack outside ``site-packages``), are watched; a changed one is
+    executed again in place, then every module and block importing it, so
+    every holder (a list block's ``ITEMS``, the entries given to
+    ``st_book``) sees the new code. See :func:`_refresh_module`.
     """
     path = getattr(block, "__file__", None)
     if not path or not os.path.isfile(path):
         return
     key = os.path.realpath(path)
-    try:
-        mtime = os.path.getmtime(key)
-    except OSError:
-        return
-    from .watch import watch_file
     if not _include_reload_enabled():
+        from .watch import watch_file
         watch_file(key)
         return
     with _INCLUDED_LOCK:
-        rec = _INCLUDED.get(key)
-        known = rec is not None and rec[0]() is block
-        if not known or rec[1] == mtime:
-            if not known:
-                _INCLUDED[key] = (weakref.ref(block), mtime)
-            watch_file(key, mtime if not known else rec[1])
-            return
-        import importlib.util
-        spec = importlib.util.spec_from_file_location(block.__name__, key)
-        spec.loader.exec_module(block)          # same object: every holder sees it
-        _INCLUDED[key] = (weakref.ref(block), mtime)
-        watch_file(key, mtime)
+        _refresh_module(block, key, {key})
 
 
 def _include_frame(block) -> tuple[object, str]:
@@ -1516,7 +1620,8 @@ def st_include(block_file_module, *args, markers=True, break_before=False, page=
 
     The block's file is watched by the page cache, and a block whose file
     changed is executed again in place, so reloading the page is enough —
-    for blocks reached through ``st_include``, in any directory (#120;
+    for blocks reached through ``st_include``, in any directory, and for the
+    project modules they import (#120;
     ``set_include_reload(False)`` or ``STX_INCLUDE_RELOAD=0`` to turn it off).
 
     ``page`` (#121) matters only with ``st_book(paginate_by=…)`` other than

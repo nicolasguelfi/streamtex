@@ -15,6 +15,7 @@ import streamlit as st
 from streamlit.delta_generator import DeltaGenerator as Delta
 from streamlit.runtime.scriptrunner_utils.script_run_context import get_script_run_ctx
 
+from . import pagewalk as _pagewalk
 from . import toc as _toc_mod
 from .auth import _password_gate
 from .banner import BannerConfig, BannerMode, _render_banner, _render_loop_banner
@@ -685,6 +686,7 @@ def _st_book_impl(module_list, toc_config: TOCConfig = None, marker_config: Mark
             pdf_config: PdfConfig = None,
             exports: list[ExportConfig] | None = None,
             paginate: bool = False,
+            paginate_by="entry",
             view_modes: list[ViewMode] | None = None,
             banner_color: str = "rgba(211, 47, 47, 0.8)",
             banner: BannerConfig = None,
@@ -713,6 +715,14 @@ def _st_book_impl(module_list, toc_config: TOCConfig = None, marker_config: Mark
         automatically after rendering.  Configs with ``mode=ExportMode.MANUAL``
         show in the sidebar panel.  Overrides ``export`` when provided.
     :param paginate: If True, renders one block at a time for faster widget interactions.
+    :param paginate_by: The pages of the paginated view (#121): ``"entry"``
+        (default) one page per entry; ``N`` or ``"depth:N"`` pages that follow
+        the composition tree down to depth N (an entry has depth 0, what it
+        includes depth 1…); ``"leaf"`` one page per leaf — an inclusion that
+        includes no other block (an atom or a composite). Arrows, markers,
+        TOC, exports and PDF are the same for every value; only the pages and
+        ``?page=`` numbers change (``?marker=<key>`` is the durable link).
+        ``st_include(..., page=True | False)`` overrides it locally.
     :param view_modes: Optional list of allowed ViewMode values.
         When a single mode is given, the View radio is hidden and
         the document is locked to that mode.  Defaults to both modes.
@@ -743,6 +753,7 @@ def _st_book_impl(module_list, toc_config: TOCConfig = None, marker_config: Mark
         ``?lang=`` > default), or an explicit code. An explicit ``"lang"``
         in ``block_kwargs`` wins. ``None`` (default) forwards nothing.
     """
+    _pagewalk.set_paginate_by(paginate_by)      # ValueError on a wrong value (#121)
     if lang is not None:
         from .i18n import current_lang
 
@@ -881,7 +892,8 @@ def _st_book_impl(module_list, toc_config: TOCConfig = None, marker_config: Mark
             _ver = f"docs {doc_version} \u00b7 lib {_lib_version}"
             _is_pag = st.session_state.get(_STX_VIEW_MODE_KEY,
                 "Paginated" if paginate else "Continuous") == "Paginated"
-            _ver_href = f"#stx-goto-{len(module_list) - 1}" if _is_pag else "#changelog"
+            _ver_href = (f"#stx-goto-{_first_page_of_last_entry(len(module_list))}"
+                         if _is_pag else "#changelog")
             st.markdown(
                 f'<a href="{_ver_href}" style="display:block;text-align:center;'
                 f'font-size:0.8em;opacity:0.55;text-decoration:none;color:inherit;"'
@@ -1452,7 +1464,7 @@ def _check_include_cycle(stack, frame) -> None:
         raise IncludeCycleError(names[i:] + (frame[1],), names)
 
 
-def st_include(block_file_module, *args, markers=True, break_before=False,
+def st_include(block_file_module, *args, markers=True, break_before=False, page=None,
                _inspector_config=None, **kwargs):
     """Render another block's ``build()`` in place, like ``\\input``.
 
@@ -1485,6 +1497,11 @@ def st_include(block_file_module, *args, markers=True, break_before=False,
     for blocks reached through ``st_include``, in any directory (#120;
     ``set_include_reload(False)`` or ``STX_INCLUDE_RELOAD=0`` to turn it off).
 
+    ``page`` (#121) matters only with ``st_book(paginate_by=…)`` other than
+    ``"entry"``: ``True`` = this inclusion starts a page with its whole
+    subtree; ``False`` = it and its subtree stay on the enclosing page;
+    ``None`` (default) = decided by ``paginate_by``.
+
     A block cannot include itself, directly or through other blocks: the
     re-entry raises :class:`IncludeCycleError` naming the chain, before
     anything of it is drawn (#119). Including the same block several times
@@ -1495,6 +1512,8 @@ def st_include(block_file_module, *args, markers=True, break_before=False,
     from .slide import SlideBreakConfig
 
     normalize_markers_arg(markers)          # ValueError before anything renders
+    if page not in (None, True, False):
+        raise TypeError(f"st_include(page={page!r}): expected None, True or False")
     if not (isinstance(break_before, (bool, SlideBreakConfig))):
         raise TypeError(f"st_include(break_before={break_before!r}): expected True, False "
                         "or a SlideBreakConfig")
@@ -1521,11 +1540,21 @@ def st_include(block_file_module, *args, markers=True, break_before=False,
 
     module_name = getattr(block_file_module, '__name__', str(block_file_module))
 
+    # Pages following the tree (#121): another page's page-starting
+    # inclusion is not executed at all
+    walk = _pagewalk.current()
+    path = None
+    if walk is not None:
+        path = walk.enter(block_file_module, page)
+        if walk.skip(path):
+            return
+
     # No cycle (#119): checked before anything of this inclusion is drawn
     frame = _include_frame(block_file_module)
     stack = _INCLUDE_STACK.get()
     _check_include_cycle(stack, frame)
     token = _INCLUDE_STACK.set(stack + (frame,))
+    begun = False
     try:
         # The break before the block, in the host's context (#118)
         if break_before is True:
@@ -1542,6 +1571,9 @@ def st_include(block_file_module, *args, markers=True, break_before=False,
             short_name = module_name.rsplit('.', 1)[-1]
             render_edit_button(short_name, _inspector_config)
 
+        if walk is not None:
+            walk.begin(path)
+            begun = True
         with include_role_override(markers):
             block_file_module.build(*args, **kwargs)
     except Exception as e:
@@ -1557,6 +1589,8 @@ def st_include(block_file_module, *args, markers=True, break_before=False,
                 pass
         raise
     finally:
+        if begun:
+            walk.end(path)
         _INCLUDE_STACK.reset(token)
 
 
@@ -1763,7 +1797,12 @@ def _compute_cache_hash(module_list, block_args: tuple = (),
             if os.path.isfile(fp):
                 parts.append(f"{fp}:{os.path.getmtime(fp)}")
 
-    # 3. Library version (invalidates on upgrade)
+    # 3. Pages following the tree (#121): another page map
+    _mode = _pagewalk.paginate_by()
+    if _mode != _pagewalk.ENTRY:
+        parts.append(f"pages:{_mode}")
+
+    # 3b. Library version (invalidates on upgrade)
     try:
         from . import __version__
         parts.append(f"stx:{__version__}")
@@ -1849,6 +1888,97 @@ def _save_file_cache(cache_path: str, cache: dict) -> None:
         logger.debug("Saved page cache to %s", cache_path)
     except Exception:
         logger.debug("Failed to save file cache.", exc_info=True)
+
+
+def _first_page_of_last_entry(n_entries: int) -> int:
+    """The page index where the last entry starts (#121; the entry index without pages)."""
+    pages = (st.session_state.get(_STX_CACHE_KEY) or {}).get("pages") or []
+    for i, p in enumerate(pages):
+        if p.get("entry") == n_entries - 1:
+            return i
+    return n_entries - 1
+
+
+def _page_named(cache, titles: list[str], pages: list[dict], tree_mode: bool) -> list[bool]:
+    """Which pages are "named" — the others are footers for the banners and the loop-back.
+
+    One page per entry: a page is named when it has a title (0.7.45 rule).
+    Pages following the tree (#121): an entry is named when one of its pages
+    has a title, and every page of a named entry is named; a page of it still
+    without a title takes the title of the nearest earlier page of the same
+    entry (a continuation page), so it is never taken for a footer.
+    """
+    named = [not t.startswith("Section ") for t in titles]
+    if not tree_mode:
+        return named
+    entry_of = [p.get("entry", i) for i, p in enumerate(pages)]
+    entry_named = {}
+    for i, e in enumerate(entry_of):
+        entry_named[e] = entry_named.get(e, False) or named[i]
+    for i, e in enumerate(entry_of):
+        if not named[i] and entry_named.get(e):
+            j = i - 1
+            while j >= 0 and entry_of[j] == e and not named[j]:
+                j -= 1
+            if j >= 0 and entry_of[j] == e:
+                titles[i] = titles[j]
+    return [entry_named.get(e, False) for e in entry_of]
+
+
+_STX_PAGE_ANCHOR_KEY = "_stx_page_anchor"
+
+
+def _rederive_current_page(cache) -> None:
+    """Keep the presenter on the same slide when the page map changes (#121).
+
+    The first stop of the current page is remembered with the cache hash;
+    after a rebuild (a list block edited, ``paginate_by`` changed) the page
+    holding that stop becomes the current page.
+    """
+    remembered = st.session_state.get(_STX_PAGE_ANCHOR_KEY)
+    markers = cache.get("markers", [])
+    if remembered and remembered[0] != cache.get("hash") and _STX_PAGE_KEY in st.session_state:
+        for e in markers:
+            if e.get("anchor") == remembered[1]:
+                st.session_state[_STX_PAGE_KEY] = e.get("page_idx", 0)
+                break
+    page = st.session_state.get(_STX_PAGE_KEY, 0)
+    first = next((e for e in markers if is_stop(e) and e.get("page_idx", 0) == page), None)
+    if first is not None:
+        st.session_state[_STX_PAGE_ANCHOR_KEY] = (cache.get("hash"), first["anchor"])
+
+
+def _render_page(module, page: dict, pages: list[dict], block_args, block_kwargs, inspector) -> None:
+    """Render one page: its whole entry, or one part of it through the gate (#121)."""
+    start = page.get("start") or []
+    if not start:
+        st_include(module, *block_args, _inspector_config=inspector, **block_kwargs)
+        return
+    entry_idx = page.get("entry")
+    starts = [p["start"] for p in pages if p.get("entry") == entry_idx]
+    gate = _pagewalk.Gate(start, starts)
+    from . import marker as _marker_mod
+    reg = _marker_mod._registry
+    n_markers = len(reg._entries) if reg is not None else 0
+    toc_reg = _toc_mod.toc
+    toc_state = (len(toc_reg.toc_list), list(toc_reg.numbers), toc_reg.current_level) if toc_reg else None
+    token = _pagewalk.activate(gate)
+    try:
+        st_include(module, *block_args, _inspector_config=inspector, **block_kwargs)
+    finally:
+        _pagewalk.deactivate(token)
+    if gate.met:
+        return
+    # The live render did not meet the page the cache expects (a block whose
+    # inclusions depend on widget state): show the whole entry instead.
+    logger.warning("Page %s of entry %s not met in the live render: showing the whole entry.",
+                   start, getattr(module, "__name__", module))
+    if reg is not None:
+        del reg._entries[n_markers:]
+    if toc_reg is not None and toc_state is not None:
+        del toc_reg.toc_list[toc_state[0]:]
+        toc_reg.numbers, toc_reg.current_level = toc_state[1], toc_state[2]
+    st_include(module, *block_args, _inspector_config=inspector, **block_kwargs)
 
 
 def _footer_first_slide(markers: list[dict], page: int, initial_marker: int | None) -> int:
@@ -2073,6 +2203,35 @@ def _suppress_cache_build_dom():
             setattr(st, attr, val)
 
 
+def _assign_tree_pages(walk, entry_idx: int, pages: list[dict], collector) -> None:
+    """Close the dry walk of one entry: its pages and the page of what it registered (#121)."""
+    starts, local = walk.assign()
+    base = len(pages)
+    if starts:
+        pages.extend({"entry": entry_idx, "start": list(p)} for p in starts)
+    else:
+        pages.append({"entry": entry_idx, "start": []})
+    markers = marker_entries()
+    tocs = toc_entries() if _toc_mod.toc is not None else []
+    stops: set[int] = set()
+    for (kind, idx), loc in local.items():
+        if kind == "m" and idx < len(markers):
+            markers[idx]["page_idx"] = base + loc
+            if is_stop(markers[idx]):
+                stops.add(base + loc)
+        elif kind == "t" and idx < len(tocs):
+            tocs[idx]["page_idx"] = base + loc
+        elif kind == "s" and collector is not None:
+            frags = collector._blocks.pop(idx, None)
+            if frags:
+                collector._blocks.setdefault(base + loc, []).extend(frags)
+    for j in range(base, len(pages)):
+        if j not in stops and markers:
+            p = pages[j]
+            logger.warning("Arrows will not stop on page %d (entry %d, path %s): it holds no stop marker.",
+                           j + 1, entry_idx, p["start"])
+
+
 def _build_page_cache(module_list, toc_config, marker_config, separator,
                       cache_hash,
                       export_config: ExportConfig | None = None,
@@ -2118,13 +2277,18 @@ def _build_page_cache(module_list, toc_config, marker_config, separator,
         # populated, but that buffer is appended-to by ``st_html`` (the
         # streamtex wrapper) *before* the patched ``streamlit.html``
         # call returns, so the buffer is preserved regardless.
+        _mode = _pagewalk.paginate_by()
+        pages: list[dict] = []
         with hidden.container(), _isolate_widget_keys(), _suppress_cache_build_dom():
             for i, module in enumerate(module_list):
                 toc_before = len(toc_entries()) if toc_config else 0
                 markers_before = len(marker_entries()) if marker_config else 0
+                base = len(pages)          # the entry's first page (#121)
 
                 if collector is not None:
-                    collector.set_block(i)
+                    collector.set_block(base)
+                walk = _pagewalk.DryWalk(_mode, collector) if _mode != _pagewalk.ENTRY else None
+                walk_token = _pagewalk.activate(walk) if walk is not None else None
 
                 # Block spacing: inject block.top + set flag
                 if _block_sp.top is not None:
@@ -2132,32 +2296,44 @@ def _build_page_cache(module_list, toc_config, marker_config, separator,
                 mark_block_top_injected()
                 marker_slide_boundary()     # each entry opens a slide (#116)
 
-                if _warmup_mode:
-                    try:
+                try:
+                    if _warmup_mode:
+                        try:
+                            st_include(module, *block_args, **block_kwargs)
+                        except IncludeCycleError:
+                            raise           # never skipped: the export would miss it (#119)
+                        except Exception:
+                            name = getattr(module, '__name__', str(module))
+                            logger.warning("Warmup: block %s raised — skipping.", name)
+                    else:
                         st_include(module, *block_args, **block_kwargs)
-                    except IncludeCycleError:
-                        raise           # never skipped: the export would miss it (#119)
-                    except Exception:
-                        name = getattr(module, '__name__', str(module))
-                        logger.warning("Warmup: block %s raised — skipping.", name)
-                else:
-                    st_include(module, *block_args, **block_kwargs)
+                finally:
+                    if walk_token is not None:
+                        _pagewalk.deactivate(walk_token)
 
                 # Close any open section wrapper + reset per-block override
                 from .slide import _close_section_wrapper_if_open
                 _close_section_wrapper_if_open()
                 reset_block_spacing()
 
+                # The entry's pages, and the page of everything it registered
+                if walk is not None:
+                    _assign_tree_pages(walk, i, pages, collector)
+                    if collector is not None:
+                        collector.set_block(len(pages) - 1)
+                else:
+                    pages.append({"entry": i, "start": []})
+
                 # Tag new TOC entries with their page index
                 if toc_config:
                     for entry in toc_entries()[toc_before:]:
                         if "page_idx" not in entry:
-                            entry["page_idx"] = i
+                            entry["page_idx"] = base
                 # Tag new marker entries with their page index
                 if marker_config:
                     for entry in marker_entries()[markers_before:]:
                         if "page_idx" not in entry:
-                            entry["page_idx"] = i
+                            entry["page_idx"] = base
 
                 if progress_callback is not None:
                     _mod_name = getattr(module, '__name__', '').rsplit('.', 1)[-1]
@@ -2215,7 +2391,10 @@ def _build_page_cache(module_list, toc_config, marker_config, separator,
         "hash": cache_hash,
         "toc": copy.deepcopy(toc_entries()) if toc_config else [],
         "markers": copy.deepcopy(marker_entries()) if marker_config else [],
-        "total": len(module_list),
+        "total": len(pages),                     # pages (#121)
+        "entries": len(module_list),
+        "paginate_by": _mode,
+        "pages": pages,
         "search_index": search_index,
         "cited_keys": _bib_cited,
         "doc_version": st.session_state.get("_stx_doc_version", ""),
@@ -2873,7 +3052,8 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
         cache is not None
         and cache.get("hash") == cache_hash
         and _watched_current(cache)
-        and cache.get("total") == total
+        and cache.get("entries", cache.get("total")) == total
+        and cache.get("paginate_by", _pagewalk.ENTRY) == _pagewalk.paginate_by()
     )
     # Invalidate cache if search was enabled but cache lacks search_index
     if has_valid_cache and toc_config and toc_config.search:
@@ -2948,6 +3128,14 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
     if loading:
         remove_loading_overlay()
 
+    # Pages (#121): one per entry, or following the composition tree
+    n_entries = total
+    pages = cache.get("pages") or [{"entry": i, "start": []} for i in range(n_entries)]
+    total = len(pages)
+    _tree_mode = _pagewalk.paginate_by() != _pagewalk.ENTRY
+    if _tree_mode:
+        _rederive_current_page(cache)
+
     # --- Current page ---
     # First run of the session: honour a deep link (?marker= / ?page=, see
     # deeplink.py). Any other run keeps the page chosen by the navigation.
@@ -2997,12 +3185,13 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
 
     # --- Banner — page titles for navigation labels ---
     page_titles = _get_page_titles(cache, total)
+    page_named = _page_named(cache, page_titles, pages, _tree_mode)
 
     # Banner — top (previous section, clickable via JS)
     # Skip banner for unnamed pages (e.g., footer blocks without markers/TOC)
     if current_page > 0 and banner_config.mode != BannerMode.HIDDEN:
         _prev = page_titles[current_page - 1]
-        if not _prev.startswith("Section "):
+        if page_named[current_page - 1]:
             _render_banner("stx-banner-prev", _prev, "◂", banner_config)
             css = banner_config._resolve()
             if css and css["show_dividers"]:
@@ -3014,15 +3203,19 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
         _pg_active_prof = next((p for p in all_profiles if p.name == active_profile), None)
     set_active_profile(_pg_active_prof)
     _pg_block_sp = resolve_block_spacing(profile=_pg_active_prof)
-    if _pg_block_sp.top is not None:
-        st_space("v", _pg_block_sp.top)
-    mark_block_top_injected()
+    _page = pages[current_page]
+    _entry_idx = _page.get("entry", current_page)
+    # block.top belongs to the entry: before its first page only (#121)
+    _first_of_entry = current_page == 0 or pages[current_page - 1].get("entry") != _entry_idx
+    if _first_of_entry:
+        if _pg_block_sp.top is not None:
+            st_space("v", _pg_block_sp.top)
+        mark_block_top_injected()
     _inject_block_horizontal_css(_pg_block_sp)
 
     marker_slide_boundary()     # each entry opens a slide (#116)
     try:
-        st_include(module_list[current_page], *block_args,
-                   _inspector_config=inspector, **block_kwargs)
+        _render_page(module_list[_entry_idx], _page, pages, block_args, block_kwargs, inspector)
     finally:
         from .slide import _close_section_wrapper_if_open
         _close_section_wrapper_if_open()
@@ -3044,7 +3237,7 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
     # Banner — bottom (next section or loop-back to first)
     if current_page < total - 1:
         _next = page_titles[current_page + 1]
-        _next_is_named = not _next.startswith("Section ")
+        _next_is_named = page_named[current_page + 1]
         if banner_config.mode != BannerMode.HIDDEN:
             css = banner_config._resolve()
             if _next_is_named:
@@ -3055,7 +3248,7 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
             else:
                 # Next page is unnamed (footer) → loop back to first page
                 _first = page_titles[0]
-                if not _first.startswith("Section ") and css:
+                if page_named[0] and css:
                     if css["show_dividers"]:
                         st.divider()
                     _render_loop_banner(_first, banner_config)
@@ -3072,7 +3265,7 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
         # Last page (including footer) → loop back to first page
         _first = page_titles[0]
         css = banner_config._resolve()
-        if not _first.startswith("Section ") and css:
+        if page_named[0] and css:
             if css["show_dividers"]:
                 st.divider()
             _render_loop_banner(_first, banner_config)
@@ -3139,7 +3332,7 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
     # Skip the widget if the current page has no markers (e.g. footer)
     _page_has_markers = any(
         e.get("page_idx", 0) == current_page for e in cache.get("markers", [])
-    )
+    ) or (_tree_mode and any(is_stop(e) for e in cache.get("markers", [])))   # #121 (w1)
     if marker_config is not None and _page_has_markers:
         inject_marker_navigation(
             profile_names=profile_names,
@@ -3170,7 +3363,7 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
     # --- Compute last named page (for loop-back on overscroll) ---
     _last_named = total - 1
     for i in range(total - 1, -1, -1):
-        if not page_titles[i].startswith("Section "):
+        if page_named[i]:
             _last_named = i
             break
 
@@ -3212,7 +3405,7 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
 #: The book settings ``[book.defaults]`` of ``stx.toml`` may provide. Book
 #: configuration only — nothing that reaches the content of a block.
 BOOK_DEFAULT_KEYS = frozenset({
-    "paginate", "page_width", "zoom", "export", "export_title", "loading",
+    "paginate", "paginate_by", "page_width", "zoom", "export", "export_title", "loading",
     "chrome_banner", "banner_color", "doc_version", "lang", "html_export_zoom",
 })
 

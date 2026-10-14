@@ -344,8 +344,14 @@ def st_slide_break(
         call_site=call_site,
     )
 
+    # A break at the head of a page (paginated view, pages following the
+    # tree, #121) draws neither its rule nor its spacers; its marker, the
+    # spacing and the zoom it activates are kept.
+    from . import pagewalk
+    head_of_page = pagewalk.suppress_break()
+
     # Inject section.bottom before the break visual (space after previous section)
-    if effective_spacing.bottom is not None:
+    if effective_spacing.bottom is not None and not head_of_page:
         st_space("v", effective_spacing.bottom)
 
     if not enabled or cfg.mode == SlideBreakMode.HIDDEN:
@@ -371,8 +377,8 @@ def st_slide_break(
     spacer_before_css = f"height: {effective_space_before};"
     spacer_css = f"height: {effective_space};"
 
-    show_rule = cfg.mode in (SlideBreakMode.FULL, SlideBreakMode.RULE_ONLY)
-    show_spacer = cfg.mode in (SlideBreakMode.FULL, SlideBreakMode.SPACER_ONLY)
+    show_rule = cfg.mode in (SlideBreakMode.FULL, SlideBreakMode.RULE_ONLY) and not head_of_page
+    show_spacer = cfg.mode in (SlideBreakMode.FULL, SlideBreakMode.SPACER_ONLY) and not head_of_page
 
     # Before-spacer: rendered before the rule when space_before > 0
     if show_spacer and effective_space_before and effective_space_before != "0vh":

@@ -75,7 +75,14 @@ class PresentationConfig:
 
     # Layout
     center_content: bool = True
-    """Vertically centre slide content within the viewport."""
+    """Vertically centre slide content within the viewport.
+
+    With ``enforce_ratio=False`` a *page* shorter than the screen is centred.
+    The vertical position of an unboxed slide therefore depends on the page
+    it falls on: alone on its page (``st_book(paginate_by="leaf")``, #121)
+    it is centred, at the head of a longer page it is not (measured in the
+    atoms lab at 1920 × 1080: a title block 150 px lower when alone). A slide
+    in a slide box (``st_slide``) is not affected."""
 
     content_padding: str = "48px 64px"
     """CSS padding inside each slide container."""

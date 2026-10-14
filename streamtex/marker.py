@@ -219,6 +219,8 @@ class MarkerRegistry:
             # current section instead for an unlisted marker (#97)
             entry["auto"] = True
         self._entries.append(entry)
+        from . import pagewalk
+        pagewalk.note("m", idx)                              # page of this marker (#121)
         return idx
 
     def attach_target(self) -> dict | None:
@@ -619,6 +621,9 @@ def st_marker(label: str = "", visible: bool = False, hidden: bool | None = None
                              toc_lvl=toc_lvl, roles=roles)
     if r.toc_lvl is not None and not label:
         raise ValueError("st_marker(): a TOC entry needs a label (toc_lvl given without label)")
+    from . import pagewalk
+    if pagewalk.muted():
+        return          # another page's marker: it comes from the page cache (#121)
 
     stop_, listed_ = effective_roles(r.stop, r.listed)     # st_include(markers=) (#113)
     toc_anchor = toc_level = None

@@ -68,6 +68,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Streamlit alone keeps the old code of a block outside the script folder).
   A failing file is reported once and retried after the fix. Opt-out:
   `stx.set_include_reload(False)` or `STX_INCLUDE_RELOAD=0`.
+- `st_book(paginate_by=…)` (#121): pages that follow the composition tree.
+  `"entry"` (default, unchanged) one page per entry; `N` or `"depth:N"`
+  down to depth N; `"leaf"` one page per leaf — an inclusion that includes
+  no other block (an atom or a composite). The page-cache build computes the
+  page map; a page renders its part of the entry only (the other leaves are
+  not executed, the rest runs without being drawn or registered). Arrows,
+  marker numbers, TOC, HTML export and PDF are identical for every value
+  (measured: the atoms lab exports byte-identical HTML in `"entry"` and
+  `"leaf"`). A break at the head of a page draws no rule nor spacer in the
+  app. Continuation pages take the title of their entry and are never taken
+  for a footer; the navigation widget also shows on pages without markers;
+  the presenter stays on the same slide when the page map changes. Local
+  override `st_include(..., page=True | False)`; `paginate_by` is a
+  `[book.defaults]` key. Measured in a browser on the lab: a page change
+  takes 278 ms (median) in `"leaf"` against 426 ms in `"entry"`.
 - `?slide=<n>` deep link (#117): opens the slide the counter calls n, in the
   paginated app and in the HTML export. `page_url(base, slide=n)` builds it;
   precedence `marker` > `slide` > `page`, in the link and in the reader.

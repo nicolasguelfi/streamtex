@@ -764,6 +764,9 @@ def st_html(html: str, *, height: int = 0, light_bg: bool = False,
         ``scrolling=True`` or ``scrolling=False``
         without effect — kept in the signature to avoid breaking callers.
     """
+    from . import pagewalk
+    if pagewalk.muted():
+        return          # content of another page: neither drawn nor exported (#121)
     # Section-level horizontal spacing + zoom: wrap each fragment
     from .spacing import get_section_horizontal, get_section_zoom
     _sh = get_section_horizontal()

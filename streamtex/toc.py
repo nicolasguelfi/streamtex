@@ -118,6 +118,8 @@ class TOCRegistry:
             "_reg_label": label,
             "_reg_level": level,
         })
+        from . import pagewalk
+        pagewalk.note("t", len(self.get_entries()) - 1)     # page of this entry (#121)
 
         if not main_needs_num:
             section_number = ""

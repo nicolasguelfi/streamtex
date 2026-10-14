@@ -159,6 +159,9 @@ def _handle_toc(final_txt: str, toc_lvl: Optional[str] = None, label: str = "",
                 spacing: Optional[Spacing] = None):
         # --- 3. Handle ToC Registration ---
     key_anchor = ""
+    from . import pagewalk
+    if pagewalk.muted():
+        return final_txt, key_anchor     # another page's heading: from the cache (#121)
     if isinstance(marker, MarkerRoles) and marker.toc_lvl is not None:
         raise ValueError("st_write(marker=MarkerRoles(toc_lvl=...)): the heading's own "
                          "toc_lvl decides the TOC entry; leave MarkerRoles.toc_lvl unset")

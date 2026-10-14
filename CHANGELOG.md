@@ -246,6 +246,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `enrich_export_html(markers=…)` given entries that did not come from the
   page cache (no roles, no numbers) showed popup rows without numbers; it
   now gives them their roles and slide numbers itself (#116, #117).
+- `CellAlignments.left_top`, `left_middle` and `left_bottom` now set
+  `text-align:left`, like the `center_*` and `right_*` presets set theirs: in
+  a centered page a "left" cell showed its text centered (#22).
+- A library installed editable (development checkout, `stx dev link`) keeps
+  its version number while its code changes, so the page cache could serve
+  titles, markers and TOC built by older code. When the library is imported
+  from outside `site-packages`, the cache key includes the newest mtime of
+  its sources (read once per server process); a regular install keeps the
+  same key.
 
 ## [0.7.45] — 2026-10-11 — Zoom for PDF and HTML exports, grid cell alignments, named sizes
 

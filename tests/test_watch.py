@@ -89,3 +89,38 @@ def test_cache_hash_unchanged_without_extra_files(tmp_path):
     m = _block(tmp_path, "bck_a")
     assert _compute_cache_hash([m]) == _compute_cache_hash([m])
     time.sleep(0)  # no file touched: stable
+
+
+
+@pytest.mark.parametrize("where, counted", [
+    (("src", "streamtex"), True),
+    (("venv", "lib", "site-packages", "streamtex"), False),
+    (("usr", "lib", "python3", "dist-packages", "streamtex"), False),
+])
+def test_library_sources_count_only_outside_site_packages(tmp_path, monkeypatch, where, counted):
+    from streamtex import book
+
+    pkg = tmp_path.joinpath(*where)
+    (pkg / "styles").mkdir(parents=True)
+    (pkg / "book.py").write_text("")
+    (pkg / "styles" / "core.py").write_text("")
+    os.utime(pkg / "book.py", (1000, 1000))
+    os.utime(pkg / "styles" / "core.py", (2000, 2000))
+    monkeypatch.setattr(book, "__file__", str(pkg / "book.py"))
+    book._editable_library_stamp.cache_clear()
+    try:
+        assert book._editable_library_stamp() == ("2000.0" if counted else "")
+    finally:
+        book._editable_library_stamp.cache_clear()
+
+
+def test_cache_hash_changes_with_library_sources_in_development(tmp_path, monkeypatch):
+    from streamtex import book
+
+    m = _block(tmp_path, "bck_a")
+    monkeypatch.setattr(book, "_editable_library_stamp", lambda: "")
+    published = _compute_cache_hash([m])
+    monkeypatch.setattr(book, "_editable_library_stamp", lambda: "100.0")
+    dev = _compute_cache_hash([m])
+    monkeypatch.setattr(book, "_editable_library_stamp", lambda: "200.0")
+    assert len({published, dev, _compute_cache_hash([m])}) == 3

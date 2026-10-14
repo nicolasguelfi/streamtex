@@ -4,7 +4,7 @@ import pytest
 
 from streamtex.styles import CellAlignments, Container, StxStyles
 
-H = {"left": ("flex-start", None), "center": ("center", "center"), "right": ("flex-end", "right")}
+H = {"left": ("flex-start", "left"), "center": ("center", "center"), "right": ("flex-end", "right")}
 V = {"top": "flex-start", "middle": "center", "bottom": "flex-end"}
 
 
@@ -16,8 +16,7 @@ def test_preset(h, v):
     assert css.startswith("display:flex;flex-direction:column;")
     assert f"justify-content:{V[v]};" in css
     assert f"align-items:{H[h][0]};" in css
-    text_align = H[h][1]
-    assert (f"text-align:{text_align};" in css) if text_align else ("text-align" not in css)
+    assert f"text-align:{H[h][1]};" in css
     assert style.style_id == f"cell_{h}_{v}"
 
 

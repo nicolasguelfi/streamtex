@@ -1853,6 +1853,30 @@ def _anchor_dir(module_list, book_file: str | None) -> str | None:
     return None
 
 
+@functools.lru_cache(maxsize=1)
+def _editable_library_stamp() -> str:
+    """Newest mtime of the library's ``.py`` files when it runs from a checkout.
+
+    An editable install (``uv sync`` in the repo, ``stx dev link``) imports the
+    library from its source tree and keeps its version number while its code
+    changes, so the version alone would let the page cache serve titles built
+    by older code. A regular install lives under ``site-packages`` and returns
+    ``""``: the cache key is unchanged. Computed once per server process.
+    """
+    pkg_dir = os.path.dirname(os.path.abspath(__file__))
+    parts = pkg_dir.split(os.sep)
+    if "site-packages" in parts or "dist-packages" in parts:
+        return ""
+    newest = 0.0
+    for root, dirs, files in os.walk(pkg_dir):
+        dirs[:] = [d for d in dirs if d != "__pycache__"]
+        for f in files:
+            if f.endswith(".py"):
+                with contextlib.suppress(OSError):
+                    newest = max(newest, os.path.getmtime(os.path.join(root, f)))
+    return f"{newest}"
+
+
 def _compute_cache_hash(module_list, block_args: tuple = (),
                         block_kwargs: dict | None = None, book_file: str | None = None):
     """Return a hash that changes when the module list or file contents change.
@@ -1869,7 +1893,8 @@ def _compute_cache_hash(module_list, block_args: tuple = (),
     ``stx.load_*`` / ``watch_file`` are NOT part of the hash (they are known
     only once the blocks have run): the cache stores their mtimes as its
     ``"watched"`` snapshot and is discarded as soon as one changed.
-    - streamtex library version (detects library upgrades)
+    - streamtex library version (detects library upgrades), plus the newest
+      mtime of its sources when it is installed editable (development)
     - A fingerprint of ``block_args`` / ``block_kwargs`` when non-empty, so a
       document built with ``block_kwargs={"lang": "fr"}`` never reuses the
       TOC / markers / page titles cached for ``"en"``
@@ -1929,12 +1954,16 @@ def _compute_cache_hash(module_list, block_args: tuple = (),
     if _mode != _pagewalk.ENTRY:
         parts.append(f"pages:{_mode}")
 
-    # 3b. Library version (invalidates on upgrade)
+    # 3b. Library version (invalidates on upgrade); an editable install keeps
+    # its version across commits, so its source mtimes count too.
     try:
         from . import __version__
         parts.append(f"stx:{__version__}")
     except ImportError:
         pass
+    stamp = _editable_library_stamp()
+    if stamp:
+        parts.append(f"stxsrc:{stamp}")
 
     # 4. Forwarded block args/kwargs (empty → no part, hash unchanged)
     fp = _block_kwargs_fingerprint(block_args, block_kwargs)

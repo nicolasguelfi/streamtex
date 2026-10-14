@@ -256,3 +256,15 @@ def test_diagnostic_for_a_page_without_stop(caplog):
         at = AppTest.from_string(script, default_timeout=60).run()
     assert not at.exception
     assert "Arrows will not stop on page 2" in caplog.text
+
+
+def test_presenter_stays_on_the_same_slide_when_the_page_map_changes():
+    from unittest.mock import patch
+    state = {bm._STX_PAGE_KEY: 2}
+    old = {"hash": "h1", "markers": [{"anchor": "x", "stop": True, "page_idx": 2}]}
+    new = {"hash": "h2", "markers": [{"anchor": "x", "stop": True, "page_idx": 5}]}
+    with patch.object(bm.st, "session_state", state):
+        bm._rederive_current_page(old)
+        assert state[bm._STX_PAGE_KEY] == 2
+        bm._rederive_current_page(new)                  # a list block was edited: x moved
+        assert state[bm._STX_PAGE_KEY] == 5

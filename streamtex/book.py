@@ -1291,6 +1291,37 @@ def _toc_dot_anchors(markers: list[dict]) -> set[str]:
     return anchors
 
 
+def _toc_target_marker(entry: dict, markers: list[dict]) -> int | None:
+    """The marker a TOC heading of another page lands on (#127).
+
+    The heading's own marker (``marker=True`` or ``"attach"``); else the last
+    stop registered before the heading on its page, i.e. the slide holding
+    it. None when the heading comes before every stop of its page, or for a
+    cache written before ``_markers_before`` existed: the link then opens the
+    page on its first marker.
+    """
+    page = entry.get("page_idx", 0)
+    anchor = entry.get("key_anchor")
+    for m in markers:
+        if anchor and m.get("toc_anchor") == anchor and m.get("page_idx", 0) == page:
+            return m["index"]
+    before = entry.get("_markers_before")
+    if before is None:
+        return None
+    target = None
+    for m in markers:
+        if m["index"] >= before:
+            break
+        if is_stop(m) and m.get("page_idx", 0) == page:
+            target = m["index"]
+    return target
+
+
+def _goto_href(page_idx: int, marker_idx: int | None) -> str:
+    """Sidebar link to another page: ``#stx-goto-<page>[-<marker>]`` (#127)."""
+    return f"#stx-goto-{page_idx}" if marker_idx is None else f"#stx-goto-{page_idx}-{marker_idx}"
+
+
 def populate_toc(toc_sidebar: Delta, toc_block: Delta = None, toc_content_style: Style = None,
                  block_index: dict[int, str] = None, search_js_placeholder=None,
                  max_level: int | None = None, toc_config: TOCConfig | None = None):
@@ -2648,7 +2679,8 @@ def _build_paginated_sidebar(cache, current_page, total, toc_config, marker_conf
 
         # --- TOC ---
         cached_toc = cache.get("toc", [])
-        marker_anchors = _toc_dot_anchors(cache.get("markers", []))
+        cache_markers = cache.get("markers", [])
+        marker_anchors = _toc_dot_anchors(cache_markers)
         indent_char = "&nbsp;"
         effective_max_level = _resolve_sidebar_max_level(toc_config, paginated=True)
 
@@ -2679,10 +2711,8 @@ def _build_paginated_sidebar(cache, current_page, total, toc_config, marker_conf
                 toc_active_done = True
                 link = f'<a href="#{entry["key_anchor"]}"{active_style}>{title_esc}</a>'
             else:
-                link = (
-                    f'<a href="#stx-goto-{page_idx}" class="stx-page-link">'
-                    f'{title_esc}</a>'
-                )
+                href = _goto_href(page_idx, _toc_target_marker(entry, cache_markers))
+                link = f'<a href="{href}" class="stx-page-link">{title_esc}</a>'
             block_attr = f' data-stx-block="{page_idx}"' if show_search else ''
             toc_parts.append(
                 f'<div{block_attr} style="overflow:hidden;text-overflow:ellipsis;'
@@ -2720,7 +2750,7 @@ def _build_paginated_sidebar(cache, current_page, total, toc_config, marker_conf
                     )
                 else:
                     link = (
-                        f'<a href="#stx-goto-{page_idx}" class="stx-page-link">'
+                        f'<a href="{_goto_href(page_idx, entry["index"])}" class="stx-page-link">'
                         f'{row}</a>'
                     )
                 block_attr = f' data-stx-block="{page_idx}"' if show_search else ''
@@ -2807,7 +2837,10 @@ def _inject_paginated_nav_js(current_page, total, marker_config,
                the double-click / double-PageDown "stuck" bug), COALESCE it:
                remember the latest requested page and apply it once the
                rerun lands (see the pending-nav block in init below).      */
-            if (targetPage !== currentPage) hostWin._stxPendingPage = targetPage;
+            if (targetPage !== currentPage) {
+                hostWin._stxPendingPage = targetPage;
+                hostWin._stxPendingMarker = null;
+            }
             return;
         }
         if (targetPage === currentPage) return;
@@ -3114,10 +3147,12 @@ def _inject_paginated_nav_js(current_page, total, marker_config,
        marker) instead of getting stuck one page short.                  */
     if (hostWin._stxPendingPage != null) {
         var pend = hostWin._stxPendingPage;
+        var pendMarker = hostWin._stxPendingMarker;
         hostWin._stxPendingPage = null;
+        hostWin._stxPendingMarker = null;
         if (pend !== currentPage && pend >= 0 && pend < totalPages) {
-            hostWin._stxMarkerStartIdx =
-                pageFirstMarker[pend] !== undefined ? pageFirstMarker[pend] : null;
+            hostWin._stxMarkerStartIdx = pendMarker != null ? pendMarker
+                : (pageFirstMarker[pend] !== undefined ? pageFirstMarker[pend] : null);
             navigateToPage(pend);
         }
     }
@@ -3129,15 +3164,18 @@ def _inject_paginated_nav_js(current_page, total, marker_config,
         e.preventDefault();
         e.stopPropagation();
         var href = a.getAttribute('href') || '';
-        var match = href.match(/^#stx-goto-(\\d+)/);
+        var match = href.match(/^#stx-goto-(\\d+)(?:-(\\d+))?/);
         if (!match) return;
         var p = parseInt(match[1], 10);
         if (isNaN(p) || p === currentPage) return;
-        /* Set marker start index for the target page so the
-           floating marker widget initialises on the right marker */
-        hostWin._stxMarkerStartIdx =
-            pageFirstMarker[p] !== undefined ? pageFirstMarker[p] : null;
+        /* The floating marker widget initialises on the link's marker
+           (#stx-goto-<page>-<marker>, #127), else on the page's first. */
+        var target = match[2] !== undefined ? parseInt(match[2], 10)
+            : (pageFirstMarker[p] !== undefined ? pageFirstMarker[p] : null);
+        hostWin._stxMarkerStartIdx = target;
         navigateToPage(p);
+        /* a rerun in flight queued the page: queue its marker with it */
+        if (hostWin._stxPendingPage === p) hostWin._stxPendingMarker = target;
     }
     hostDoc.addEventListener('click', linkClick, true);
 

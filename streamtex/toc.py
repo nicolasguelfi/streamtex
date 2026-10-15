@@ -110,6 +110,7 @@ class TOCRegistry:
         key_anchor = self.get_key_anchor(section_number + label)
 
         # Add the ToC entry to the list
+        from .marker import marker_count
         self.get_entries().append({
             "level": lvl,
             "title": section_number + label if sidebar_needs_num else label,
@@ -117,6 +118,8 @@ class TOCRegistry:
             "key_anchor": key_anchor,
             "_reg_label": label,
             "_reg_level": level,
+            # markers registered before this heading: its slide is the last of them (#127)
+            "_markers_before": marker_count(),
         })
         from . import pagewalk
         pagewalk.note("t", len(self.get_entries()) - 1)     # page of this entry (#121)

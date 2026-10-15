@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Sidebar links to another page land on their own slide** (#127). In a
+  paginated book whose pages hold several slides (list blocks,
+  `st_sequence`), a Markers or Contents entry of another page opened that
+  page on its first slide. The link now carries its marker,
+  `#stx-goto-<page>-<marker>`: a Markers entry lands on its marker, a
+  Contents heading on its own marker or else on the slide that holds it.
+  A heading above every stop of its page still opens the page on its first
+  marker, as do the old `#stx-goto-<page>` links (banner, version link). A
+  link clicked while another page is still opening keeps its slide. TOC
+  entries record `_markers_before`, the number of markers registered before
+  them. Continuous mode and the HTML export already linked each entry to its
+  anchor; an e2e test now checks all three.
+
 ## [0.7.47] — 2026-10-15 — New projects get streamtex-pack-design 0.3.1
 
 ### Changed

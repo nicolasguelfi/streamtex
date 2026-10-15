@@ -109,6 +109,11 @@ jobs:
           if [ -z "$BODY" ]; then
             BODY="Release $VERSION"
           fi
+          # GitHub may deliver one push twice: the first run has made the release
+          if gh release view "$VERSION" >/dev/null 2>&1; then
+            echo "::notice::Release $VERSION already exists"
+            exit 0
+          fi
           gh release create "$VERSION" \
             --title "$VERSION" \
             --notes "$BODY" \

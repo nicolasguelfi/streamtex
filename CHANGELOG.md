@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Release workflow: when the GitHub release already exists, the step says so
+  and succeeds. GitHub ran the 0.7.48 publish twice for one push; the
+  second run failed on that step although everything was published.
+
 ## [0.7.48] — 2026-10-15 — Sidebar links land on their own slide
 
 ### Fixed

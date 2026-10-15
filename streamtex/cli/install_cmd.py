@@ -724,7 +724,7 @@ _DEFAULT_DESIGN_PACK = {
     "name": "streamtex-pack-design",
     "ref": "github.com/nicolasguelfi/streamtex-packs",
     "subdirectory": "streamtex-pack-design",
-    "rev": "pack-design-v0.3.0",
+    "rev": "pack-design-v0.3.1",
 }
 
 # Presets that opt in to the streamtex-design pack by default (PLAN §29.6).

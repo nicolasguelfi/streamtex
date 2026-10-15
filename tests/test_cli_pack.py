@@ -236,7 +236,7 @@ def test_pack_sync_writes_git_source_with_subdirectory(tmp_path: Path):
 
 
 _SOURCE_LINES = ('git = "https://github.com/nicolasguelfi/streamtex-packs"',
-                 'subdirectory = "streamtex-pack-design"', 'rev = "pack-design-v0.3.0"')
+                 'subdirectory = "streamtex-pack-design"')
 
 
 @pytest.mark.parametrize("ref", [
@@ -255,7 +255,7 @@ def test_pack_sync_reads_the_old_fragment_form(tmp_path: Path, ref: str):
     assert result.exit_code == 0, result.output
     pyproject = (project / "pyproject.toml").read_text()
     assert "#" not in pyproject.split("[tool.uv.sources]", 1)[1]
-    for line in _SOURCE_LINES:
+    for line in (*_SOURCE_LINES, 'rev = "pack-design-v0.3.0"'):
         assert line in pyproject
 
 
@@ -267,7 +267,7 @@ def test_install_default_design_pack_syncs_to_a_valid_source(tmp_path: Path):
     _stx_toml.add_pack(project, {"type": "git", **_DEFAULT_DESIGN_PACK})
     assert _run(["pack", "sync"], project).exit_code == 0
     pyproject = (project / "pyproject.toml").read_text()
-    for line in _SOURCE_LINES:
+    for line in (*_SOURCE_LINES, 'rev = "pack-design-v0.3.1"'):
         assert line in pyproject
 
 

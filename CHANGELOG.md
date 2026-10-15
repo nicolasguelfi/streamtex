@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.47] — 2026-10-15 — New projects get streamtex-pack-design 0.3.1
+
+### Changed
+
+- `stx install` / `stx project new` pin the default design pack to
+  `pack-design-v0.3.1` (was `v0.3.0`). The pack's CLI templates now declare
+  monorepo packs as `ref` + `subdirectory` (#125); no component changed.
+- README: the `stx pack add` example uses `pack-design-v0.3.1`.
+
 ## [0.7.46] — 2026-10-14 — Marker roles, slide numbers, composing by atoms
 
 Every marker has three independent roles — stop, listed, in TOC (#116) —

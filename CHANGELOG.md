@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.48] — 2026-10-15 — Sidebar links land on their own slide
+
 ### Fixed
 
 - **Sidebar links to another page land on their own slide** (#127). In a

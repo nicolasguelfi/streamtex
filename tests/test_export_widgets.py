@@ -383,6 +383,23 @@ class TestStVideo:
         assert "<video" in html
         assert "https://example.com/video.mp4" in html
 
+    def test_plain_video_keeps_controls_only(self, mock_st):
+        reset_export_buffer(ExportConfig(enabled=True))
+        st_video("https://example.com/video.mp4", format="video/mp4")
+        html = generate_export_html()
+        assert "<video controls class=" in html
+        assert "autoplay" not in html and "loop" not in html
+
+    def test_autoplay_loop_muted_exported(self, mock_st):
+        """A looping silent clip (a GIF replaced by a video) plays alone in the export too."""
+        reset_export_buffer(ExportConfig(enabled=True))
+        st_video("https://example.com/clip.mp4", format="video/mp4", autoplay=True, loop=True, muted=True)
+        mock_st.video.assert_called_once_with(
+            "https://example.com/clip.mp4", format="video/mp4", autoplay=True, loop=True, muted=True)
+        html = generate_export_html()
+        assert "<video controls autoplay playsinline loop muted" in html
+        assert "width:100%" in html
+
     def test_bytes_source(self, mock_st):
         reset_export_buffer(ExportConfig(enabled=True))
         st_video(b"\x00\x01\x02", format="video/mp4")

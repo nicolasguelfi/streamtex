@@ -282,8 +282,19 @@ def st_video(data, **kw):
                 return
 
         src, mime = _media_src(data, _VIDEO_MIME, fmt)
+        # The export plays the video the way the live page does: the same
+        # ``autoplay`` / ``loop`` / ``muted`` given to ``st.video()``, and the
+        # full width of its container (``st.video`` stretches by default).
+        # Browsers only autoplay a muted video, inline on phones.
+        attrs = ["controls"]
+        if kw.get("autoplay"):
+            attrs += ["autoplay", "playsinline"]
+        if kw.get("loop"):
+            attrs.append("loop")
+        if kw.get("muted"):
+            attrs.append("muted")
         export_append(
-            f'<video controls class="stx-media" style="max-width:100%">'
+            f'<video {" ".join(attrs)} class="stx-media" style="width:100%;max-width:100%">'
             f'<source src="{src}" type="{mime}">'
             f'Your browser does not support the video element.</video>'
         )

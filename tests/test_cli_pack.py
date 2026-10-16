@@ -267,7 +267,7 @@ def test_install_default_design_pack_syncs_to_a_valid_source(tmp_path: Path):
     _stx_toml.add_pack(project, {"type": "git", **_DEFAULT_DESIGN_PACK})
     assert _run(["pack", "sync"], project).exit_code == 0
     pyproject = (project / "pyproject.toml").read_text()
-    for line in (*_SOURCE_LINES, 'rev = "pack-design-v0.3.1"'):
+    for line in (*_SOURCE_LINES, 'rev = "pack-design-v0.3.2"'):
         assert line in pyproject
 
 

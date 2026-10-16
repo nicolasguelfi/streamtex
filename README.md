@@ -376,7 +376,7 @@ in the `streamtex-packs` monorepo.
 
 ```bash
 # Add a pack to a project (git, local, or PyPI)
-stx pack add 'git:https://github.com/nicolasguelfi/streamtex-packs@pack-design-v0.3.1#subdirectory=streamtex-pack-design'
+stx pack add 'git:https://github.com/nicolasguelfi/streamtex-packs@pack-design-v0.3.2#subdirectory=streamtex-pack-design'
 
 # List installed packs and components
 stx pack list

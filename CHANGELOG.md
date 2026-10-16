@@ -26,6 +26,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   scroll-spy bar is hidden on these entries (one cue). A page without the
   bar clears the rule. Continuous mode and the HTML export are unchanged.
   The real-browser harness now reads the colour each link is painted in.
+- **Projects made from the pack-design templates install again**
+  (streamtex-packs#2). The default design pack installed by `stx install`
+  moves to `pack-design-v0.3.2`, whose `new-manual`, `new-training` and
+  `new-gse-module` templates name pack-manuals v0.2.1 and pack-gse v2.0.1.
+  With v0.3.1, a project made from them could not be locked: those packs
+  required pack-design v0.3.0 at an exact URL ("conflicting URLs for package
+  streamtex-pack-design"). They now require it by name and range.
 
 ## [0.7.49] — 2026-10-16 — Passwords with spaces, videos and centred lists in the export
 

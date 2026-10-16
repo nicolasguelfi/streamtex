@@ -760,6 +760,7 @@ def inject_marker_navigation(
     profile_names: list[str] | None = None,
     active_profile: str | None = None,
     profile_modified: bool = False,
+    nav_toc: dict[int, int] | None = None,
 ) -> None:
     """Inject the floating nav widget and keyboard/scroll JS.
 
@@ -771,6 +772,9 @@ def inject_marker_navigation(
     :param profile_names: List of profile names for the profile popup.
     :param active_profile: Currently active profile name.
     :param profile_modified: Whether the active profile has been modified.
+    :param nav_toc: Paginated books: the Contents entry in force on each slide,
+        stop marker index -> position in the TOC (``book._toc_nav_table``).
+        The bar puts that entry and its Markers row in cyan (#130).
     """
     entries = marker_entries()
     if not entries:
@@ -800,6 +804,32 @@ def inject_marker_navigation(
     var markers = __MARKERS__;
     var currentIdx = 0;   /* a POSITION in markers, stop or not */
 __ROLES_JS__
+    var navToc = __NAV_TOC__;
+
+    /* --- Sidebar highlight (#130) ---
+       The paginated sidebar marks each entry with data-stx-nav ("mk<index>",
+       "toc<position>").  The entry of the current slide is named by ONE style
+       rule in the host page: a rule applies to whatever nodes Streamlit
+       renders later, so a rerun that rebuilds the sidebar cannot lose the
+       highlight (the failure of 0.6.36-0.6.40), and nothing watches the DOM.
+       Markers: the row the bar's label names; Contents: navToc's entry for
+       the current slide. */
+    function syncSidebar() {
+        var sel = [];
+        var vi = sectionVi(currentIdx);
+        if (vi >= 0) sel.push('[data-stx-nav="mk' + listedMarkers[vi].index + '"] a');
+        var s = stopOf(currentIdx);
+        var key = s >= 0 ? stops[s].index : currentIdx;
+        if (navToc && navToc[key] != null) sel.push('[data-stx-nav="toc' + navToc[key] + '"] a');
+        var el = hostDoc.getElementById('stx-sidebar-active-style');
+        if (!el) {
+            el = hostDoc.createElement('style');
+            el.id = 'stx-sidebar-active-style';
+            hostDoc.head.appendChild(el);
+        }
+        el.textContent = sel.length
+            ? sel.join(', ') + ' { color: var(--stx-link-active-color) !important; }' : '';
+    }
     var nextKeys = __NEXT_KEYS__;
     var prevKeys = __PREV_KEYS__;
     var OFFSET = __OFFSET__;
@@ -1493,6 +1523,7 @@ __ROLES_JS__
 
     /* --- Update UI (counter = the stop of the current position) --- */
     function updateUI() {
+        syncSidebar();
         if (counterEditing) return;
         var m = markers[currentIdx];
         var padded = stopNumber().padStart(totalDigits, '\\u2007');
@@ -1659,6 +1690,7 @@ __ROLES_JS__
     js_body = (js_body
         .replace('__ROLES_JS__', _MARKER_ROLES_JS)
         .replace('__MARKERS__', json.dumps(entries))
+        .replace('__NAV_TOC__', json.dumps(nav_toc) if nav_toc else 'null')
         .replace('__NEXT_KEYS__', json.dumps(config.next_keys))
         .replace('__PREV_KEYS__', json.dumps(config.prev_keys))
         .replace('__OFFSET__', str(scroll_offset))

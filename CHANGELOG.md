@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **The sidebar highlight follows the slide in a paginated book** (#130).
+  The cyan entry of the Markers and Contents tabs stayed on the first entry
+  of the current page while the reader moved through it, then jumped at the
+  page change: with pages made of list blocks (98 slides on one page), it
+  looked frozen. The floating bar now names the entry of its slide at every
+  move (arrow, click, deep link, page change): in Markers, the row its label
+  names; in Contents, the first heading of the slide, else the last heading
+  before it. Each sidebar entry carries `data-stx-nav` (`mk<index>`,
+  `toc<position>`), the server computes the Contents entry of every slide
+  (`_toc_nav_table`, passed to `inject_marker_navigation(nav_toc=…)`), and
+  the bar writes one style rule in the host page. A rule applies to the
+  nodes Streamlit renders later, so a rerun that rebuilds the sidebar keeps
+  the highlight, the failure that had the 0.6.36–0.6.40 attempts reverted.
+  The server no longer colours the first entry of the page, and the
+  scroll-spy bar is hidden on these entries (one cue). A page without the
+  bar clears the rule. Continuous mode and the HTML export are unchanged.
+  The real-browser harness now reads the colour each link is painted in.
+
 ## [0.7.49] — 2026-10-16 — Passwords with spaces, videos and centred lists in the export
 
 ### Fixed

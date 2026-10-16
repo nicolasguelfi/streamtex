@@ -113,8 +113,9 @@ def launch_browser(p):
 # For each sidebar link we record:
 #   block            — the data-stx-block value of its entry (page index)
 #   text             — trimmed link text
-#   inlineActive     — entry rendered with inline color:var(--stx-link-active-color)
-#                      (the SERVER group-highlight cue — multiple lit = bug 6.13)
+#   inlineActive     — link painted in var(--stx-link-active-color), the cyan: since
+#                      #130 the floating bar names it with one style rule (it was
+#                      an inline style from the server — multiple lit = bug 6.13)
 #   navActiveClass   — entry carries .stx-nav-active (the SCROLL-SPY cue)
 #   visible          — entry is in the currently-shown tab (offsetParent != null)
 #   href             — anchor target (#stx-goto-N for cross-page, #anchor same-page)
@@ -123,13 +124,18 @@ NAV_READOUT_JS = r"""
   const sb = document.querySelector('[data-testid="stSidebar"]');
   const entries = [];
   if (sb) {
+    // the cyan as the browser resolves it, read from a probe in the sidebar
+    const probe = document.createElement('a');
+    probe.style.color = 'var(--stx-link-active-color)';
+    sb.appendChild(probe);
+    const cyan = getComputedStyle(probe).color;
+    probe.remove();
     sb.querySelectorAll('a[href^="#"]').forEach(a => {
       const entry = a.closest('[data-stx-block]');
-      const styleAttr = (a.getAttribute('style') || '');
       entries.push({
         block: entry ? entry.getAttribute('data-stx-block') : null,
         text: (a.textContent || '').trim().slice(0, 80),
-        inlineActive: styleAttr.indexOf('stx-link-active-color') !== -1,
+        inlineActive: getComputedStyle(a).color === cyan,
         navActiveClass: entry ? entry.classList.contains('stx-nav-active') : false,
         visible: a.offsetParent !== null,
         href: a.getAttribute('href'),

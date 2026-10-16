@@ -1322,6 +1322,42 @@ def _goto_href(page_idx: int, marker_idx: int | None) -> str:
     return f"#stx-goto-{page_idx}" if marker_idx is None else f"#stx-goto-{page_idx}-{marker_idx}"
 
 
+def _toc_nav_table(toc: list[dict], markers: list[dict], max_level: int | None) -> dict[int, int]:
+    """The Contents entry in cyan on each slide of a paginated book (#130).
+
+    Maps every stop's marker index to the position, in *toc*, of the heading
+    in force on that slide: the first listed heading of the slide, else the
+    last one before it.  A heading belongs to the slide its sidebar link
+    lands on (``_toc_target_marker``), the page's first slide when it comes
+    before every stop.  Slides before any heading are absent.  The floating
+    bar looks its current slide up in this table (``navToc``).
+    """
+    stops = [m["index"] for m in markers if is_stop(m)]
+    page_first: dict[int, int] = {}
+    for m in markers:
+        if is_stop(m):
+            page_first.setdefault(m.get("page_idx", 0), m["index"])
+    slides: list[tuple[int, int]] = []        # (slide's stop index, toc position)
+    for pos, entry in enumerate(toc):
+        if max_level is not None and entry["level"] > max_level:
+            continue
+        target = _toc_target_marker(entry, markers)
+        first = page_first.get(entry.get("page_idx", 0))
+        if first is None:
+            continue
+        if target is None or target < first:
+            target = first
+        slide = max(k for k in stops if k <= target)
+        slides.append((slide, pos))
+    table: dict[int, int] = {}
+    for stop in stops:
+        held = [slide for slide, _ in slides if slide <= stop]
+        if held:
+            slide = max(held)
+            table[stop] = min(pos for k, pos in slides if k == slide)
+    return table
+
+
 def populate_toc(toc_sidebar: Delta, toc_block: Delta = None, toc_content_style: Style = None,
                  block_index: dict[int, str] = None, search_js_placeholder=None,
                  max_level: int | None = None, toc_config: TOCConfig | None = None):
@@ -2686,13 +2722,10 @@ def _build_paginated_sidebar(cache, current_page, total, toc_config, marker_conf
 
         toc_parts = []
 
-        # Highlight only the FIRST entry of the current page, not every
-        # same-page entry. A page with multiple headings (H1 + H2…) used to
-        # light its whole group simultaneously (issue 6.13, the user-reported
-        # group-highlight bug). Subsequent same-page entries still link to
-        # their in-page anchor — they just don't carry the active colour.
-        toc_active_done = False
-        for entry in cached_toc:
+        # The cyan entry of each tab is chosen by the floating bar, slide by
+        # slide (#130): every entry carries data-stx-nav, and the bar writes
+        # one style rule naming the entry of its current slide.
+        for pos, entry in enumerate(cached_toc):
             if effective_max_level is not None and entry["level"] > effective_max_level:
                 continue
             indent = indent_char * (entry["level"] - 1) * 4
@@ -2704,19 +2737,14 @@ def _build_paginated_sidebar(cache, current_page, total, toc_config, marker_conf
             page_idx = entry.get("page_idx", 0)
             title_esc = entry["title"]
             if page_idx == current_page:
-                active_style = (
-                    ' style="color:var(--stx-link-active-color);"'
-                    if not toc_active_done else ''
-                )
-                toc_active_done = True
-                link = f'<a href="#{entry["key_anchor"]}"{active_style}>{title_esc}</a>'
+                link = f'<a href="#{entry["key_anchor"]}">{title_esc}</a>'
             else:
                 href = _goto_href(page_idx, _toc_target_marker(entry, cache_markers))
                 link = f'<a href="{href}" class="stx-page-link">{title_esc}</a>'
             block_attr = f' data-stx-block="{page_idx}"' if show_search else ''
             toc_parts.append(
-                f'<div{block_attr} style="overflow:hidden;text-overflow:ellipsis;'
-                f'white-space:nowrap;padding:1px 0;font-size:14px;">'
+                f'<div data-stx-nav="toc{pos}"{block_attr} style="overflow:hidden;'
+                f'text-overflow:ellipsis;white-space:nowrap;padding:1px 0;font-size:14px;">'
                 f'{indent}{dot}{link}</div>'
             )
 
@@ -2730,24 +2758,13 @@ def _build_paginated_sidebar(cache, current_page, total, toc_config, marker_conf
         # --- Markers ---
         if tab_markers is not None:
             marker_parts = []
-            # Same single-highlight rule as the TOC tab (issue 6.13): only the
-            # first marker on the current page carries the active colour.
-            marker_active_done = False
             for entry in cache.get("markers", []):
                 if not is_listed(entry):
                     continue
                 row = marker_row_text(entry)     # same text as the popup (#117)
                 page_idx = entry.get("page_idx", 0)
                 if page_idx == current_page:
-                    active_style = (
-                        ' style="color:var(--stx-link-active-color);"'
-                        if not marker_active_done else ''
-                    )
-                    marker_active_done = True
-                    link = (
-                        f'<a href="#{entry["anchor"]}"{active_style}>'
-                        f'{row}</a>'
-                    )
+                    link = f'<a href="#{entry["anchor"]}">{row}</a>'
                 else:
                     link = (
                         f'<a href="{_goto_href(page_idx, entry["index"])}" class="stx-page-link">'
@@ -2755,8 +2772,8 @@ def _build_paginated_sidebar(cache, current_page, total, toc_config, marker_conf
                     )
                 block_attr = f' data-stx-block="{page_idx}"' if show_search else ''
                 marker_parts.append(
-                    f'<div{block_attr} style="overflow:hidden;text-overflow:ellipsis;'
-                    f'white-space:nowrap;font-size:14px;">{link}</div>'
+                    f'<div data-stx-nav="mk{entry["index"]}"{block_attr} style="overflow:hidden;'
+                    f'text-overflow:ellipsis;white-space:nowrap;font-size:14px;">{link}</div>'
                 )
             marker_parts.append('<div style="height:40px;"></div>')
             with tab_markers:
@@ -2773,7 +2790,7 @@ def _build_paginated_sidebar(cache, current_page, total, toc_config, marker_conf
 
 def _inject_paginated_nav_js(current_page, total, marker_config,
                              page_marker_info=None, last_named_page=None,
-                             initial_marker=None):
+                             initial_marker=None, has_bar=True):
     """Inject JS for cross-page navigation via hidden buttons.
 
     Navigation mechanisms:
@@ -2793,6 +2810,13 @@ def _inject_paginated_nav_js(current_page, total, marker_config,
     var pageFirstMarker = __PAGE_FIRST_MARKER__;
     var pageLastMarker  = __PAGE_LAST_MARKER__;
     var initialMarker = __INITIAL_MARKER__;
+
+    /* A page without the floating bar has no slide to name: clear the
+       sidebar highlight rule the bar of the previous page wrote (#130). */
+    if (!__HAS_BAR__) {
+        var hlRule = hostDoc.getElementById('stx-sidebar-active-style');
+        if (hlRule) hlRule.textContent = '';
+    }
 
     /* --- Deep link (?marker=): the server resolved the page; make the
        marker widget start (and scroll) on the requested marker instead of
@@ -3207,7 +3231,8 @@ def _inject_paginated_nav_js(current_page, total, marker_config,
                .replace("__PAGE_FIRST_MARKER__", pmi_first)
                .replace("__PAGE_LAST_MARKER__", pmi_last)
                .replace("__INITIAL_MARKER__",
-                        str(int(initial_marker)) if initial_marker is not None else "null"))
+                        str(int(initial_marker)) if initial_marker is not None else "null")
+               .replace("__HAS_BAR__", "true" if has_bar else "false"))
     st.iframe(js_body, height=1)
 
 
@@ -3551,6 +3576,8 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
             profile_names=profile_names,
             active_profile=active_profile,
             profile_modified=profile_modified,
+            nav_toc=_toc_nav_table(cache.get("toc", []), cache.get("markers", []),
+                                   _resolve_sidebar_max_level(toc_config, paginated=True)),
         )
 
     # --- Hidden navigation buttons (one per page, clickable by JS) ---
@@ -3586,7 +3613,8 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
     _initial_marker = st.session_state.pop(_STX_INITIAL_MARKER_KEY, None)
     _inject_paginated_nav_js(current_page, total, marker_config, page_marker_info,
                              last_named_page=_last_named,
-                             initial_marker=_initial_marker)
+                             initial_marker=_initial_marker,
+                             has_bar=marker_config is not None and _page_has_markers)
 
     # --- Inspector panel (opt-in, rendered into reserved sidebar placeholder) ---
     if _inspector_placeholder is not None and st.session_state.get("_stx_inspector_open", False):

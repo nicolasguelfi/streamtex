@@ -1,3 +1,4 @@
+import html
 import re
 from contextlib import contextmanager
 from contextvars import ContextVar
@@ -142,6 +143,21 @@ def _build_list_root_payload(list_id: str, text_align: str | None = None,
     )
 
 
+def _export_marker_attr(bullet_content: str, is_ordered: bool) -> str:
+    """The live marker, carried to the exported ``<li>`` (#112, A').
+
+    The export draws an inside marker itself — the browser's native one is
+    much wider than the live ``::before`` — so each item says what the live
+    page draws: the symbol of an unordered item, or the counter style of an
+    ordered one (the number comes from the item's position).
+    """
+    if is_ordered:
+        m = re.match(r"counter\(streamtex-counter,\s*([\w-]+)\)", bullet_content)
+        return f' data-stx-marker-counter="{m.group(1) if m else "decimal"}"'
+    symbol = bullet_content[1:-1] if bullet_content[:1] == bullet_content[-1:] == "'" else bullet_content
+    return f' data-stx-marker="{html.escape(symbol, quote=True)}"'
+
+
 class ListController:
     def __init__(self, li_style: Style, bullet_content: str, is_ordered: bool,
                  alt_li_styles: list[Style] | None = None):
@@ -178,7 +194,8 @@ class ListController:
 
         # Export wrapper: <li> (suppresses st_block's own <div>)
         if is_export_active():
-            export_push_wrapper(f'<li style="{final_style}">')
+            marker_attr = _export_marker_attr(self.bullet_content, self.is_ordered)
+            export_push_wrapper(f'<li style="{final_style}"{marker_attr}>')
 
         with st_block(style=final_style, _export_wrapper=False):
             # Per-item bullet stylesheet + sentinel marker span go INSIDE the

@@ -1084,3 +1084,23 @@ class TestInsideMarkerFollowsEffectiveAlignment:
                '[data-testid="stVerticalBlock"] > [data-testid="stElementContainer"]' \
                ':first-child' in self.CSS
         assert "display: inline;" in self.CSS
+
+
+class TestExportMarkerAttr:
+    """#112, A' — each exported item carries the marker the live page draws."""
+
+    def test_unordered_symbol(self):
+        from streamtex.list import _export_marker_attr
+        assert _export_marker_attr("'•'", False) == ' data-stx-marker="•"'
+        assert _export_marker_attr("'○'", False) == ' data-stx-marker="○"'
+
+    def test_symbol_is_escaped(self):
+        from streamtex.list import _export_marker_attr
+        assert _export_marker_attr("'\"'", False) == ' data-stx-marker="&quot;"'
+
+    def test_ordered_counter_style(self):
+        from streamtex.list import _export_marker_attr
+        assert _export_marker_attr("counter(streamtex-counter, decimal) '.'", True) == \
+            ' data-stx-marker-counter="decimal"'
+        assert _export_marker_attr("counter(streamtex-counter, lower-roman) '.'", True) == \
+            ' data-stx-marker-counter="lower-roman"'

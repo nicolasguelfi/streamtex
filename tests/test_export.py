@@ -224,6 +224,15 @@ class TestHtmlExportBuffer:
         assert "first.classList.contains('stx-el')" in html
         assert "first.style.display = 'inline';" in html
 
+    def test_export_draws_the_live_marker_in_an_inside_list(self):
+        """#112, A' — the live marker (1.2rem box, right-aligned, 0.5rem gap)
+        replaces the browser's much wider inside marker."""
+        html = self._make_buffer().generate_full_html()
+        assert "li.getAttribute('data-stx-marker')" in html
+        assert "m.style.minWidth = '1.2rem';" in html
+        assert "m.style.marginInlineEnd = '0.5rem';" in html
+        assert "if (drawn) list.style.listStyleType = 'none';" in html
+
     def test_generate_full_html_no_zoom_when_default(self):
         buf = self._make_buffer()
         buf.append("<p>test</p>")

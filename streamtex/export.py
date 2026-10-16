@@ -526,8 +526,15 @@ class HtmlExportBuffer:
 # the script does the same here, for every list whose marker is inside —
 # declared or implied.  Only that first element and its text wrapper become
 # inline: a nested list, a second paragraph or a layout block stays a block.
-# The line break the export writes between `<li>` and the item would then show
-# as a space after the marker; it is removed, as the live layout has none.
+#
+# The marker itself is drawn the live way too (#112, A'): the browser's inside
+# marker is about 1.3 em wide, the live `::before` is a box of
+# `--stx-list-marker-width` (1.2rem), right-aligned, followed by
+# `--stx-list-marker-gap` (0.5rem).  `list.py` writes the live symbol on each
+# exported item (`data-stx-marker`, or `data-stx-marker-counter` for an
+# ordered list); the script puts it in a span with those metrics and hides the
+# native marker.  An item without the attribute keeps the native marker, and
+# an outside-mode list (left-aligned) is untouched.
 _LIST_INSIDE_JS = (
     "<script>\n"
     "(function () {\n"
@@ -540,9 +547,50 @@ _LIST_INSIDE_JS = (
     "    }\n"
     "    return true;\n"
     "  }\n"
+    "  function roman(n) {\n"
+    "    var v = [1000, 900, 500, 400, 100, 90, 50, 40, 10, 9, 5, 4, 1];\n"
+    "    var r = ['m', 'cm', 'd', 'cd', 'c', 'xc', 'l', 'xl', 'x', 'ix', 'v', 'iv', 'i'];\n"
+    "    var out = '';\n"
+    "    for (var k = 0; k < v.length; k++) { while (n >= v[k]) { out += r[k]; n -= v[k]; } }\n"
+    "    return out;\n"
+    "  }\n"
+    "  function alpha(n) {\n"
+    "    var out = '';\n"
+    "    while (n > 0) { n--; out = String.fromCharCode(97 + n % 26) + out; n = Math.floor(n / 26); }\n"
+    "    return out;\n"
+    "  }\n"
+    "  function counter(style, n) {\n"
+    "    if (style === 'lower-roman') return roman(n);\n"
+    "    if (style === 'upper-roman') return roman(n).toUpperCase();\n"
+    "    if (style === 'lower-alpha' || style === 'lower-latin') return alpha(n);\n"
+    "    if (style === 'upper-alpha' || style === 'upper-latin') return alpha(n).toUpperCase();\n"
+    "    return String(n);\n"
+    "  }\n"
+    "  function marker(li, n) {\n"
+    "    var sym = li.getAttribute('data-stx-marker');\n"
+    "    var cnt = li.getAttribute('data-stx-marker-counter');\n"
+    "    if (sym === null && cnt === null) return false;\n"
+    "    var m = document.createElement('span');\n"
+    "    m.className = 'stx-li-marker';\n"
+    "    m.setAttribute('aria-hidden', 'true');\n"
+    "    m.textContent = sym !== null ? sym : counter(cnt, n) + '.';\n"
+    "    m.style.display = 'inline-block';\n"
+    "    m.style.minWidth = '1.2rem';\n"
+    "    m.style.marginInlineEnd = '0.5rem';\n"
+    "    m.style.textAlign = 'right';\n"
+    "    li.insertBefore(m, li.firstChild);\n"
+    "    var gap = m.nextSibling;\n"
+    "    if (gap && gap.nodeType === 3 && !gap.textContent.trim()) gap.remove();\n"
+    "    return true;\n"
+    "  }\n"
     "  function inlineFirst(list) {\n"
+    "    var n = 0, drawn = false;\n"
     "    for (var j = 0; j < list.children.length; j++) {\n"
-    "      var first = list.children[j].firstElementChild;\n"
+    "      var li = list.children[j];\n"
+    "      if (li.tagName !== 'LI') continue;\n"
+    "      n++;\n"
+    "      var first = li.firstElementChild;\n"
+    "      if (marker(li, n)) drawn = true;\n"
     "      if (!first || !first.classList.contains('stx-el')) continue;\n"
     "      var inner = first.firstElementChild;\n"
     "      if (inner && !PHRASING.test(inner.tagName)) {\n"
@@ -550,9 +598,8 @@ _LIST_INSIDE_JS = (
     "        inner.style.display = 'inline';\n"
     "      }\n"
     "      first.style.display = 'inline';\n"
-    "      var gap = first.previousSibling;\n"
-    "      if (gap && gap.nodeType === 3 && !gap.textContent.trim()) gap.remove();\n"
     "    }\n"
+    "    if (drawn) list.style.listStyleType = 'none';\n"
     "  }\n"
     "  function apply() {\n"
     "    var lists = document.querySelectorAll('ul, ol');\n"

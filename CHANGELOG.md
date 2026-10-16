@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.49] — 2026-10-16 — Passwords with spaces, videos and centred lists in the export
+
+### Fixed
+
+- **A password typed with spaces opens the site** (#129). The login screen
+  (`stx_auth`) removes every whitespace character of the typed password
+  (space, tab, newline, no-break and narrow no-break spaces) before checking
+  it: phones add a space after a word, a copy-paste keeps one at the end.
+  Case still matters. `stx deploy auth` refuses a password that holds
+  whitespace, naming its label, since it could never match.
+- **A remote video or audio file plays in the HTML export** (#114).
+  `st_video(url)` and `st_audio(url)` wrote
+  `type="application/octet-stream"`, which Chrome skips: the player stayed
+  empty. The type now comes from the extension of the URL's path (query
+  string and fragment ignored); an unknown extension writes the `<source>`
+  without `type`. A `format=` given by the author still wins.
+- **`st_video` plays in the export as in the live page.** The export wrote a
+  bare `<video controls>`: it now carries the `autoplay` (with
+  `playsinline`), `loop` and `muted` given to the call, and the video takes
+  the full width of its container, as `st.video` does.
+- **Centred lists in the HTML export: the marker shares the line of its
+  text** (#112, point 1). The export only set `list-style-position: inside`,
+  and the item's block put its text on the line below the marker. The
+  export script now renders the item's first element inline, as the live
+  inside-mode rules do; a nested list or a second paragraph stays a block.
+- **The exported inside marker is drawn the live way** (#112). Each exported
+  `<li>` of an inside-mode list carries the live marker (`data-stx-marker`,
+  or `data-stx-marker-counter` for an ordered list), and the export draws it
+  with the live size, symbol per level and gap, instead of the browser's
+  wider native marker. Outside-mode (left-aligned) lists are untouched.
+  Point 2 of #112 (item text wrapped in `st_zoom`) remains open.
+
 ### Changed
 
 - Release workflow: when the GitHub release already exists, the step says so

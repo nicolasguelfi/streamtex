@@ -16,6 +16,7 @@ import json
 import os
 import re
 from typing import TYPE_CHECKING
+from urllib.parse import urlsplit
 
 if TYPE_CHECKING:
     import pandas as pd
@@ -220,7 +221,9 @@ _VIDEO_MIME = {
 def _media_src(data, mime_map: dict, format_hint: str | None) -> tuple[str, str]:
     """Return ``(src_attr, mime)`` for an ``<audio>`` or ``<video>`` tag.
 
-    *data* can be a file path (str), a URL (str), or raw bytes.
+    *data* can be a file path (str), a URL (str), or raw bytes.  For a URL,
+    the type comes from the extension of its path; an unknown one gives
+    ``""``, and the ``<source>`` is then written without ``type`` (#114).
     """
     if isinstance(data, (bytes, bytearray)):
         mime = format_hint or "application/octet-stream"
@@ -229,8 +232,8 @@ def _media_src(data, mime_map: dict, format_hint: str | None) -> tuple[str, str]
 
     if isinstance(data, str):
         if data.startswith(("http://", "https://", "www.")):
-            mime = format_hint or "application/octet-stream"
-            return data, mime
+            ext = os.path.splitext(urlsplit(data).path)[1].lower()
+            return data, format_hint or mime_map.get(ext, "")
         # Local file path
         ext = os.path.splitext(data)[1].lower()
         mime = format_hint or mime_map.get(ext, "application/octet-stream")
@@ -251,6 +254,16 @@ def _media_src(data, mime_map: dict, format_hint: str | None) -> tuple[str, str]
     return str(data), format_hint or "application/octet-stream"
 
 
+def _source_tag(src: str, mime: str) -> str:
+    """``<source>`` with its ``type``, or without one when it is unknown.
+
+    The browser skips a source whose ``type`` it cannot play, such as
+    ``application/octet-stream``; without ``type`` it reads the file to decide.
+    """
+    type_attr = f' type="{mime}"' if mime else ""
+    return f'<source src="{src}"{type_attr}>'
+
+
 def st_audio(data, **kw):
     """Display audio with ``st.audio()`` and export an ``<audio>`` tag."""
     st.audio(data, **kw)
@@ -259,7 +272,7 @@ def st_audio(data, **kw):
         src, mime = _media_src(data, _AUDIO_MIME, fmt)
         export_append(
             f'<audio controls class="stx-media">'
-            f'<source src="{src}" type="{mime}">'
+            f'{_source_tag(src, mime)}'
             f'Your browser does not support the audio element.</audio>'
         )
 
@@ -295,6 +308,6 @@ def st_video(data, **kw):
             attrs.append("muted")
         export_append(
             f'<video {" ".join(attrs)} class="stx-media" style="width:100%;max-width:100%">'
-            f'<source src="{src}" type="{mime}">'
+            f'{_source_tag(src, mime)}'
             f'Your browser does not support the video element.</video>'
         )

@@ -3,6 +3,7 @@
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
+import pytest
 
 import streamtex.export as export_mod
 from streamtex.export import ExportConfig, generate_export_html, reset_export_buffer
@@ -341,6 +342,12 @@ class TestStAudio:
         assert "<audio" in html
         assert "data:audio/wav;base64," in html
 
+    def test_remote_mp3_gets_its_type(self, mock_st):
+        """#114: the same gap as st_video, for a remote audio file."""
+        reset_export_buffer(ExportConfig(enabled=True))
+        st_audio("https://example.com/talk.mp3")
+        assert '<source src="https://example.com/talk.mp3" type="audio/mpeg">' in generate_export_html()
+
 
 # ---------------------------------------------------------------------------
 # st_video
@@ -406,3 +413,28 @@ class TestStVideo:
         html = generate_export_html()
         assert "<video" in html
         assert "data:video/mp4;base64," in html
+
+    @pytest.mark.parametrize("url,mime", [
+        ("https://example.com/promptleon.mp4", "video/mp4"),
+        ("https://example.com/clip.webm", "video/webm"),
+        ("https://example.com/clip.OGG", "video/ogg"),
+        ("https://example.com/clip.mp4?v=2#t=3", "video/mp4"),
+    ])
+    def test_remote_url_gets_its_type_from_the_extension(self, mock_st, url, mime):
+        """#114: a remote video is not written as application/octet-stream."""
+        reset_export_buffer(ExportConfig(enabled=True))
+        st_video(url)
+        html = generate_export_html()
+        assert f'<source src="{url}" type="{mime}">' in html
+        assert "octet-stream" not in html
+
+    def test_remote_url_without_extension_has_no_type(self, mock_st):
+        reset_export_buffer(ExportConfig(enabled=True))
+        st_video("https://example.com/video?id=42")
+        html = generate_export_html()
+        assert '<source src="https://example.com/video?id=42">' in html
+
+    def test_format_given_by_the_author_wins(self, mock_st):
+        reset_export_buffer(ExportConfig(enabled=True))
+        st_video("https://example.com/video?id=42", format="video/webm")
+        assert 'type="video/webm"' in generate_export_html()

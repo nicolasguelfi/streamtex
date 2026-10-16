@@ -518,18 +518,50 @@ class HtmlExportBuffer:
 # alignment is `center` or `right` takes its marker inside the line.  A list
 # that declares `text_align=` already carries the property inline from
 # `_list_export_css`, so this only ever adds what inheritance implied.
+#
+# Moving the marker inside is not enough on its own (#112): an exported item is
+# `<li><div class="stx-el">text</div>…</li>`, and that `div` is a block, so the
+# marker stood alone on its line and the text started below it.  The live
+# inside-mode rules (`stx_global.css`) render the item's FIRST element inline;
+# the script does the same here, for every list whose marker is inside —
+# declared or implied.  Only that first element and its text wrapper become
+# inline: a nested list, a second paragraph or a layout block stays a block.
+# The line break the export writes between `<li>` and the item would then show
+# as a space after the marker; it is removed, as the live layout has none.
 _LIST_INSIDE_JS = (
     "<script>\n"
     "(function () {\n"
     "  var INSIDE = { center: 1, right: 1, end: 1 };\n"
+    "  var TEXT = /^(P|H[1-6])$/;\n"
+    "  var PHRASING = /^(SPAN|A|B|I|EM|STRONG|CODE|SUB|SUP|SMALL|MARK|BR)$/;\n"
+    "  function textOnly(e) {\n"
+    "    for (var k = 0; k < e.children.length; k++) {\n"
+    "      if (!PHRASING.test(e.children[k].tagName)) return false;\n"
+    "    }\n"
+    "    return true;\n"
+    "  }\n"
+    "  function inlineFirst(list) {\n"
+    "    for (var j = 0; j < list.children.length; j++) {\n"
+    "      var first = list.children[j].firstElementChild;\n"
+    "      if (!first || !first.classList.contains('stx-el')) continue;\n"
+    "      var inner = first.firstElementChild;\n"
+    "      if (inner && !PHRASING.test(inner.tagName)) {\n"
+    "        if (!(TEXT.test(inner.tagName) || inner.tagName === 'DIV') || !textOnly(inner)) continue;\n"
+    "        inner.style.display = 'inline';\n"
+    "      }\n"
+    "      first.style.display = 'inline';\n"
+    "      var gap = first.previousSibling;\n"
+    "      if (gap && gap.nodeType === 3 && !gap.textContent.trim()) gap.remove();\n"
+    "    }\n"
+    "  }\n"
     "  function apply() {\n"
     "    var lists = document.querySelectorAll('ul, ol');\n"
     "    for (var i = 0; i < lists.length; i++) {\n"
     "      var el = lists[i];\n"
-    "      if (el.style.listStylePosition) continue;\n"
-    "      if (INSIDE[getComputedStyle(el).textAlign]) {\n"
+    "      if (!el.style.listStylePosition && INSIDE[getComputedStyle(el).textAlign]) {\n"
     "        el.style.listStylePosition = 'inside';\n"
     "      }\n"
+    "      if (el.style.listStylePosition === 'inside') inlineFirst(el);\n"
     "    }\n"
     "  }\n"
     "  if (document.readyState === 'loading') {\n"

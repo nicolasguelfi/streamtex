@@ -213,7 +213,16 @@ class TestHtmlExportBuffer:
         """A list that used `st_list(text_align=…)` already carries the
         property inline; the script only adds what inheritance implied."""
         html = self._make_buffer().generate_full_html()
-        assert "if (el.style.listStylePosition) continue;" in html
+        assert "if (!el.style.listStylePosition && INSIDE[getComputedStyle(el).textAlign])" in html
+
+    def test_export_puts_the_first_element_of_an_inside_item_inline(self):
+        """#112 — the live inside mode renders the item's first element inline,
+        so the marker shares its line; the export does the same for every list
+        whose marker is inside, declared or implied."""
+        html = self._make_buffer().generate_full_html()
+        assert "if (el.style.listStylePosition === 'inside') inlineFirst(el);" in html
+        assert "first.classList.contains('stx-el')" in html
+        assert "first.style.display = 'inline';" in html
 
     def test_generate_full_html_no_zoom_when_default(self):
         buf = self._make_buffer()

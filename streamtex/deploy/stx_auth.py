@@ -7,6 +7,7 @@ container. nginx asks it before serving any protected page of either face
 - ``GET /check``  -> 204 (session valid, ``X-Stx-Label`` names the entry) or 401;
 - ``GET /login``  -> the login form (status 401), in the visitor's language;
 - ``POST /login`` -> checks the password, sets the session cookie, 303 back.
+  Whitespace typed anywhere in the password is removed first (#129).
 
 nginx describes each request with headers it sets itself (a client cannot
 supply them, the service listens on 127.0.0.1 only):
@@ -131,6 +132,16 @@ def hash_password(word: str, *, n: int = SCRYPT_N, r: int = SCRYPT_R, p: int = S
     digest = hashlib.scrypt(word.encode("utf-8"), salt=salt, n=n, r=r, p=p,
                             maxmem=SCRYPT_MAXMEM, dklen=32)
     return f"scrypt${n}${r}${p}${salt.hex()}${digest.hex()}"
+
+
+def typed_password(word: str) -> str:
+    """The password typed at login without its whitespace (#129).
+
+    Phones add a space after a word and a copy-paste keeps one at the end;
+    ``str.split()`` also removes tabs, newlines and no-break spaces.  A stored
+    password never holds whitespace (``stx deploy auth`` refuses it).
+    """
+    return "".join(word.split())
 
 
 def check_password(record: str, word: str) -> bool:
@@ -437,7 +448,7 @@ class Handler(BaseHTTPRequestHandler):
             self.close_connection = True
             return self.send(413)
         form = parse_qs(self.rfile.read(length).decode("utf-8", "replace"))
-        word = (form.get("password") or [""])[0]
+        word = typed_password((form.get("password") or [""])[0])
         nxt = safe_path((form.get("next") or [""])[0], self.home())
         site = self.site()
         records = self.server.store.get(site)

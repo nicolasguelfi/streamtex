@@ -240,6 +240,22 @@ class TestService:
         resp, _ = _login(server, "")
         assert resp.status == 401
 
+    @pytest.mark.parametrize("typed", ["pw", " pw", "pw ", "p w", "p\u00a0w", "p\u202fw", "\tpw\n"])
+    def test_whitespace_typed_is_removed(self, server, typed):
+        """#129: a space added by a phone or a copy-paste does not refuse the password."""
+        _write(server, "demo", _rec("pw") + "\n")
+        resp, _ = _login(server, typed)
+        assert resp.status == 303
+        assert _cookie(resp)
+
+    def test_case_still_matters_and_spaces_do_not_open_a_wrong_password(self, server):
+        _write(server, "demo", _rec("pw") + "\n")
+        assert _login(server, "pW")[0].status == 401
+        resp, body = _login(server, " p x ")
+        assert resp.status == 401
+        assert "Wrong password" in body.decode()
+        assert _login(server, "   ")[0].status == 401
+
     def test_login_then_check(self, server):
         _write(server, "demo", _rec("right") + "\n")
         resp, _ = _login(server, "right")

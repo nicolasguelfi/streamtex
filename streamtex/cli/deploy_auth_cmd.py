@@ -17,12 +17,15 @@ shown (one prompt only).
 ``.stx-passwords.toml``::
 
     [default]                       # or a section named after the service
-    live = "a password"             # one password, label "default"
+    live = "apassword"              # one password, label "default"
     html = "COHORT1:pw1,COHORT2:pw2"  # labelled passwords
 
     [default.live]                  # the same as a table (needed when a
     COHORT1 = "pw1"                 # password contains ':' or ',')
     COHORT2 = { password = "pw2", valid_until = "2027-01-31" }
+
+A password holds no whitespace: the login screen removes the spaces typed
+(phones add one after a word), so a stored one could never match (#129).
 """
 
 from __future__ import annotations
@@ -112,6 +115,10 @@ def _check_entries(entries: list[PlainEntry], where: str) -> None:
             raise click.ClickException(f"{where}: label '{e.label}' appears twice")
         if not e.password:
             raise click.ClickException(f"{where}.{e.label}: empty password")
+        if any(c.isspace() for c in e.password):
+            raise click.ClickException(
+                f"{where}.{e.label}: the password contains whitespace; the login screen "
+                "removes whitespace before checking, so it could never match")
         if e.password in passwords:
             raise click.ClickException(
                 f"{where}: '{e.label}' and '{passwords[e.password]}' share a password; "

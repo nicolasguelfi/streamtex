@@ -329,10 +329,12 @@ def st_video(data, *, width: int | str | None = None, align: str = "center", **k
 
     ``autoplay=True`` without ``muted`` cannot start: browsers only play a
     muted video on their own. The video is then muted (one warning in the
-    log); the reader can turn the sound on with the controls (#35).
+    log); the reader can turn the sound on with the controls (#35). An
+    explicit ``muted=False`` is kept: a browser that allows sound on its own
+    (a projection profile) plays it with sound, others wait for a click.
     """
     global _warned_autoplay
-    if kw.get("autoplay") and not kw.get("muted"):
+    if kw.get("autoplay") and "muted" not in kw:
         kw["muted"] = True
         if not _warned_autoplay:
             _warned_autoplay = True

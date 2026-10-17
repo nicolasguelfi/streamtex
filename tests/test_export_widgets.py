@@ -473,6 +473,12 @@ class TestMediaWidthAndAutoplay:
         mock_st.video.assert_called_once_with("https://example.com/a.mp4", autoplay=True, muted=True)
         assert "needs muted" not in caplog.text
 
+    def test_explicit_muted_false_keeps_the_sound(self, mock_st, caplog):
+        html = self._html(lambda: st_video("https://example.com/a.mp4", autoplay=True, muted=False))
+        mock_st.video.assert_called_once_with("https://example.com/a.mp4", autoplay=True, muted=False)
+        assert "autoplay playsinline" in html and "muted" not in html
+        assert "needs muted" not in caplog.text
+
     def test_no_width_keeps_the_full_width_output(self, mock_st):
         html = self._html(lambda: st_video("https://example.com/v.mp4"))
         assert '<div class="stx-block"' not in html and 'style="width:100%;max-width:100%"' in html

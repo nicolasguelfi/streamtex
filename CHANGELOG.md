@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`st_video(autoplay=True, muted=False)` keeps its sound** (#35). Since
+  0.7.52 an autoplay video was muted whenever `muted` was not true, so an
+  explicit `muted=False` was overridden and a project could no longer play
+  a video with sound in a browser that allows it (a projection profile).
+  Only an autoplay video that does not mention `muted` is muted now, with
+  the same one warning; `muted=False` is passed as written, live and in the
+  HTML export, and an ordinary browser waits for a click.
+
 ## [0.7.52] — 2026-10-17 — Video width and alignment, autoplay without muted, zoomed list items
 
 ### Added

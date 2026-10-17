@@ -1,5 +1,8 @@
 """st_video(width=, align=) draws the same box live and in the export (#126);
-autoplay=True without muted starts, muted (#35).
+autoplay=True without muted starts, muted; an explicit muted=False keeps the
+sound: it waits for a click in a default browser and plays with sound in one
+that allows it (``--autoplay-policy=no-user-gesture-required``, as in a
+projection profile) (#35).
 
 Widths are compared with the full-width video of the same page: 50% is half
 of it, 400 px is 400 px, align="left" starts at its left edge. The autoplay
@@ -24,18 +27,24 @@ pytestmark = pytest.mark.e2e
 
 DECK = Path(__file__).resolve().parent / "fixtures" / "media_app"
 VIEWPORT = {"width": 1920, "height": 1080}
+SOUND_ALLOWED = ["--autoplay-policy=no-user-gesture-required"]
 READ = """() => [...document.querySelectorAll('video')].map(v => {
   const r = v.getBoundingClientRect();
   return {left: r.left, right: r.right, width: r.width, paused: v.paused, muted: v.muted, t: v.currentTime}; })"""
 
 
-def _check(videos: list[dict]) -> None:
-    auto, full, half, px400, halfleft = videos
+def _check(videos: list[dict], sound_allowed: bool = False) -> None:
+    auto, sound, full, half, px400, halfleft = videos
     assert abs(half["width"] - full["width"] / 2) <= 2
     assert abs((half["left"] - full["left"]) - (full["right"] - half["right"])) <= 2      # centred
     assert abs(px400["width"] - 400) <= 1
     assert abs(halfleft["left"] - full["left"]) <= 1 and abs(halfleft["width"] - half["width"]) <= 1
     assert auto["muted"] and not auto["paused"] and auto["t"] > 0
+    assert not sound["muted"]
+    if sound_allowed:
+        assert not sound["paused"] and sound["t"] > 0
+    else:
+        assert sound["paused"]
 
 
 def _read_after(page, url: str) -> list[dict]:
@@ -79,5 +88,16 @@ def test_export_sizes_and_autoplay(exported):
         browser = p.chromium.launch()
         try:
             _check(_read_after(browser.new_page(viewport=VIEWPORT), exported.as_uri()))
+        finally:
+            browser.close()
+
+
+@pytest.mark.parametrize("where", ["live", "export"])
+def test_explicit_muted_false_plays_with_sound_where_allowed(where, deck_url, exported):
+    url = deck_url if where == "live" else exported.as_uri()
+    with playwright.sync_playwright() as p:
+        browser = p.chromium.launch(args=SOUND_ALLOWED)
+        try:
+            _check(_read_after(browser.new_page(viewport=VIEWPORT), url), sound_allowed=True)
         finally:
             browser.close()

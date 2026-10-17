@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.52] — 2026-10-17 — Video width and alignment, autoplay without muted, zoomed list items
+
 ### Added
 
 - **`st_video(width=, align=)` and `st_audio(width=, align=)`** (#126). A

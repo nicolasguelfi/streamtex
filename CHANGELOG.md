@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.51] — 2026-10-17 — Export images that load as the reader nears them, Contents links in long sections
+
 ### Changed
 
 - **The images of an HTML export load as the reader nears them** (#115).

@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **The images of an HTML export load as the reader nears them** (#115).
+  An exported deck loaded every image when it opened: hundreds of MB per
+  reader for decks with large GIFs, and a classroom Wi-Fi saturated. Every
+  `<img>` after the first slide of each file now carries
+  `loading="lazy" decoding="async"`; the images of the first slide (before
+  the second stop marker) load at once, as do all the images of a
+  one-slide file, and the first image of a document without markers. This
+  applies to `stx export html` (continuous and paginated files, embedded or
+  external assets), the HTML download button and automatic HTML exports;
+  the live page and the PDF are unchanged, and an `<img>` with its own
+  `loading=` is left as is (`export.lazy_load_images`). Measured on a
+  98-slide page of a training deck: 2.7 MB at open instead of 15.9 MB;
+  arrow navigation and Contents links land as before, on a slow network
+  too and without the browser's scroll anchoring.
+
 ## [0.7.50] — 2026-10-17 — Sidebar highlight that follows the slide, export Contents links, pack templates
 
 ### Fixed

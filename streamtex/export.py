@@ -777,6 +777,37 @@ def strip_page_sentinels(html: str) -> str:
     return _PAGE_SENTINEL_RE.sub("", html)
 
 
+_MARKER_DIV_RE = re.compile(r'class="streamtex-marker" data-marker-index="(\d+)"')
+_IMG_TAG_RE = re.compile(r"<img\b(?![^>]*\bloading=)", re.IGNORECASE)
+
+
+def lazy_load_images(html: str, markers: Optional[list] = None) -> str:
+    """An HTML export whose images load as the reader nears them (#115).
+
+    The images of the document's first slide (before its second stop
+    marker) load at once, every later ``<img>`` gets ``loading="lazy"
+    decoding="async"``.  Without a second stop, a document of one slide
+    keeps all its images, and a document without markers its first image
+    only.  An ``<img>`` that already has ``loading=`` is left as is.  For
+    the export copies only: the live page and the PDF (printed from a copy
+    without it) are unchanged.  *markers* (``cache["markers"]``) tells the
+    stops apart; without it every marker counts as a stop.
+    """
+    stops = None if not markers else {m["index"] for m in markers if m.get("stop", True)}
+    seen = [m.start() for m in _MARKER_DIV_RE.finditer(html)
+            if stops is None or int(m.group(1)) in stops]
+    if len(seen) >= 2:
+        cut = seen[1]
+    elif seen:
+        return html
+    else:
+        first = _IMG_TAG_RE.search(html)
+        if first is None:
+            return html
+        cut = first.end()
+    return html[:cut] + _IMG_TAG_RE.sub('<img loading="lazy" decoding="async"', html[cut:])
+
+
 def export_append(html: str) -> None:
     """Append *html* to the buffer (no-op when export is inactive)."""
     if _buffer is not None:

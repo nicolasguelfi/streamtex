@@ -253,7 +253,10 @@ def export_html(path, output, asset_mode, title, no_nav, theme_mode, theme_bg, t
             raise SystemExit(1)
     pages_dir_name = "pages" if use_external else f"{base_name}-pages"
 
+    from ..export import lazy_load_images
+
     def _enrich(html_in, page_nav=None):
+        html_in = lazy_load_images(html_in, nav_markers)       # each output file (#115)
         if no_nav or not nav_data:
             return html_in
         from ..export_enrich import enrich_export_html

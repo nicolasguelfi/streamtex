@@ -482,6 +482,9 @@ def _offer_export_downloads(html: str, base_name: str,
                         page_width=f"{st.session_state.get(_PAGE_WIDTH_KEY, 100)}%",
                         zoom=html_zoom_pct / 100,
                     )
+                from .export import lazy_load_images
+                html_download = lazy_load_images(            # the HTML file only (#115)
+                    html_download, st.session_state.get(_STX_CACHE_KEY, {}).get("markers"))
                 if enrich_nav:
                     try:
                         from .export_enrich import enrich_export_html
@@ -633,8 +636,10 @@ def _run_auto_exports(
                 # Materialise served media on the export copy (issue #48);
                 # local variable — the raw `html` stays untouched for the
                 # PDF branch (which resolves media via base_url instead).
-                from .export import materialize_served_media
+                from .export import lazy_load_images, materialize_served_media
                 _html_out = materialize_served_media(html, collector)
+                _html_out = lazy_load_images(                 # #115
+                    _html_out, st.session_state.get(_STX_CACHE_KEY, {}).get("markers"))
                 if collector:
                     # External mode: write HTML + data/ folder to disk
                     out_dir = str(_P(path).parent)

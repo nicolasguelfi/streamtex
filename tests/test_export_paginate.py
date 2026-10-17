@@ -227,3 +227,48 @@ def test_st_book_refuses_a_wrong_mode():
     with pytest.raises(ValueError, match="html_export_mode"):
         bm._st_book_impl([], html_export_mode="pages")
     assert "html_export_mode" in bm.BOOK_DEFAULT_KEYS
+
+
+# ---------------------------------------------------------------------------
+# Images load as the reader nears them (#115)
+# ---------------------------------------------------------------------------
+
+_PNG = ("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==")
+
+
+@pytest.fixture
+def image_project(tmp_path):
+    import base64
+    p = _project(tmp_path)
+    (p / "pic.png").write_bytes(base64.b64decode(_PNG))
+    for name in ("bck_intro", "bck_rag", "bck_end"):
+        (p / "blocks" / f"{name}.py").write_text(textwrap.dedent(f"""
+            import streamtex as stx
+            def build(**k):
+                stx.st_marker("{name}")
+                stx.st_write("text-{name}", toc_lvl="1")
+                stx.st_image(uri=r"{p / 'pic.png'}", width="10px")
+                stx.st_slide_break()
+                stx.st_image(uri=r"{p / 'pic.png'}", width="10px")
+        """))
+    yield p
+    for n in [n for n in sys.modules if n == "blocks" or n.startswith("blocks.")]:
+        del sys.modules[n]
+
+
+def _imgs(html):
+    return re.findall(r"<img\b[^>]*>", _body(html))
+
+
+def test_cli_images_after_the_first_slide_are_lazy(image_project, tmp_path):
+    from streamtex.cli.export_cmd import export_html
+    out = tmp_path / "out"
+    r = CliRunner().invoke(export_html, [str(image_project), "-o", str(out), "--asset-mode", "embedded"])
+    assert r.exit_code == 0, r.output
+    for f in ("bck_intro.html", "bck_rag.html", "bck_end.html"):     # each page: its first slide eager
+        first, second = _imgs((out / "deck-pages" / f).read_text())
+        assert "loading=" not in first
+        assert 'loading="lazy" decoding="async"' in second
+    cont = _imgs((out / "deck.html").read_text())
+    assert len(cont) == 6 and "loading=" not in cont[0]
+    assert all('loading="lazy"' in i for i in cont[1:])

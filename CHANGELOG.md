@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.50] — 2026-10-17 — Sidebar highlight that follows the slide, export Contents links, pack templates
+
 ### Fixed
 
 - **The sidebar highlight follows the slide in a paginated book** (#130).

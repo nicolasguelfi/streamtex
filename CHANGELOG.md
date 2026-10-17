@@ -26,6 +26,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   scroll-spy bar is hidden on these entries (one cue). A page without the
   bar clears the rule. Continuous mode and the HTML export are unchanged.
   The real-browser harness now reads the colour each link is painted in.
+- **A Contents link of the HTML export lands on its heading's slide** (#128).
+  A heading in the middle of its slide was scrolled to the top of the
+  screen, and the counter then named the next slide; on a slow network,
+  images loading above could push the landing down. A Contents link (from
+  another page file, in the same file, or in a continuous export) now shows
+  the start of the slide holding the heading, as the live app does since
+  #127, unless the heading would then sit below the screen (a long section
+  of a text page, where only chapters carry markers): then the heading
+  itself. The counter shows the heading's slide in both cases, and the
+  bar's scroll tracker waits while the landing holds. The landing is kept
+  in place when content above it changes height, and against the browser's
+  own scroll to the URL's `#heading` at load, until the reader scrolls,
+  clicks or presses a key (15 s at most). Each heading of the export's
+  deep-link table carries the marker of its slide (`_toc_target_marker`).
+  A heading before every marker of its page, or from a cache without
+  `_markers_before`, still lands on itself.
 - **Projects made from the pack-design templates install again**
   (streamtex-packs#2). The default design pack installed by `stx install`
   moves to `pack-design-v0.3.2`, whose `new-manual`, `new-training` and

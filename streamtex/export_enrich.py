@@ -572,9 +572,10 @@ __ROLES_JS__
   window.addEventListener('scrollend', function() { if (navigating) setTimeout(navDone, 50); });
 
   window.addEventListener('scroll', function() {
-    if (navigating) return;
+    if (navigating || (window.__stxLandingHeld && window.__stxLandingHeld())) return;
     clearTimeout(scrollTimer);
     scrollTimer = setTimeout(function() {
+      if (window.__stxLandingHeld && window.__stxLandingHeld()) return;
       // At the bottom of a short document (a page file, #106) the last
       // slides cannot reach the top: keep the current one while it is in
       // view, or the next arrow press would repeat it.
@@ -646,6 +647,17 @@ _DEEPLINK_JS = r"""
     for (i = 0; i < markers.length; i++) if (markers[i].anchor === ref) return markers[i];
     // a TOC heading attached to a marker (#116): its anchor leads to that marker
     for (i = 0; i < markers.length; i++) if (markers[i].toc_anchor === ref) return markers[i];
+    // any other TOC heading leads to the start of its slide, as in the live
+    // app (#127, #128), or to itself when it would then sit below the screen
+    // (goTo); a heading before every stop of its page, to itself
+    for (i = 0; i < toc.length; i++) {
+      if (toc[i].key_anchor !== ref) continue;
+      var mk = markers[toc[i].marker];
+      if (toc[i].marker !== null && mk) {
+        return { anchor: mk.anchor, index: mk.index, page_idx: mk.page_idx, heading: ref };
+      }
+      return { anchor: ref, index: -1, page_idx: toc[i].page_idx || 0 };
+    }
     var slug = slugOf(ref);
     for (i = 0; i < markers.length; i++) {
       if (markerSlug(markers[i]) === slug || slugOf(markers[i].label) === slug) return markers[i];
@@ -705,15 +717,60 @@ _DEEPLINK_JS = r"""
     }
     if (!el) return;
     el.scrollIntoView({ behavior: 'instant', block: 'start' });
+    hold(el, m.heading ? document.getElementById(m.heading) : null);
     var nav = window.__stxMarkerNavigateTo;
     if (typeof nav === 'function' && m.index >= 0) nav(m.index);
   }
+  /* Keep the landing in place while content above it changes height
+     (images, videos, diagrams drawn late) and against the browser's own
+     scroll to the URL's #heading at load (#128), until the reader's first
+     gesture or HOLD_MS: a scroll without a gesture is not the reader's. */
+  var HOLD_MS = 15000, held = null, heldTop = 0, heldUntil = 0, heading = null;
+  function hold(el, h) {
+    held = el; heading = h; heldTop = el.getBoundingClientRect().top; heldUntil = Date.now() + HOLD_MS;
+    belowScreen();
+  }
+  /* The slide start is shown only while the heading stays on screen (a
+     long section of a text page): else the heading itself (#128). */
+  function belowScreen() {
+    if (!heading || heading.getBoundingClientRect().bottom <= window.innerHeight) return;
+    heading.scrollIntoView({ behavior: 'instant', block: 'start' });
+    held = heading; heading = null; heldTop = held.getBoundingClientRect().top;
+  }
+  function release() { held = null; heading = null; }
+  function reanchor() {
+    if (!held) return;
+    if (Date.now() > heldUntil) { release(); return; }
+    var shift = held.getBoundingClientRect().top - heldTop;
+    if (Math.abs(shift) > 1) window.scrollBy({ top: shift, behavior: 'instant' });
+    belowScreen();
+  }
+  /* the bar's scroll tracker waits: the landing sets the counter */
+  window.__stxLandingHeld = function() { return held !== null && Date.now() <= heldUntil; };
+  ['wheel', 'touchstart', 'mousedown', 'keydown'].forEach(function(type) {
+    window.addEventListener(type, release, { capture: true, passive: true });
+  });
+  window.addEventListener('scroll', reanchor, { passive: true });
+  if (window.ResizeObserver) new ResizeObserver(reanchor).observe(document.body);
+  document.addEventListener('load', reanchor, true);     /* each image, video… */
+  /* A Contents link of this file: same landing as from another file, also
+     when its hash is already the current one (no hashchange then).      */
+  document.addEventListener('click', function(e) {
+    var a = e.target && e.target.closest ? e.target.closest('.stx-toc-entry a[href^="#"]') : null;
+    if (!a || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey) return;
+    var h = a.getAttribute('href');
+    var m = findMarker(decodeURIComponent(h.slice(1)));
+    if (!m || !document.getElementById(m.anchor)) return;
+    e.preventDefault();
+    if (window.location.hash !== h) history.pushState(null, '', h);
+    goTo(m);
+  });
   /* Initial load: the query wins, then the hash. Later hash changes (a
      click on a sidebar #anchor link) resolve the hash ONLY -- the query
      is a landing instruction, not a permanent override.                */
   function initial() { goTo(fromQuery() || fromHash()); }
   initial();
-  window.addEventListener('load', initial);
+  window.addEventListener('load', reanchor);
   window.addEventListener('hashchange', function() { goTo(fromHash()); });
 })();
 """
@@ -1022,8 +1079,11 @@ def enrich_export_html(
         marker_js = _marker_nav_script(markers, page_nav)
         extra_js_parts.append(marker_js)
     if has_markers or has_toc:
+        from .book import _toc_target_marker
+        # each heading with the marker of its slide, where its link lands (#128)
         _toc_pages = [
-            {"key_anchor": e.get("key_anchor"), "page_idx": e.get("page_idx", 0)}
+            {"key_anchor": e.get("key_anchor"), "page_idx": e.get("page_idx", 0),
+             "marker": _toc_target_marker(e, markers or [])}
             for e in (toc or []) if e.get("key_anchor")
         ]
         extra_js_parts.append(_DEEPLINK_JS

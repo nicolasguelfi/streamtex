@@ -16,7 +16,14 @@ These tests pin the contract that:
 """
 from __future__ import annotations
 
+import json
+import re
+import shutil
+import subprocess
+import textwrap
 from unittest.mock import patch
+
+import pytest
 
 from streamtex.export import _get_theme_color
 from streamtex.export_enrich import (
@@ -484,6 +491,66 @@ class TestDeepLinkJs:
                                              "level": 1, "page_idx": 3}], markers=[])
         assert '"key_anchor": "3-footer"' in out and '"page_idx": 3' in out
         assert "hashchange" in out
+
+
+_SLIDES = [{"index": i, "label": f"s{i + 1}", "anchor": f"mk{i}", "hidden": False, "page_idx": 0}
+           for i in range(4)]
+_HEADINGS = [
+    {"title": "Before", "key_anchor": "before", "level": 1, "page_idx": 0, "_markers_before": 0},
+    {"title": "Mid three", "key_anchor": "mid3", "level": 1, "page_idx": 0, "_markers_before": 3},
+    {"title": "Old cache", "key_anchor": "old", "level": 1, "page_idx": 0},
+    {"title": "Far three", "key_anchor": "far3", "level": 2, "page_idx": 0, "_markers_before": 3},
+]
+
+
+def _toc_pages(out: str) -> list[dict]:
+    return json.loads(re.search(r"var toc = (\[.*?\]);\n", out).group(1))
+
+
+class TestContentsLanding:
+    """A Contents link lands on the start of its heading's slide (#128)."""
+
+    def test_toc_pages_carry_the_slide_marker(self):
+        out = enrich_export_html("<html><head></head><body></body></html>",
+                                 toc=_HEADINGS, markers=_SLIDES)
+        assert {e["key_anchor"]: e["marker"] for e in _toc_pages(out)} == {
+            "before": None, "mid3": 2, "old": None, "far3": 2}
+
+    @pytest.mark.skipif(not shutil.which("node"), reason="node not available")
+    @pytest.mark.parametrize("hash_, landed", [
+        ("#mid3", ["mk2"]),           # mid-slide heading: the start of slide 3
+        ("#far3", ["mk2", "far3"]),   # below the screen from there: the heading
+        ("#before", ["before"]),      # before every stop: the heading itself
+        ("#old", ["old"]),            # cache without _markers_before: the heading
+    ])
+    def test_heading_hash_lands_on_its_slide(self, hash_, landed):
+        from streamtex.export_enrich import _DEEPLINK_JS
+        dom = textwrap.dedent("""
+            var scrolled = [];
+            var document = { body: {}, addEventListener: function() {},
+              getElementById: function(id) { return { id: id,
+                scrollIntoView: function() { scrolled.push(this.id); },
+                getBoundingClientRect: function() {
+                  return { top: 0, bottom: id === 'far3' ? 5000 : 40 }; } }; } };
+            var window = { location: { search: '', hash: '__HASH__' }, innerHeight: 1000,
+                           addEventListener: function() {} };
+            function URLSearchParams() { this.get = function() { return null; }; }
+        """).replace("__HASH__", hash_)
+        out = enrich_export_html("<html><head></head><body></body></html>",
+                                 toc=_HEADINGS, markers=_SLIDES)
+        js = (_DEEPLINK_JS.replace("__MARKERS__", json.dumps(_SLIDES))
+              .replace("__TOC__", json.dumps(_toc_pages(out))).replace("__PAGE_NAV__", "null"))
+        r = subprocess.run(["node", "-e", dom + js + "\nconsole.log(JSON.stringify(scrolled));"],
+                           capture_output=True, text=True)
+        assert r.returncode == 0, r.stderr
+        assert json.loads(r.stdout) == landed
+
+    def test_landing_is_held_until_the_reader_moves(self):
+        out = enrich_export_html("<html><head></head><body></body></html>",
+                                 toc=_HEADINGS, markers=_SLIDES)
+        for needle in ("new ResizeObserver(reanchor)", "'wheel', 'touchstart', 'mousedown', 'keydown'",
+                       "window.addEventListener('scroll', reanchor", "HOLD_MS = 15000"):
+            assert needle in out
 
 
 class TestMarkerNavParity:

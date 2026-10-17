@@ -216,8 +216,9 @@ def test_export_deeplink_by_slide():
     e = annotate_marker_numbers(_example_45())
     dom = textwrap.dedent("""
         var scrolled = [];
-        var document = { getElementById: function(id) {
-          return { scrollIntoView: function() { scrolled.push(id); } }; } };
+        var document = { addEventListener: function() {}, getElementById: function(id) {
+          return { scrollIntoView: function() { scrolled.push(id); },
+                   getBoundingClientRect: function() { return { top: 0 }; } }; } };
         var window = { location: { search: '?slide=7', hash: '' }, addEventListener: function() {},
                        __stxMarkerNavigateTo: function(i) { scrolled.push('idx' + i); } };
         function URLSearchParams(q) { this.q = q; }

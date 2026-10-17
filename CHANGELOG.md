@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.53] — 2026-10-17 — Autoplay video with muted=False keeps its sound
+
 ### Fixed
 
 - **`st_video(autoplay=True, muted=False)` keeps its sound** (#35). Since

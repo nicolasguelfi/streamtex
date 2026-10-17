@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A centred list keeps its bullet on the line of a zoomed item** (#112,
+  point 2). When an item's text was wrapped in `st_zoom` (a common way to
+  enlarge a list title), the bullet of a centred or right-aligned list stood
+  alone on a line above the text, live and in the HTML export (so in the
+  PDF too). The inside-mode rules now reach through the zoom: live, the
+  zoom's layout wrapper, its `.stx-zoom` block and its first visible element
+  go inline (`stx_global.css`); in the export, the list script inlines the
+  `.stx-zoom` containers around the item's first element. The text keeps its
+  zoomed size, a nested list after the zoomed title stays below it, and
+  left-aligned lists are unchanged.
+
 ## [0.7.51] — 2026-10-17 — Export images that load as the reader nears them, Contents links in long sections
 
 ### Changed

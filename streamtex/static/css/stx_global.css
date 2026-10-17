@@ -240,6 +240,20 @@
 [data-testid="stVerticalBlock"].stx-list-item--inside [data-testid="stElementContainer"]:first-child > [data-testid="stMarkdown"] > [data-testid="stMarkdownContainer"] > p {
   display: inline;
 }
+/* The same when the item's first cell is an st_zoom container (#112): the
+ * zoom's layout wrapper and its `.stx-zoom` block join the line, then its
+ * first visible element (the one after the hidden zoom marker cell).  An
+ * inline box keeps its `zoom`, so the text keeps its size. */
+[data-testid="stVerticalBlock"].stx-list-item--inside > [data-testid="stVerticalBlock"] > [data-testid="stLayoutWrapper"]:first-child:has(> .stx-zoom),
+[data-testid="stVerticalBlock"].stx-list-item--inside > [data-testid="stLayoutWrapper"] > [data-testid="stVerticalBlock"] > [data-testid="stLayoutWrapper"]:first-child:has(> .stx-zoom),
+[data-testid="stVerticalBlock"].stx-list-item--inside [data-testid="stLayoutWrapper"]:first-child > .stx-zoom,
+[data-testid="stVerticalBlock"].stx-list-item--inside [data-testid="stLayoutWrapper"]:first-child > .stx-zoom > .stx-marker-cell + [data-testid="stElementContainer"],
+[data-testid="stVerticalBlock"].stx-list-item--inside [data-testid="stLayoutWrapper"]:first-child > .stx-zoom > .stx-marker-cell + [data-testid="stElementContainer"] > [data-testid="stHtml"],
+[data-testid="stVerticalBlock"].stx-list-item--inside [data-testid="stLayoutWrapper"]:first-child > .stx-zoom > .stx-marker-cell + [data-testid="stElementContainer"] > [data-testid="stMarkdown"],
+[data-testid="stVerticalBlock"].stx-list-item--inside [data-testid="stLayoutWrapper"]:first-child > .stx-zoom > .stx-marker-cell + [data-testid="stElementContainer"] > [data-testid="stMarkdown"] > [data-testid="stMarkdownContainer"],
+[data-testid="stVerticalBlock"].stx-list-item--inside [data-testid="stLayoutWrapper"]:first-child > .stx-zoom > .stx-marker-cell + [data-testid="stElementContainer"] > [data-testid="stMarkdown"] > [data-testid="stMarkdownContainer"] > p {
+  display: inline;
+}
 
 /* ============================================================================
  * Phase 3 (0.6.14) — st_grid / st_zoom / _render_md_body

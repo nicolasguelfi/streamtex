@@ -7,8 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`st_video(width=, align=)` and `st_audio(width=, align=)`** (#126). A
+  player can be sized from the call: `width` is pixels (`int`) or a CSS
+  length (`"50%"` of the parent, `"60vw"`, `"800px"`), `align` places a
+  narrower player (`"center"` by default, `"left"`, `"right"`). The same box
+  is drawn live (an `st_block` around the stretched native player) and in
+  the HTML export (its wrapper; the video, the audio and the YouTube frame
+  fill it, the frame at 16:9). Without `width`, nothing changes. The
+  `st_zoom` docstring now says that zoom does not shrink fluid-width
+  elements (video, full-width image, percentage grid column). Measured at
+  1920 × 1080: 50% is half the content width and centred, 800 px is 800 px,
+  `align="left"` starts at the left edge, live and in the export.
+
 ### Fixed
 
+- **`st_video(autoplay=True)` without `muted` starts, muted** (#35).
+  Browsers only play a muted video on their own: such a video stayed paused
+  at 0:00, live and in the export, with no message. It is now muted, with
+  one warning in the log; the reader can turn the sound on. A muted
+  autoplay already started (measured in Chromium with Streamlit 1.60).
 - **A centred list keeps its bullet on the line of a zoomed item** (#112,
   point 2). When an item's text was wrapped in `st_zoom` (a common way to
   enlarge a list title), the bullet of a centred or right-aligned list stood

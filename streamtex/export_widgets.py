@@ -264,21 +264,91 @@ def _source_tag(src: str, mime: str) -> str:
     return f'<source src="{src}"{type_attr}>'
 
 
-def st_audio(data, **kw):
-    """Display audio with ``st.audio()`` and export an ``<audio>`` tag."""
+_ALIGN_MARGINS = {"center": "margin-left:auto;margin-right:auto;",
+                  "left": "margin-right:auto;", "right": "margin-left:auto;"}
+_CSS_LENGTH_RE = re.compile(r"^\d+(\.\d+)?(px|%|vw|vh|em|rem)$")
+_warned_autoplay = False
+
+
+def _media_box(width, align: str):
+    """The st_block that sizes and places a media player (#126), or None.
+
+    *width* is None (the full width, no box), pixels (``int``) or a CSS length
+    (``"50%"``, ``"60vw"``, ``"800px"``); *align* places the narrower box. The
+    player stretches inside it, live and in the export (the block's wrapper).
+    """
+    if align not in _ALIGN_MARGINS:
+        raise ValueError(f"align must be 'center', 'left' or 'right', not {align!r}")
+    if width is None:
+        return None
+    if isinstance(width, bool) or not isinstance(width, (int, str)):
+        raise ValueError(f"width must be pixels (int) or a CSS length such as '50%', not {width!r}")
+    length = f"{width}px" if isinstance(width, int) else width.strip()
+    if not _CSS_LENGTH_RE.match(length):
+        raise ValueError(f"width must be pixels (int) or a CSS length such as '50%', '60vw', '800px', not {width!r}")
+    from .container import st_block
+    from .styles import Style
+    return st_block(Style(f"width:{length};max-width:100%;{_ALIGN_MARGINS[align]}", "stx_media_box"))
+
+
+def st_audio(data, *, width: int | str | None = None, align: str = "center", **kw) -> None:
+    """Display audio with ``st.audio()`` and export an ``<audio>`` tag.
+
+    *width* / *align*: as for :func:`st_video` (#126).
+    """
+    box = _media_box(width, align)
+    if box is None:
+        _audio(data, **kw)
+        return
+    with box:
+        _audio(data, _boxed=True, **kw)
+
+
+def _audio(data, _boxed: bool = False, **kw):
     st.audio(data, **kw)
     if is_export_active():
         fmt = kw.get("format")
         src, mime = _media_src(data, _AUDIO_MIME, fmt)
+        style = ' style="width:100%"' if _boxed else ""   # fills its sized box (#126)
         export_append(
-            f'<audio controls class="stx-media">'
+            f'<audio controls class="stx-media"{style}>'
             f'{_source_tag(src, mime)}'
             f'Your browser does not support the audio element.</audio>'
         )
 
 
-def st_video(data, **kw):
-    """Display video with ``st.video()`` and export a ``<video>`` or YouTube embed."""
+def st_video(data, *, width: int | str | None = None, align: str = "center", **kw) -> None:
+    """Display video with ``st.video()`` and export a ``<video>`` or YouTube embed.
+
+    *width* (#126): None (the full width of the container, as before), pixels
+    (``int``) or a CSS length (``"50%"`` of the parent, ``"60vw"``, ``"800px"``);
+    the video keeps its aspect ratio. *align* (``"center"``, ``"left"``,
+    ``"right"``) places a video narrower than its container. The same box is
+    drawn live and in the HTML export. ``st_zoom`` does not shrink a video,
+    which fills its container: give it a width.
+
+    ``autoplay=True`` without ``muted`` cannot start: browsers only play a
+    muted video on their own. The video is then muted (one warning in the
+    log); the reader can turn the sound on with the controls (#35).
+    """
+    global _warned_autoplay
+    if kw.get("autoplay") and not kw.get("muted"):
+        kw["muted"] = True
+        if not _warned_autoplay:
+            _warned_autoplay = True
+            import logging
+            logging.getLogger(__name__).warning(
+                "st_video(autoplay=True) needs muted=True: browsers block a video that plays "
+                "sound on its own. The video starts muted; the reader can turn the sound on.")
+    box = _media_box(width, align)
+    if box is None:
+        _video(data, **kw)
+        return
+    with box:
+        _video(data, _boxed=True, **kw)
+
+
+def _video(data, _boxed: bool = False, **kw):
     st.video(data, **kw)
     if is_export_active():
         fmt = kw.get("format")
@@ -287,8 +357,11 @@ def st_video(data, **kw):
             yt = _YOUTUBE_RE.search(data)
             if yt:
                 vid = yt.group(1)
+                # in a sized box (#126) the frame fills it at 16:9
+                size = ('style="width:100%;height:auto;aspect-ratio:16/9" ' if _boxed
+                        else 'width="560" height="315" ')
                 export_append(
-                    f'<div class="stx-media"><iframe width="560" height="315" '
+                    f'<div class="stx-media"><iframe {size}'
                     f'src="https://www.youtube.com/embed/{vid}" '
                     f'frameborder="0" allowfullscreen></iframe></div>'
                 )

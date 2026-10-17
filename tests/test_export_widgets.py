@@ -438,3 +438,70 @@ class TestStVideo:
         reset_export_buffer(ExportConfig(enabled=True))
         st_video("https://example.com/video?id=42", format="video/webm")
         assert 'type="video/webm"' in generate_export_html()
+
+
+# ---------------------------------------------------------------------------
+# st_video / st_audio: width and align (#126), autoplay without muted (#35)
+# ---------------------------------------------------------------------------
+
+@patch("streamtex.export_widgets.st")
+class TestMediaWidthAndAutoplay:
+    def setup_method(self):
+        import streamtex.export_widgets as ew
+        export_mod._buffer = None
+        ew._warned_autoplay = False
+
+    def teardown_method(self):
+        export_mod._buffer = None
+
+    def _html(self, call):
+        reset_export_buffer(ExportConfig(enabled=True))
+        call()
+        return generate_export_html()
+
+    def test_autoplay_without_muted_is_muted_once_with_a_warning(self, mock_st, caplog):
+        import logging
+        with caplog.at_level(logging.WARNING, logger="streamtex.export_widgets"):
+            html = self._html(lambda: (st_video("https://example.com/a.mp4", autoplay=True),
+                                       st_video("https://example.com/b.mp4", autoplay=True)))
+        assert mock_st.video.call_args_list[0].kwargs == {"autoplay": True, "muted": True}
+        assert html.count("autoplay playsinline muted") == 2
+        assert sum("needs muted=True" in r.message for r in caplog.records) == 1
+
+    def test_muted_autoplay_unchanged(self, mock_st, caplog):
+        st_video("https://example.com/a.mp4", autoplay=True, muted=True)
+        mock_st.video.assert_called_once_with("https://example.com/a.mp4", autoplay=True, muted=True)
+        assert "needs muted" not in caplog.text
+
+    def test_no_width_keeps_the_full_width_output(self, mock_st):
+        html = self._html(lambda: st_video("https://example.com/v.mp4"))
+        assert '<div class="stx-block"' not in html and 'style="width:100%;max-width:100%"' in html
+
+    @pytest.mark.parametrize("width,align,css", [
+        ("50%", "center", "width:50%;max-width:100%;margin-left:auto;margin-right:auto;"),
+        (800, "center", "width:800px;max-width:100%;margin-left:auto;margin-right:auto;"),
+        ("60vw", "left", "width:60vw;max-width:100%;margin-right:auto;"),
+        ("40%", "right", "width:40%;max-width:100%;margin-left:auto;"),
+    ])
+    def test_width_draws_a_sized_box(self, mock_st, width, align, css):
+        html = self._html(lambda: st_video("https://example.com/v.mp4", width=width, align=align))
+        box = html.index(css)
+        assert html.index("<video", box) > box
+        mock_st.video.assert_called_once_with("https://example.com/v.mp4")
+
+    def test_youtube_in_a_box_fills_it(self, mock_st):
+        html = self._html(lambda: st_video("https://youtu.be/dQw4w9WgXcQ", width="50%"))
+        assert 'style="width:100%;height:auto;aspect-ratio:16/9"' in html
+        assert 'width="560"' not in html
+
+    def test_audio_in_a_box_fills_it(self, mock_st):
+        html = self._html(lambda: st_audio("https://example.com/talk.mp3", width="30%", align="left"))
+        assert "width:30%;max-width:100%;margin-right:auto;" in html
+        assert '<audio controls class="stx-media" style="width:100%">' in html
+        mock_st.audio.assert_called_once_with("https://example.com/talk.mp3")
+
+    @pytest.mark.parametrize("kw", [{"width": "half"}, {"width": "50"}, {"width": True},
+                                    {"width": 1.5}, {"align": "middle"}])
+    def test_bad_width_or_align_is_refused(self, mock_st, kw):
+        with pytest.raises(ValueError):
+            st_video("https://example.com/v.mp4", **kw)

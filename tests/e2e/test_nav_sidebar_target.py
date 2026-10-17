@@ -104,6 +104,32 @@ def test_cross_page_sidebar_link_lands_on_its_slide(deck_url, start, tab, entry,
             browser.close()
 
 
+@pytest.mark.parametrize("start", [1, 22])
+def test_heading_far_down_a_tall_slide_is_shown(deck_url, start):
+    """A Contents heading 2400 px down its slide (#131): its slide start would leave
+    it below the screen, so the link shows the heading itself; the counter shows
+    its slide, and stays there."""
+    with playwright.sync_playwright() as p:
+        browser = launch_browser(p)
+        page = browser.new_context(viewport=VIEWPORT).new_page()
+        page.set_default_timeout(60_000)
+        try:
+            wait_ready(page, f"{deck_url}/?slide={start}")
+            select_tab(page, "Contents")
+            href = page.evaluate(CLICK_ENTRY, "far eighteen")
+            assert href and href.startswith("#stx-goto-"), href
+            _wait_slide(page, 18)
+            page.wait_for_function(
+                """() => { const el = [...document.querySelectorAll('div')].find(
+                     d => d.children.length === 0 && (d.textContent || '').trim() === 'far eighteen');
+                   if (!el) return false; const r = el.getBoundingClientRect();
+                   return r.top >= -5 && r.bottom <= window.innerHeight; }""", timeout=10_000)
+            page.wait_for_timeout(1500)                 # the tracker must not take it back
+            assert _slide(page) == 18
+        finally:
+            browser.close()
+
+
 def test_link_clicked_while_a_page_opens_keeps_its_slide(deck_url):
     """A link to page C clicked while page B is still opening is queued with its
     marker: the reader ends on that slide of page C, not on its first."""

@@ -2,8 +2,8 @@
 
 Deck (``nav_sidebar_target_app``): pages of 1, 20 and 3 slides (slides 1 |
 2-21 | 22-24); every slide's marker is ``s<n>``; the Contents tab lists
-« page a » (slide 1), « page b » (slide 2), « detail twelve » (slide 12) and
-« page c » (slide 22). At every step, each tab has exactly one entry in cyan:
+« page a » (slide 1), « page b » (slide 2), « detail twelve » (slide 12),
+« far eighteen » (slide 18, far down a tall slide) and « page c » (slide 22). At every step, each tab has exactly one entry in cyan:
 the Markers row of the bar's slide and the heading in force on it.
 
 The gate is a headed run, where Streamlit is as slow as for a reader (the
@@ -48,7 +48,8 @@ COUNTER_JS = """() => {
 
 
 def _heading(n: int) -> str:
-    return "page a" if n == 1 else "page b" if n < 12 else "detail twelve" if n < 22 else "page c"
+    return ("page a" if n == 1 else "page b" if n < 12 else "detail twelve" if n < 18
+            else "far eighteen" if n < 22 else "page c")
 
 
 def _expected(n: int) -> list[str]:

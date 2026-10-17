@@ -24,6 +24,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   arrow navigation and Contents links land as before, on a slow network
   too and without the browser's scroll anchoring.
 
+### Fixed
+
+- **A Contents link to another page shows its heading in a long section**
+  (#131). In a paginated book, the link landed on the start of the
+  heading's slide (#127); where only chapters carry markers (the docs
+  manuals), that slide is a whole chapter and the heading stayed below the
+  screen for about one link in two (52/102 and 99/186 on two manuals). The
+  rule of the HTML export (#128) now applies: the slide start while the
+  heading stays on screen, else the heading itself. The counter and the
+  sidebar highlight keep the heading's slide, and the bar's scroll tracker
+  waits until the reader's first gesture (15 s at most). The sidebar link
+  carries the heading (`data-stx-heading`); decks whose slides fit the
+  screen land as before. Measured on the two manuals: every heading on
+  screen after the click.
+
 ## [0.7.50] — 2026-10-17 — Sidebar highlight that follows the slide, export Contents links, pack templates
 
 ### Fixed

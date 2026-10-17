@@ -2745,7 +2745,9 @@ def _build_paginated_sidebar(cache, current_page, total, toc_config, marker_conf
                 link = f'<a href="#{entry["key_anchor"]}">{title_esc}</a>'
             else:
                 href = _goto_href(page_idx, _toc_target_marker(entry, cache_markers))
-                link = f'<a href="{href}" class="stx-page-link">{title_esc}</a>'
+                # the heading, for a long slide whose start would leave it below the screen (#131)
+                link = (f'<a href="{href}" class="stx-page-link" '
+                        f'data-stx-heading="{entry["key_anchor"]}">{title_esc}</a>')
             block_attr = f' data-stx-block="{page_idx}"' if show_search else ''
             toc_parts.append(
                 f'<div data-stx-nav="toc{pos}"{block_attr} style="overflow:hidden;'
@@ -3202,6 +3204,8 @@ def _inject_paginated_nav_js(current_page, total, marker_config,
         var target = match[2] !== undefined ? parseInt(match[2], 10)
             : (pageFirstMarker[p] !== undefined ? pageFirstMarker[p] : null);
         hostWin._stxMarkerStartIdx = target;
+        /* a Contents heading: the bar shows it if its slide start would leave it below the screen (#131) */
+        hostWin._stxLandingHeading = a.getAttribute('data-stx-heading') || null;
         navigateToPage(p);
         /* a rerun in flight queued the page: queue its marker with it */
         if (hostWin._stxPendingPage === p) hostWin._stxPendingMarker = target;

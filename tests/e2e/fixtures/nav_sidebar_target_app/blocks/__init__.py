@@ -1,7 +1,8 @@
 """Three pages of 1, 20 and 3 slides (slides 1 | 2-21 | 22-24).
 
 Each slide's marker is ``s<n>``; each page's first slide carries a level-1
-heading; slide 12 carries the level-2 heading ``detail twelve``.
+heading; slide 12 carries the level-2 heading ``detail twelve``; slide 18 is
+taller than the screen, its level-2 heading ``far eighteen`` 2400 px down (#131).
 """
 from __future__ import annotations
 
@@ -14,6 +15,7 @@ from streamtex.styles import Style
 _PAGE = Style("background:#0b1020; padding:24px; color:#f0f0f0; min-height:100vh;", "nav_page")
 _H1 = Style("color:#FFD700; font-size:26pt; font-weight:bold;", "nav_h1")
 _H2 = Style("color:#9fd3ff; font-size:18pt;", "nav_h2")
+_TALL = Style("min-height:2400px;", "nav_tall")
 
 
 def _page(pid: str, first: int, n: int):
@@ -28,6 +30,10 @@ def _page(pid: str, first: int, n: int):
                          toc_lvl="1" if k == 0 else None, label=f"page {pid}")
                 if num == 12:
                     st_write(_H2, "detail twelve", tag=t.div, toc_lvl="2")
+                if num == 18:
+                    with st_block(_TALL):
+                        st_write("a long section", tag=t.div)
+                    st_write(_H2, "far eighteen", tag=t.div, toc_lvl="2")
 
     return build
 

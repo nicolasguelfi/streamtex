@@ -1584,11 +1584,39 @@ __ROLES_JS__
     obs.observe(hostDoc.body, { childList: true, subtree: true });
     var scanInterval = setInterval(scanIframes, 2000);
 
+    /* --- Landing on a Contents heading of another page (#131) ---
+       The slide start is shown while the heading stays on screen, else the
+       heading itself; the counter keeps the heading's slide and the scroll
+       tracker waits until the reader's first gesture (or HOLD_MS). */
+    var HOLD_MS = 15000, landingUntil = 0;
+    function landingHeld() { return Date.now() < landingUntil; }
+    function releaseLanding() { landingUntil = 0; }
+    ['wheel', 'touchstart', 'mousedown', 'keydown'].forEach(function(type) {
+        hostDoc.addEventListener(type, releaseLanding, { capture: true, passive: true });
+    });
+    function viewHeight() {
+        var sc = hostDoc.querySelector('.stMain');
+        return (sc && sc.scrollHeight > sc.clientHeight) ? sc.clientHeight : hostWin.innerHeight;
+    }
+    function landOnHeading(markerEl, anchor, since) {
+        var h = hostDoc.getElementById(anchor);
+        if (!h) {                                    /* not rendered yet */
+            if (Date.now() - since < 3000) {
+                setTimeout(function() { landOnHeading(markerEl, anchor, since); }, 200);
+            }
+            return;
+        }
+        var below = h.getBoundingClientRect().bottom - markerEl.getBoundingClientRect().top + OFFSET;
+        if (below > viewHeight()) scrollToTarget(h);
+    }
+
     /* --- Scroll tracker --- */
     var scrollTimer = null;
     function scrollHandler() {
         clearTimeout(scrollTimer);
+        if (landingHeld()) return;
         scrollTimer = setTimeout(function() {
+            if (landingHeld()) return;
             var best = -1, bestDist = Infinity;
             for (var i = 0; i < markers.length; i++) {
                 var t = findMarkerElement(markers[i].anchor);
@@ -1616,6 +1644,9 @@ __ROLES_JS__
         clearTimeout(scrollTimer);
         clearTimeout(initTimer);
         scrollTarget.removeEventListener('scroll', scrollHandler);
+        ['wheel', 'touchstart', 'mousedown', 'keydown'].forEach(function(type) {
+            hostDoc.removeEventListener(type, releaseLanding, { capture: true });
+        });
         var el = hostDoc.getElementById('streamtex-marker-nav');
         if (el) el.remove();
         var ms = hostDoc.getElementById('stx-marker-responsive');
@@ -1646,6 +1677,8 @@ __ROLES_JS__
         if (startIdx < 0) startIdx = markers.length + startIdx;
         startIdx = Math.max(0, Math.min(startIdx, markers.length - 1));
         hostWin._stxMarkerStartIdx = null;
+        var heading = hostWin._stxLandingHeading || null;
+        hostWin._stxLandingHeading = null;
 
         /* Scroll to the target marker if it is in the DOM (same page).
            Without this, doScrollReset() in book.py forces the viewport
@@ -1658,6 +1691,10 @@ __ROLES_JS__
             _navigating = true;
             scrollToTarget(target);
             setTimeout(function() { _navigating = false; }, 600);
+            if (heading) {
+                landingUntil = Date.now() + HOLD_MS;
+                landOnHeading(target, heading, Date.now());
+            }
         } else {
             /* Target marker not in DOM (cross-page or iframes not loaded).
                Detect nearest visible marker to sync with actual viewport. */

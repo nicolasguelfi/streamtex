@@ -679,6 +679,54 @@ class TestFormatEntry:
             assert len(result) > 0
 
 
+class TestFormatMissingAuthorOrYear:
+    """An entry without author and/or year (a web page: @online with title and url)
+    formats in every style; APA raised IndexError when both were missing."""
+
+    URL = "https://example.org/page"
+    LINKED = (BibFormat.APA, BibFormat.IEEE)     # the styles that print the url / DOI
+
+    def _entry(self, extra=""):
+        return parse_bibtex_string(f"@online{{k, title={{Une page}}, url={{{self.URL}}}{extra}}}")[0]
+
+    @pytest.mark.parametrize("fmt", list(BibFormat))
+    def test_no_author_no_year(self, fmt):
+        result = format_entry(self._entry(), fmt, 1)
+        assert "Une page" in result
+        if fmt in self.LINKED:
+            assert result.index("Une page") < result.index(self.URL)
+
+    @pytest.mark.parametrize("fmt", list(BibFormat))
+    def test_no_author_no_year_with_doi(self, fmt):
+        result = format_entry(self._entry(", doi={10.1234/x}"), fmt, 1)
+        assert "Une page" in result
+        if fmt in self.LINKED:
+            assert result.index("Une page") < result.index("10.1234/x")
+
+    @pytest.mark.parametrize("fmt", list(BibFormat))
+    def test_author_without_year(self, fmt):
+        result = format_entry(self._entry(", author={Doe, Jane}"), fmt, 1)
+        assert "Une page" in result and "Doe" in result
+        if fmt in self.LINKED:
+            assert result.index("Doe") < result.index("Une page") < result.index(self.URL)
+
+    @pytest.mark.parametrize("fmt", list(BibFormat))
+    def test_year_without_author(self, fmt):
+        result = format_entry(self._entry(", year={2024}"), fmt, 1)
+        assert "Une page" in result
+        if fmt is not BibFormat.MLA:             # MLA prints the year with a journal only
+            assert "2024" in result
+        if fmt in self.LINKED:
+            assert result.index("Une page") < result.index(self.URL)
+
+    def test_apa_shapes(self):
+        assert format_entry(self._entry(), BibFormat.APA).startswith("<i>Une page</i>.")
+        assert format_entry(self._entry(", author={Doe, Jane}"), BibFormat.APA).startswith(
+            "Doe, Jane. <i>Une page</i>.")
+        assert format_entry(self._entry(", year={2024}"), BibFormat.APA).startswith(
+            "(2024). <i>Une page</i>.")
+
+
 # ===================================================================
 # cite()
 # ===================================================================

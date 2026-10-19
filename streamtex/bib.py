@@ -1162,8 +1162,8 @@ def _format_apa(entry: BibEntry) -> str:
 
     if entry.year:
         parts.append(f"({entry.year}).")
-    else:
-        parts[-1] += "." if parts else ""
+    elif parts:
+        parts[-1] += "."
 
     if entry.title:
         if entry.entry_type in ("article", "inproceedings", "conference"):

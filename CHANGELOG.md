@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **APA formats an entry without author and year** (for example an `@online`
+  web page cited by its title and address). `_format_apa` evaluated
+  `parts[-1]` on an empty list and raised `IndexError: list index out of
+  range`; the entry now renders as its title followed by its address or DOI.
+  MLA, IEEE, Chicago and Harvard already rendered it (#132).
+
 ## [0.7.53] — 2026-10-17 — Autoplay video with muted=False keeps its sound
 
 ### Fixed

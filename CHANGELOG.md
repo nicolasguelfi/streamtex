@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **The login service states its version and interface** (#135).
+  `streamtex/deploy/stx_auth.py` is also copied onto servers by projects
+  that publish with their own tooling. It now carries `STX_VERSION` (the
+  library release) and `AUTH_INTERFACE = 1` as plain constants, returns
+  both in an `X-Stx-Auth` header on `GET /check` (nginx's auth sub-request,
+  never shown to visitors), and documents its contract in the module
+  docstring: request and response headers, environment variables, record
+  files and their grammar, server key, cookie and token. A test pins that
+  contract to its number; any change bumps `AUTH_INTERFACE` and is announced
+  here.
+
 ### Changed
 
 - **`stx export html` stops when a block raises** (#134). It used to exit

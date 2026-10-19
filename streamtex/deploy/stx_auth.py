@@ -42,6 +42,25 @@ parsed once per change, and concurrent scrypt computations are capped.
 
 Run with ``python3 stx_auth.py``; configured by ``STX_AUTH_ROOT``,
 ``STX_AUTH_PORT`` and ``STX_AUTH_SESSION_HOURS``.
+
+Interface (#135). Projects copy this file onto their servers, so what it
+expects from nginx and from the tooling that writes the record files is a
+contract, numbered by ``AUTH_INTERFACE``:
+
+- the request headers above (``X-Stx-Site``, ``X-Stx-Cookie``,
+  ``X-Stx-Login``, ``X-Stx-Home``, ``X-Original-URI``,
+  ``X-Forwarded-Prefix``) and the response header ``X-Stx-Label``;
+- the environment variables above;
+- the record files ``<root>/sites/<site>/pass``, their line grammar and the
+  scrypt record format; the server key ``<root>/conf/session.key``;
+- the cookie ``stx_session_<site>`` and its token
+  ``<expiry>.<label>.<generation>.<signature>``.
+
+Any change to one of them bumps ``AUTH_INTERFACE`` and is announced in the
+CHANGELOG. ``STX_VERSION`` is the library release the file comes from. Both
+are plain constants (a copied file can be checked with ``grep``), and
+``GET /check`` returns them in ``X-Stx-Auth`` (``<interface> <version>``):
+nginx's auth sub-request keeps that header from the visitor.
 """
 
 from __future__ import annotations
@@ -59,6 +78,10 @@ from datetime import date, datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
+
+#: The library release this file ships with, and its interface number (#135).
+STX_VERSION = "0.7.53"
+AUTH_INTERFACE = 1
 
 DEFAULT_ROOT = "/var/lib/stx-auth"
 DEFAULT_PORT = 9100
@@ -426,12 +449,13 @@ class Handler(BaseHTTPRequestHandler):
         site = self.site()
         records = self.server.store.get(site)
         if path == "/check":
+            stamp = {"X-Stx-Auth": f"{AUTH_INTERFACE} {STX_VERSION}"}
             if records.open:
-                return self.send(204, headers={"X-Stx-Label": "open"})
+                return self.send(204, headers={**stamp, "X-Stx-Label": "open"})
             entry = check_token(self.server.key, site, records, self.token())
             if entry is None:
-                return self.send(401)
-            return self.send(204, headers={"X-Stx-Label": entry.label})
+                return self.send(401, headers=stamp)
+            return self.send(204, headers={**stamp, "X-Stx-Label": entry.label})
         if path == "/login":
             return self.form(safe_path(self.original_uri(), self.home()), error=False)
         return self.send(404)

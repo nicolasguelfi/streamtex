@@ -268,6 +268,7 @@ def warmup(path):
         # Enable warmup mode in streamtex.book
         from streamtex import book as _book_mod
         _book_mod._warmup_mode = True
+        _book_mod._warmup_errors.clear()
 
         t0 = time.time()
         try:

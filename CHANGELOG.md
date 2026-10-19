@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **`stx export html` stops when a block raises** (#134). It used to exit
+  with status 0, log one "Warmup: block … raised — skipping" line and write
+  a page that kept the part of the block drawn before the error, so a
+  publishing chain uploaded an incomplete page without knowing it. Now each
+  failing block is named with its error (the innermost included block),
+  nothing is written and the exit status is 1. `--keep-going` writes the
+  export anyway and ends with the list of blocks left incomplete.
+  **A project that exported with a broken block will now see its export
+  fail**: fix the block, or pass `--keep-going`.
+
 ## [0.7.53] — 2026-10-17 — Autoplay video with muted=False keeps its sound
 
 ### Fixed

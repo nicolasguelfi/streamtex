@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.54] — 2026-10-19 — Export stops on a failing block, APA web pages, login service version, multi-module deploys
+
 ### Added
 
 - **The login service states its version and interface** (#135).

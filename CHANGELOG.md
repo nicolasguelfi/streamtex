@@ -20,6 +20,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   contract to its number; any change bumps `AUTH_INTERFACE` and is announced
   here.
 
+### Removed
+
+- **Leftovers of the old manuals deployment** (#102). The repository's root
+  `Dockerfile` and `.dockerignore` built a manual from
+  `documentation/manuals/`, which moved to `streamtex-docs` long ago (the
+  manuals deploy with their own workflow; projects use the files written by
+  `stx deploy`). `discover_manuals`, `derive_service_name` and
+  `parse_env_vars` in `streamtex.cli.deploy_cmd` were used only by their
+  tests.
+
 ### Changed
 
 - **`stx export html` stops when a block raises** (#134). It used to exit

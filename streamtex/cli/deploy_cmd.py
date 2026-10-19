@@ -831,57 +831,6 @@ def detect_git_remote(project_path: str) -> str | None:
     return url
 
 
-def discover_manuals(project_path: str) -> list[str]:
-    """Scan ``manuals/`` for ``stx_manual_*`` / ``stx_manuals_*`` directories.
-
-    Returns sorted relative paths (e.g. ``manuals/stx_manual_intro``).
-    """
-    manuals_dir = os.path.join(project_path, "manuals")
-    if not os.path.isdir(manuals_dir):
-        return []
-
-    found: list[str] = []
-    for entry in sorted(os.listdir(manuals_dir)):
-        full = os.path.join(manuals_dir, entry)
-        if os.path.isdir(full) and (
-            entry.startswith("stx_manual_") or entry.startswith("stx_manuals_")
-        ):
-            found.append(f"manuals/{entry}")
-    return found
-
-
-def derive_service_name(manual_path: str) -> str:
-    """Derive a Coolify service name from a manual directory path.
-
-    ``manuals/stx_manual_intro`` → ``streamtex-intro``
-    ``manuals/stx_manuals_collection`` → ``streamtex-collection``
-    """
-    basename = os.path.basename(manual_path)
-    for prefix in ("stx_manuals_", "stx_manual_"):
-        if basename.startswith(prefix):
-            return f"streamtex-{basename[len(prefix):]}"
-    return basename
-
-
-def parse_env_vars(env_list: tuple[str, ...]) -> list[tuple[str, str]]:
-    """Parse ``KEY=VALUE`` pairs from CLI ``--env`` options.
-
-    Uses :func:`str.partition` so values containing ``=`` are preserved.
-
-    Raises:
-        click.BadParameter: if a value has no ``=``.
-    """
-    result: list[tuple[str, str]] = []
-    for item in env_list:
-        key, sep, value = item.partition("=")
-        if not sep:
-            raise click.BadParameter(
-                f"Invalid format: '{item}'. Expected KEY=VALUE."
-            )
-        result.append((key, value))
-    return result
-
-
 # ---------------------------------------------------------------------------
 # Hugging Face helpers
 # ---------------------------------------------------------------------------

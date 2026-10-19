@@ -545,6 +545,57 @@ def test_detect_git_remote_none_on_failure(tmp_path):
 
 
 # ---------------------------------------------------------------------------
+# Multi-module projects: FOLDER and default subdomain (#101)
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def repo(tmp_path):
+    import subprocess
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    for rel in ("modules/x", "trainings/CHAT1D/slides", "manuals/stx_manual_intro"):
+        (tmp_path / rel).mkdir(parents=True)
+    return tmp_path
+
+
+@pytest.mark.parametrize("rel, folder, sub", [
+    ("modules/x", "modules/x", "x"),
+    ("trainings/CHAT1D/slides", "trainings/CHAT1D/slides", "chat1d-slides"),
+    ("manuals/stx_manual_intro", "manuals/stx_manual_intro", "stx-manual-intro"),
+])
+def test_module_folder_and_subdomain(repo, rel, folder, sub):
+    from streamtex.cli.deploy_cmd import default_subdomain, module_folder
+    p = str(repo / rel)
+    assert module_folder(p) == folder
+    assert default_subdomain(p, module_folder(p)) == sub
+
+
+def test_repository_root_has_no_folder(repo):
+    from streamtex.cli.deploy_cmd import default_subdomain, module_folder
+    assert module_folder(str(repo)) is None
+    assert default_subdomain(str(repo), None) == default_subdomain(str(repo), None).lower()
+    assert default_subdomain(str(repo), None)
+
+
+def test_outside_git_has_no_folder(tmp_path):
+    from streamtex.cli.deploy_cmd import module_folder
+    assert module_folder(str(tmp_path)) is None
+
+
+def test_subdomain_is_a_valid_label():
+    from streamtex.cli.deploy_cmd import default_subdomain
+    assert default_subdomain("/r/My Deck_2", None) == "my-deck-2"
+    assert default_subdomain("/r", "a/" + "b" * 80) == "b" * 63
+
+
+def test_hetzner_and_update_take_a_timeout():
+    from streamtex.cli.deploy_cmd import hetzner_cmd, update_cmd
+    for cmd in (hetzner_cmd, update_cmd):
+        opt = next(o for o in cmd.params if o.name == "timeout")
+        assert opt.default == 300
+
+
+# ---------------------------------------------------------------------------
 # Hugging Face: verify_git_lfs
 # ---------------------------------------------------------------------------
 

@@ -87,6 +87,11 @@ logger = logging.getLogger(__name__)
 # Warmup mode flag — set by CLI ``stx cache warmup`` for headless cache build.
 _warmup_mode = False
 
+#: Blocks that raised during a warmup run, as ``(block, error)`` pairs: the
+#: block is the innermost inclusion that raised. ``stx export html`` reads it
+#: to fail instead of writing a partial page (#134).
+_warmup_errors: list[tuple[str, str]] = []
+
 #: Set by ``stx export html`` for a paginated export (#106): the cache build
 #: marks where each page starts in the export buffer.
 _export_page_sentinels = False
@@ -1784,6 +1789,7 @@ def st_include(block_file_module, *args, markers=True, break_before=False, page=
                 st.markdown(f":red-background[Error in block '{module_name}': {e}]")
             try:
                 e._stx_reported = True
+                e._stx_block = module_name      # the block named by the export (#134)
             except AttributeError:
                 pass
         raise
@@ -2545,9 +2551,10 @@ def _build_page_cache(module_list, toc_config, marker_config, separator,
                             st_include(module, *block_args, **block_kwargs)
                         except IncludeCycleError:
                             raise           # never skipped: the export would miss it (#119)
-                        except Exception:
-                            name = getattr(module, '__name__', str(module))
+                        except Exception as e:
+                            name = getattr(e, "_stx_block", None) or getattr(module, '__name__', str(module))
                             logger.warning("Warmup: block %s raised — skipping.", name)
+                            _warmup_errors.append((name, f"{type(e).__name__}: {e}"))
                     else:
                         st_include(module, *block_args, **block_kwargs)
                 finally:

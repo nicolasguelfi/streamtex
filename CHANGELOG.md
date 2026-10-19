@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **The login service states its version and interface** (#135).
+  `streamtex/deploy/stx_auth.py` is also copied onto servers by projects
+  that publish with their own tooling. It now carries `STX_VERSION` (the
+  library release) and `AUTH_INTERFACE = 1` as plain constants, returns
+  both in an `X-Stx-Auth` header on `GET /check` (nginx's auth sub-request,
+  never shown to visitors), and documents its contract in the module
+  docstring: request and response headers, environment variables, record
+  files and their grammar, server key, cookie and token. A test pins that
+  contract to its number; any change bumps `AUTH_INTERFACE` and is announced
+  here.
+
+### Removed
+
+- **Leftovers of the old manuals deployment** (#102). The repository's root
+  `Dockerfile` and `.dockerignore` built a manual from
+  `documentation/manuals/`, which moved to `streamtex-docs` long ago (the
+  manuals deploy with their own workflow; projects use the files written by
+  `stx deploy`). `discover_manuals`, `derive_service_name` and
+  `parse_env_vars` in `streamtex.cli.deploy_cmd` were used only by their
+  tests.
+
 ### Fixed
 
 - **APA formats an entry without author and year** (for example an `@online`
@@ -14,6 +37,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `parts[-1]` on an empty list and raised `IndexError: list index out of
   range`; the entry now renders as its title followed by its address or DOI.
   MLA, IEEE, Chicago and Harvard already rendered it (#132).
+- **`stx deploy hetzner` for projects with several modules** (#101). `FOLDER`
+  (the folder the container serves) was set only for `manuals/…`; it is now
+  the deployed folder relative to the repository root whenever that is not
+  the root (`modules/x`, `trainings/CHAT1D/slides`). The proposed subdomain
+  was the folder name, so twelve `trainings/<ID>/slides` decks all proposed
+  `slides`; it is now the folder without its first level
+  (`trainings/CHAT1D/slides` → `chat1d-slides`, `modules/x` → `x`,
+  `manuals/stx_manual_intro` → `stx-manual-intro`, unchanged), still
+  editable at the prompt or with `--subdomain`. `stx deploy hetzner` and
+  `stx deploy update` take `--timeout SECONDS` (default 300) for the health
+  wait, and say that a first start runs the cache warm-up and the HTML
+  export, which can take several minutes on a large module.
+
+### Changed
+
+- **`stx export html` stops when a block raises** (#134). It used to exit
+  with status 0, log one "Warmup: block … raised — skipping" line and write
+  a page that kept the part of the block drawn before the error, so a
+  publishing chain uploaded an incomplete page without knowing it. Now each
+  failing block is named with its error (the innermost included block),
+  nothing is written and the exit status is 1. `--keep-going` writes the
+  export anyway and ends with the list of blocks left incomplete.
+  **A project that exported with a broken block will now see its export
+  fail**: fix the block, or pass `--keep-going`.
 
 ## [0.7.53] — 2026-10-17 — Autoplay video with muted=False keeps its sound
 

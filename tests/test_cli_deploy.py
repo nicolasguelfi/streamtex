@@ -14,15 +14,12 @@ from streamtex.cli.commands import cli
 from streamtex.cli.deploy_cmd import (
     HF_LFS_PATTERNS,
     check_hf_status,
-    derive_service_name,
     detect_git_remote,
-    discover_manuals,
     docker_build,
     find_docker,
     generate_dockerfile,
     generate_hf_frontmatter,
     http_probe,
-    parse_env_vars,
     parse_hf_remote,
     run_preflight,
     setup_hf_remote,
@@ -548,90 +545,54 @@ def test_detect_git_remote_none_on_failure(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# Deploy helpers: discover_manuals
+# Multi-module projects: FOLDER and default subdomain (#101)
 # ---------------------------------------------------------------------------
 
 
-def test_discover_manuals_finds_all(tmp_path):
-    manuals = tmp_path / "manuals"
-    manuals.mkdir()
-    (manuals / "stx_manual_intro").mkdir()
-    (manuals / "stx_manuals_collection").mkdir()
-
-    result = discover_manuals(str(tmp_path))
-    assert len(result) == 2
-    assert "manuals/stx_manuals_collection" in result
-    assert "manuals/stx_manual_intro" in result
+@pytest.fixture
+def repo(tmp_path):
+    import subprocess
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    for rel in ("modules/x", "trainings/CHAT1D/slides", "manuals/stx_manual_intro"):
+        (tmp_path / rel).mkdir(parents=True)
+    return tmp_path
 
 
-def test_discover_manuals_excludes_non_matching(tmp_path):
-    manuals = tmp_path / "manuals"
-    manuals.mkdir()
-    (manuals / "stx_manual_intro").mkdir()
-    (manuals / "shared-blocks").mkdir()
-    (manuals / "README.md").write_text("hi")
-
-    result = discover_manuals(str(tmp_path))
-    assert len(result) == 1
-    assert "manuals/stx_manual_intro" in result
-
-
-def test_discover_manuals_no_dir(tmp_path):
-    result = discover_manuals(str(tmp_path))
-    assert result == []
+@pytest.mark.parametrize("rel, folder, sub", [
+    ("modules/x", "modules/x", "x"),
+    ("trainings/CHAT1D/slides", "trainings/CHAT1D/slides", "chat1d-slides"),
+    ("manuals/stx_manual_intro", "manuals/stx_manual_intro", "stx-manual-intro"),
+])
+def test_module_folder_and_subdomain(repo, rel, folder, sub):
+    from streamtex.cli.deploy_cmd import default_subdomain, module_folder
+    p = str(repo / rel)
+    assert module_folder(p) == folder
+    assert default_subdomain(p, module_folder(p)) == sub
 
 
-def test_discover_manuals_sorted(tmp_path):
-    manuals = tmp_path / "manuals"
-    manuals.mkdir()
-    (manuals / "stx_manual_z").mkdir()
-    (manuals / "stx_manual_a").mkdir()
-    (manuals / "stx_manuals_m").mkdir()
-
-    result = discover_manuals(str(tmp_path))
-    assert result == [
-        "manuals/stx_manual_a",
-        "manuals/stx_manual_z",
-        "manuals/stx_manuals_m",
-    ]
+def test_repository_root_has_no_folder(repo):
+    from streamtex.cli.deploy_cmd import default_subdomain, module_folder
+    assert module_folder(str(repo)) is None
+    assert default_subdomain(str(repo), None) == default_subdomain(str(repo), None).lower()
+    assert default_subdomain(str(repo), None)
 
 
-# ---------------------------------------------------------------------------
-# Deploy helpers: derive_service_name
-# ---------------------------------------------------------------------------
+def test_outside_git_has_no_folder(tmp_path):
+    from streamtex.cli.deploy_cmd import module_folder
+    assert module_folder(str(tmp_path)) is None
 
 
-def test_derive_name_manual():
-    assert derive_service_name("manuals/stx_manual_intro") == "streamtex-intro"
+def test_subdomain_is_a_valid_label():
+    from streamtex.cli.deploy_cmd import default_subdomain
+    assert default_subdomain("/r/My Deck_2", None) == "my-deck-2"
+    assert default_subdomain("/r", "a/" + "b" * 80) == "b" * 63
 
 
-def test_derive_name_manuals():
-    assert derive_service_name("manuals/stx_manuals_collection") == "streamtex-collection"
-
-
-def test_derive_name_fallback():
-    assert derive_service_name("manuals/other") == "other"
-
-
-# ---------------------------------------------------------------------------
-# Deploy helpers: parse_env_vars
-# ---------------------------------------------------------------------------
-
-
-def test_parse_env_valid():
-    result = parse_env_vars(("KEY=val",))
-    assert result == [("KEY", "val")]
-
-
-def test_parse_env_value_with_equals():
-    result = parse_env_vars(("KEY=a=b",))
-    assert result == [("KEY", "a=b")]
-
-
-def test_parse_env_invalid():
-    with pytest.raises(click.BadParameter, match="Invalid format"):
-        parse_env_vars(("NOEQUALS",))
-
+def test_hetzner_and_update_take_a_timeout():
+    from streamtex.cli.deploy_cmd import hetzner_cmd, update_cmd
+    for cmd in (hetzner_cmd, update_cmd):
+        opt = next(o for o in cmd.params if o.name == "timeout")
+        assert opt.default == 300
 
 
 # ---------------------------------------------------------------------------

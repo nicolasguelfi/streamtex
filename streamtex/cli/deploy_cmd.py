@@ -831,55 +831,38 @@ def detect_git_remote(project_path: str) -> str | None:
     return url
 
 
-def discover_manuals(project_path: str) -> list[str]:
-    """Scan ``manuals/`` for ``stx_manual_*`` / ``stx_manuals_*`` directories.
+def module_folder(project_path: str) -> str | None:
+    """The deployed folder relative to its repository root, ``None`` at the root (#101).
 
-    Returns sorted relative paths (e.g. ``manuals/stx_manual_intro``).
+    ``trainings/CHAT1D/slides``, ``modules/x``, ``manuals/stx_manual_intro``:
+    the container's entrypoint serves ``/app/<FOLDER>``.
     """
-    manuals_dir = os.path.join(project_path, "manuals")
-    if not os.path.isdir(manuals_dir):
-        return []
-
-    found: list[str] = []
-    for entry in sorted(os.listdir(manuals_dir)):
-        full = os.path.join(manuals_dir, entry)
-        if os.path.isdir(full) and (
-            entry.startswith("stx_manual_") or entry.startswith("stx_manuals_")
-        ):
-            found.append(f"manuals/{entry}")
-    return found
+    try:
+        top = subprocess.run(["git", "-C", project_path, "rev-parse", "--show-toplevel"],
+                             capture_output=True, text=True, check=True).stdout.strip()
+    except (OSError, subprocess.CalledProcessError):
+        return None
+    rel = os.path.relpath(os.path.realpath(project_path), os.path.realpath(top))
+    return None if rel == "." else rel.replace(os.sep, "/")
 
 
-def derive_service_name(manual_path: str) -> str:
-    """Derive a Coolify service name from a manual directory path.
+def default_subdomain(project_path: str, folder: str | None) -> str:
+    """The proposed subdomain: the folder without its first level (#101).
 
-    ``manuals/stx_manual_intro`` → ``streamtex-intro``
-    ``manuals/stx_manuals_collection`` → ``streamtex-collection``
+    ``trainings/CHAT1D/slides`` -> ``chat1d-slides`` (twelve ``slides`` decks
+    no longer collide), ``modules/x`` -> ``x``, ``manuals/stx_manual_intro``
+    -> ``stx-manual-intro``; a repository root -> its directory name.
     """
-    basename = os.path.basename(manual_path)
-    for prefix in ("stx_manuals_", "stx_manual_"):
-        if basename.startswith(prefix):
-            return f"streamtex-{basename[len(prefix):]}"
-    return basename
+    parts = folder.split("/") if folder else [os.path.basename(os.path.abspath(project_path))]
+    if len(parts) > 1:
+        parts = parts[1:]
+    name = re.sub(r"[^a-z0-9-]+", "-", "-".join(parts).lower())
+    return re.sub(r"-{2,}", "-", name).strip("-")[:63].strip("-") or "app"
 
 
-def parse_env_vars(env_list: tuple[str, ...]) -> list[tuple[str, str]]:
-    """Parse ``KEY=VALUE`` pairs from CLI ``--env`` options.
-
-    Uses :func:`str.partition` so values containing ``=`` are preserved.
-
-    Raises:
-        click.BadParameter: if a value has no ``=``.
-    """
-    result: list[tuple[str, str]] = []
-    for item in env_list:
-        key, sep, value = item.partition("=")
-        if not sep:
-            raise click.BadParameter(
-                f"Invalid format: '{item}'. Expected KEY=VALUE."
-            )
-        result.append((key, value))
-    return result
+#: Said before waiting: the first start of a dual/static-only container exports the HTML.
+_SLOW_START = ("The first start runs the page cache warm-up and the HTML export: a large "
+               "module can take several minutes. --timeout SECONDS waits longer.")
 
 
 # ---------------------------------------------------------------------------
@@ -1856,8 +1839,11 @@ def setup_cmd() -> None:
 @click.option("--serve-mode", type=click.Choice(["dual", "static-only", "streamlit-only"]),
               default="dual",
               help="Service mode: dual (Nginx+Streamlit, default), static-only (Nginx), or streamlit-only (no Nginx).")
+@click.option("--timeout", type=click.IntRange(min=30), default=DEFAULT_DEPLOY_TIMEOUT, show_default=True,
+              help="Seconds to wait for the service to become healthy.")
 @click.option("--yes", is_flag=True, help="Skip confirmation prompts.")
-def hetzner_cmd(path: str, subdomain: str | None, uuid: str | None, serve_mode: str, yes: bool) -> None:
+def hetzner_cmd(path: str, subdomain: str | None, uuid: str | None, serve_mode: str, timeout: int,
+                yes: bool) -> None:
     """Deploy a StreamTeX project to Hetzner via Coolify."""
     from .coolify import CoolifyClient, CoolifyError, load_deploy_state, save_deploy_state
 
@@ -1888,9 +1874,10 @@ def hetzner_cmd(path: str, subdomain: str | None, uuid: str | None, serve_mode: 
     console.print(f"[green]\u2713 Git remote:[/green] {repo}")
 
     # 4. Prompt for subdomain
+    folder = module_folder(p)
     if not subdomain:
         domain = env.get("DEPLOY_DOMAIN", "streamtex.org")
-        default_sub = os.path.basename(p).lower().replace("_", "-").replace(" ", "-")
+        default_sub = default_subdomain(p, folder)
         subdomain = click.prompt(
             f"Subdomain (*.{domain})", default=default_sub
         )
@@ -1951,11 +1938,8 @@ def hetzner_cmd(path: str, subdomain: str | None, uuid: str | None, serve_mode: 
             )
             app_uuid = click.prompt("Coolify application UUID")
 
-    # 7. Set FOLDER env var if in manuals/ subdirectory
-    rel_path = os.path.basename(p)
-    parent = os.path.basename(os.path.dirname(p))
-    if parent == "manuals" or rel_path.startswith("stx_manual"):
-        folder = f"manuals/{rel_path}"
+    # 7. FOLDER: the deployed folder when it is not the repository root (#101)
+    if folder:
         console.print(f"[cyan]Setting FOLDER={folder}[/cyan]")
         try:
             client.set_env_var(app_uuid, "FOLDER", folder)
@@ -1993,8 +1977,10 @@ def hetzner_cmd(path: str, subdomain: str | None, uuid: str | None, serve_mode: 
     console.print(f"[green]\u2713 Rebuild triggered:[/green] {result.message}")
 
     # 10. Wait for healthy
-    console.print("[cyan]Waiting for service to become healthy…[/cyan]")
-    healthy = client.wait_healthy(app_uuid, timeout=DEFAULT_DEPLOY_TIMEOUT)
+    console.print(f"[cyan]Waiting for service to become healthy (up to {timeout}s)…[/cyan]")
+    if serve_mode != "streamlit-only":
+        console.print(f"[dim]{_SLOW_START}[/dim]")
+    healthy = client.wait_healthy(app_uuid, timeout=timeout)
     if healthy:
         console.print("[bold green]\u2713 Service is healthy![/bold green]")
     else:
@@ -2034,8 +2020,10 @@ def hetzner_cmd(path: str, subdomain: str | None, uuid: str | None, serve_mode: 
 @click.option("--serve-mode", type=click.Choice(["dual", "static-only", "streamlit-only"]),
               default=None,
               help="Change service mode before rebuild: dual, static-only, or streamlit-only.")
+@click.option("--timeout", type=click.IntRange(min=30), default=DEFAULT_DEPLOY_TIMEOUT, show_default=True,
+              help="Seconds to wait for the primary to become healthy after a rebuild.")
 @click.option("--yes", is_flag=True, help="Skip confirmation prompts.")
-def update_cmd(target: str | None, quick: bool, serve_mode: str | None, yes: bool) -> None:
+def update_cmd(target: str | None, quick: bool, serve_mode: str | None, timeout: int, yes: bool) -> None:
     """Rebuild or restart a Coolify service.
 
     TARGET can be a service name, subdomain, or Coolify UUID.
@@ -2101,8 +2089,9 @@ def update_cmd(target: str | None, quick: bool, serve_mode: str | None, yes: boo
             console.print(f"[green]\u2713 {action.capitalize()} triggered ({label})[/green]")
 
     if not quick:
-        console.print("[cyan]Waiting for primary to become healthy…[/cyan]")
-        healthy = client.wait_healthy(app_uuid, timeout=DEFAULT_DEPLOY_TIMEOUT)
+        console.print(f"[cyan]Waiting for primary to become healthy (up to {timeout}s)…[/cyan]")
+        console.print(f"[dim]{_SLOW_START}[/dim]")
+        healthy = client.wait_healthy(app_uuid, timeout=timeout)
         if healthy:
             console.print("[bold green]\u2713 Service is healthy![/bold green]")
         else:

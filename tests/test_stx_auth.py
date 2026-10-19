@@ -380,3 +380,75 @@ def test_service_uses_only_the_standard_library():
         elif isinstance(node, ast.ImportFrom) and node.module:
             names.add(node.module.split(".")[0])
     assert names <= set(sys.stdlib_module_names) | {"__future__"}
+
+
+# ---------------------------------------------------------------------------
+# Interface (#135): the file is copied onto servers by projects
+# ---------------------------------------------------------------------------
+
+_REC = "scrypt$16384$8$1$" + "0" * 32 + "$" + "1" * 64
+
+#: What each interface number promises. Changing one of these means a new
+#: number: add a key here, bump AUTH_INTERFACE and say it in the CHANGELOG.
+INTERFACES = {
+    1: {
+        "headers": ["X-Forwarded-Prefix", "X-Original-URI", "X-Stx-Auth", "X-Stx-Cookie",
+                    "X-Stx-Home", "X-Stx-Label", "X-Stx-Login", "X-Stx-Site"],
+        "env": ["STX_AUTH_PORT", "STX_AUTH_ROOT", "STX_AUTH_SESSION_HOURS"],
+        "patterns": {
+            "SITE_RE": r"^[a-z0-9-]{1,63}$",
+            "LABEL_RE": r"^[A-Za-z0-9_-]{1,64}$",
+            "COOKIE_RE": r"^[A-Za-z0-9_-]{1,64}$",
+            "DATE_RE": r"^\d{4}-\d{2}-\d{2}$",
+            "RECORD_RE": r"^scrypt\$\d+\$\d+\$\d+\$[0-9a-f]{16,128}\$[0-9a-f]{32,128}$",
+        },
+        "scrypt": [16384, 8, 1],
+        "defaults": ["/var/lib/stx-auth", 9100, "default"],
+        "paths": ["conf", "pass", "session.key", "sites"],
+        "cookie": ["stx_session_"],
+        "token": "1060.T1.0db25f8b5ddde317.f13e6b4c04deb8e405280bfff7bc09d81dc4f8320a4e7a22f6cae5952ade00c1",
+        "lines": ["default:" + _REC, "T1:" + _REC, "T1:" + _REC + ":2027-01-31"],
+    },
+}
+
+
+def _interface():
+    import re
+    code = Path(stx_auth.__file__).read_text(encoding="utf-8").split('"""', 2)[2]
+    return {
+        "headers": sorted(set(re.findall(r'"(X-[A-Za-z]+(?:-[A-Za-z]+)*)"', code))),
+        "env": sorted(set(re.findall(r'"(STX_AUTH_[A-Z_]+)"', code))),
+        "patterns": {n: getattr(stx_auth, n).pattern
+                     for n in ("SITE_RE", "LABEL_RE", "COOKIE_RE", "DATE_RE", "RECORD_RE")},
+        "scrypt": [stx_auth.SCRYPT_N, stx_auth.SCRYPT_R, stx_auth.SCRYPT_P],
+        "defaults": [stx_auth.DEFAULT_ROOT, stx_auth.DEFAULT_PORT, stx_auth.DEFAULT_LABEL],
+        "paths": sorted(set(re.findall(r'"(sites|pass|conf|session\.key)"', code))),
+        "cookie": sorted(set(re.findall(r"stx_session_", code))),
+        "token": make_token(b"k" * 32, "demo", Entry("T1", _REC), 60, now=1000),
+        "lines": [format_entry(Entry(stx_auth.DEFAULT_LABEL, _REC)), format_entry(Entry("T1", _REC)),
+                  format_entry(Entry("T1", _REC, date(2027, 1, 31)))],
+    }
+
+
+class TestInterface:
+    def test_the_interface_matches_its_number(self):
+        assert _interface() == INTERFACES[stx_auth.AUTH_INTERFACE]
+
+    def test_the_version_is_the_release(self):
+        import tomllib
+        pyproject = Path(__file__).resolve().parents[1] / "pyproject.toml"
+        version = tomllib.loads(pyproject.read_text(encoding="utf-8"))["project"]["version"]
+        assert stx_auth.STX_VERSION == version, "bump STX_VERSION in streamtex/deploy/stx_auth.py"
+
+    def test_check_returns_the_stamp(self, server):
+        stamp = f"{stx_auth.AUTH_INTERFACE} {stx_auth.STX_VERSION}"
+        _write(server, "demo", _rec("pw") + "\n")
+        resp, _ = _req(server, "GET", "/check", _h())
+        assert resp.status == 401 and resp.getheader("X-Stx-Auth") == stamp
+        _write(server, "shut", "open\n")
+        resp, _ = _req(server, "GET", "/check", _h("shut"))
+        assert resp.status == 204 and resp.getheader("X-Stx-Auth") == stamp
+
+    def test_the_login_page_does_not_show_the_version(self, server):
+        resp, _ = _req(server, "GET", "/login", _h())
+        assert resp.getheader("X-Stx-Auth") is None

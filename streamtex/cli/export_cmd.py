@@ -102,8 +102,12 @@ def resolve_export_lang(lang_option: str | None) -> str:
               default=None,
               help="continuous (one file), paginated (one file per page of the page map) "
                    "or both. Defaults to st_book(html_export_mode=…) of the module.")
+@click.option("--keep-going", is_flag=True, default=False,
+              help="Write the export even when a block raises (the block is left "
+                   "incomplete) and list the failing blocks at the end. Without it, "
+                   "a failing block stops the export: nothing is written, exit status 1.")
 def export_html(path, output, asset_mode, title, no_nav, theme_mode, theme_bg, theme_text,
-                lang, suffix, html_mode):
+                lang, suffix, html_mode, keep_going):
     """Generate static HTML from a StreamTeX project without a Streamlit server.
 
     Exports a fully navigable HTML document with sidebar TOC, floating
@@ -119,6 +123,7 @@ def export_html(path, output, asset_mode, title, no_nav, theme_mode, theme_bg, t
         STX_LANG=fr stx export html --suffix -fr .     # <html lang="fr">, deck-fr.html
         stx export html --lang fr --output ./out/fr .
         stx export html --html-mode both .              # continuous + one file per page
+        stx export html --keep-going .                  # write it even if a block raises
     """
     from ..export import AssetCollector, AssetMode, ExportConfig
 
@@ -190,6 +195,7 @@ def export_html(path, output, asset_mode, title, no_nav, theme_mode, theme_bg, t
         # Enable warmup mode + export in streamtex.book
         from streamtex import book as _book_mod
         _book_mod._warmup_mode = True
+        _book_mod._warmup_errors.clear()
         _book_mod._warmup_export_config = export_cfg
         _book_mod._export_page_sentinels = True        # where pages start (#106)
         _book_mod._html_export_mode = "continuous"
@@ -221,6 +227,20 @@ def export_html(path, output, asset_mode, title, no_nav, theme_mode, theme_bg, t
         _cache_data = st.session_state.get(_book_mod._STX_CACHE_KEY) or {}
 
     elapsed = time.time() - t0
+
+    # A block that raised leaves a partial page (#134): stop unless --keep-going
+    block_errors = list(_book_mod._warmup_errors)
+    for name, error in block_errors:
+        console.print(f"[red]Error in block[/] [bold]{name}[/]: {error}")
+    if block_errors and not keep_going:
+        console.print(f"[red]Export stopped:[/] {len(block_errors)} block(s) raised; nothing is "
+                      f"written. Fix the block, or pass --keep-going to export anyway.")
+        raise SystemExit(1)
+    if block_errors:
+        names = ", ".join(name for name, _ in block_errors)
+        click.get_current_context().call_on_close(lambda: console.print(
+            f"[yellow]Exported with --keep-going:[/] {len(block_errors)} block(s) left "
+            f"incomplete: {names}"))
 
     if not full_html:
         console.print(

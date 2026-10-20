@@ -25,6 +25,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and the PDF the panel makes is not affected by `html_print`. It states a
   rule; it cannot stop a screenshot. Automatic exports (`exports=[...]`) are
   the author's and keep writing their PDF. `PrintConfig` is exported.
+- **A video that dominates the screen** (#56): `st_video(theater=, fit=,
+  fullscreen=)`, live and in the HTML export.
+  - `theater="slide"` (or `True`) fills the screen height in the flow of
+    the document, on black, and scrolls with its slide.
+  - `theater="window"` covers the whole window while its slide is on
+    screen, above the sidebars; the × button or Esc closes it, leaving the
+    slide closes it and pauses the video, coming back opens it again (an
+    autoplay video starts again). Printing shows it in the page.
+  - `fit="contain"` (default) shows the whole picture with black bars;
+    `fit="cover"` fills and crops the edges.
+  - `fullscreen=True` enters fullscreen on the first Play (browsers allow
+    it only after a click, never at page load) and leaves it when the video
+    ends, unless it loops. The player's own fullscreen button stays.
+  The view zoom does not shrink the stage. A YouTube video takes `theater`
+  but not `fullscreen` (a frame of another site keeps its own button).
 
 ## [0.7.54] — 2026-10-19 — Export stops on a failing block, APA web pages, login service version, multi-module deploys
 

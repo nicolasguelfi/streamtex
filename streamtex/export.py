@@ -498,6 +498,7 @@ class HtmlExportBuffer:
             f"{body}\n"
             f"</div>\n"
             f"{_LIST_INSIDE_JS}\n"
+            f"{_video_stage_js(body)}"
             f"</body>\n</html>\n"
         )
 
@@ -844,6 +845,15 @@ def apply_view_to_export_html(html: str, *, built_view: Optional[tuple] = None,
         return html
     css = f".streamtex-page {{ max-width: {page_width}; zoom: {zoom:g}; }}"
     return html.replace("</head>", f"<style>{css}</style>\n</head>", 1)
+
+
+def _video_stage_js(body: str) -> str:
+    """The video stage script (#56), once, when the page has a staged video."""
+    if "stx-video-marker" not in body:
+        return ""
+    path = os.path.join(os.path.dirname(__file__), "static", "js", "stx_video.js")
+    with open(path, encoding="utf-8") as f:
+        return f"<script>\n{f.read()}</script>\n"
 
 
 def generate_export_html() -> Optional[str]:

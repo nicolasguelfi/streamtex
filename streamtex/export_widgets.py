@@ -317,7 +317,9 @@ def _audio(data, _boxed: bool = False, **kw):
         )
 
 
-def st_video(data, *, width: int | str | None = None, align: str = "center", **kw) -> None:
+def st_video(data, *, width: int | str | None = None, align: str = "center",
+             theater: bool | str = False, fit: str = "contain", fullscreen: bool = False,
+             **kw) -> None:
     """Display video with ``st.video()`` and export a ``<video>`` or YouTube embed.
 
     *width* (#126): None (the full width of the container, as before), pixels
@@ -332,6 +334,22 @@ def st_video(data, *, width: int | str | None = None, align: str = "center", **k
     log); the reader can turn the sound on with the controls (#35). An
     explicit ``muted=False`` is kept: a browser that allows sound on its own
     (a projection profile) plays it with sound, others wait for a click.
+
+    A video that dominates the screen (#56), live and in the HTML export:
+
+    - *theater*: ``"slide"`` (or ``True``) fills the screen height in the
+      flow of the document, on black, and scrolls with its slide;
+      ``"window"`` covers the whole window while its slide is on screen —
+      the × button or Esc closes it, leaving the slide closes it and pauses
+      the video, coming back opens it again. *width* / *align* do not apply.
+    - *fit*: ``"contain"`` (default) shows the whole picture, with black
+      bars when the screen has another shape; ``"cover"`` fills the screen
+      and crops the edges.
+    - *fullscreen*: ``True`` asks the browser for fullscreen on the first
+      Play (browsers allow fullscreen only after a click, so never at page
+      load) and leaves it when the video ends, unless it loops. The
+      player's own fullscreen button is always there. Not possible for a
+      YouTube video (a frame of another site): its own button remains.
     """
     global _warned_autoplay
     if kw.get("autoplay") and "muted" not in kw:
@@ -342,6 +360,14 @@ def st_video(data, *, width: int | str | None = None, align: str = "center", **k
             logging.getLogger(__name__).warning(
                 "st_video(autoplay=True) needs muted=True: browsers block a video that plays "
                 "sound on its own. The video starts muted; the reader can turn the sound on.")
+    mode = _theater_mode(theater)
+    if fit not in _FITS:
+        raise ValueError(f"fit must be 'contain' or 'cover', not {fit!r}")
+    if not isinstance(fullscreen, bool):
+        raise ValueError(f"fullscreen must be True or False, not {fullscreen!r}")
+    if mode or fullscreen:
+        _staged_video(data, mode, fit, fullscreen, kw)
+        return
     box = _media_box(width, align)
     if box is None:
         _video(data, **kw)
@@ -350,39 +376,73 @@ def st_video(data, *, width: int | str | None = None, align: str = "center", **k
         _video(data, _boxed=True, **kw)
 
 
+_FITS = ("contain", "cover")
+
+
+def _theater_mode(theater) -> str:
+    """``False`` → ``""``; ``True`` / ``"slide"`` → ``"slide"``; ``"window"``."""
+    if theater is False or theater is None:
+        return ""
+    if theater is True:
+        return "slide"
+    if theater in ("slide", "window"):
+        return theater
+    raise ValueError(f"theater must be True, False, 'slide' or 'window', not {theater!r}")
+
+
+def _staged_video(data, mode: str, fit: str, fullscreen: bool, kw: dict) -> None:
+    """A video under the stage script (#56): a marker the script finds, then the player.
+
+    Live, the marker and ``st.video`` share one ``st.container``, which the
+    script turns into the box; in the export, the box is written here.
+    """
+    marker = (f'<span class="stx-video-marker" data-stx-video="{mode}" data-stx-fit="{fit}" '
+              f'data-stx-fs="{int(fullscreen)}" data-stx-loop="{int(bool(kw.get("loop")))}" '
+              f'style="display:none"></span>')
+    close = ('<button type="button" class="stx-vbox-close" aria-label="Close" title="Close (Esc)">'
+             '&times;</button>' if mode == "window" else "")
+    with st.container():
+        st.markdown(marker + close, unsafe_allow_html=True)
+        st.video(data, **kw)
+    if is_export_active():
+        classes = "stx-vbox" + (f" stx-theater-{mode}" if mode else "") + f" stx-fit-{fit}"
+        export_append(f'<div class="stx-vbox-slot"><div class="{classes}">{marker}{close}'
+                      f'{_video_export_html(data, True, kw)}</div></div>')
+
+
 def _video(data, _boxed: bool = False, **kw):
     st.video(data, **kw)
     if is_export_active():
-        fmt = kw.get("format")
-        # YouTube URL → iframe embed
-        if isinstance(data, str):
-            yt = _YOUTUBE_RE.search(data)
-            if yt:
-                vid = yt.group(1)
-                # in a sized box (#126) the frame fills it at 16:9
-                size = ('style="width:100%;height:auto;aspect-ratio:16/9" ' if _boxed
-                        else 'width="560" height="315" ')
-                export_append(
-                    f'<div class="stx-media"><iframe {size}'
-                    f'src="https://www.youtube.com/embed/{vid}" '
-                    f'frameborder="0" allowfullscreen></iframe></div>'
-                )
-                return
+        export_append(_video_export_html(data, _boxed, kw))
 
-        src, mime = _media_src(data, _VIDEO_MIME, fmt)
-        # The export plays the video the way the live page does: the same
-        # ``autoplay`` / ``loop`` / ``muted`` given to ``st.video()``, and the
-        # full width of its container (``st.video`` stretches by default).
-        # Browsers only autoplay a muted video, inline on phones.
-        attrs = ["controls"]
-        if kw.get("autoplay"):
-            attrs += ["autoplay", "playsinline"]
-        if kw.get("loop"):
-            attrs.append("loop")
-        if kw.get("muted"):
-            attrs.append("muted")
-        export_append(
-            f'<video {" ".join(attrs)} class="stx-media" style="width:100%;max-width:100%">'
+
+def _video_export_html(data, boxed: bool, kw: dict) -> str:
+    """The exported player: a ``<video>``, or a YouTube frame."""
+    fmt = kw.get("format")
+    # YouTube URL → iframe embed
+    if isinstance(data, str):
+        yt = _YOUTUBE_RE.search(data)
+        if yt:
+            vid = yt.group(1)
+            # in a sized box (#126) the frame fills it at 16:9
+            size = ('style="width:100%;height:auto;aspect-ratio:16/9" ' if boxed
+                    else 'width="560" height="315" ')
+            return (f'<div class="stx-media"><iframe {size}'
+                    f'src="https://www.youtube.com/embed/{vid}" '
+                    f'frameborder="0" allowfullscreen></iframe></div>')
+
+    src, mime = _media_src(data, _VIDEO_MIME, fmt)
+    # The export plays the video the way the live page does: the same
+    # ``autoplay`` / ``loop`` / ``muted`` given to ``st.video()``, and the
+    # full width of its container (``st.video`` stretches by default).
+    # Browsers only autoplay a muted video, inline on phones.
+    attrs = ["controls"]
+    if kw.get("autoplay"):
+        attrs += ["autoplay", "playsinline"]
+    if kw.get("loop"):
+        attrs.append("loop")
+    if kw.get("muted"):
+        attrs.append("muted")
+    return (f'<video {" ".join(attrs)} class="stx-media" style="width:100%;max-width:100%">'
             f'{_source_tag(src, mime)}'
-            f'Your browser does not support the video element.</video>'
-        )
+            f'Your browser does not support the video element.</video>')

@@ -511,3 +511,58 @@ class TestMediaWidthAndAutoplay:
     def test_bad_width_or_align_is_refused(self, mock_st, kw):
         with pytest.raises(ValueError):
             st_video("https://example.com/v.mp4", **kw)
+
+
+@patch("streamtex.export_widgets.st")
+class TestVideoStage:
+    """st_video(theater=, fit=, fullscreen=) (#56): the box and marker the stage script reads."""
+
+    def setup_method(self):
+        export_mod._buffer = None
+
+    def teardown_method(self):
+        export_mod._buffer = None
+
+    def _html(self, call):
+        reset_export_buffer(ExportConfig(enabled=True))
+        call()
+        return generate_export_html()
+
+    @pytest.mark.parametrize("theater,mode", [(True, "slide"), ("slide", "slide"), ("window", "window")])
+    def test_theater_draws_a_box_with_its_marker(self, mock_st, theater, mode):
+        html = self._html(lambda: st_video("https://example.com/v.mp4", theater=theater, loop=True))
+        assert f'<div class="stx-vbox stx-theater-{mode} stx-fit-contain">' in html
+        assert (f'data-stx-video="{mode}" data-stx-fit="contain" data-stx-fs="0" data-stx-loop="1"'
+                in html)
+        assert html.index("stx-vbox-slot") < html.index("<video") < html.index("</body>")
+        assert ("stx-vbox-close" in html.split("<script>")[0]) == (mode == "window")
+        assert html.count("win.__stxVideo = { scan: scan };") == 1   # the script, once
+        mock_st.video.assert_called_once_with("https://example.com/v.mp4", loop=True)
+
+    def test_cover_and_fullscreen(self, mock_st):
+        html = self._html(lambda: st_video("https://example.com/v.mp4", fit="cover", fullscreen=True))
+        assert '<div class="stx-vbox stx-fit-cover">' in html
+        assert 'data-stx-video="" data-stx-fit="cover" data-stx-fs="1" data-stx-loop="0"' in html
+
+    def test_a_plain_video_has_no_stage(self, mock_st):
+        html = self._html(lambda: st_video("https://example.com/v.mp4", width="50%"))
+        assert "stx-vbox" not in html and "__stxVideo" not in html
+
+    def test_youtube_on_stage(self, mock_st):
+        html = self._html(lambda: st_video("https://youtu.be/dQw4w9WgXcQ", theater="window"))
+        assert "stx-theater-window" in html and "youtube.com/embed/dQw4w9WgXcQ" in html
+
+    def test_live_marker_shares_the_container(self, mock_st):
+        st_video("v.mp4", theater="window", fullscreen=True)
+        mock_st.container.assert_called_once()
+        marker = mock_st.markdown.call_args.args[0]
+        assert 'data-stx-video="window"' in marker and 'data-stx-fs="1"' in marker
+        assert "stx-vbox-close" in marker
+        assert mock_st.markdown.call_args.kwargs == {"unsafe_allow_html": True}
+        mock_st.video.assert_called_once_with("v.mp4")
+
+    @pytest.mark.parametrize("kw", [{"theater": "full"}, {"theater": 1}, {"fit": "fill"},
+                                    {"fullscreen": "yes"}, {"fullscreen": 1}])
+    def test_bad_values_are_refused(self, mock_st, kw):
+        with pytest.raises(ValueError):
+            st_video("https://example.com/v.mp4", **kw)

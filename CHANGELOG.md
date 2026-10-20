@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.57] — 2026-10-20 — Countdown, stopwatch and clock racks
+
 ### Added
 
 - **`st_countdown`: a grid of countdown, stopwatch and clock cards** (#52).

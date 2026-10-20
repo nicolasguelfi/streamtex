@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.55] — 2026-10-20 — Usage notice and print rules per document, videos that dominate the screen
+
 ### Added
 
 - **A usage notice and print rules per document** (#107).
@@ -40,6 +42,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     ends, unless it loops. The player's own fullscreen button stays.
   The view zoom does not shrink the stage. A YouTube video takes `theater`
   but not `fullscreen` (a frame of another site keeps its own button).
+
+### Fixed
+
+- **Browser tests: each module exports its own deck.** Every fixture deck
+  names its package `blocks`; the in-process exports of one test module
+  reused the package imported by an earlier one, so the media export test
+  failed when run after the list zoom test (also on 0.7.54). The e2e
+  `conftest.py` forgets `blocks` around each module.
 
 ## [0.7.54] — 2026-10-19 — Export stops on a failing block, APA web pages, login service version, multi-module deploys
 

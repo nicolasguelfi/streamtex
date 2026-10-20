@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`stx export html` runs ordinary widget code again** (headless Streamlit).
+  Since 0.7.54 a block that raises stops the export (#134), and three
+  stand-ins of the headless Streamlit made common widget code raise. The
+  advanced manual's export stopped on two blocks.
+  - `st.number_input("Age", 0, 120, 25)` takes its bounds by position.
+  - `st.session_state.step = 1` works: the headless session state takes
+    attributes as well as keys.
+  - Widgets called on a column or the sidebar (`col.checkbox(...)`,
+    `st.sidebar.selectbox(...)`) return their default value instead of a
+    placeholder.
+
 ## [0.7.55] — 2026-10-20 — Usage notice and print rules per document, videos that dominate the screen
 
 ### Added

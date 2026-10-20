@@ -23,7 +23,9 @@ class _HeadlessDelta:
     """
 
     def __getattr__(self, name):
-        return _HeadlessDelta()
+        # col.checkbox(...), st.sidebar.number_input(...) return values too
+        mock = _WIDGET_MOCKS.get(name)
+        return mock if mock is not None else _HeadlessDelta()
 
     def __call__(self, *args, **kwargs):
         return _HeadlessDelta()
@@ -100,7 +102,10 @@ def _mock_toggle(_label="", value=False, **kw):
     return value
 
 
-def _mock_number_input(_label="", *, value=0, **kw):
+def _mock_number_input(_label="", min_value=None, max_value=None, value="min", *a, **kw):
+    # st.number_input("Age", 0, 120, 25): the bounds may come by position
+    if value == "min" or value is None:
+        return min_value if min_value is not None else 0
     return value
 
 
@@ -126,6 +131,42 @@ def _mock_date_input(_label="", value=None, **kw):
 
 def _mock_time_input(_label="", value=None, **kw):
     return value
+
+
+# Widgets that return default values (must NOT return _HeadlessDelta).
+_WIDGET_MOCKS = {
+    "selectbox": _mock_selectbox,
+    "radio": _mock_radio,
+    "multiselect": _mock_multiselect,
+    "checkbox": _mock_checkbox,
+    "toggle": _mock_toggle,
+    "number_input": _mock_number_input,
+    "slider": _mock_slider,
+    "text_input": _mock_text_input,
+    "text_area": _mock_text_area,
+    "color_picker": _mock_color_picker,
+    "date_input": _mock_date_input,
+    "time_input": _mock_time_input,
+}
+
+
+class _HeadlessSessionState(dict):
+    """``st.session_state`` without a session: keys and attributes alike."""
+
+    def __getattr__(self, name):
+        try:
+            return self[name]
+        except KeyError:
+            raise AttributeError(name) from None
+
+    def __setattr__(self, name, value):
+        self[name] = value
+
+    def __delattr__(self, name):
+        try:
+            del self[name]
+        except KeyError:
+            raise AttributeError(name) from None
 
 
 @contextmanager
@@ -161,29 +202,14 @@ def _headless_streamlit():
             _saved[attr] = getattr(st, attr)
             setattr(st, attr, _mock)
 
-    # Widgets that return default values (must NOT return _HeadlessDelta).
-    _WIDGET_MOCKS = {
-        "selectbox": _mock_selectbox,
-        "radio": _mock_radio,
-        "multiselect": _mock_multiselect,
-        "checkbox": _mock_checkbox,
-        "toggle": _mock_toggle,
-        "number_input": _mock_number_input,
-        "slider": _mock_slider,
-        "text_input": _mock_text_input,
-        "text_area": _mock_text_area,
-        "color_picker": _mock_color_picker,
-        "date_input": _mock_date_input,
-        "time_input": _mock_time_input,
-    }
     for attr, fn in _WIDGET_MOCKS.items():
         if hasattr(st, attr):
             _saved[attr] = getattr(st, attr)
             setattr(st, attr, fn)
 
-    # session_state must be a real dict.
+    # session_state: a dict that also takes attributes (st.session_state.x = 1)
     _saved["session_state"] = st.session_state
-    st.session_state = {}
+    st.session_state = _HeadlessSessionState()
 
     # sidebar needs to be a mock (attribute, not function).
     _saved["sidebar"] = st.sidebar

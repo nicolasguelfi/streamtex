@@ -31,6 +31,9 @@ class Target:
             raise ReleaseError(f"target '{name}': 'root' is required (the folder that holds static/ and live/)")
         self.root = cfg["root"]
         self.domain = cfg.get("domain", "streamtex.org")
+        #: a provisional suffix of every address (``-next``: docs-advanced-next.example.org), to try a
+        #: new installation next to the one in service; removed at the switch
+        self.suffix = cfg.get("site_suffix", "")
 
     # -- commands -----------------------------------------------------------------------
     def ssh_argv(self) -> list[str]:
@@ -87,9 +90,9 @@ class Target:
     # -- HTTP, as a visitor -----------------------------------------------------------------
     def url_of(self, base_key: str, site: str, path: str) -> tuple[str, str | None]:
         if self.kind == "local":
-            return self.cfg[base_key] + path, f"{site}.{self.domain}"
+            return self.cfg[base_key] + path, f"{site}{self.suffix}.{self.domain}"
         sub = self.cfg.get(f"{base_key}_suffix", "")
-        return f"https://{site}{sub}.{self.domain}{path}", None
+        return f"https://{site}{self.suffix}{sub}.{self.domain}{path}", None
 
     def get(self, base_key: str, site: str, path: str, cookie: str = "") -> tuple[int, str]:
         url, host = self.url_of(base_key, site, path)

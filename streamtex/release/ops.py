@@ -218,6 +218,12 @@ def sleep_wake(t: Target, cfg: ReleaseConfig, state: dict, site: Site, asleep: b
     save_state(cfg.root, state)
 
 
+def image_version(t: Target) -> str:
+    """The streamtex version the live application actually runs, or ``""`` when it cannot be read."""
+    r = t.dexec("live", "/app/.venv/bin/python -c 'import streamtex; print(streamtex.__version__)'", check=False)
+    return r.stdout.strip() if r.returncode == 0 else ""
+
+
 def status_rows(t: Target, cfg: ReleaseConfig, state: dict, data: dict | None) -> list[tuple]:
     rows = []
     for name, v in sorted(sites_of(state, t.name).items()):
@@ -249,9 +255,25 @@ def _stx_auth_source() -> str:
     return Path(importlib.util.find_spec("streamtex.deploy.stx_auth").origin).read_text(encoding="utf-8")
 
 
+_SITE_MAP = "    ~^(?<label>[a-z0-9-]+)\\.  $label;"
+
+
+def http_conf(app: str, suffix: str = "") -> str:
+    """The application's nginx configuration; with a provisional *suffix*, the site is the host's first
+    label without it (docs-advanced-next.example.org → site docs-advanced)."""
+    text = (TEMPLATES / app / "stx-http.conf").read_text(encoding="utf-8")
+    if suffix:
+        import re
+        if not re.fullmatch(r"-[a-z0-9-]+", suffix):
+            raise ReleaseError(f"site_suffix {suffix!r}: '-' then a-z, 0-9, '-' (e.g. '-next')")
+        assert text.count(_SITE_MAP) == 1
+        text = text.replace(_SITE_MAP, f"    ~^(?<label>[a-z0-9-]+?){re.escape(suffix)}\\.  $label;")
+    return text
+
+
 #: What server-config sends, per application: file name → content.
-def server_files(app: str) -> dict[str, str]:
-    return {"stx-http.conf": (TEMPLATES / app / "stx-http.conf").read_text(encoding="utf-8"),
+def server_files(app: str, suffix: str = "") -> dict[str, str]:
+    return {"stx-http.conf": http_conf(app, suffix),
             "stx_auth.py": (TEMPLATES / "static" / "stx_auth.py").read_text(encoding="utf-8"),
             "stx_auth_lib.py": _stx_auth_source()}
 
@@ -268,7 +290,7 @@ def server_config(t: Target, echo: Echo) -> None:
     service is restarted, and we wait until it answers."""
     for app in ("static", "live"):
         conf, root = t.path(app, "conf"), f"/srv/{app}/conf"
-        for name, content in server_files(app).items():
+        for name, content in server_files(app, t.suffix).items():
             t.write(f"{conf}/{name}.new", content, mode=0o644)
         test = t.dexec(app, f"sh -c 'cp {root}/stx-http.conf /tmp/stx-http.conf.old 2>/dev/null; "
                             f"cp {root}/stx-http.conf.new {root}/stx-http.conf && nginx -t'", check=False)

@@ -56,6 +56,11 @@ def publish_cmd(sites, groups, target, allow_skew, html_env):
     release_name = build.require_committed(cfg.root)
     build.require_lock(cfg)
     skew = build.library_skew(cfg)
+    running = ops.image_version(t)
+    wanted = (cfg.lock_dir / "stx-version").read_text(encoding="utf-8").strip()
+    if not skew and running and running != wanted:
+        skew = (f"the live application runs streamtex {running}, {cfg.dir}/stx-version says {wanted} — "
+                "rebuild it (stx release setup --show live, paste, redeploy)")
     if skew and not allow_skew:
         raise ReleaseError(f"{skew} — publish with the image's streamtex, or pass --allow-skew for a trial")
     if skew:
@@ -77,7 +82,11 @@ def status_cmd(target):
     except ReleaseError:
         data = None
     head = build.git(cfg.root, "rev-parse", "--short=12", "HEAD")
-    click.echo(f"target {t.name} · HEAD {head}\n")
+    running = ops.image_version(t) or "?"
+    wanted_path = cfg.lock_dir / "stx-version"
+    wanted = wanted_path.read_text(encoding="utf-8").strip() if wanted_path.exists() else "?"
+    gap = "" if running == wanted else "  ← GAP"
+    click.echo(f"target {t.name} · HEAD {head} · live image streamtex {running} (stx-version {wanted}){gap}\n")
     rows = ops.status_rows(t, cfg, state, data)
     w = max([28] + [len(r[0]) + 2 for r in rows])
     click.echo(f"{'site':<{w}}{'published':<14}{'served (html)':<17}{'live':<8}{'html':<11}date")

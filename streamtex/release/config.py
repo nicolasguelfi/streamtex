@@ -4,12 +4,15 @@
 
     [release]
     project = "trainings"          # the media folder on the server and the Coolify project name
-    langs = ["en", "fr"]           # one HTML export per language (STX_LANG); default ["en"]
+    langs = ["en", "fr"]           # one HTML export per language (STX_LANG); default ["en"];
+                                   # [] = one export, no STX_LANG, no language folder in /html/
     snapshot = ["content", "shared", "trainings_pack"]   # in every code snapshot, besides the site's paths
     media = "assets"               # copied once per project, linked into every snapshot (optional)
     media_exclude = [".DS_Store", "*-original.*"]
     pythonpath = ["trainings_pack"]  # PYTHONPATH of the live process, relative to the snapshot
     lock_exclude = ["trainings-pack"]  # local packages kept out of the live image's requirements
+    lock_no_sources = false        # true: requirements resolved without [tool.uv.sources] (git packs)
+    apt = ["texlive-latex-base"]   # system packages added to the live image
     sites_from = "shared.release:sites"   # a function of the project returning the sites, or:
 
     [[release.sites]]
@@ -37,7 +40,8 @@ FACES = ("live", "html")
 SITE_RE = re.compile(r"^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$")
 _SITE_KEYS = {"site", "book", "group", "faces", "paths", "exclude", "explicit", "legacy"}
 _RELEASE_KEYS = {"project", "langs", "snapshot", "media", "media_exclude", "pythonpath", "lock_exclude",
-                 "min_words", "port_base", "dir", "sites", "sites_from", "checks"}
+                 "lock_no_sources", "apt", "min_words", "port_base", "dir", "sites", "sites_from", "checks"}
+_APT_RE = re.compile(r"^[a-z0-9][a-z0-9.+-]+$")
 
 
 @dataclass(frozen=True)
@@ -75,6 +79,8 @@ class ReleaseConfig:
     media_exclude: tuple[str, ...] = (".DS_Store",)
     pythonpath: tuple[str, ...] = ()
     lock_exclude: tuple[str, ...] = ()
+    lock_no_sources: bool = False
+    apt: tuple[str, ...] = ()
     min_words: int = 100
     port_base: int = 9000
     dir: str = ".stx-release"
@@ -176,13 +182,18 @@ def load_config(root: Path | None = None) -> ReleaseConfig:
     if twice:
         raise ReleaseError(f"{where}: site name(s) used twice: {', '.join(twice)}")
     langs = tuple(data.get("langs", ("en",)))
-    if not langs or not all(isinstance(x, str) and re.fullmatch(r"[a-z]{2,3}", x) for x in langs):
-        raise ReleaseError("[release] langs: language codes such as ['en', 'fr']")
+    if not all(isinstance(x, str) and re.fullmatch(r"[a-z]{2,3}", x) for x in langs):
+        raise ReleaseError("[release] langs: language codes such as ['en', 'fr'], or [] for one export")
+    apt = tuple(data.get("apt", ()))
+    bad = [p for p in apt if not isinstance(p, str) or not _APT_RE.match(p)]
+    if bad:
+        raise ReleaseError(f"[release] apt: not a package name: {bad}")
     return ReleaseConfig(
         root=root, project=project, sites=sites, langs=langs,
         snapshot=tuple(data.get("snapshot", ())), media=data.get("media"),
         media_exclude=tuple(data.get("media_exclude", (".DS_Store",))),
         pythonpath=tuple(data.get("pythonpath", ())), lock_exclude=tuple(data.get("lock_exclude", ())),
+        lock_no_sources=bool(data.get("lock_no_sources", False)), apt=apt,
         min_words=int(data.get("min_words", 100)), port_base=int(data.get("port_base", 9000)),
         dir=str(data.get("dir", ".stx-release")), checks=data.get("checks"))
 

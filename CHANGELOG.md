@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`stx release`: what the StreamTeX manuals need** (board docrel, 2026-10-20).
+  - `[release] apt = [...]`: system packages added to the live image (TeX
+    Live for TikZ, for instance).
+  - `[release] langs = []`: one HTML export, with no `STX_LANG` and no
+    language folder, so a single-language project keeps its
+    `/html/<doc>/<doc>.html` addresses.
+  - `[release] lock_no_sources = true`: the live image's requirements are
+    resolved without the project's local `[tool.uv.sources]`, so packs come
+    from their git tags.
+  - A target's `site_suffix` (for instance `"-next"`) publishes a new
+    installation under provisional addresses next to the one in service;
+    nginx, the domains and the checks follow it. Remove it at the switch
+    and run `server-config` again.
+  - `stx release status` shows the streamtex version the live application
+    actually runs. `publish` refuses when it is not `stx-version` (rebuild
+    the live application), unless `--allow-skew`.
+
 ## [0.7.58] — 2026-10-20 — stx release: multi-document projects, passwords per site
 
 ### Added

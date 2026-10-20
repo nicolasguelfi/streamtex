@@ -47,8 +47,9 @@ def require_committed(root: Path) -> str:
 
 def lock_files(cfg: ReleaseConfig) -> tuple[str, str]:
     """``requirements.txt`` and ``stx-version`` of the live image, as uv.lock gives them today."""
-    argv = ["uv", "export", "--no-hashes", "--no-emit-project", "--no-dev", "--frozen",
-            "--no-emit-package", "streamtex"]
+    argv = ["uv", "export", "--no-hashes", "--no-emit-project", "--no-dev", "--no-emit-package", "streamtex"]
+    # git packs: resolved without the project's local sources (uv refuses --frozen with --no-sources)
+    argv += ["--no-sources"] if cfg.lock_no_sources else ["--frozen"]
     for pkg in cfg.lock_exclude:
         argv += ["--no-emit-package", pkg]
     r = subprocess.run(argv, cwd=cfg.root, text=True, capture_output=True)
@@ -161,30 +162,33 @@ def export(cfg: ReleaseConfig, site: Site, code: Path, work: Path, release: str,
         linked_media = media
     env = {k: v for k, v in os.environ.items()
            if k not in ("STX_PASSWORD", "STX_GATE") and not k.startswith(("STX_URL_", "STX_EXPORT_URL_"))}
-    for lang in cfg.langs:
-        out = html / lang
+    for lang in cfg.langs or ("",):
+        out = html / lang if lang else html
+        lang_env = {"STX_LANG": lang} if lang else {}
         r = subprocess.run(["uv", "run", "--project", str(cfg.root), "stx", "export", "html", "--output",
                             str(out), "."], cwd=doc, text=True, capture_output=True,
-                           env={**env, "STX_LANG": lang, **(html_env or {})})
+                           env={**env, **lang_env, **(html_env or {})})
         page = out / name / f"{name}.html"
         if r.returncode or not page.exists():
-            raise ReleaseError(f"{site.site}: the {lang} export failed (code {r.returncode}):\n"
+            raise ReleaseError(f"{site.site}: the {lang or 'HTML'} export failed (code {r.returncode}):\n"
                                f"{(r.stderr or r.stdout)[-1500:]}")
         files = [page] + sorted((page.parent / "pages").glob("*.html"))
         text = "\n".join(f.read_text(encoding="utf-8", errors="replace") for f in files)
         words = len(re.sub(r"<[^>]+>", " ", text).split())
         if GATE_MARK in text:
-            raise ReleaseError(f"{site.site}: the {lang} export holds the keypad gate")
+            raise ReleaseError(f"{site.site}: the {lang or 'HTML'} export holds the keypad gate")
         if words < cfg.min_words:
-            raise ReleaseError(f"{site.site}: the {lang} export has {words} words only (< {cfg.min_words})")
-        (out / "index.html").write_text(redirect(f"/html/{lang}/{name}/{name}.html"), encoding="utf-8")
-    first = cfg.langs[0]
-    (html / "index.html").write_text(redirect(f"/html/{first}/{name}/{name}.html"), encoding="utf-8")
+            raise ReleaseError(f"{site.site}: the {lang or 'HTML'} export has {words} words only (< {cfg.min_words})")
+        if lang:
+            (out / "index.html").write_text(redirect(f"/html/{lang}/{name}/{name}.html"), encoding="utf-8")
+    first = f"{cfg.langs[0]}/" if cfg.langs else ""
+    (html / "index.html").write_text(redirect(f"/html/{first}{name}/{name}.html"), encoding="utf-8")
     (html / "version.txt").write_text(f"{release}\n{site.site}\n{dt.datetime.now().isoformat(timespec='seconds')}\n",
                                       encoding="utf-8")
     if linked_media is not None:
         linked_media.unlink()
-    share_media(html, cfg.langs)
+    if len(cfg.langs) > 1:
+        share_media(html, cfg.langs)
     return html
 
 

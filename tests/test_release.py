@@ -224,3 +224,52 @@ def test_templates_ship_with_the_package():
     from streamtex.release.ops import TEMPLATES
     for f in ("static/Dockerfile", "static/stx-http.conf", "live/Dockerfile", "live/supervisord.conf"):
         assert (TEMPLATES / f).is_file()
+
+
+# -- 0.7.59: one export, system packages, git packs, provisional names ------------------------
+
+def test_one_export_without_language_folder_and_system_packages(tmp_path):
+    cfg = load_config(_project(tmp_path, SITES.replace('langs = ["en", "fr"]', 'langs = []\n    apt = ["texlive-latex-base", "texlive-pictures"]\n    lock_no_sources = true')))
+    assert cfg.langs == () and cfg.apt == ("texlive-latex-base", "texlive-pictures") and cfg.lock_no_sources
+    (cfg.lock_dir).mkdir()
+    (cfg.lock_dir / "stx-version").write_text("0.7.59\n")
+    (cfg.lock_dir / "requirements.txt").write_text("")
+    live = compose_dockerfile(cfg, "live")
+    assert ("RUN apt-get update && apt-get install -y --no-install-recommends texlive-latex-base texlive-pictures"
+            in live) and "STX_RELEASE_APT" not in live
+    with pytest.raises(ReleaseError, match="package name"):
+        load_config(_project(tmp_path, SITES.replace('langs = ["en", "fr"]', 'apt = ["bad name"]')))
+
+
+def test_lock_without_sources_drops_frozen(tmp_path, monkeypatch):
+    from streamtex.release import build
+    cfg = load_config(_project(tmp_path, SITES.replace('langs = ["en", "fr"]', "lock_no_sources = true")))
+    seen = {}
+
+    class R:
+        returncode, stdout, stderr = 0, "rich==13\n", ""
+
+    def fake_run(argv, **kw):
+        seen.setdefault("argv", argv)
+        return R()
+
+    monkeypatch.setattr(build.subprocess, "run", fake_run)
+    monkeypatch.setattr(build, "installed_version", lambda cfg: "0.7.59")
+    build.lock_files(cfg)
+    assert "--no-sources" in seen["argv"] and "--frozen" not in seen["argv"]
+
+
+def test_provisional_suffix_in_nginx_domains_and_urls(tmp_path):
+    from streamtex.release.ops import http_conf
+    from streamtex.release.target import Target
+    plain = http_conf("static")
+    assert "~^(?<label>[a-z0-9-]+)\\.  $label;" in plain
+    nxt = http_conf("live", "-next")
+    assert "~^(?<label>[a-z0-9-]+?)\\-next\\.  $label;" in nxt
+    with pytest.raises(ReleaseError, match="site_suffix"):
+        http_conf("static", "next")
+    cfg = load_config(_project(tmp_path, SITES))
+    d = domains_for(cfg, {"domain": "example.org", "site_suffix": "-next"})
+    assert d["live"].startswith("https://chat1d-slides-next.example.org,")
+    t = Target("p", {"type": "ssh", "host": "h", "root": "/r", "domain": "example.org", "site_suffix": "-next"})
+    assert t.url_of("live_url", "chat1d-slides", "/x") == ("https://chat1d-slides-next.example.org/x", None)

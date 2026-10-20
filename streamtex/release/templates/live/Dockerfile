@@ -13,6 +13,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 UV_LINK_MODE=copy \
 RUN apt-get update && apt-get install -y --no-install-recommends nginx-light supervisor curl \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=ghcr.io/astral-sh/uv:0.9 /uv /bin/uv
+# STX_RELEASE_APT — the project's system packages ([release] apt), or nothing
 
 WORKDIR /app
 COPY stx-version requirements.txt ./

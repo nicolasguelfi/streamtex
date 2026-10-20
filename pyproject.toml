@@ -102,6 +102,7 @@ include = ["streamtex*"]
 "streamtex.static.css" = ["*.css"]
 "streamtex.static.js" = ["*.js"]
 "streamtex.styles" = ["*.toml"]
+"streamtex.release" = ["templates/*/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

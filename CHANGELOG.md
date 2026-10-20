@@ -7,6 +7,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`stx release`: publish the documents of a multi-document project** (#136,
+  #111). This takes in the streamtex-all-trainings prototype
+  (`_project/deploy/release/publish.py`, 37 sites online) and keeps its
+  server layout exactly. A project runs two long-lived Coolify applications:
+  a static one (nginx, the HTML exports) and a live one (one Streamlit
+  process per site under supervisord, behind an nginx router).
+  - **One publication**: a committed repository is required. The command
+    takes a code snapshot, exports the HTML once per language on this
+    machine and checks it (enough words, no keypad gate, an export that
+    stops on a failing block is refused). It copies the delta over SSH
+    (`rsync --link-dest`), writes the passwords, switches both faces of the
+    site together, restarts only that site's process, and checks what is
+    actually served. If a check fails, both faces go back to the previous
+    release. Two releases are kept per site.
+  - **Commands**: `publish`, `status` (what each site serves, as a
+    visitor), `rollback`, `passwd`, `auth-status`, `sleep` / `wake`,
+    `lock` (the live image's dependencies from uv.lock), `server-config`
+    (`nginx -t` before any reload), `prune`, `setup` (the two Coolify
+    applications and their domains, through the API only; the steps the API
+    cannot do are printed), `import` and `convert-passwords` (taking a
+    project over from the prototype without republishing), and
+    `local up | down` (both applications in Docker on this machine).
+  - **Settings**: the `[release]` table of `stx.toml` lists the sites, as
+    `[[release.sites]]` (`site`, `book`, `group`, `faces`, `paths`,
+    `exclude`, `explicit`) or through a project function (`sites_from`),
+    together with languages, media and the project's checks. Site names are
+    written by the project and checked: duplicates and invalid DNS labels
+    are refused. A site may have one face only. State is kept in
+    `.stx-release.json` (versioned, no secret); credentials come from the
+    target's env file.
+  - **Version**: publishing is refused when the streamtex that exports here
+    is not the live image's, or comes from a working copy with uncommitted
+    changes. `--allow-skew` publishes anyway for a trial, and `status` marks
+    the site.
+  - **Passwords per site** (#111): `.stx-passwords.toml` is read in three
+    levels, `[default]` → `[<group>]` → `[<group>.sites.<site>]`.
+    `open = true` (or a list of faces) opens a site explicitly; an empty
+    string is refused, and a face with no password is an error.
+
+### Changed
+
+- **Password lists accept the writings of the all-trainings prototype**
+  (`stx deploy lock / passwd` and `stx release`): a list of pairs
+  `[["LABEL", "password"], ["LABEL2", "password2", "2027-01-31"]]`, and an
+  end date following the password (`"LABEL:password:2027-01-31"`,
+  `LABEL = "password:2027-01-31"`).
+
+### Fixed
+
+- **The login service starts on the first start of the release images.**
+  Both images now ship the library's `stx_auth`. Before, the live one
+  waited for `server-config` and supervisord gave up in between (the
+  prototype had the same gap).
+
 ## [0.7.57] — 2026-10-20 — Countdown, stopwatch and clock racks
 
 ### Added

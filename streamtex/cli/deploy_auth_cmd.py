@@ -24,6 +24,11 @@ shown (one prompt only).
     COHORT1 = "pw1"                 # password contains ':' or ',')
     COHORT2 = { password = "pw2", valid_until = "2027-01-31" }
 
+An end date may also follow a password as ``:YYYY-MM-DD`` (``"COHORT1:pw1:2027-01-31"``,
+``COHORT1 = "pw1:2027-01-31"``), and a list of pairs is accepted:
+``[["COHORT1", "pw1"], ["COHORT2", "pw2", "2027-01-31"]]`` — the writings of the
+streamtex-all-trainings prototype, kept for stx release (#136).
+
 A password holds no whitespace: the login screen removes the spaces typed
 (phones add one after a word), so a stored one could never match (#129).
 """
@@ -31,6 +36,7 @@ A password holds no whitespace: the login screen removes the spaces typed
 from __future__ import annotations
 
 import base64
+import re
 import subprocess
 import tomllib
 from abc import ABC, abstractmethod
@@ -72,8 +78,19 @@ def _parse_date(value: object, where: str) -> date:
         raise click.ClickException(f"{where}: valid_until must be a date (YYYY-MM-DD), got {value!r}") from e
 
 
+_DATED_RE = re.compile(r"^(.*):(\d{4}-\d{2}-\d{2})$")
+
+
+def _dated(label: str, word: str, where: str) -> PlainEntry:
+    """A labelled password whose word may end with ``:YYYY-MM-DD`` (its end date)."""
+    m = _DATED_RE.match(word)
+    if m:
+        return PlainEntry(label, m.group(1), _parse_date(m.group(2), f"{where}.{label}"))
+    return PlainEntry(label, word)
+
+
 def parse_password_spec(spec: object, where: str) -> list[PlainEntry]:
-    """Read one face's passwords: a string or a table, see the module docstring."""
+    """Read one face's passwords: a string, a table or a list of pairs, see the module docstring."""
     entries: list[PlainEntry] = []
     if isinstance(spec, str):
         if ":" not in spec:
@@ -83,19 +100,26 @@ def parse_password_spec(spec: object, where: str) -> list[PlainEntry]:
                 label, sep, password = pair.strip().partition(":")
                 if not sep:
                     raise click.ClickException(f"{where}: '{pair.strip()}' is not label:password")
-                entries.append(PlainEntry(label.strip(), password))
+                entries.append(_dated(label.strip(), password, where))
     elif isinstance(spec, dict):
         for label, value in spec.items():
             if isinstance(value, str):
-                entries.append(PlainEntry(label, value))
+                entries.append(_dated(label, value, where))
             elif isinstance(value, dict) and isinstance(value.get("password"), str):
                 until = value.get("valid_until")
                 entries.append(PlainEntry(label, value["password"],
                                           _parse_date(until, f"{where}.{label}") if until else None))
             else:
                 raise click.ClickException(f"{where}.{label}: expected a password or {{ password = ... }}")
+    elif isinstance(spec, list):
+        for item in spec:
+            if not (isinstance(item, list) and len(item) in (2, 3) and all(isinstance(x, str) for x in item)):
+                raise click.ClickException(f"{where}: a list of passwords holds pairs "
+                                           f"[\"LABEL\", \"password\"] (a 3rd item: the end date YYYY-MM-DD)")
+            until = _parse_date(item[2], f"{where}.{item[0]}") if len(item) == 3 else None
+            entries.append(PlainEntry(item[0], item[1], until))
     else:
-        raise click.ClickException(f"{where}: expected a string or a table")
+        raise click.ClickException(f"{where}: expected a string, a table or a list of pairs")
     _check_entries(entries, where)
     return entries
 

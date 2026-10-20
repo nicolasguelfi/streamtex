@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.58] — 2026-10-20 — stx release: multi-document projects, passwords per site
+
 ### Added
 
 - **`stx release`: publish the documents of a multi-document project** (#136,

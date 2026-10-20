@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.59] — 2026-10-20 — stx release for the StreamTeX manuals
+
 ### Added
 
 - **`stx release`: what the StreamTeX manuals need** (board docrel, 2026-10-20).

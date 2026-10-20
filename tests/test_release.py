@@ -273,3 +273,39 @@ def test_provisional_suffix_in_nginx_domains_and_urls(tmp_path):
     assert d["live"].startswith("https://chat1d-slides-next.example.org,")
     t = Target("p", {"type": "ssh", "host": "h", "root": "/r", "domain": "example.org", "site_suffix": "-next"})
     assert t.url_of("live_url", "chat1d-slides", "/x") == ("https://chat1d-slides-next.example.org/x", None)
+
+
+# -- 0.7.60: behind a CDN, and a clean tree after a publication --------------------------------
+
+def test_visitor_checks_send_a_user_agent(monkeypatch):
+    from streamtex.release.target import Target
+    seen = {}
+
+    class Resp:
+        status = 200
+        def read(self):
+            return b"rel\n"
+        def __enter__(self):
+            return self
+        def __exit__(self, *a):
+            return False
+
+    def fake_open(req, timeout=0):
+        seen["ua"] = req.get_header("User-agent")
+        return Resp()
+
+    monkeypatch.setattr("urllib.request.urlopen", fake_open)
+    t = Target("p", {"type": "ssh", "host": "h", "root": "/r", "domain": "example.org"})
+    assert t.get("static_url", "s", "/html/version.txt") == (200, "rel\n")
+    assert seen["ua"].startswith("stx-release/")
+
+
+def test_uv_lock_is_put_back(tmp_path):
+    from streamtex.release.build import keep_lock
+    lock = tmp_path / "uv.lock"
+    lock.write_text("original\n")
+    with keep_lock(tmp_path):
+        lock.write_text("rewritten by uv\n")
+    assert lock.read_text() == "original\n"
+    with keep_lock(tmp_path / "nowhere"):
+        pass                                                   # no lock: nothing to do

@@ -43,6 +43,30 @@ def require_committed(root: Path) -> str:
     return git(root, "rev-parse", "--short=12", "HEAD")
 
 
+# -- the project's uv.lock is never changed by stx release ------------------------------------
+
+class keep_lock:
+    """Put the project's ``uv.lock`` back as it was after a ``uv`` call: ``uv export --no-sources`` rewrites
+    it, and so does ``uv run`` when the lock is stale. A publication must not leave the tree modified."""
+
+    def __init__(self, root: Path):
+        self.path = root / "uv.lock"
+        self.saved: bytes | None = None
+
+    def __enter__(self):
+        self.saved = self.path.read_bytes() if self.path.is_file() else None
+        return self
+
+    def __exit__(self, *exc):
+        if self.saved is not None and (not self.path.is_file() or self.path.read_bytes() != self.saved):
+            self.path.write_bytes(self.saved)
+
+
+def _env_without_frozen() -> dict:
+    """``UV_FROZEN`` makes ``uv export`` ignore ``--no-sources`` (local paths in the requirements)."""
+    return {k: v for k, v in os.environ.items() if k not in ("UV_FROZEN", "UV_LOCKED")}
+
+
 # -- the live image's dependencies ---------------------------------------------------------
 
 def lock_files(cfg: ReleaseConfig) -> tuple[str, str]:
@@ -52,7 +76,9 @@ def lock_files(cfg: ReleaseConfig) -> tuple[str, str]:
     argv += ["--no-sources"] if cfg.lock_no_sources else ["--frozen"]
     for pkg in cfg.lock_exclude:
         argv += ["--no-emit-package", pkg]
-    r = subprocess.run(argv, cwd=cfg.root, text=True, capture_output=True)
+    with keep_lock(cfg.root):
+        r = subprocess.run(argv, cwd=cfg.root, text=True, capture_output=True,
+                           env=_env_without_frozen() if cfg.lock_no_sources else None)
     if r.returncode:
         raise ReleaseError(f"uv export: {r.stderr[-600:]}")
     req = "".join(line + "\n" for line in r.stdout.splitlines() if line and not line.startswith(("#", " ")))
@@ -64,8 +90,9 @@ def installed_version(cfg: ReleaseConfig) -> str:
 
 
 def _project_python(cfg: ReleaseConfig, code: str) -> str:
-    r = subprocess.run(["uv", "run", "--project", str(cfg.root), "python", "-c", code],
-                       cwd=cfg.root, text=True, capture_output=True)
+    with keep_lock(cfg.root):
+        r = subprocess.run(["uv", "run", "--project", str(cfg.root), "python", "-c", code],
+                           cwd=cfg.root, text=True, capture_output=True)
     if r.returncode:
         raise ReleaseError(f"the project's python: {r.stderr[-400:]}")
     return r.stdout.strip()
@@ -165,9 +192,10 @@ def export(cfg: ReleaseConfig, site: Site, code: Path, work: Path, release: str,
     for lang in cfg.langs or ("",):
         out = html / lang if lang else html
         lang_env = {"STX_LANG": lang} if lang else {}
-        r = subprocess.run(["uv", "run", "--project", str(cfg.root), "stx", "export", "html", "--output",
-                            str(out), "."], cwd=doc, text=True, capture_output=True,
-                           env={**env, **lang_env, **(html_env or {})})
+        with keep_lock(cfg.root):
+            r = subprocess.run(["uv", "run", "--project", str(cfg.root), "stx", "export", "html", "--output",
+                                str(out), "."], cwd=doc, text=True, capture_output=True,
+                               env={**env, **lang_env, **(html_env or {})})
         page = out / name / f"{name}.html"
         if r.returncode or not page.exists():
             raise ReleaseError(f"{site.site}: the {lang or 'HTML'} export failed (code {r.returncode}):\n"

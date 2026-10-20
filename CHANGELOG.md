@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`stx release` behind Cloudflare.** Every visitor check (`status`, and
+  the check after a publication) now sends a `User-Agent`
+  (`stx-release/<version>`). Cloudflare answers 403 to Python's default
+  agent, which made `status` report gaps and would have made a publication
+  roll itself back. Found when the StreamTeX manuals switched over.
+- **`stx release` no longer modifies `uv.lock`.** `uv export --no-sources`
+  rewrote it, and so did `uv run` when the lock was stale, which left the
+  tree modified after a publication. The project's `uv.lock` is now put
+  back after every `uv` call, and `UV_FROZEN` is no longer passed to the
+  export without sources (it made uv ignore `--no-sources`).
+
 ## [0.7.59] — 2026-10-20 — stx release for the StreamTeX manuals
 
 ### Added

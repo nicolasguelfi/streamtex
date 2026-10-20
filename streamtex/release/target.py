@@ -17,6 +17,17 @@ from pathlib import Path
 
 from . import ReleaseError
 
+
+def _user_agent() -> str:
+    """Sent with every visitor check: a CDN in front of the sites (Cloudflare) answers 403 to Python's
+    default ``Python-urllib`` agent, which a check would then read as a failed publication."""
+    try:
+        from importlib.metadata import version
+        return f"stx-release/{version('streamtex')} (+https://streamtex.org)"
+    except Exception:  # noqa: BLE001
+        return "stx-release (+https://streamtex.org)"
+
+
 LIVE_ROOT = "/srv/live"
 STATIC_ROOT = "/srv/static"
 
@@ -96,7 +107,7 @@ class Target:
 
     def get(self, base_key: str, site: str, path: str, cookie: str = "") -> tuple[int, str]:
         url, host = self.url_of(base_key, site, path)
-        req = urllib.request.Request(url)
+        req = urllib.request.Request(url, headers={"User-Agent": _user_agent()})
         if host:
             req.add_header("Host", host)
         if cookie:
@@ -113,7 +124,7 @@ class Target:
         """Log in to the HTML face as a visitor: the session cookie, or ``""``."""
         url, host = self.url_of("static_url", site, "/html/_login")
         data = urllib.parse.urlencode({"password": password, "next": "/html/"}).encode()
-        req = urllib.request.Request(url, data=data, method="POST")
+        req = urllib.request.Request(url, data=data, method="POST", headers={"User-Agent": _user_agent()})
         if host:
             req.add_header("Host", host)
 

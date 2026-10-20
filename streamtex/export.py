@@ -499,6 +499,7 @@ class HtmlExportBuffer:
             f"</div>\n"
             f"{_LIST_INSIDE_JS}\n"
             f"{_video_stage_js(body)}"
+            f"{_countdown_js(body)}"
             f"</body>\n</html>\n"
         )
 
@@ -847,13 +848,23 @@ def apply_view_to_export_html(html: str, *, built_view: Optional[tuple] = None,
     return html.replace("</head>", f"<style>{css}</style>\n</head>", 1)
 
 
-def _video_stage_js(body: str) -> str:
-    """The video stage script (#56), once, when the page has a staged video."""
-    if "stx-video-marker" not in body:
+def _runtime_js(body: str, needle: str, name: str) -> str:
+    """The runtime script *name*, once, when *body* holds *needle*."""
+    if needle not in body:
         return ""
-    path = os.path.join(os.path.dirname(__file__), "static", "js", "stx_video.js")
+    path = os.path.join(os.path.dirname(__file__), "static", "js", name)
     with open(path, encoding="utf-8") as f:
         return f"<script>\n{f.read()}</script>\n"
+
+
+def _video_stage_js(body: str) -> str:
+    """The video stage script (#56), once, when the page has a staged video."""
+    return _runtime_js(body, "stx-video-marker", "stx_video.js")
+
+
+def _countdown_js(body: str) -> str:
+    """The countdown runtime (#52), once, when the page holds a rack."""
+    return _runtime_js(body, "data-stx-countdown", "stx_countdown.js")
 
 
 def generate_export_html() -> Optional[str]:

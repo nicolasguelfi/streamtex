@@ -116,6 +116,9 @@ try:
     # Usage notice and print rules of a document (#107)
     from .printing import PrintConfig
 
+    # Countdown / stopwatch / clock racks (#52)
+    from .countdown import CountdownConfig, st_countdown
+
     # Export-aware widget wrappers
     from .export_widgets import (
         st_dataframe, st_table, st_metric, st_json, st_graphviz,
@@ -274,6 +277,8 @@ __all__ = [
     "PageLayout",
     "PdfConfig",
     "PrintConfig",
+    "CountdownConfig",
+    "st_countdown",
     "PdfLoadReport",
     "PdfMode",
     "PresentationConfig",

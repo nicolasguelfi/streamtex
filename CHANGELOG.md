@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`st_countdown`: a grid of countdown, stopwatch and clock cards** (#52).
+  `st_countdown(steps, mode)` draws a rack on a slide, the same way live and
+  in the HTML export, with no server state. The userland version comes from
+  the POSTAIR decks (`st_countdown_rack`); this version needs no iframe and
+  no `key`.
+  - **Steps**: `(label, minutes)`, with fractions allowed; a 3rd item can be
+    a timbre or an options dict (`type`, `tz`, `city`, `alarm`, `volume`,
+    `duration`, `label_scale`, `width`). Card types: `countdown`,
+    `stopwatch` (counts up, optional target in minutes) and `clock` (an IANA
+    `tz` shown with the browser's `Intl`, optional target `"HH:MM"`).
+  - **Modes**: in `"chain"` one card with an end runs at a time and starts
+    the next one when it ends; cards with no end run freely. A stopwatch
+    keeps counting past its target, and a clock target already past hands
+    over at once. In `"parallel"` the cards are independent.
+  - **Buttons**: ▶ ⏸ ↺ on each card, ▶ Start / ↺ Reset above the grid.
+    Nothing runs before a click, unless `autostart` (a break screen, which
+    starts the first time it is on screen). While a card runs, its "ends at
+    HH:MM" line shows. A finished card shows its initial duration in the
+    finished colour.
+  - **Alarms** (opt-in): bell, beep, chime or gong, synthesised with
+    WebAudio, so no media file is needed. Volume, repeat duration and a
+    per-card override are available. An alarmed rack starts muted: card and
+    global bells arm it, and each card's choice is remembered in the browser.
+  - **Editing**: double-click the digits to set a countdown's time left, a
+    stopwatch's target or a clock's target; ↺ restores the original.
+  - **Sizing**: `grid=(rows, cols)` or a compact default, `rack_vh`,
+    `scale`, `label_scale`, `ends_scale`, `digits_width`. The digits are
+    measured to fill their card, and no scrollbar appears.
+  - **Survives reruns**: the state of a rack carries over when Streamlit
+    redraws it.
+  - **Configuration**: `CountdownConfig` holds colours, labels, `autostart`,
+    global buttons and alarms. `CountdownConfig.resolve(local, json_path)`
+    layers defaults, local values and a JSON file, and drops what does not
+    fit instead of failing.
+  - One script, `static/js/stx_countdown.js`, runs with the marker runtime
+    live and inline, once, in an export page that holds a rack. A PDF shows
+    the idle state.
+
 ## [0.7.56] — 2026-10-20 — Headless export runs ordinary widget code
 
 ### Fixed

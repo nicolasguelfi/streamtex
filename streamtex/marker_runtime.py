@@ -61,6 +61,7 @@ _CSS_PATH = _STATIC_DIR / "css" / "stx_global.css"
 _JS_PATH = _STATIC_DIR / "js" / "stx_marker_observer.js"
 _SCROLL_SPY_JS_PATH = _STATIC_DIR / "js" / "stx_scroll_spy.js"
 _VIDEO_JS_PATH = _STATIC_DIR / "js" / "stx_video.js"          # st_video stage (#56)
+_COUNTDOWN_JS_PATH = _STATIC_DIR / "js" / "stx_countdown.js"  # st_countdown (#52)
 
 _COMPONENT_NAME = "stx_marker_observer"
 
@@ -123,6 +124,7 @@ def inject_marker_runtime() -> None:
     js = _read_asset(_JS_PATH)
     scroll_spy_js = _read_asset(_SCROLL_SPY_JS_PATH)
     video_js = _read_asset(_VIDEO_JS_PATH)
+    countdown_js = _read_asset(_COUNTDOWN_JS_PATH)
     if not css and not js and not scroll_spy_js:
         return
 
@@ -137,7 +139,7 @@ def inject_marker_runtime() -> None:
         if js or scroll_spy_js:
             component = st.components.v2.component(
                 _COMPONENT_NAME,
-                js=_wrap_observer_for_v2(js, scroll_spy_js, video_js),
+                js=_wrap_observer_for_v2(js, scroll_spy_js, video_js, countdown_js),
                 isolate_styles=False,
             )
             component()

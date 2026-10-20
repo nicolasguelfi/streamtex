@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.56] — 2026-10-20 — Headless export runs ordinary widget code
+
 ### Fixed
 
 - **`stx export html` runs ordinary widget code again** (headless Streamlit).

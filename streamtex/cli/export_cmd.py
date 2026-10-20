@@ -225,6 +225,8 @@ def export_html(path, output, asset_mode, title, no_nav, theme_mode, theme_bg, t
         full_html = st.session_state.get(_book_mod._STX_FULL_EXPORT_HTML_KEY)
         nav_data = st.session_state.get("_stx_export_nav")
         _cache_data = st.session_state.get(_book_mod._STX_CACHE_KEY) or {}
+        from ..printing import get_print_state
+        print_rules = get_print_state(st.session_state)       # notice, html_print (#107)
 
     elapsed = time.time() - t0
 
@@ -277,6 +279,8 @@ def export_html(path, output, asset_mode, title, no_nav, theme_mode, theme_bg, t
 
     def _enrich(html_in, page_nav=None):
         html_in = lazy_load_images(html_in, nav_markers)       # each output file (#115)
+        from ..printing import apply_html_print_rule
+        html_in = apply_html_print_rule(html_in, print_rules)  # #107
         if no_nav or not nav_data:
             return html_in
         from ..export_enrich import enrich_export_html
@@ -288,6 +292,7 @@ def export_html(path, output, asset_mode, title, no_nav, theme_mode, theme_bg, t
             doc_version=_cache_data.get("doc_version", ""),
             lib_version=_cache_data.get("lib_version", ""),
             page_nav=page_nav,
+            notice=print_rules["notice"],
         )
 
     if not no_nav and nav_data:

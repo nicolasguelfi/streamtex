@@ -270,7 +270,7 @@ if _LOGO_TINY_PATH.exists():
 
 def _build_sidebar_html(toc: list[dict], has_search: bool = False,
                         doc_version: str = "", lib_version: str = "",
-                        page_nav: dict | None = None) -> str:
+                        page_nav: dict | None = None, notice: str = "") -> str:
     """Build the sidebar TOC HTML from cache data.
 
     In a paginated export file (*page_nav*, #106) the table of contents is the
@@ -330,6 +330,10 @@ def _build_sidebar_html(toc: list[dict], has_search: bool = False,
             f'border-top:1px solid #e0e0e0;font-size:11px;color:#999;">'
             f'{_ver_text}</div>'
         )
+    if notice:                                   # the usage notice (#107)
+        from .printing import notice_html
+        _rule = "" if doc_version else "margin-top:16px;padding-top:8px;border-top:1px solid #e0e0e0;"
+        parts.append(notice_html(notice, f"{_rule}margin-top:4px;font-size:11px;color:#999;"))
     parts.append('<div style="height:40px;"></div>')  # bottom spacer
     # Drag-resize handle on the right edge.  Double-click resets to 280px.
     # tabindex=0 + role="separator" makes it keyboard-focusable; the JS
@@ -983,6 +987,7 @@ def enrich_export_html(
     doc_version: str = "",
     lib_version: str = "",
     page_nav: dict | None = None,
+    notice: str = "",
 ) -> str:
     """Transform raw export HTML into a fully navigable static document.
 
@@ -1071,7 +1076,7 @@ def enrich_export_html(
     if has_toc:
         sidebar_html = _build_sidebar_html(toc, has_search=has_search,
                                            doc_version=doc_version, lib_version=lib_version,
-                                           page_nav=page_nav)
+                                           page_nav=page_nav, notice=notice)
         raw_html = raw_html.replace("<body>", "<body>\n" + sidebar_html, 1)
 
     # --- Build JS block ---

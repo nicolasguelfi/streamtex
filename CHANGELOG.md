@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **A usage notice and print rules per document** (#107).
+  `st_book(notice=..., printable=...)` sets them for one module, in the live
+  app and in every HTML export of it (`stx export html`, the "Download as..."
+  panel, automatic exports).
+  - `notice="…"` or `{"en": …, "fr": …}`: one grey line under the version in
+    the sidebar of the app and of the HTML export.
+  - `printable=False`: printing the app or the HTML export (File › Print,
+    "Save as PDF") gives a sheet with the notice and nothing else, and the
+    panel no longer offers the PDF. The HTML download stays.
+  - `printable=PrintConfig(app_print=, app_pdf=, html_print=, app_html=)`
+    sets each one; the panel disappears when it has neither HTML nor PDF to
+    offer.
+  The rule is a `@media print` style: no script, nothing changes on screen,
+  and the PDF the panel makes is not affected by `html_print`. It states a
+  rule; it cannot stop a screenshot. Automatic exports (`exports=[...]`) are
+  the author's and keep writing their PDF. `PrintConfig` is exported.
+
 ## [0.7.54] — 2026-10-19 — Export stops on a failing block, APA web pages, login service version, multi-module deploys
 
 ### Added

@@ -113,6 +113,9 @@ try:
     # PDF Export (requires optional 'pdf' extra)
     from .pdf_export import PdfConfig, PdfLoadReport, PdfMode, export_pdf
 
+    # Usage notice and print rules of a document (#107)
+    from .printing import PrintConfig
+
     # Export-aware widget wrappers
     from .export_widgets import (
         st_dataframe, st_table, st_metric, st_json, st_graphviz,
@@ -270,6 +273,7 @@ __all__ = [
     "NumberingMode",
     "PageLayout",
     "PdfConfig",
+    "PrintConfig",
     "PdfLoadReport",
     "PdfMode",
     "PresentationConfig",

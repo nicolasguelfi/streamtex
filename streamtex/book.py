@@ -67,6 +67,15 @@ from .presentation_profile import (
     build_default_profile,
     is_profile_modified,
 )
+from .printing import (
+    PRINT_KEY,
+    PrintConfig,
+    apply_html_print_rule,
+    get_print_state,
+    notice_html,
+    print_block_css,
+    print_state,
+)
 from .search import generate_search_input_html, generate_search_script, start_collector, stop_collector
 from .slide import add_slide_break_options
 from .space import st_br, st_space
@@ -265,7 +274,10 @@ def _offer_export_downloads(html: str, base_name: str,
     """
     from .pdf_export import PdfLoadReport, PdfMode, export_pdf
 
-    pdf_available = _is_pdf_available()
+    rules = get_print_state()                  # what the author lets a reader take (#107)
+    if not (rules["app_html"] or rules["app_pdf"]):
+        return
+    pdf_available = _is_pdf_available() and rules["app_pdf"]
     state_key = f"_stx_export_{base_name}"
     defaults = pdf_config or PdfConfig()
 
@@ -288,13 +300,15 @@ def _offer_export_downloads(html: str, base_name: str,
     with st.expander("Download as..."):
 
         # ── Format checkboxes — outside form for dynamic rerun ────
-        want_html = st.checkbox("HTML", value=True,
-                                key=f"_stx_want_html_{base_name}")
+        want_html = False
+        if rules["app_html"]:
+            want_html = st.checkbox("HTML", value=True,
+                                    key=f"_stx_want_html_{base_name}")
         want_pdf = False
         if pdf_available:
             want_pdf = st.checkbox("PDF", value=False,
                                    key=f"_stx_want_pdf_{base_name}")
-        else:
+        elif rules["app_pdf"]:
             st.caption("PDF requires `streamtex[pdf]`")
 
         # ── Form — configuration + Generate ──────────────────────
@@ -501,6 +515,7 @@ def _offer_export_downloads(html: str, base_name: str,
                             search_index=_cache.get("search_index"),
                             doc_version=_cache.get("doc_version", ""),
                             lib_version=_cache.get("lib_version", ""),
+                            notice=rules["notice"],
                         )
                         # Apply custom title override
                         if enrich_title:
@@ -517,6 +532,7 @@ def _offer_export_downloads(html: str, base_name: str,
                         # original html_download untouched and continue.
                         pass
 
+                html_download = apply_html_print_rule(html_download, rules)   # #107
                 collector = get_asset_collector()
                 # Served media (configure_image_path) must survive off the
                 # server: materialise them into the collector / as data
@@ -645,6 +661,7 @@ def _run_auto_exports(
                 _html_out = materialize_served_media(html, collector)
                 _html_out = lazy_load_images(                 # #115
                     _html_out, st.session_state.get(_STX_CACHE_KEY, {}).get("markers"))
+                _html_out = apply_html_print_rule(_html_out, get_print_state())   # #107
                 if collector:
                     # External mode: write HTML + data/ folder to disk
                     out_dir = str(_P(path).parent)
@@ -731,7 +748,9 @@ def _st_book_impl(module_list, toc_config: TOCConfig = None, marker_config: Mark
             block_args: tuple = (),
             block_kwargs: dict | None = None,
             lang: str | None = None,
-            html_export_zoom: int = 0):
+            html_export_zoom: int = 0,
+            notice=None,
+            printable: bool | PrintConfig = True):
     """Generates a web page e-book from a list of block modules.
 
     :param separator: Optional module with a build() function, rendered between each block.
@@ -785,6 +804,17 @@ def _st_book_impl(module_list, toc_config: TOCConfig = None, marker_config: Mark
         ``"auto"`` = :func:`streamtex.i18n.current_lang` (``$STX_LANG`` >
         ``?lang=`` > default), or an explicit code. An explicit ``"lang"``
         in ``block_kwargs`` wins. ``None`` (default) forwards nothing.
+    :param notice: A usage notice of this document (#107), ``"…"`` or
+        ``{"en": …, "fr": …}``: one line under the version in the sidebar of
+        the app and of the HTML export, and the only thing on the printed
+        sheet when printing is off.
+    :param printable: What a reader may print or download (#107). ``True``
+        (default) everything; ``False`` no printing of the app, no PDF in the
+        "Download as..." panel, no printing of the HTML export (the HTML
+        download stays); a :class:`~streamtex.printing.PrintConfig` sets
+        ``app_print``, ``app_pdf``, ``html_print`` and ``app_html`` one by one.
+        Automatic exports (``exports=[...]``) are the author's and keep
+        writing their PDF.
     """
     _pagewalk.set_paginate_by(paginate_by)      # ValueError on a wrong value (#121)
     if html_export_mode not in HTML_EXPORT_MODES:
@@ -801,6 +831,8 @@ def _st_book_impl(module_list, toc_config: TOCConfig = None, marker_config: Mark
         doc_version = _project_version()
     _block_args = tuple(block_args or ())
     _block_kwargs = dict(block_kwargs or {})
+    # --- Usage notice and print rules (#107): read by the panel and every export ---
+    st.session_state[PRINT_KEY] = print_state(printable, notice, _block_kwargs.get("lang"))
     # --- Resolve PdfConfig from exports list if not provided directly ---
     if pdf_config is None and exports:
         for _ecfg in exports:
@@ -938,6 +970,15 @@ def _st_book_impl(module_list, toc_config: TOCConfig = None, marker_config: Mark
                 f'>{_ver}</a>',
                 unsafe_allow_html=True,
             )
+        _print_rules = st.session_state[PRINT_KEY]
+        if _print_rules["notice"]:
+            st.markdown(notice_html(_print_rules["notice"],
+                                    "text-align:center;font-size:0.75em;opacity:0.55;"),
+                        unsafe_allow_html=True)
+        if not _print_rules["app_print"]:
+            # the printed sheet carries the notice only (#107)
+            st.markdown(f"<style>{print_block_css(_print_rules['notice'])}</style>",
+                        unsafe_allow_html=True)
         _stx_settings = st.expander("Settings")
         with _stx_settings:
             if marker_config is not None:

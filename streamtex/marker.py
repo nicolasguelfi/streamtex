@@ -772,7 +772,7 @@ def inject_marker_navigation(
     :param profile_names: List of profile names for the profile popup.
     :param active_profile: Currently active profile name.
     :param profile_modified: Whether the active profile has been modified.
-    :param nav_toc: Paginated books: the Contents entry in force on each slide,
+    :param nav_toc: The Contents entry in force on each slide (paginated and continuous),
         stop marker index -> position in the TOC (``book._toc_nav_table``).
         The bar puts that entry and its Markers row in cyan (#130).
     """
@@ -807,7 +807,7 @@ __ROLES_JS__
     var navToc = __NAV_TOC__;
 
     /* --- Sidebar highlight (#130) ---
-       The paginated sidebar marks each entry with data-stx-nav ("mk<index>",
+       The sidebar (paginated and continuous) marks each entry with data-stx-nav ("mk<index>",
        "toc<position>").  The entry of the current slide is named by ONE style
        rule in the host page: a rule applies to whatever nodes Streamlit
        renders later, so a rerun that rebuilds the sidebar cannot lose the

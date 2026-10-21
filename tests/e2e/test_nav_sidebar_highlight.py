@@ -13,6 +13,7 @@ highlight of 0.6.36-0.6.40 only broke there):
 """
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import pytest
@@ -149,3 +150,46 @@ def test_the_cyan_survives_a_rerun_that_rebuilds_the_sidebar(page):
     page.get_by_role("button", name="Refresh search index").click()
     page.wait_for_timeout(4000)
     _check(page, 5, "after rerun")
+
+
+# ---------------------------------------------------------------------------
+# Continuous book: the same cyan, from the same bar
+# ---------------------------------------------------------------------------
+
+SPY_BARS_JS = """() => [...document.querySelectorAll('[data-testid="stSidebar"] .stx-nav-active')]
+  .filter(e => getComputedStyle(e, '::before').display !== 'none').length"""
+
+
+@pytest.fixture(scope="module")
+def continuous_url():
+    os.environ["STX_E2E_CONTINUOUS"] = "1"          # read by the deck's book.py
+    try:
+        with streamlit_deck(DECK) as url:
+            yield url
+    finally:
+        os.environ.pop("STX_E2E_CONTINUOUS", None)
+
+
+def test_continuous_arrow_presses_move_the_cyan(continuous_url):
+    """The continuous tables carry data-stx-nav: the bar lights one row per tab, and no scroll-spy bar."""
+    with playwright.sync_playwright() as p:
+        browser = launch_browser(p)
+        page = browser.new_context(viewport=VIEWPORT).new_page()
+        page.set_default_timeout(60_000)
+        try:
+            wait_ready(page, continuous_url)
+            _settle(page, 1)
+            _check(page, 1, "continuous start")
+            for n in range(2, 24):
+                page.keyboard.press("ArrowRight")
+                _settle(page, n)
+                _check(page, n, "continuous ArrowRight")
+                assert page.evaluate(SPY_BARS_JS) == 0, f"slide {n}: a scroll-spy bar is drawn"
+            # the last slide also holds the « Table of Contents » block st_book
+            # draws after the last entry in continuous mode: its heading is in force
+            page.keyboard.press("ArrowRight")
+            page.wait_for_timeout(2000)
+            assert page.evaluate(COUNTER_JS) == 24
+            assert _cyan(page) == sorted(["mk:24. s24", "to:Table of Contents"])
+        finally:
+            browser.close()

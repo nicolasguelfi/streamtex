@@ -7,12 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Continuous view: the sidebar entry of the current slide in cyan** (#130
+  extended). The floating bar already named the Markers row and the Contents
+  heading of its slide, but only the paginated sidebar carried the
+  `data-stx-nav` keys it targets: in continuous view no row was lit. The
+  continuous tables now carry the same keys, and the bar receives the
+  Contents table of a continuous book too. One row per tab is in cyan, as in
+  a paginated book. The scroll-spy bar, clipped and therefore invisible on
+  these rows, is hidden there, as in the paginated sidebar. The HTML export is
+  unchanged.
+
 ### Tests
 
 - `stx release` end to end (Docker): the shared media folder (`media`,
   `media_exclude`) is now checked — one copy in the HTML export of both
   languages, the excluded files left out, the live face reading it through
   the link in each snapshot.
+- Continuous sidebar highlight: unit tests (the keys, with and without
+  search, and the Contents table of a continuous book) and a browser test
+  (24 real ArrowRight presses, one cyan row per tab, no scroll-spy bar).
 
 ## [0.7.61] — 2026-10-21 — the live image built from the repository
 

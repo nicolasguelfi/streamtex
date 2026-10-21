@@ -9,7 +9,7 @@ import json
 import re
 import shutil
 import subprocess
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -119,8 +119,52 @@ def test_the_bar_receives_the_table():
     assert "syncSidebar();" in js
 
 
-def test_continuous_books_send_no_table():
+def test_no_table_sends_null():
     assert "var navToc = null;" in _bar_js(None)
+
+
+# ---------------------------------------------------------------------------
+# Continuous books: the same keys, the same table
+# ---------------------------------------------------------------------------
+
+def _continuous_deck():
+    """One page, no page_idx: s1 « Intro » | s2 « Top » | s3 | s4 « Detail » | s5."""
+    st_marker("s1")
+    st_write("Intro", toc_lvl="1")
+    st_marker("s2")
+    st_write("Top", toc_lvl="1")
+    st_marker("s3")
+    st_marker("s4")
+    st_write("Detail", toc_lvl="2")
+    st_marker("s5")
+
+
+def _continuous_sidebar(search: bool) -> str:
+    from streamtex.book import populate_markers_sidebar, populate_toc
+
+    out = []
+    with patch("streamtex.book.st.markdown", side_effect=lambda h, **k: out.append(h)), \
+         patch("streamtex.book.st.html", side_effect=lambda h, **k: out.append(h)):
+        block_index = {0: ""} if search else None
+        populate_toc(MagicMock(), block_index=block_index, max_level=2)
+        populate_markers_sidebar(MagicMock(), block_index=block_index)
+    return "\n".join(out)
+
+
+@pytest.mark.parametrize("search", [True, False])
+def test_continuous_sidebar_entries_carry_their_nav_key(search):
+    _continuous_deck()
+    html = _continuous_sidebar(search)
+    assert re.findall(r'data-stx-nav="(mk\d+|toc\d+)"', html) == [
+        "toc0", "toc1", "toc2", "mk0", "mk1", "mk2", "mk3", "mk4"]
+    assert "stx-link-active-color" not in html
+
+
+def test_a_continuous_book_gets_the_table():
+    _continuous_deck()
+    table = _toc_nav_table(toc_entries(), marker_entries(), 2)
+    titles = {stop: toc_entries()[pos]["title"].split(" ", 1)[-1] for stop, pos in table.items()}
+    assert titles == {0: "Intro", 1: "Top", 2: "Top", 3: "Detail", 4: "Detail"}
 
 
 node = pytest.mark.skipif(shutil.which("node") is None, reason="node not installed")

@@ -43,8 +43,8 @@
   border-radius: 2px;
   pointer-events: none;
 }
-/* Paginated live sidebar: the floating bar names the entry of its slide in
- * cyan (#130, data-stx-nav); the scroll-spy bar would be a second cue that
+/* Live sidebar, paginated or continuous: the floating bar names the entry of
+ * its slide in cyan (#130, data-stx-nav); the scroll-spy bar would be a second cue that
  * can point at another row. */
 [data-stx-nav].stx-nav-active::before { display: none; }
 

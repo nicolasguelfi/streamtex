@@ -1229,12 +1229,17 @@ def _st_book_impl(module_list, toc_config: TOCConfig = None, marker_config: Mark
         if markers_sidebar is not None:
             populate_markers_sidebar(markers_sidebar, block_index=block_index)
 
-    # Inject marker navigation JS (only if markers were registered)
+    # Inject marker navigation JS (only if markers were registered).
+    # The bar names the sidebar entries of its slide in cyan, as in a
+    # paginated book: the continuous tables carry data-stx-nav too.
     if marker_config is not None:
         inject_marker_navigation(
             profile_names=profile_names,
             active_profile=active_name,
             profile_modified=_profile_modified,
+            nav_toc=_toc_nav_table(toc_entries(), marker_entries(),
+                                   _resolve_sidebar_max_level(toc_config, paginated=False))
+            if use_toc_sidebar else None,
         )
 
     # Presentation footer (auto-rendered when PresentationConfig is active)
@@ -1420,7 +1425,7 @@ def populate_toc(toc_sidebar: Delta, toc_block: Delta = None, toc_content_style:
         if block_index is not None:
             # Search-enabled: single st.markdown block (entries with data-stx-block)
             toc_parts = []
-            for entry in toc_entry_list:
+            for pos, entry in enumerate(toc_entry_list):
                 if max_level is not None and entry['level'] > max_level:
                     continue
                 indent = indent_char * (entry['level'] - 1) * 4
@@ -1431,7 +1436,7 @@ def populate_toc(toc_sidebar: Delta, toc_block: Delta = None, toc_content_style:
                 )
                 block_attr = f' data-stx-block="{entry.get("block_idx", 0)}"'
                 toc_parts.append(
-                    f'<div{block_attr} style="overflow:hidden;text-overflow:ellipsis;'
+                    f'<div data-stx-nav="toc{pos}"{block_attr} style="overflow:hidden;text-overflow:ellipsis;'
                     f'white-space:nowrap;padding:1px 0;font-size:14px;">'
                     f'{indent}{dot}<a href="#{entry["key_anchor"]}">'
                     f'{entry["title"]}</a></div>'
@@ -1439,7 +1444,7 @@ def populate_toc(toc_sidebar: Delta, toc_block: Delta = None, toc_content_style:
             toc_parts.append('<div style="height:40px;"></div>')
             st.markdown("\n".join(toc_parts), unsafe_allow_html=True)
         else:
-            for entry in toc_entry_list:
+            for pos, entry in enumerate(toc_entry_list):
                 if max_level is not None and entry['level'] > max_level:
                     continue
                 indent = indent_char * (entry['level'] - 1) * 4
@@ -1449,7 +1454,7 @@ def populate_toc(toc_sidebar: Delta, toc_block: Delta = None, toc_content_style:
                     if entry['key_anchor'] in marker_anchors else ''
                 )
                 st.html(
-                    f'<span style="overflow:hidden;text-overflow:ellipsis;'
+                    f'<span data-stx-nav="toc{pos}" style="overflow:hidden;text-overflow:ellipsis;'
                     f'text-wrap:nowrap;word-wrap:normal;">'
                     f'{indent}{dot}<a href="#{entry["key_anchor"]}">'
                     f'{entry["title"]}</a></span>'
@@ -1486,8 +1491,8 @@ def populate_markers_sidebar(markers_placeholder: Delta, block_index: dict[int, 
             for entry in entries:
                 block_attr = f' data-stx-block="{entry.get("block_idx", 0)}"'
                 parts.append(
-                    f'<div{block_attr} style="overflow:hidden;text-overflow:ellipsis;'
-                    f'white-space:nowrap;padding:1px 0;font-size:14px;">'
+                    f'<div data-stx-nav="mk{entry["index"]}"{block_attr} style="overflow:hidden;'
+                    f'text-overflow:ellipsis;white-space:nowrap;padding:1px 0;font-size:14px;">'
                     f'<a href="#{entry["anchor"]}">{marker_row_text(entry)}</a></div>'
                 )
             parts.append('<div style="height:40px;"></div>')
@@ -1495,7 +1500,8 @@ def populate_markers_sidebar(markers_placeholder: Delta, block_index: dict[int, 
         else:
             for entry in entries:
                 st.html(
-                    f'<span style="overflow:hidden;text-overflow:ellipsis;text-wrap:nowrap;word-wrap:normal;">'
+                    f'<span data-stx-nav="mk{entry["index"]}" style="overflow:hidden;'
+                    f'text-overflow:ellipsis;text-wrap:nowrap;word-wrap:normal;">'
                     f'<a href="#{entry["anchor"]}">{marker_row_text(entry)}</a></span>'
                 )
 

@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Tests
+
+- `stx release` end to end (Docker): the shared media folder (`media`,
+  `media_exclude`) is now checked — one copy in the HTML export of both
+  languages, the excluded files left out, the live face reading it through
+  the link in each snapshot.
+
 ## [0.7.61] — 2026-10-21 — the live image built from the repository
 
 ### Added

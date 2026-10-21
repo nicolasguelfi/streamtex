@@ -3,13 +3,16 @@
 A three-site project (both faces, html only, live only) is published, visited as a visitor (a list of
 passwords with an end date, an open face, the live login), published again, rolled back, put to sleep
 and woken, its passwords changed without publishing, pruned, and a broken document is refused while
-the served release stays.
+the served release stays. Its shared media folder (``media``, ``media_exclude``) reaches the HTML export
+of each language and the live face, through the link put in each snapshot.
 
 Needs Docker (skipped otherwise). Run:  uv run pytest -m e2e tests/e2e/test_release_local.py -v
 """
 from __future__ import annotations
 
+import base64
 import json
+import re
 import shutil
 import socket
 import subprocess
@@ -25,6 +28,8 @@ import pytest
 pytestmark = pytest.mark.e2e
 
 LIB = Path(__file__).resolve().parents[2]
+# a 1x1 PNG: the shared media of the project
+DOT = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==")
 
 
 def _docker_ok() -> bool:
@@ -75,14 +80,20 @@ def project(tmp_path_factory):
         """))
         (root / "docs" / d / "blocks" / "__init__.py").write_text("")
         (root / "docs" / d / "blocks" / "bck_main.py").write_text(textwrap.dedent(f"""
+            from pathlib import Path
             import streamtex as stx
             from streamtex.i18n import T
+            DOT = Path(__file__).resolve().parents[3] / "assets" / "img" / "dot.png"   # the snapshot's media link
             def build(**k):
                 stx.st_marker("main")
+                stx.st_image(uri=str(DOT), width=8)
                 stx.st_write(T({{"en": "Document {d} version one", "fr": "Document {d} version un"}}), toc_lvl="1")
                 for i in range(40):
                     stx.st_write(f"Paragraph {{i}} of document {d} with enough words for the minimum check.")
         """))
+    (root / "assets" / "img").mkdir(parents=True)
+    (root / "assets" / "img" / "dot.png").write_bytes(DOT)
+    (root / "assets" / "img" / "dot-original.png").write_bytes(DOT)          # kept out by media_exclude
     (root / "pyproject.toml").write_text(textwrap.dedent(f"""
         [project]
         name = "release-e2e"
@@ -96,6 +107,8 @@ def project(tmp_path_factory):
         [release]
         project = "demo"
         langs = ["en", "fr"]
+        media = "assets"
+        media_exclude = [".DS_Store", "*-original.*"]
         [[release.sites]]
         site = "demo-a"
         book = "docs/a/book.py"
@@ -144,7 +157,8 @@ def project(tmp_path_factory):
     stx("local", "up")
     time.sleep(5)
     stx("server-config")
-    yield {"root": root, "stx": stx, "git": git, "S": f"http://127.0.0.1:{sp}", "L": f"http://127.0.0.1:{lp}"}
+    yield {"root": root, "stx": stx, "git": git, "S": f"http://127.0.0.1:{sp}", "L": f"http://127.0.0.1:{lp}",
+           "host": host, "live": f"stxrel-{tag}-live"}
     stx("local", "down", check=False)
 
 
@@ -174,6 +188,28 @@ def test_release_end_to_end(project):
     assert cookie and _req(p["L"] + "/", "demo-a.example.org", cookie=cookie)[0] == 200
     assert _req(p["L"] + "/_stcore/health", "demo-c.example.org")[0] == 200
     assert _req(p["L"] + "/", "demo-b.example.org")[0] == 404                 # no live face
+
+    # the shared media: in the HTML export of each language, and on the live side through the link
+    cookie_html = _login(p["S"], "demo-a.example.org", "/html/_login", "octpass1")
+    release_html = p["host"] / "static" / "sites" / "demo-a" / "releases" / r1
+    files = {}
+    for lang in ("en", "fr"):
+        code, _, page = _req(p["S"] + f"/html/{lang}/a/a.html", "demo-a.example.org", cookie=cookie_html)
+        src = re.search(r'<img src="(data/images/[0-9a-f]+\.png)"[^>]*width: 8px', page)
+        assert code == 200 and src, f"{lang}: the shared image is not in the export"
+        assert _req(p["S"] + f"/html/{lang}/a/{src.group(1)}", "demo-a.example.org", cookie=cookie_html)[0] == 200
+        files[lang] = release_html / lang / "a" / src.group(1)
+        assert files[lang].read_bytes() == DOT
+    assert files["en"].stat().st_ino == files["fr"].stat().st_ino            # one copy for both languages
+    media = p["host"] / "live" / "media" / "demo" / "assets" / "img"
+    assert (media / "dot.png").read_bytes() == DOT and not (media / "dot-original.png").exists()
+    for site in ("demo-a", "demo-c"):
+        link = p["host"] / "live" / "sites" / site / "releases" / r1 / "assets"
+        assert link.is_symlink() and str(link.readlink()) == "/srv/live/media/demo/assets"
+        seen = subprocess.run(["docker", "exec", p["live"], "test", "-f",
+                               f"/srv/live/sites/{site}/current/assets/img/dot.png"])
+        assert seen.returncode == 0, f"{site}: the live face does not see the shared media"
+    assert not (p["host"] / "static" / "sites" / "demo-a" / "releases" / r1 / "assets").exists()
 
     # a second release, then back
     bck = p["root"] / "docs" / "a" / "blocks" / "bck_main.py"

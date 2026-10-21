@@ -309,3 +309,134 @@ def test_uv_lock_is_put_back(tmp_path):
     assert lock.read_text() == "original\n"
     with keep_lock(tmp_path / "nowhere"):
         pass                                                   # no lock: nothing to do
+
+
+# -- 0.7.61: the live image built from a public repository ---------------------------------------
+
+class FakeCoolify:
+    """Coolify's API as the release code uses it: applications by uuid, deployments that finish."""
+
+    def __init__(self, apps):
+        self.apps = {a["uuid"]: dict(a) for a in apps}
+        self.calls = []
+
+    def call(self, method, path, body=None):
+        self.calls.append((method, path, body))
+        if path == "/projects":
+            return [{"name": "docs", "uuid": "p1"}]
+        if path == "/servers":
+            return [{"name": "localhost", "uuid": "s1"}]
+        if path == "/applications" and method == "GET":
+            return list(self.apps.values())
+        if path == "/applications/public":
+            self.apps["new1"] = {"uuid": "new1", "name": body["name"], "git_repository": body["git_repository"]}
+            return {"uuid": "new1"}
+        if path.startswith("/applications/") and method == "GET":
+            return self.apps[path.split("/")[2]]
+        if path.startswith("/applications/") and method == "PATCH":
+            self.apps[path.split("/")[2]].update(body)
+            return {}
+        if path.startswith("/deployments/"):
+            return {"status": "finished"}
+        if path.startswith("/deploy?"):
+            return {"deployments": [{"deployment_uuid": "d1"}]}
+        if path.endswith("/restart"):
+            return {"deployment_uuid": "d2"}
+        return {}
+
+
+def _repo_target():
+    return {"coolify_env": "x.env", "coolify_project": "docs", "root": "/data/stx/docs", "domain": "example.org",
+            "static_app": "docs-static", "live_app": "docs-live", "static_uuid": "st1", "live_uuid": "old1",
+            "repo": "owner/docs"}
+
+
+def _locked(tmp_path):
+    cfg = load_config(_project(tmp_path, SITES))
+    cfg.lock_dir.mkdir()
+    (cfg.lock_dir / "stx-version").write_text("0.7.61\n")
+    (cfg.lock_dir / "requirements.txt").write_text("rich==13.0\n")
+    return cfg
+
+
+def test_repo_faces_and_their_dockerfile(tmp_path):
+    from streamtex.release import coolify
+    cfg = _locked(tmp_path)
+    assert coolify.repo_faces({}) == () and coolify.repo_faces(_repo_target()) == ("live",)
+    with pytest.raises(ReleaseError, match="repo_faces"):
+        coolify.repo_faces({"repo": "o/r", "repo_faces": ["web"]})
+    [path] = coolify.write_dockerfiles(cfg, ("live",))
+    assert path == cfg.lock_dir / "Dockerfile.live" and path.read_text() == compose_dockerfile(cfg, "live")
+    assert coolify.repo_url("owner/docs") == "https://github.com/owner/docs"
+
+
+def test_a_missing_live_app_is_created_from_the_repository(tmp_path, monkeypatch):
+    from streamtex.release import coolify
+    cfg = _locked(tmp_path)
+    fake = FakeCoolify([{"uuid": "st1", "name": "docs-static", "dockerfile": "FROM nginx"}])
+    monkeypatch.setattr(coolify, "Coolify", lambda root, env: fake)
+    uuids = coolify.setup(cfg, _repo_target(), lambda m: None)
+    assert uuids == {"static_uuid": "st1", "live_uuid": "new1"}
+    [body] = [b for m, p, b in fake.calls if p == "/applications/public"]
+    assert body["git_repository"] == "https://github.com/owner/docs" and body["build_pack"] == "dockerfile"
+    assert body["dockerfile_location"] == "/.stx-release/Dockerfile.live" and body["is_auto_deploy_enabled"] is False
+
+
+def test_migration_moves_the_domains_in_two_runs(tmp_path, monkeypatch):
+    from streamtex.release import coolify
+    cfg = _locked(tmp_path)
+    fake = FakeCoolify([{"uuid": "old1", "name": "docs-live", "dockerfile": "FROM python"}])
+    monkeypatch.setattr(coolify, "Coolify", lambda root, env: fake)
+    monkeypatch.setattr(coolify, "require_pushed_dockerfile", lambda *a: None)
+    t, said = _repo_target(), []
+    assert coolify.migrate(cfg, t, "live", lambda u: True, said.append) is False
+    assert t["live_uuid"] == "new1" and t["live_uuid_inline"] == "old1"
+    assert fake.apps["old1"]["name"] == "docs-live-inline" and any("Directory Mount" in m for m in said)
+    with pytest.raises(ReleaseError, match="not mounted"):
+        coolify.migrate(cfg, t, "live", lambda u: False, said.append)
+    assert fake.apps["old1"].get("domains") is None                         # nothing moved without the volume
+    assert coolify.migrate(cfg, t, "live", lambda u: True, said.append) is True
+    assert fake.apps["old1"]["domains"] == "" and fake.apps["new1"]["domains"].startswith("https://chat1d-slides.")
+    order = [p for m, p, b in fake.calls if p in ("/applications/old1", "/applications/new1") and m == "PATCH"]
+    assert order[-2:] == ["/applications/old1", "/applications/new1"]       # freed before it is taken
+    assert ("POST", "/applications/old1/stop", None) in fake.calls and "live_uuid_inline" not in t
+    assert coolify.migrate(cfg, t, "live", lambda u: True, said.append) is True   # nothing left to do
+
+
+def test_rebuild_refuses_a_pasted_dockerfile(tmp_path, monkeypatch):
+    from streamtex.release import coolify
+    cfg = _locked(tmp_path)
+    with pytest.raises(ReleaseError, match="paste"):
+        coolify.rebuild(cfg, {**_repo_target(), "repo": ""}, "live", print)
+    fake = FakeCoolify([{"uuid": "old1", "name": "docs-live", "dockerfile": "FROM python"}])
+    monkeypatch.setattr(coolify, "Coolify", lambda root, env: fake)
+    monkeypatch.setattr(coolify, "require_pushed_dockerfile", lambda *a: None)
+    with pytest.raises(ReleaseError, match="--migrate live"):
+        coolify.rebuild(cfg, _repo_target(), "live", print)
+
+
+def test_rebuild_needs_the_dockerfile_pushed(tmp_path):
+    import subprocess
+
+    from streamtex.release import coolify
+    remote, work = tmp_path / "remote.git", tmp_path / "work"
+    subprocess.run(["git", "init", "-q", "--bare", "-b", "main", str(remote)], check=True)
+    work.mkdir()
+    cfg = _locked(work)
+
+    def g(*a):
+        subprocess.run(["git", "-C", str(work), *a], check=True, capture_output=True)
+
+    g("init", "-q", "-b", "main")
+    g("remote", "add", "origin", str(remote))
+    g("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", "start")
+    g("push", "-q", "origin", "main")
+    with pytest.raises(ReleaseError, match="stx release lock"):
+        coolify.require_pushed_dockerfile(cfg, _repo_target(), "live")
+    coolify.write_dockerfiles(cfg, ("live",))
+    with pytest.raises(ReleaseError, match="push it"):
+        coolify.require_pushed_dockerfile(cfg, _repo_target(), "live")
+    g("add", ".")
+    g("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "lock")
+    g("push", "-q", "origin", "main")
+    coolify.require_pushed_dockerfile(cfg, _repo_target(), "live")

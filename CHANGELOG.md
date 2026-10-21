@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`stx release`: the live image built from a public repository** — no
+  more Dockerfile to paste in Coolify at each streamtex version.
+  - In the target, `"repo": "owner/name"` (and `repo_branch`, default
+    `main`; `repo_faces`, default `["live"]`): `stx release lock` also writes
+    `<dir>/Dockerfile.<face>`, to commit and push.
+  - `stx release rebuild [--face live]` checks that the Dockerfile on the
+    remote branch is today's, has Coolify build it, waits for the
+    deployment and checks the streamtex version the live application runs.
+  - `stx release setup --apply` creates a missing application from the
+    repository. An application created from a pasted Dockerfile cannot be
+    switched through the API: `stx release setup --migrate live` renames it
+    `<name>-inline`, creates the new one; after the volume is mounted in
+    Coolify, a second run builds it, checks the volume, moves the domains
+    and stops the old one (kept for a rollback).
+  - `publish`, on a version gap, names `stx release rebuild` when it applies.
+
 ## [0.7.60] — 2026-10-21 — stx release behind Cloudflare
 
 ### Fixed

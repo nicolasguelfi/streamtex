@@ -59,8 +59,10 @@ def publish_cmd(sites, groups, target, allow_skew, html_env):
     running = ops.image_version(t)
     wanted = (cfg.lock_dir / "stx-version").read_text(encoding="utf-8").strip()
     if not skew and running and running != wanted:
+        how = ("stx release rebuild" if "live" in coolify.repo_faces(t.cfg)
+               else "stx release setup --show live, paste, redeploy")
         skew = (f"the live application runs streamtex {running}, {cfg.dir}/stx-version says {wanted} — "
-                "rebuild it (stx release setup --show live, paste, redeploy)")
+                f"rebuild it ({how})")
     if skew and not allow_skew:
         raise ReleaseError(f"{skew} — publish with the image's streamtex, or pass --allow-skew for a trial")
     if skew:
@@ -172,10 +174,31 @@ def wake_cmd(site, target):
 
 @release.command("lock")
 def lock_cmd():
-    """Write the live image's requirements.txt and stx-version from uv.lock (then rebuild the live app)."""
+    """Write the live image's requirements.txt and stx-version from uv.lock (then rebuild the live app).
+
+    For the faces a target builds from the repository (``repo``), also their Dockerfile.<face>."""
     cfg = load_config()
     n, ver = build.write_lock(cfg)
     click.echo(f"{cfg.dir}/requirements.txt ({n} packages) and {cfg.dir}/stx-version ({ver}) written")
+    if (cfg.root / STATE_FILE).is_file():
+        faces = sorted({f for tc in load_state(cfg.root).get("targets", {}).values() for f in coolify.repo_faces(tc)})
+        for path in coolify.write_dockerfiles(cfg, faces):
+            click.echo(f"{path.relative_to(cfg.root)} written — commit and push it, then `stx release rebuild`")
+
+
+@release.command("rebuild")
+@_target
+@click.option("--face", type=click.Choice(["static", "live"]), default="live", show_default=True)
+def rebuild_cmd(target, face):
+    """Rebuild an application built from the repository (after lock, commit, push) and wait for it."""
+    cfg, _state, t = _ctx(target)
+    coolify.rebuild(cfg, t.cfg, face, click.echo)
+    if face == "live":
+        running = ops.image_version(t)
+        wanted = (cfg.lock_dir / "stx-version").read_text(encoding="utf-8").strip()
+        if running != wanted:
+            raise ReleaseError(f"rebuilt, but the live application runs streamtex {running or '?'}, not {wanted}")
+        click.echo(f"  live application on streamtex {running}")
 
 
 @release.command("server-config")
@@ -208,7 +231,9 @@ def prune_cmd(target):
 @click.option("--show", type=click.Choice(["static", "live"]), help="Print the composed Dockerfile and stop.")
 @click.option("--domains", is_flag=True, help="Set both applications' domains from the site list.")
 @click.option("--deploy", is_flag=True, help="With --domains: redeploy both applications.")
-def setup_cmd(target, apply_, show, domains, deploy):
+@click.option("--migrate", type=click.Choice(["static", "live"]),
+              help="Move this face from its pasted Dockerfile to the repository (run it twice: see its output).")
+def setup_cmd(target, apply_, show, domains, deploy, migrate):
     """The two Coolify applications of an ssh target, through the API; prints the manual steps."""
     cfg, state, t = _ctx(target)
     if show:
@@ -216,6 +241,18 @@ def setup_cmd(target, apply_, show, domains, deploy):
         return
     if t.kind != "ssh":
         raise ReleaseError(f"target {t.name} is local — use `stx release local up`")
+    if migrate:
+        def mounted(uuid: str) -> bool:
+            r = t.sh(f"docker inspect --format '{{{{range .Mounts}}}}{{{{.Destination}}}} {{{{end}}}}' "
+                     f"$(docker ps -q --filter name={uuid} | head -1)", check=False)
+            return f"/srv/{migrate}" in r.stdout.split()
+        try:
+            done = coolify.migrate(cfg, t.cfg, migrate, mounted, click.echo)
+        finally:
+            save_state(cfg.root, state)
+        click.echo(f"{migrate}: built from the repository from now on — `stx release rebuild` after each lock"
+                   if done else f"{STATE_FILE}: the new application recorded")
+        return
     if domains:
         coolify.apply_domains(cfg, t.cfg, click.echo, deploy)
         return

@@ -26,11 +26,11 @@ from .config import ReleaseConfig, Site
 GATE_MARK = "stx_gate_header"        # the keypad gate's mark in a page: never exported online
 
 
-def git(root: Path, *args: str) -> str:
+def git(root: Path, *args: str, strip: bool = True) -> str:
     r = subprocess.run(["git", "-C", str(root), *args], text=True, capture_output=True)
     if r.returncode:
         raise ReleaseError(f"git {' '.join(args)}: {r.stderr.strip()[-300:]}")
-    return r.stdout.strip()
+    return r.stdout.strip() if strip else r.stdout
 
 
 def require_committed(root: Path) -> str:

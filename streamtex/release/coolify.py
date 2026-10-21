@@ -231,7 +231,7 @@ def _create_from_repo(co: Coolify, cfg: ReleaseConfig, tcfg: dict, face: str, pr
         "name": tcfg[f"{face}_app"], "instant_deploy": False, "ports_exposes": "80",
         "git_repository": repo_url(tcfg["repo"]), "git_branch": tcfg.get("repo_branch", "main"),
         "build_pack": "dockerfile", "dockerfile_location": "/" + rel, "base_directory": "/",
-        "is_auto_deploy_enabled": False, "health_check_start_period": 180})
+        "is_auto_deploy_enabled": False, "autogenerate_domain": False, "health_check_start_period": 180})
     _health(co, created["uuid"])
     return created["uuid"]
 

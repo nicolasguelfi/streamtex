@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.62] — 2026-10-21 — the cyan in continuous view
+
 ### Fixed
 
 - **Continuous view: the sidebar entry of the current slide in cyan** (#130

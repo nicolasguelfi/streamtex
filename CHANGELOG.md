@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.61] — 2026-10-21 — the live image built from the repository
+
 ### Added
 
 - **`stx release`: the live image built from a public repository** — no

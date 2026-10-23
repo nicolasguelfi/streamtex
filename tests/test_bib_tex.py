@@ -1,6 +1,8 @@
 """BibTeX: TeX decoding, nested braces (#34), institutional authors, ancient
 dates, strict keys, projection cards, long URLs (#54) — #86."""
 
+import re
+
 import pytest
 
 from streamtex import bib
@@ -104,3 +106,38 @@ def test_bibliography_entries_wrap_long_urls(monkeypatch):  # #54
          patch("streamtex.write.st_write"), patch("streamtex.container.st_block"):
         bib.st_bibliography(only_cited=False)
     assert any("overflow-wrap:anywhere;" in h for h in captured)
+
+
+# -- the label before each entry follows citation_style (#23) ----------------------------
+
+def _labels(monkeypatch, citation_style, **kw):
+    from unittest.mock import patch
+
+    from streamtex.bib import BibConfig, CitationStyle
+    reg = bib.get_bib_registry()
+    reg.register_many(parse_bibtex_string(
+        "@article{dart, author = {Dart, Eli and Rotman, Lauren and Tierney, Brian}, year = {2013}, title = {DMZ}}\n"
+        "@book{knuth, author = {Knuth, Donald}, year = {1984}, title = {TeX}}"))
+    monkeypatch.setattr(bib, "_bib_config", BibConfig(citation_style=getattr(CitationStyle, citation_style)))
+    captured = []
+    with patch("streamtex.export._render", side_effect=lambda h, **k: captured.append(h)), \
+         patch("streamtex.write.st_write"), patch("streamtex.container.st_block"):
+        bib.st_bibliography(only_cited=False, **kw)
+    return [re.search(r'<span style="[^"]*">(.*?)</span>', h).group(1) for h in captured if 'id="bib-' in h]
+
+
+def test_author_year_lists_show_the_inline_label(monkeypatch):
+    labels = _labels(monkeypatch, "AUTHOR_YEAR")
+    assert len(labels) == 2 and all(lb.startswith("(") and lb.endswith(")") for lb in labels)
+    assert any("Knuth" in lb and "1984" in lb for lb in labels)
+    assert any("Dart" in lb and "2013" in lb for lb in labels)
+
+
+@pytest.mark.parametrize("style", ["NUMERIC", "SUPERSCRIPT"])
+def test_numbered_lists_keep_their_numbers(monkeypatch, style):
+    assert _labels(monkeypatch, style) == ["[1]", "[2]"]
+
+
+def test_label_style_overrides_the_citation_style(monkeypatch):
+    from streamtex.bib import CitationStyle
+    assert _labels(monkeypatch, "AUTHOR_YEAR", label_style=CitationStyle.NUMERIC) == ["[1]", "[2]"]

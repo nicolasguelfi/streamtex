@@ -1064,7 +1064,8 @@ def st_bibliography(*, style=None, title: str = "References",
                     title_style=None, entry_style=None, number_style=None,
                     toc_lvl: Optional[str] = None,
                     only_cited: bool = True,
-                    format: Optional[BibFormat] = None) -> None:
+                    format: Optional[BibFormat] = None,
+                    label_style: Optional[CitationStyle] = None) -> None:
     """Render the full bibliography list.
 
     Args:
@@ -1072,10 +1073,15 @@ def st_bibliography(*, style=None, title: str = "References",
         title: Section title
         title_style: Style for the title
         entry_style: Style for each bibliography entry text (controls font size, color, etc.)
-        number_style: Style for the citation number [N] (controls color, weight)
+        number_style: Style for the label before each entry (controls color, weight)
         toc_lvl: Register title in TOC at this level
         only_cited: Only show cited entries (vs all registered)
         format: Override BibConfig format
+        label_style: The label before each entry. Defaults to
+            ``BibConfig.citation_style``, so the list shows what ``cite()``
+            shows inline: ``(Dart et al., 2013)`` in AUTHOR_YEAR, ``[3]`` in
+            NUMERIC and SUPERSCRIPT. Pass ``CitationStyle.NUMERIC`` to keep
+            ``[N]`` beside author-year citations.
     """
     from .container import st_block
     from .export import _render
@@ -1102,18 +1108,26 @@ def st_bibliography(*, style=None, title: str = "References",
     # Build inline CSS from Style objects
     entry_css = entry_style.css if entry_style else ""
     number_css = number_style.css if number_style else "font-weight:bold;"
+    labels = label_style or cfg.citation_style
 
     # Entries
     with st_block(style):
         for i, entry in enumerate(entries):
             formatted = format_entry(entry, fmt, number=0)
-            num_html = f'<span style="{number_css}">[{i + 1}]</span> '
+            num_html = f'<span style="{number_css}">{_entry_label(entry, i + 1, labels)}</span> '
             anchor_id = f"bib-{entry.key}"
             _render(
                 f'<p id="{anchor_id}" style="margin-bottom:10px;text-indent:-2.5em;'
                 f'padding-left:2.5em;line-height:1.6;overflow-wrap:anywhere;{entry_css}">'
                 f'{num_html}{formatted}</p>'
             )
+
+
+def _entry_label(entry: BibEntry, number: int, style: CitationStyle) -> str:
+    """The label of a bibliography entry: the one cite() shows inline (#23)."""
+    if style == CitationStyle.AUTHOR_YEAR:
+        return f"({entry.authors_short}, {_label_year(entry)})"
+    return f"[{number}]"
 
 
 def _sort_entries(entries: List[BibEntry], sort_by: str) -> List[BibEntry]:

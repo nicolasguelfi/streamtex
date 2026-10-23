@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.63] — 2026-10-23 — export zoom, a waiting sidebar, author-year references
+
+### Added
+
+- **`stx export html --zoom <percent>` and `--page-width <percent>`** (#139).
+  The document opens as if the browser were at that zoom (`--zoom 80`):
+  `ExportConfig.zoom` / `page_width` are now reachable from the CLI, for the
+  continuous file and every paginated page. It multiplies with the document's
+  own `st_zoom`. A zero or negative value (or a page width above 100) is an
+  error, exit status 1. Without the options the output is unchanged.
+- **`stx release`: `zoom = 80` per site** in `[[release.sites]]` — its HTML
+  face is exported with `--zoom`. The live face is unchanged.
+- **`st_bibliography(label_style=…)`** (#23, first part).
+
+### Changed
+
+- **`st_bibliography()`: the label before each entry follows
+  `BibConfig.citation_style`** (#23). In AUTHOR_YEAR (the default), the list
+  shows `(Dart et al., 2013)`, as `cite()` does inline, instead of `[3]`.
+  NUMERIC and SUPERSCRIPT keep `[N]`. `label_style=CitationStyle.NUMERIC`
+  keeps the numbers beside author-year citations.
+- **`stx deploy hetzner` points to `stx release`**: it prints a one-line note
+  first, then runs as before. It is no longer developed (#103, #124 closed).
+
+### Fixed
+
+- **Continuous view: the Contents and Markers tabs say their table is coming**
+  (#137). They were empty for as long as a long document rendered (the
+  entries are only known after the last block), which looked like a bug.
+  Each tab now shows « Building the table of contents… » / « Building the
+  markers… » until its table replaces it. The paginated view is unchanged.
+- **Docstrings of `st_video` and `st_zoom`**: an explicit video width (px,
+  vw, vh) IS multiplied by an enclosing `st_zoom`; only a video without a
+  width keeps filling its container (measured in #138).
+
 ## [0.7.62] — 2026-10-21 — the cyan in continuous view
 
 ### Fixed

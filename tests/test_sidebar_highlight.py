@@ -167,6 +167,56 @@ def test_a_continuous_book_gets_the_table():
     assert titles == {0: "Intro", 1: "Top", 2: "Top", 3: "Detail", 4: "Detail"}
 
 
+# -- the waiting line of the continuous sidebar (#137) --------------------------------------
+
+def _placeholders(has_markers):
+    """build_ToC_sidebar_placeholder with Streamlit mocked: (toc, markers) placeholders."""
+    from streamtex.book import build_ToC_sidebar_placeholder
+
+    tabs = [MagicMock(), MagicMock()]
+    with patch("streamtex.book.st.sidebar", MagicMock()), \
+         patch("streamtex.book.st.tabs", return_value=tabs), \
+         patch("streamtex.book.st.header"), \
+         patch("streamtex.book.st.empty", return_value=MagicMock()):
+        toc_ph, markers_ph, _ = build_ToC_sidebar_placeholder(has_markers=has_markers)
+    return toc_ph, markers_ph
+
+
+def _shown(placeholder):
+    return " ".join(str(c.args[0]) for c in placeholder.markdown.call_args_list)
+
+
+@pytest.mark.parametrize("has_markers", [True, False])
+def test_the_tabs_say_their_table_is_coming_before_the_blocks_run(has_markers):
+    toc_ph, markers_ph = _placeholders(has_markers)
+    assert "Building the table of contents" in _shown(toc_ph)
+    if has_markers:
+        assert "Building the markers" in _shown(markers_ph)
+    else:
+        assert markers_ph is None
+
+
+def test_the_tables_replace_the_waiting_line():
+    from streamtex.book import populate_markers_sidebar, populate_toc
+
+    toc_ph, markers_ph = _placeholders(True)
+    _continuous_deck()
+    with patch("streamtex.book.st.markdown"), patch("streamtex.book.st.html"):
+        populate_toc(toc_ph, max_level=2)
+        populate_markers_sidebar(markers_ph)
+    toc_ph.container.assert_called_once()                # a container replaces the line
+    markers_ph.container.assert_called_once()
+
+
+def test_no_marker_listed_leaves_no_waiting_line():
+    from streamtex.book import populate_markers_sidebar
+
+    _, markers_ph = _placeholders(True)
+    populate_markers_sidebar(markers_ph)                  # no marker registered
+    markers_ph.empty.assert_called_once()
+    markers_ph.container.assert_not_called()
+
+
 node = pytest.mark.skipif(shutil.which("node") is None, reason="node not installed")
 
 

@@ -1311,6 +1311,20 @@ def load_css(file_name: str):
     st.html(f'<style>{_read_css(file_name)}</style>')
 
 
+# What the continuous sidebar shows while the blocks run: its tables are only
+# known after the last block, and a long document takes a while (#137).
+_TOC_WAITING = "Building the table of contents…"
+_MARKERS_WAITING = "Building the markers…"
+
+
+def _waiting(placeholder: Delta, text: str) -> Delta:
+    """Fill a sidebar placeholder with a waiting line, until its table replaces it."""
+    placeholder.markdown(
+        f'<div class="stx-sidebar-waiting" style="font-size:13px;font-style:italic;opacity:.65;'
+        f'padding:4px 0;">{text}</div>', unsafe_allow_html=True)
+    return placeholder
+
+
 def build_ToC_sidebar_placeholder(has_markers=False, has_search=False):
     with st.sidebar:
         # Search input above tabs (always visible regardless of active tab)
@@ -1324,12 +1338,12 @@ def build_ToC_sidebar_placeholder(has_markers=False, has_search=False):
             search_js_placeholder = None
         if has_markers:
             tab_markers, tab_toc = st.tabs(["Markers", "Contents"])
-            toc_sidebar = tab_toc.empty()
-            markers_sidebar = tab_markers.empty()
+            toc_sidebar = _waiting(tab_toc.empty(), _TOC_WAITING)
+            markers_sidebar = _waiting(tab_markers.empty(), _MARKERS_WAITING)
             return toc_sidebar, markers_sidebar, search_js_placeholder
         else:
             st.header("Table of Contents")
-            toc_sidebar = st.empty()
+            toc_sidebar = _waiting(st.empty(), _TOC_WAITING)
             return toc_sidebar, None, search_js_placeholder
 
 
@@ -1483,6 +1497,7 @@ def populate_toc(toc_sidebar: Delta, toc_block: Delta = None, toc_content_style:
 def populate_markers_sidebar(markers_placeholder: Delta, block_index: dict[int, str] = None):
     entries = [e for e in annotate_marker_numbers(marker_entries()) if is_listed(e)]
     if not entries:
+        markers_placeholder.empty()                     # no waiting line left behind
         return
     with markers_placeholder.container():
         if block_index is not None:

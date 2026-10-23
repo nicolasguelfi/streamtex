@@ -193,8 +193,9 @@ def export(cfg: ReleaseConfig, site: Site, code: Path, work: Path, release: str,
         out = html / lang if lang else html
         lang_env = {"STX_LANG": lang} if lang else {}
         with keep_lock(cfg.root):
+            view = ["--zoom", f"{site.zoom:g}"] if site.zoom is not None else []
             r = subprocess.run(["uv", "run", "--project", str(cfg.root), "stx", "export", "html", "--output",
-                                str(out), "."], cwd=doc, text=True, capture_output=True,
+                                str(out), *view, "."], cwd=doc, text=True, capture_output=True,
                                env={**env, **lang_env, **(html_env or {})})
         page = out / name / f"{name}.html"
         if r.returncode or not page.exists():

@@ -23,6 +23,7 @@
     paths = ["trainings/CHAT1D"]   # its part of the code snapshot (default: the book's folder)
     exclude = ["trainings/CHAT1D/pack"]   # removed from the snapshot
     explicit = false               # true: published only when named (a home page)
+    zoom = 80                      # the HTML face opens as at this browser zoom, in percent (optional)
 """
 
 from __future__ import annotations
@@ -38,7 +39,7 @@ from . import ReleaseError
 
 FACES = ("live", "html")
 SITE_RE = re.compile(r"^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$")
-_SITE_KEYS = {"site", "book", "group", "faces", "paths", "exclude", "explicit", "legacy"}
+_SITE_KEYS = {"site", "book", "group", "faces", "paths", "exclude", "explicit", "legacy", "zoom"}
 _RELEASE_KEYS = {"project", "langs", "snapshot", "media", "media_exclude", "pythonpath", "lock_exclude",
                  "lock_no_sources", "apt", "min_words", "port_base", "dir", "sites", "sites_from", "checks"}
 _APT_RE = re.compile(r"^[a-z0-9][a-z0-9.+-]+$")
@@ -56,6 +57,7 @@ class Site:
     exclude: tuple[str, ...] = ()
     explicit: bool = False
     legacy: tuple[str, ...] = ()          # the prototype's (training, kind), for convert-passwords
+    zoom: float | None = None             # the HTML face's zoom in percent (stx export html --zoom)
 
     @property
     def doc_dir(self) -> str:
@@ -151,8 +153,12 @@ def _site(raw: object, where: str) -> Site:
     if legacy and (len(legacy) != 2 or not all(isinstance(x, str) for x in legacy)):
         raise ReleaseError(f"{where} ({name}): legacy must be [group, kind]")
     paths = tuple(raw.get("paths") or (str(Path(book).parent),))
+    zoom = raw.get("zoom")
+    if zoom is not None and (isinstance(zoom, bool) or not isinstance(zoom, (int, float)) or zoom <= 0):
+        raise ReleaseError(f"{where} ({name}): zoom {zoom!r} — a positive percentage, such as 80")
     return Site(site=name, book=book, group=str(raw.get("group") or name), faces=faces, paths=paths,
-                exclude=tuple(raw.get("exclude", ())), explicit=bool(raw.get("explicit", False)), legacy=legacy)
+                exclude=tuple(raw.get("exclude", ())), explicit=bool(raw.get("explicit", False)), legacy=legacy,
+                zoom=float(zoom) if zoom is not None else None)
 
 
 def load_config(root: Path | None = None) -> ReleaseConfig:

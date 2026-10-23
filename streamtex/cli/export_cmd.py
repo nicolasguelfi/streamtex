@@ -106,8 +106,14 @@ def resolve_export_lang(lang_option: str | None) -> str:
               help="Write the export even when a block raises (the block is left "
                    "incomplete) and list the failing blocks at the end. Without it, "
                    "a failing block stops the export: nothing is written, exit status 1.")
+@click.option("--zoom", type=float, default=None,
+              help="Open the document as if the browser were at this zoom, in percent "
+                   "(e.g. 80). Multiplies with the document's own st_zoom. Default: no zoom.")
+@click.option("--page-width", type=float, default=None,
+              help="Width of the page, in percent of the window (e.g. 90), as the "
+                   "panel's HTML export does. Default: the library's page width.")
 def export_html(path, output, asset_mode, title, no_nav, theme_mode, theme_bg, theme_text,
-                lang, suffix, html_mode, keep_going):
+                lang, suffix, html_mode, keep_going, zoom, page_width):
     """Generate static HTML from a StreamTeX project without a Streamlit server.
 
     Exports a fully navigable HTML document with sidebar TOC, floating
@@ -124,12 +130,19 @@ def export_html(path, output, asset_mode, title, no_nav, theme_mode, theme_bg, t
         stx export html --lang fr --output ./out/fr .
         stx export html --html-mode both .              # continuous + one file per page
         stx export html --keep-going .                  # write it even if a block raises
+        stx export html --zoom 80 --lang fr --output ./out/fr .   # opens as at 80 %
     """
     from ..export import AssetCollector, AssetMode, ExportConfig
 
     resolved_lang = resolve_export_lang(lang)
 
     console = get_console()
+    if zoom is not None and zoom <= 0:
+        console.print(f"[red]Error:[/] --zoom must be a positive percentage (got {zoom:g}).")
+        raise SystemExit(1)
+    if page_width is not None and not 0 < page_width <= 100:
+        console.print(f"[red]Error:[/] --page-width must be a percentage in (0, 100] (got {page_width:g}).")
+        raise SystemExit(1)
     project_dir = os.path.abspath(path)
     book_py = os.path.join(project_dir, "book.py")
 
@@ -166,6 +179,11 @@ def export_html(path, output, asset_mode, title, no_nav, theme_mode, theme_bg, t
 
     # Build the ExportConfig that will be injected into warmup mode
     use_external = asset_mode == "external"
+    view = {}                       # without the options, the output stays as it was
+    if zoom is not None:
+        view["zoom"] = zoom / 100
+    if page_width is not None:
+        view["page_width"] = f"{page_width:g}%"
     export_cfg = ExportConfig(
         enabled=True,
         page_title=title or "StreamTeX Export",
@@ -174,7 +192,10 @@ def export_html(path, output, asset_mode, title, no_nav, theme_mode, theme_bg, t
         theme_text=resolved_text,
         theme_primary=resolved_primary,
         lang=resolved_lang,
+        **view,
     )
+    if view:
+        console.print(f"[green]\u2713 View:[/] zoom {export_cfg.zoom:g}, page width {export_cfg.page_width}")
     console.print(f"[green]\u2713 Language:[/] <html lang=\"{resolved_lang}\">")
 
     # Add project dir to sys.path so ``import setup`` / ``import blocks`` work.

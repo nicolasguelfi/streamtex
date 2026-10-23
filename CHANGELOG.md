@@ -37,6 +37,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   headless build returned before `bib_sources` were read, so every exported
   HTML showed its citations as `[key?]` and an empty `st_bibliography()` —
   the published advanced manual among them. The live app was not affected.
+- **The release workflow publishes a version whose tag is missing.** It used
+  to compare `pyproject.toml` with the previous commit only, so a bump pushed
+  together with a later commit was never published (0.7.63 itself). It can
+  also be started by hand (`gh workflow run auto-tag.yml`).
 - **Continuous view: the Contents and Markers tabs say their table is coming**
   (#137). They were empty for as long as a long document rendered (the
   entries are only known after the last block), which looked like a bug.

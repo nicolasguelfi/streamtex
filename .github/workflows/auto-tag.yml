@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "pyproject.toml"
+  workflow_dispatch:      # publish a version whose push did not (gh workflow run auto-tag.yml)
 
 permissions:
   contents: write
@@ -28,12 +29,12 @@ jobs:
 
       - name: Detect version bump
         id: version
+        # A version is new when its tag does not exist yet. Comparing with
+        # HEAD~1 missed a bump pushed together with a later commit (0.7.63).
         run: |
           NEW=$(grep '^version' pyproject.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
-          OLD=$(git show HEAD~1:pyproject.toml 2>/dev/null | grep '^version' | head -1 | sed 's/.*"\(.*\)".*/\1/' || echo "")
           echo "new=$NEW" >> "$GITHUB_OUTPUT"
-          echo "old=$OLD" >> "$GITHUB_OUTPUT"
-          if [ "$NEW" != "$OLD" ] && [ -n "$NEW" ]; then
+          if [ -n "$NEW" ] && ! git ls-remote --exit-code --tags origin "refs/tags/v$NEW" >/dev/null; then
             echo "bumped=true" >> "$GITHUB_OUTPUT"
           else
             echo "bumped=false" >> "$GITHUB_OUTPUT"

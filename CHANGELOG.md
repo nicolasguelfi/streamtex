@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.7.63] — 2026-10-23 — export zoom, a waiting sidebar, author-year references
+## [0.7.63] — 2026-10-23 — export zoom and references, a waiting sidebar
 
 ### Added
 
@@ -33,6 +33,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`stx export html` (and `stx cache`) load the book's bibliography.** The
+  headless build returned before `bib_sources` were read, so every exported
+  HTML showed its citations as `[key?]` and an empty `st_bibliography()` —
+  the published advanced manual among them. The live app was not affected.
 - **Continuous view: the Contents and Markers tabs say their table is coming**
   (#137). They were empty for as long as a long document rendered (the
   entries are only known after the last block), which looked like a bug.

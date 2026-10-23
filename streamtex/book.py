@@ -870,6 +870,9 @@ def _st_book_impl(module_list, toc_config: TOCConfig = None, marker_config: Mark
 
     # --- Headless warmup: build + save cache, then return ---
     if _warmup_mode:
+        # The references first: an HTML export without them shows every
+        # citation as [key?] and an empty bibliography.
+        _setup_bibliography(bib_sources, bib_config)
         _warmup_build_cache(module_list, toc_config, marker_config,
                             separator,
                             block_args=_block_args,

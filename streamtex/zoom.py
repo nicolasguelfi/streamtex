@@ -160,10 +160,11 @@ def st_zoom(factor: int = 100):
             ``200`` = double size.  Composes multiplicatively with the
             global page zoom and any section-level zoom.
 
-    Zoom scales fixed sizes (text, images with an explicit width).  It does
-    not shrink fluid-width elements — a video, a full-width image, a grid
-    column in percent — which fill their container whatever the zoom: give
-    them a width instead (``st_video(url, width="50%")``).
+    Zoom scales every length, ``vw`` and ``vh`` included: text, and images
+    or videos given a width (``st_video(url, width="50vh")`` inside
+    ``st_zoom(130)`` is 65 vh wide).  It does not shrink fluid-width
+    elements — a video or image without a width, a grid column in percent —
+    which fill their container whatever the zoom.
 
     Example::
 

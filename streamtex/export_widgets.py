@@ -326,8 +326,10 @@ def st_video(data, *, width: int | str | None = None, align: str = "center",
     (``int``) or a CSS length (``"50%"`` of the parent, ``"60vw"``, ``"800px"``);
     the video keeps its aspect ratio. *align* (``"center"``, ``"left"``,
     ``"right"``) places a video narrower than its container. The same box is
-    drawn live and in the HTML export. ``st_zoom`` does not shrink a video,
-    which fills its container: give it a width.
+    drawn live and in the HTML export. Inside ``st_zoom``, a video without a
+    width still fills its container, while an explicit width (px, vw, vh) is
+    multiplied by the zoom factor, like any other length: ``width="50vh"``
+    in ``st_zoom(130)`` gives a 65 vh wide player.
 
     ``autoplay=True`` without ``muted`` cannot start: browsers only play a
     muted video on their own. The video is then muted (one warning in the

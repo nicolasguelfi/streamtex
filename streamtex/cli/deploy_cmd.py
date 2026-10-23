@@ -1832,6 +1832,11 @@ def setup_cmd() -> None:
 # ---------------------------------------------------------------------------
 
 
+RELEASE_NOTICE = ("[yellow]Note:[/] stx deploy hetzner is replaced by [cyan]stx release[/] "
+                  "(one or many documents, HTML and live, per-site passwords, rollback). "
+                  "It still works and is no longer developed — see [cyan]stx release --help[/].")
+
+
 @click.command("hetzner")
 @click.argument("path", default=".")
 @click.option("--subdomain", default=None, help="Subdomain for the service.")
@@ -1844,10 +1849,16 @@ def setup_cmd() -> None:
 @click.option("--yes", is_flag=True, help="Skip confirmation prompts.")
 def hetzner_cmd(path: str, subdomain: str | None, uuid: str | None, serve_mode: str, timeout: int,
                 yes: bool) -> None:
-    """Deploy a StreamTeX project to Hetzner via Coolify."""
+    """Deploy a StreamTeX project to Hetzner via Coolify.
+
+    Replaced by ``stx release``, which publishes one or many documents
+    (HTML and live faces, per-site passwords, rollback). This command still
+    works and is no longer developed.
+    """
     from .coolify import CoolifyClient, CoolifyError, load_deploy_state, save_deploy_state
 
     console = get_console()
+    console.print(RELEASE_NOTICE)
     p = os.path.abspath(path)
 
     # 1. Read .stx-deploy.env

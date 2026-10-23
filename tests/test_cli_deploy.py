@@ -1159,3 +1159,13 @@ def test_preflight_dockerignore(tmp_path):
     assert _status(proj, ".dockerignore").status == "pass"
     for name in (".env", ".stx-deploy.env", ".stx-passwords.toml", ".venv"):
         assert name in generate_dockerignore().split()
+
+
+def test_hetzner_points_to_stx_release(tmp_path):
+    """stx deploy hetzner is replaced by stx release (2026-10-23): it says so first, and still runs."""
+    from click.testing import CliRunner
+
+    from streamtex.cli.deploy_cmd import hetzner_cmd
+    r = CliRunner().invoke(hetzner_cmd, [str(tmp_path), "--yes"])
+    assert "stx release" in r.output.splitlines()[0]
+    assert "No .stx-deploy.env" in r.output                  # then goes on as before

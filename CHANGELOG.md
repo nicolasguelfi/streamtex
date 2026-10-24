@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.64] — 2026-10-24 — videos served and bounded
+
 ### Added
 
 - **`st_video(max_vw=, max_vh=, natural_size=)`: two bounds, as in

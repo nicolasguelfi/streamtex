@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **`st_video` / `st_audio`: a local file under the app's `static/` folder
+  is served, not read into memory** (#140). Live, the player gets its
+  `/app/static/…` URL: Streamlit streams it from its static route (with
+  seeking), instead of reading the whole file at every run, which a
+  paginated book does for every video when it builds its page cache. In the
+  HTML export the file is copied into `data/` (or inlined with
+  `--asset-mode embedded`), instead of a base64 `data:` URI in the page.
+  It needs `server.enableStaticServing = true`, which `stx project` writes.
+  A file elsewhere, a link leading out of `static/`, a file over Streamlit's
+  200 MB limit, a URL or bytes behave as before.
+
 ## [0.7.63] — 2026-10-23 — export zoom and references, a waiting sidebar
 
 ### Added

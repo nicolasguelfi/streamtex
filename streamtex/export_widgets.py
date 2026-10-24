@@ -16,7 +16,7 @@ import json
 import os
 import re
 from typing import TYPE_CHECKING
-from urllib.parse import urlsplit
+from urllib.parse import quote, urlsplit
 
 if TYPE_CHECKING:
     import pandas as pd
@@ -218,13 +218,73 @@ _VIDEO_MIME = {
 }
 
 
+# Streamlit's own limit for a file of the app's ``static`` folder.
+_SERVED_MAX_BYTES = 200 * 1024 * 1024
+
+
+def _static_rel(data) -> str | None:
+    """The path of a local *data* file inside the app's ``static`` folder, or None (#140).
+
+    Streamlit serves that folder at ``/app/static/``. A video or a sound
+    found there is played from that URL, instead of being read whole into
+    memory at every run, and the HTML export takes it as a served file. Not
+    for a file reached through a link that leaves the folder, nor one over
+    200 MB: Streamlit refuses to serve both.
+    """
+    if isinstance(data, os.PathLike):
+        data = os.fspath(data)
+    if (not isinstance(data, str) or data.startswith(("http://", "https://", "www.", "data:"))
+            or not os.path.isfile(data)):
+        return None
+    from .image_crop import _app_static_dir
+    root = _app_static_dir()
+    root_real = os.path.realpath(root)
+    for path, base in ((os.path.abspath(data), os.path.abspath(root)),
+                       (os.path.realpath(data), root_real)):
+        try:
+            rel = os.path.relpath(path, base)
+        except ValueError:      # another drive
+            continue
+        if rel != os.pardir and not rel.startswith(os.pardir + os.sep):
+            break
+    else:
+        return None
+    if not os.path.realpath(os.path.join(root_real, rel)).startswith(root_real + os.sep):
+        return None
+    if os.path.getsize(data) > _SERVED_MAX_BYTES:
+        return None
+    return rel.replace(os.sep, "/")
+
+
+def _live_source(data):
+    """What ``st.video`` / ``st.audio`` receives: a served URL for a file of ``static`` (#140).
+
+    Streamlit plays a ``/app/static/`` URL as it is, without its media file
+    manager. Without static serving (``server.enableStaticServing``), or for
+    any other source, *data* is passed on unchanged.
+    """
+    rel = _static_rel(data)
+    if rel is None:
+        return data
+    try:
+        serving = st.get_option("server.enableStaticServing")
+    except Exception:  # pragma: no cover — Streamlit version drift
+        serving = False
+    return "/app/static/" + quote(rel) if serving else data
+
+
 def _media_src(data, mime_map: dict, format_hint: str | None) -> tuple[str, str]:
     """Return ``(src_attr, mime)`` for an ``<audio>`` or ``<video>`` tag.
 
     *data* can be a file path (str), a URL (str), or raw bytes.  For a URL,
     the type comes from the extension of its path; an unknown one gives
     ``""``, and the ``<source>`` is then written without ``type`` (#114).
+    A file of the app's ``static`` folder becomes ``app/static/…``, which
+    the export copies into its ``data/`` folder (#140); another local file
+    is inlined.
     """
+    if isinstance(data, os.PathLike):
+        data = os.fspath(data)
     if isinstance(data, (bytes, bytearray)):
         mime = format_hint or "application/octet-stream"
         b64 = base64.b64encode(data).decode()
@@ -237,6 +297,9 @@ def _media_src(data, mime_map: dict, format_hint: str | None) -> tuple[str, str]
         # Local file path
         ext = os.path.splitext(data)[1].lower()
         mime = format_hint or mime_map.get(ext, "application/octet-stream")
+        rel = _static_rel(data)
+        if rel is not None:
+            return f"app/static/{rel}", mime
         try:
             with open(data, "rb") as f:
                 b64 = base64.b64encode(f.read()).decode()
@@ -294,7 +357,8 @@ def _media_box(width, align: str):
 def st_audio(data, *, width: int | str | None = None, align: str = "center", **kw) -> None:
     """Display audio with ``st.audio()`` and export an ``<audio>`` tag.
 
-    *width* / *align*: as for :func:`st_video` (#126).
+    *width* / *align*, and a file under ``static/``: as for :func:`st_video`
+    (#126, #140).
     """
     box = _media_box(width, align)
     if box is None:
@@ -305,7 +369,7 @@ def st_audio(data, *, width: int | str | None = None, align: str = "center", **k
 
 
 def _audio(data, _boxed: bool = False, **kw):
-    st.audio(data, **kw)
+    st.audio(_live_source(data), **kw)
     if is_export_active():
         fmt = kw.get("format")
         src, mime = _media_src(data, _AUDIO_MIME, fmt)
@@ -336,6 +400,11 @@ def st_video(data, *, width: int | str | None = None, align: str = "center",
     log); the reader can turn the sound on with the controls (#35). An
     explicit ``muted=False`` is kept: a browser that allows sound on its own
     (a projection profile) plays it with sound, others wait for a click.
+
+    A local file under the app's ``static/`` folder (static serving on) is
+    played from its ``/app/static/…`` URL, not read into memory at every
+    run, and the HTML export copies it into ``data/`` (#140). Put large
+    videos there.
 
     A video that dominates the screen (#56), live and in the HTML export:
 
@@ -405,7 +474,7 @@ def _staged_video(data, mode: str, fit: str, fullscreen: bool, kw: dict) -> None
              '&times;</button>' if mode == "window" else "")
     with st.container():
         st.markdown(marker + close, unsafe_allow_html=True)
-        st.video(data, **kw)
+        st.video(_live_source(data), **kw)
     if is_export_active():
         classes = "stx-vbox" + (f" stx-theater-{mode}" if mode else "") + f" stx-fit-{fit}"
         export_append(f'<div class="stx-vbox-slot"><div class="{classes}">{marker}{close}'
@@ -413,7 +482,7 @@ def _staged_video(data, mode: str, fit: str, fullscreen: bool, kw: dict) -> None
 
 
 def _video(data, _boxed: bool = False, **kw):
-    st.video(data, **kw)
+    st.video(_live_source(data), **kw)
     if is_export_active():
         export_append(_video_export_html(data, _boxed, kw))
 

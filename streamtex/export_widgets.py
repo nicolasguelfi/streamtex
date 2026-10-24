@@ -11,10 +11,12 @@ No ``st.html()`` calls here — satisfies ``test_export_guard.py``.
 from __future__ import annotations
 
 import base64
+import functools
 import io
 import json
 import os
 import re
+import struct
 from typing import TYPE_CHECKING
 from urllib.parse import quote, urlsplit
 
@@ -333,25 +335,134 @@ _CSS_LENGTH_RE = re.compile(r"^\d+(\.\d+)?(px|%|vw|vh|em|rem)$")
 _warned_autoplay = False
 
 
-def _media_box(width, align: str):
+def _media_box(width, align: str, max_vw=None, max_vh=None, ratio: float | None = None):
     """The st_block that sizes and places a media player (#126), or None.
 
     *width* is None (the full width, no box), pixels (``int``) or a CSS length
     (``"50%"``, ``"60vw"``, ``"800px"``); *align* places the narrower box. The
     player stretches inside it, live and in the export (the block's wrapper).
+    *max_vw* / *max_vh* bound the box (#141): its width becomes
+    ``min(width, max_vw vw, max_vh vh × ratio)``; without a *ratio* the
+    height bound cannot be turned into a width and is left out.
     """
     if align not in _ALIGN_MARGINS:
         raise ValueError(f"align must be 'center', 'left' or 'right', not {align!r}")
-    if width is None:
+    if width is None and max_vw is None and max_vh is None:
         return None
-    if isinstance(width, bool) or not isinstance(width, (int, str)):
-        raise ValueError(f"width must be pixels (int) or a CSS length such as '50%', not {width!r}")
-    length = f"{width}px" if isinstance(width, int) else width.strip()
-    if not _CSS_LENGTH_RE.match(length):
-        raise ValueError(f"width must be pixels (int) or a CSS length such as '50%', '60vw', '800px', not {width!r}")
+    if width is None:
+        length = "100%"
+    else:
+        if isinstance(width, bool) or not isinstance(width, (int, str)):
+            raise ValueError(f"width must be pixels (int) or a CSS length such as '50%', not {width!r}")
+        length = f"{width}px" if isinstance(width, int) else width.strip()
+        if not _CSS_LENGTH_RE.match(length):
+            raise ValueError(
+                f"width must be pixels (int) or a CSS length such as '50%', '60vw', '800px', not {width!r}")
+    parts = [length]
+    if max_vw is not None:
+        parts.append(f"{_num(max_vw)}vw")
+    if max_vh is not None and ratio is not None:
+        parts.append(f"calc({_num(max_vh)}vh * {ratio:.6f})")
+    if len(parts) > 1:
+        length = f"min({', '.join(parts)})"
     from .container import st_block
     from .styles import Style
     return st_block(Style(f"width:{length};max-width:100%;{_ALIGN_MARGINS[align]}", "stx_media_box"))
+
+
+def _num(value: float) -> str:
+    return f"{value:.4f}".rstrip("0").rstrip(".")
+
+
+# -- the picture size of a video (#141) --------------------------------------
+
+_MP4_HEAD = 1 << 20          # the header of a "faststart" MP4 lies in its first MiB
+_warned_ratio: set = set()
+
+
+def _mp4_boxes(buf: bytes, start: int, end: int):
+    """``(type, payload start, payload end, complete)`` of the boxes in ``buf[start:end]``."""
+    i = start
+    while i + 8 <= end:
+        size, kind = struct.unpack(">I4s", buf[i:i + 8])
+        head = 8
+        if size == 1:
+            if i + 16 > end:
+                return
+            size, head = struct.unpack(">Q", buf[i + 8:i + 16])[0], 16
+        elif size == 0:
+            size = end - i
+        if size < head:
+            return
+        yield kind, i + head, min(i + size, end), i + size <= end
+        i += size
+
+
+def _tkhd_size(buf: bytes, start: int, end: int) -> tuple[float, float] | None:
+    """The displayed size in the first ``tkhd`` with a picture (audio tracks have 0 × 0)."""
+    for kind, a, b, complete in _mp4_boxes(buf, start, end):
+        if kind in (b"moov", b"trak"):
+            size = _tkhd_size(buf, a, b)
+            if size:
+                return size
+        elif kind == b"tkhd" and complete and b - a >= 84:
+            matrix = struct.unpack(">9i", buf[b - 44:b - 8])
+            w, h = (v / 65536 for v in struct.unpack(">II", buf[b - 8:b]))
+            if w > 0 and h > 0:
+                # a quarter turn (a phone held upright) swaps the sides on screen
+                return (h, w) if matrix[0] == 0 and matrix[4] == 0 else (w, h)
+    return None
+
+
+@functools.lru_cache(maxsize=256)
+def _mp4_size(path: str, mtime: float) -> tuple[float, float] | None:
+    """Width and height of an MP4 / MOV picture, read in its first MiB, or None."""
+    try:
+        with open(path, "rb") as f:
+            head = f.read(_MP4_HEAD)
+    except OSError:
+        return None
+    return _tkhd_size(head, 0, len(head))
+
+
+def _video_ratio(data, natural_size) -> float | None:
+    """Width / height of the picture: *natural_size*, else read from a local MP4.
+
+    Warns once per source when it cannot be read: the height bound is then
+    left out.
+    """
+    if natural_size is not None:
+        return natural_size[0] / natural_size[1]
+    if isinstance(data, os.PathLike):
+        data = os.fspath(data)
+    size = None
+    if isinstance(data, str) and os.path.isfile(data):
+        size = _mp4_size(os.path.abspath(data), os.path.getmtime(data))
+    if size:
+        return size[0] / size[1]
+    key = data if isinstance(data, str) else type(data).__name__
+    if key not in _warned_ratio:
+        _warned_ratio.add(key)
+        import logging
+        logging.getLogger(__name__).warning(
+            "st_video(max_vh=): the picture size of %s cannot be read, so the height bound is "
+            "left out. An MP4 needs its header first (ffmpeg -movflags +faststart); otherwise "
+            "give natural_size=(width, height).", key)
+    return None
+
+
+def _check_bounds(max_vw, max_vh, natural_size) -> None:
+    for name, bound in (("max_vw", max_vw), ("max_vh", max_vh)):
+        if bound is not None and (isinstance(bound, bool) or not isinstance(bound, (int, float))
+                                  or bound <= 0):
+            raise ValueError(f"{name} must be a positive number of {name[-2:]} units, not {bound!r}")
+    if natural_size is not None:
+        if max_vw is None and max_vh is None:
+            raise ValueError("natural_size= goes with max_vw= / max_vh=")
+        if (not isinstance(natural_size, (tuple, list)) or len(natural_size) != 2
+                or any(isinstance(v, bool) or not isinstance(v, (int, float)) or v <= 0
+                       for v in natural_size)):
+            raise ValueError(f"natural_size must be (width, height), two positive numbers, not {natural_size!r}")
 
 
 def st_audio(data, *, width: int | str | None = None, align: str = "center", **kw) -> None:
@@ -382,6 +493,8 @@ def _audio(data, _boxed: bool = False, **kw):
 
 
 def st_video(data, *, width: int | str | None = None, align: str = "center",
+             max_vw: float | None = None, max_vh: float | None = None,
+             natural_size: tuple[float, float] | None = None,
              theater: bool | str = False, fit: str = "contain", fullscreen: bool = False,
              **kw) -> None:
     """Display video with ``st.video()`` and export a ``<video>`` or YouTube embed.
@@ -400,6 +513,19 @@ def st_video(data, *, width: int | str | None = None, align: str = "center",
     log); the reader can turn the sound on with the controls (#35). An
     explicit ``muted=False`` is kept: a browser that allows sound on its own
     (a projection profile) plays it with sound, others wait for a click.
+
+    *max_vw* / *max_vh* (#141), as in :func:`st_image`: the largest
+    width in % of the window width, and the largest height in % of the
+    window height. The player takes the largest size within *width* (the
+    container by default) and both bounds, without distortion:
+    ``st_video(clip, max_vw=100, max_vh=50)`` gives a 960 × 540 player for
+    a 16:9 clip in a 1920 × 1080 window, and fills a narrow window's
+    width. The picture's shape is read from a local MP4 (its header must
+    come first: ``ffmpeg -movflags +faststart``); for a URL or another
+    file, give *natural_size* ``(width, height)``. When it cannot be read,
+    one warning is logged and only *max_vw* applies. Inside ``st_zoom``,
+    the bounds are multiplied by the zoom like any length. Not with
+    *theater*.
 
     A local file under the app's ``static/`` folder (static serving on) is
     played from its ``/app/static/…`` URL, not read into memory at every
@@ -436,10 +562,22 @@ def st_video(data, *, width: int | str | None = None, align: str = "center",
         raise ValueError(f"fit must be 'contain' or 'cover', not {fit!r}")
     if not isinstance(fullscreen, bool):
         raise ValueError(f"fullscreen must be True or False, not {fullscreen!r}")
-    if mode or fullscreen:
+    bounded = max_vw is not None or max_vh is not None
+    _check_bounds(max_vw, max_vh, natural_size)
+    if mode and bounded:
+        raise ValueError("max_vw / max_vh do not apply with theater=: the theater sizes the video")
+    if mode:
         _staged_video(data, mode, fit, fullscreen, kw)
         return
-    box = _media_box(width, align)
+    ratio = _video_ratio(data, natural_size) if max_vh is not None else None
+    box = _media_box(width, align, max_vw, max_vh, ratio)
+    if fullscreen:
+        if box is None:
+            _staged_video(data, mode, fit, fullscreen, kw)
+            return
+        with box:
+            _staged_video(data, mode, fit, fullscreen, kw)
+        return
     if box is None:
         _video(data, **kw)
         return

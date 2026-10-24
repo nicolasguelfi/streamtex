@@ -106,7 +106,9 @@ def st_image(
         ``"auto"``.  When the natural size cannot be read (remote URI
         without `natural_size`), the bounds become ``max-width`` /
         ``max-height`` (the image is then never enlarged).  Both `None`
-        (default) keeps the emitted HTML strictly identical.
+        (default) keeps the emitted HTML strictly identical.  Inside
+        ``st_zoom``, the bounds are multiplied by the zoom like any
+        length: ``max_vh=50`` in ``st_zoom(130)`` is 65 vh on screen.
 
     :param align: Optional ``"left"`` / ``"center"`` / ``"right"``: place
         this image, contradicting its container locally. By default the

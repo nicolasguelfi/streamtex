@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`st_video(max_vw=, max_vh=, natural_size=)`: two bounds, as in
+  `st_image`** (#141). The player takes the largest size within `width`
+  (the container by default), `max_vw` % of the window width and `max_vh` %
+  of its height, without distortion: a 16:9 clip with `max_vw=100,
+  max_vh=50` is 960 × 540 in a 1920 × 1080 window and fills a narrow
+  window's width. The same box is drawn live and in the HTML export. The
+  picture's shape is read from the MP4 header (`tkhd`, a quarter turn
+  included) in the file's first MiB; an MP4 whose header comes last
+  (encode with `ffmpeg -movflags +faststart`), a WebM or a URL needs
+  `natural_size=(width, height)`. Without it, one warning is logged and
+  only `max_vw` applies. Inside `st_zoom`, the bounds are multiplied by the
+  zoom like any length (as `width=` and `st_image`'s bounds). Refused with
+  `theater=`.
+  *Migration*: a project helper that wraps the video in a container sized
+  `min(<max_vw>vw, <ratio × max_vh>vh, 100%)` can call
+  `st_video(path, max_vw=…, max_vh=…)` instead; it no longer needs to read
+  the MP4 ratio itself.
+
 ### Changed
 
 - **`st_video` / `st_audio`: a local file under the app's `static/` folder
@@ -19,6 +39,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   It needs `server.enableStaticServing = true`, which `stx project` writes.
   A file elsewhere, a link leading out of `static/`, a file over Streamlit's
   200 MB limit, a URL or bytes behave as before.
+
+### Fixed
+
+- **`st_video(width=…, fullscreen=True)`** drew the full-width player: the
+  width was dropped as soon as `fullscreen` was on. The box now applies
+  (it still does not with `theater=`, which sizes the video itself).
 
 ## [0.7.63] — 2026-10-23 — export zoom and references, a waiting sidebar
 

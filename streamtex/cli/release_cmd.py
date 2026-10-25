@@ -35,26 +35,18 @@ def release():
     """Publish the sites of a multi-document project: two long-lived applications, snapshots, rollback."""
 
 
-@release.command("publish")
-@click.argument("sites", nargs=-1)
-@click.option("--group", "groups", multiple=True, help="Publish every site of this group (repeatable).")
-@_target
-@click.option("--allow-skew", is_flag=True,
-              help="Publish although the exporting streamtex is not the live image's (marked in status).")
-@click.option("--html-env", "html_env", multiple=True, metavar="KEY=VALUE",
-              help="An environment variable for the HTML export only (e.g. a partial deck).")
-def publish_cmd(sites, groups, target, allow_skew, html_env):
-    """Publish SITES (default: every site not marked explicit): both faces together, all or nothing."""
-    cfg, state, t = _ctx(target)
-    chosen = cfg.select(sites, groups)
+def _html_env(items) -> dict[str, str]:
     env = {}
-    for item in html_env:
+    for item in items:
         if "=" not in item:
             raise ReleaseError(f"--html-env {item!r}: expected KEY=VALUE")
         k, v = item.split("=", 1)
         env[k] = v
-    release_name = build.require_committed(cfg.root)
-    build.require_lock(cfg)
+    return env
+
+
+def _skew(cfg, t, allow_skew: bool) -> str:
+    """Why the exporting streamtex is not the live image's, refused unless --allow-skew (rel version=a)."""
     skew = build.library_skew(cfg)
     running = ops.image_version(t)
     wanted = (cfg.lock_dir / "stx-version").read_text(encoding="utf-8").strip()
@@ -67,6 +59,25 @@ def publish_cmd(sites, groups, target, allow_skew, html_env):
         raise ReleaseError(f"{skew} — publish with the image's streamtex, or pass --allow-skew for a trial")
     if skew:
         click.echo(f"  ⚠ {skew} (--allow-skew: the sites are marked in status)")
+    return skew
+
+
+@release.command("publish")
+@click.argument("sites", nargs=-1)
+@click.option("--group", "groups", multiple=True, help="Publish every site of this group (repeatable).")
+@_target
+@click.option("--allow-skew", is_flag=True,
+              help="Publish although the exporting streamtex is not the live image's (marked in status).")
+@click.option("--html-env", "html_env", multiple=True, metavar="KEY=VALUE",
+              help="An environment variable for the HTML export only (e.g. a partial deck).")
+def publish_cmd(sites, groups, target, allow_skew, html_env):
+    """Publish SITES (default: every site not marked explicit): both faces together, all or nothing."""
+    cfg, state, t = _ctx(target)
+    chosen = cfg.select(sites, groups)
+    env = _html_env(html_env)
+    release_name = build.require_committed(cfg.root)
+    build.require_lock(cfg)
+    skew = _skew(cfg, t, allow_skew)
     run_checks(cfg, chosen)
     data = _passwords(cfg)
     faces = {s.site: pw.for_site(data, s) for s in chosen}     # every password checked before any copy
@@ -91,18 +102,55 @@ def status_cmd(target):
     click.echo(f"target {t.name} · HEAD {head} · live image streamtex {running} (stx-version {wanted}){gap}\n")
     rows = ops.status_rows(t, cfg, state, data)
     w = max([28] + [len(r[0]) + 2 for r in rows])
-    click.echo(f"{'site':<{w}}{'published':<14}{'served (html)':<17}{'live':<8}{'html':<11}date")
+    click.echo(f"{'site':<{w}}{'published':<14}{'served (html)':<19}{'live':<8}{'html':<11}date")
     for name, rel, html, live, access, date, flag in rows:
-        click.echo(f"{name:<{w}}{rel:<14}{html:<17}{live:<8}{access:<11}{date}{flag}")
+        click.echo(f"{name:<{w}}{rel:<14}{html:<19}{live:<8}{access:<11}{date}{flag}")
+
+
+@release.command("limit")
+@click.argument("site")
+@click.argument("slide")
+@_target
+@click.option("--allow-skew", is_flag=True,
+              help="Export although the exporting streamtex is not the live image's.")
+@click.option("--html-env", "html_env", multiple=True, metavar="KEY=VALUE",
+              help="An environment variable for the HTML export.")
+def limit_cmd(site, slide, target, allow_skew, html_env):
+    """What participants see on SITE's HTML face: slides 1 to SLIDE, or `all`.
+
+    \b
+    The number is the slide counter's (n / N), as projected; the block that holds
+    that slide is kept whole, and later blocks are not exported at all. Only the
+    HTML face is exported again, from the release already published, and switched:
+    no password is rewritten and the live face does not restart, so participants
+    stay logged in. The limit is kept: every later `publish SITE` applies it, and
+    `rollback SITE` undoes it alone.
+
+    \b
+    Examples:
+        stx release limit gai4as-slides 120
+        stx release limit gai4as-slides all
+    """
+    if slide == "all":
+        up_to = None
+    elif slide.isdigit() and int(slide) >= 1:
+        up_to = int(slide)
+    else:
+        raise ReleaseError(f"{slide!r}: a slide number (1 or more) or `all`")
+    cfg, state, t = _ctx(target)
+    s = cfg.site(site)
+    _skew(cfg, t, allow_skew)
+    html_pw = "" if "html" not in s.faces else pw.first_password(pw.for_site(_passwords(cfg), s)["html"])
+    ops.limit_site(t, cfg, state, s, up_to, html_pw, click.echo, _html_env(html_env))
 
 
 @release.command("rollback")
 @click.argument("site")
 @_target
 def rollback_cmd(site, target):
-    """Put both faces of SITE back on its previous release."""
+    """Undo SITE's last change: a limit (the HTML face alone), else a publication (both faces)."""
     cfg, state, t = _ctx(target)
-    click.echo(f"{site}: both faces are back on {ops.rollback(t, cfg, state, cfg.site(site))}")
+    click.echo(f"{site}: {ops.rollback(t, cfg, state, cfg.site(site))}")
 
 
 @release.command("passwd")

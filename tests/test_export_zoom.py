@@ -116,7 +116,7 @@ def test_the_html_face_is_exported_with_the_site_zoom(tmp_path, monkeypatch, ext
         return R()
 
     monkeypatch.setattr(build.subprocess, "run", fake_run)
-    build.export(cfg, cfg.site("deck"), code, work, "rel1")
+    assert build.export(cfg, cfg.site("deck"), code, work, "rel1")[1] == "rel1"
     argv = seen[0]
     tail = argv[argv.index("--output") + 2:]
     assert tail == [*expected, "."]

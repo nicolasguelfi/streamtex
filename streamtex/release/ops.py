@@ -15,6 +15,11 @@ On the target (``<root>`` of the target, ``/srv/<face>`` in the containers)::
 
 Both faces switch together (all or nothing); a failed check after the switch puts both back on the
 previous release. Two releases are kept per site: the current one and the previous one.
+
+A slide limit (#146) is kept per site (``up_to_slide``): the HTML face then serves
+``<release>-s<last slide>``, its own release (``html_release``, ``html_previous``). ``limit`` changes it
+alone, from the release already published: the live face, its program and the passwords stay as they
+are, so the participants' sessions stay open; ``rollback`` after a limit undoes the limit alone.
 """
 
 from __future__ import annotations
@@ -62,9 +67,17 @@ def write_maps(t: Target, state: dict) -> None:
                     if v.get("port") and not v.get("asleep")))
 
 
-def switch(t: Target, site: Site, release: str) -> None:
-    for face in _faces_dirs(site):
-        t.sh(t.switch_cmd(t.path(face, "sites", site.site), release))
+def html_of(v: dict) -> str | None:
+    """The release the HTML face serves: its own with a slide limit (#146), else the site's."""
+    return v.get("html_release") or v.get("release")
+
+
+def switch(t: Target, site: Site, release: str, html_release: str | None = None,
+           faces: list[str] | None = None) -> None:
+    """Each face's ``current`` link; the HTML face's points to *html_release* when it has its own."""
+    for face in faces or _faces_dirs(site):
+        name = (html_release or release) if face == "static" else release
+        t.sh(t.switch_cmd(t.path(face, "sites", site.site), name))
 
 
 def reload_all(t: Target, site: Site | None = None) -> None:
@@ -109,13 +122,15 @@ def wait_live(t: Target, site: Site, seconds: int = 90) -> bool:
     return False
 
 
-def prune(t: Target, site: Site, keep: set[str]) -> list[str]:
-    """Keep only the releases *keep* of a site (rsync --link-dest hard links make removal safe)."""
+def prune(t: Target, site: Site, keep: set[str], keep_html: set[str] | None = None) -> list[str]:
+    """Keep only the releases *keep* of a site, and *keep_html* on its HTML face when it has its own
+    (rsync --link-dest hard links make removal safe)."""
     removed: list[str] = []
     for face in _faces_dirs(site):
         base = t.path(face, "sites", site.site, "releases")
+        kept = keep_html if face == "static" and keep_html is not None else keep
         for r in t.sh(f"ls -1 {shlex.quote(base)} 2>/dev/null", check=False).stdout.split():
-            if r not in keep:
+            if r not in kept:
                 t.sh(f"rm -rf {shlex.quote(base + '/' + r)}")
                 removed.append(f"{face}/{r}")
     return removed
@@ -127,15 +142,27 @@ def publish_site(t: Target, cfg: ReleaseConfig, state: dict, site: Site, release
     entries = sites_of(state, t.name)
     v = entries.setdefault(site.site, {})
     previous = v.get("release")
-    check_dir = t.path(_faces_dirs(site)[0], "sites", site.site, "releases", previous) if previous else ""
+    check_dir = t.path(_faces_dirs(site)[0], "sites", site.site, "releases",
+                       html_of(v) if _faces_dirs(site)[0] == "static" else previous) if previous else ""
     if previous and t.sh(f"test -d {shlex.quote(check_dir)}", check=False).returncode:
         previous = None          # the recorded release is not on this target: no hard link, no rollback to it
+    old_html = html_of(v) if previous else None
+    if old_html and "html" in site.faces and t.sh(
+            f"test -d {shlex.quote(t.path('static', 'sites', site.site, 'releases', old_html))}",
+            check=False).returncode:
+        old_html = None
+    limit = v.get("up_to_slide")                  # kept: a publication does not open the whole document (#146)
+    html_release = release
     if "live" in site.faces and not v.get("port"):
         v["port"] = max([cfg.port_base - 1] + [s.get("port") or 0 for s in entries.values()]) + 1
     with tempfile.TemporaryDirectory(prefix="stx-release-") as w:
         work = Path(w)
         code = build.snapshot(cfg, site, work)
-        html = build.export(cfg, site, code, work, release, html_env) if "html" in site.faces else None
+        html = None
+        if "html" in site.faces:
+            html, html_release = build.export(cfg, site, code, work, release, html_env, limit)
+            if limit is not None:
+                echo(f"  slide limit kept: slides 1 to {html_release.rsplit('-s', 1)[1]} (asked: {limit})")
         if "live" in site.faces:
             dirs = [t.path("live", "sites", site.site, "releases")]
             if cfg.media:
@@ -155,11 +182,12 @@ def publish_site(t: Target, cfg: ReleaseConfig, state: dict, site: Site, release
             t.rsync(str(code) + "/", t.path("live", "sites", site.site, "releases", release) + "/", "--delete")
         if html is not None:
             t.sh("mkdir -p " + shlex.quote(t.path("static", "sites", site.site, "releases")))
-            link = (["--link-dest", t.path("static", "sites", site.site, "releases", previous)]
-                    if previous and previous != release else [])
-            t.rsync(str(html) + "/", t.path("static", "sites", site.site, "releases", release) + "/",
+            link = (["--link-dest", t.path("static", "sites", site.site, "releases", old_html)]
+                    if old_html and old_html != html_release else [])
+            t.rsync(str(html) + "/", t.path("static", "sites", site.site, "releases", html_release) + "/",
                     "--delete", "-H", "-c", *link)
-        rel_dirs = " ".join(shlex.quote(t.path(f, "sites", site.site, "releases", release))
+        rel_dirs = " ".join(shlex.quote(t.path(f, "sites", site.site, "releases",
+                                               html_release if f == "static" else release))
                             for f in _faces_dirs(site))
         t.sh(f"chmod -R a+rX {rel_dirs}")
     if "live" in site.faces:
@@ -167,19 +195,21 @@ def publish_site(t: Target, cfg: ReleaseConfig, state: dict, site: Site, release
              f"{shlex.quote(t.path('live', 'sites', site.site, 'static'))}")
     apply_passwords(t, cfg, state, site, faces)
     write_maps(t, state)
-    switch(t, site, release)                      # both faces TOGETHER
+    switch(t, site, release, html_release)        # both faces TOGETHER
     reload_all(t, site)
     ok_live = wait_live(t, site) if "live" in site.faces else True
     html_seen, _ = served(t, site, v, pw.first_password(faces.get("html")))
-    if not ok_live or ("html" in site.faces and html_seen != release):
+    if not ok_live or ("html" in site.faces and html_seen != html_release):
         echo(f"  ✗ check after the switch: html={html_seen} live={'ok' if ok_live else 'down'}")
         if previous:
-            switch(t, site, previous)
+            switch(t, site, previous, old_html)
             reload_all(t, site)
             echo(f"  ↩ both faces are back on {previous}")
-        raise ReleaseError(f"{site.site}: what is served is not {release}")
+        raise ReleaseError(f"{site.site}: what is served is not {html_release}")
     v.update(release=release, previous=previous, date=dt.datetime.now().isoformat(timespec="seconds"),
-             asleep=False)
+             asleep=False, last="publish", up_to_slide_previous=limit)
+    if "html" in site.faces:
+        v.update(html_release=html_release, html_previous=old_html)
     if skew:
         v["skew"] = skew
     else:
@@ -188,21 +218,91 @@ def publish_site(t: Target, cfg: ReleaseConfig, state: dict, site: Site, release
     echo(f"  ✓ {site.site}: html {html_seen}, live {'ok' if 'live' in site.faces else '-'}"
          + (f" — port {v['port']}" if v.get("port") else "")
          + ("" if "html" not in site.faces else f", html {'open' if v.get('html_open') else 'protected'}"))
-    if removed := prune(t, site, {release, previous} - {None}):
+    if removed := prune(t, site, {release, previous} - {None}, {html_release, old_html} - {None}):
+        echo(f"  ⌫ {len(removed)} old release(s) removed: {', '.join(removed)}")
+
+
+def _slides(v: dict) -> str:
+    return "all slides" if v.get("up_to_slide") is None else \
+        f"slides 1 to {html_of(v).rsplit('-s', 1)[1]}"
+
+
+def limit_site(t: Target, cfg: ReleaseConfig, state: dict, site: Site, slide: int | None, html_password: str,
+               echo: Echo, html_env: dict[str, str] | None = None) -> None:
+    """What the participants can see: slides 1 to *slide*, or all of them (``None``) — #146.
+
+    Only the HTML face is exported again, from the release already published (its code, so its slide
+    numbering is the one being projected), then it alone switches. The live face is not touched: no
+    password is rewritten and no program restarts, so the participants' sessions stay open. The limit is
+    kept for the site: every later publication applies it.
+    """
+    if "html" not in site.faces:
+        raise ReleaseError(f"{site.site} has no HTML face: a slide limit applies to the HTML face")
+    v = sites_of(state, t.name).get(site.site)
+    if not v or not v.get("release"):
+        raise ReleaseError(f"{site.site} is not published on {t.name} — publish it first")
+    release, old_html, old_limit = v["release"], html_of(v), v.get("up_to_slide")
+    echo(f"\n▶ {site.site}: HTML face of {release}, " + ("all slides" if slide is None else f"up to slide {slide}")
+         + f" ({t.name})")
+    base = t.path("static", "sites", site.site, "releases")
+    has_old = bool(old_html) and not t.sh(f"test -d {shlex.quote(base + '/' + old_html)}", check=False).returncode
+    with tempfile.TemporaryDirectory(prefix="stx-limit-") as w:
+        work = Path(w)
+        code = build.snapshot(cfg, site, work, rev=release)
+        html, name = build.export(cfg, site, code, work, release, html_env, slide)
+        if name == old_html and has_old:
+            v["up_to_slide"] = slide
+            save_state(cfg.root, state)
+            echo(f"  ✓ {site.site}: nothing to change, {name} is what the HTML face serves")
+            return
+        t.sh("mkdir -p " + shlex.quote(base))
+        t.rsync(str(html) + "/", f"{base}/{name}/", "--delete", "-H", "-c",
+                *(["--link-dest", f"{base}/{old_html}"] if has_old and old_html != name else []))
+        t.sh(f"chmod -R a+rX {shlex.quote(base + '/' + name)}")
+    switch(t, site, release, name, faces=["static"])
+    t.dexec("static", "nginx -s reload")
+    html_seen, _ = served(t, site, v, html_password)
+    if html_seen != name:
+        if has_old:
+            switch(t, site, release, old_html, faces=["static"])
+            t.dexec("static", "nginx -s reload")
+            echo(f"  ↩ the HTML face is back on {old_html}")
+        raise ReleaseError(f"{site.site}: what the HTML face serves is not {name} (served: {html_seen})")
+    v.update(html_release=name, html_previous=old_html if has_old else None, up_to_slide=slide,
+             up_to_slide_previous=old_limit, last="limit",
+             html_date=dt.datetime.now().isoformat(timespec="seconds"))
+    save_state(cfg.root, state)
+    echo(f"  ✓ {site.site}: html {html_seen} ({_slides(v)}) — live face and participants' sessions unchanged")
+    if removed := prune(t, site, {release, v.get("previous")} - {None}, {name, v["html_previous"]} - {None}):
         echo(f"  ⌫ {len(removed)} old release(s) removed: {', '.join(removed)}")
 
 
 def rollback(t: Target, cfg: ReleaseConfig, state: dict, site: Site) -> str:
+    """Undo the last change: a limit (the HTML face alone), else a publication (both faces)."""
     v = sites_of(state, t.name).get(site.site)
     if not v:
         raise ReleaseError(f"{site.site} is not published on {t.name}")
+    if v.get("last") == "limit":
+        if not v.get("html_previous"):
+            raise ReleaseError(f"{site.site}: no previous HTML release")
+        v["html_release"], v["html_previous"] = v["html_previous"], v["html_release"]
+        v["up_to_slide"], v["up_to_slide_previous"] = v.get("up_to_slide_previous"), v.get("up_to_slide")
+        switch(t, site, v["release"], v["html_release"], faces=["static"])
+        t.dexec("static", "nginx -s reload")
+        save_state(cfg.root, state)
+        return f"the HTML face is back on {v['html_release']} ({_slides(v)}); the live face is unchanged"
     if not v.get("previous"):
         raise ReleaseError(f"{site.site}: no previous release")
+    html_now = html_of(v)
     v["release"], v["previous"] = v["previous"], v["release"]
-    switch(t, site, v["release"])
+    if "html_release" in v:
+        v["html_release"], v["html_previous"] = v.get("html_previous") or v["release"], html_now
+        v["up_to_slide"], v["up_to_slide_previous"] = v.get("up_to_slide_previous"), v.get("up_to_slide")
+    switch(t, site, v["release"], v.get("html_release"))
     reload_all(t, site)
     save_state(cfg.root, state)
-    return v["release"]
+    return f"both faces are back on {v['release']}" + \
+        (f" (HTML {v['html_release']})" if v.get("html_release") not in (None, v["release"]) else "")
 
 
 def sleep_wake(t: Target, cfg: ReleaseConfig, state: dict, site: Site, asleep: bool) -> None:
@@ -241,9 +341,11 @@ def status_rows(t: Target, cfg: ReleaseConfig, state: dict, data: dict | None) -
         if html == "HTTP 401" and not password and not v.get("html_open"):
             html, flag = "? (no password)", ""         # cannot read it: unknown, not a gap
         else:
-            flag = "" if "html" not in site.faces or html == v.get("release") else "  ← GAP"
+            flag = "" if "html" not in site.faces or html == html_of(v) else "  ← GAP"
         if v.get("skew"):
             flag += "  (skew)"
+        if v.get("up_to_slide") is not None and "html" in site.faces:
+            flag += f"  ({_slides(v)})"
         access = "-" if "html" not in site.faces else ("open" if v.get("html_open") else "protected")
         rows.append((name, v.get("release", "?"), html, live, access, v.get("date", ""), flag))
     return rows

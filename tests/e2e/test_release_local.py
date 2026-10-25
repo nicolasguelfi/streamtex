@@ -91,6 +91,19 @@ def project(tmp_path_factory):
                 for i in range(40):
                     stx.st_write(f"Paragraph {{i}} of document {d} with enough words for the minimum check.")
         """))
+    # demo-d: three blocks, slides 1 | 2-3 | 4 — the slide limit (#146)
+    (root / "docs" / "d" / "blocks").mkdir(parents=True)
+    (root / "docs" / "d" / "blocks" / "__init__.py").write_text("")
+    for name, slides in (("bck_one", ["s1"]), ("bck_two", ["s2", "s3"]), ("bck_three", ["s4"])):
+        body = "".join(f'    stx.st_marker("{x}")\n    stx.st_write("Slide {x} of document d, version one", toc_lvl="1")\n'
+                       f'    for i in range(15):\n        stx.st_write(f"Words {{i}} on slide {x} for the minimum check.")\n'
+                       for x in slides)
+        (root / "docs" / "d" / "blocks" / f"{name}.py").write_text(f"import streamtex as stx\ndef build(**k):\n{body}")
+    (root / "docs" / "d" / "book.py").write_text(textwrap.dedent("""
+        import streamtex as stx
+        from blocks import bck_one, bck_two, bck_three
+        stx.st_book([bck_one, bck_two, bck_three], toc_config=stx.TOCConfig(), marker_config=stx.MarkerConfig())
+    """))
     (root / "assets" / "img").mkdir(parents=True)
     (root / "assets" / "img" / "dot.png").write_bytes(DOT)
     (root / "assets" / "img" / "dot-original.png").write_bytes(DOT)          # kept out by media_exclude
@@ -123,6 +136,10 @@ def project(tmp_path_factory):
         book = "docs/c/book.py"
         group = "demo"
         faces = ["live"]
+        [[release.sites]]
+        site = "demo-d"
+        book = "docs/d/book.py"
+        explicit = true
     """))
     (root / ".stx-passwords.toml").write_text(textwrap.dedent("""
         [default]
@@ -259,3 +276,70 @@ def test_release_end_to_end(project):
 
     status = stx("status").stdout
     assert "demo-a" in status and "GAP" not in status
+
+
+def _head(p) -> str:
+    return subprocess.run(["git", "rev-parse", "--short=12", "HEAD"], cwd=p["root"], text=True,
+                          capture_output=True).stdout.strip()
+
+
+def _live_pid(p, site) -> str:
+    return subprocess.run(["docker", "exec", p["live"], "supervisorctl", "pid", site],
+                          text=True, capture_output=True).stdout.strip()
+
+
+def _html_page(p, site, cookie) -> str:
+    code, _, page = _req(p["S"] + "/html/en/d/d.html", f"{site}.example.org", cookie=cookie)
+    assert code == 200
+    return page
+
+
+def test_slide_limit_end_to_end(project):
+    """#146: the limit changes the HTML face alone, participants stay logged in, publish keeps it."""
+    p, stx, git = project, project["stx"], project["git"]
+    git("checkout", "-q", "--", ".")
+    stx("publish", "demo-d", "--allow-skew")
+    r1 = _head(p)
+    assert _html_version(p, "demo-d", "octpass1") == r1
+    cookie = _login(p["S"], "demo-d.example.org", "/html/_login", "octpass1")      # a participant
+    pid = _live_pid(p, "demo-d")
+    passes = {f: (p["host"] / f / "sites" / "demo-d" / "pass").stat().st_mtime_ns for f in ("static", "live")}
+
+    out = stx("limit", "demo-d", "2", "--allow-skew").stdout
+    assert f"{r1}-s3" in out
+    page = _html_page(p, "demo-d", cookie)                    # the same session, still open
+    assert "Slide s3 of document d" in page and "Slide s4" not in page and '"s4"' not in page
+    assert _html_version(p, "demo-d", "octpass1") == f"{r1}-s3"
+    assert _live_pid(p, "demo-d") == pid                      # the live face did not restart
+    assert passes == {f: (p["host"] / f / "sites" / "demo-d" / "pass").stat().st_mtime_ns
+                      for f in ("static", "live")}            # no password rewritten
+    assert "nothing to change" in stx("limit", "demo-d", "3", "--allow-skew").stdout
+    assert "slides 1 to 3" in stx("status").stdout
+
+    # a new release keeps the limit
+    bck = p["root"] / "docs" / "d" / "blocks" / "bck_one.py"
+    bck.write_text(bck.read_text().replace("version one", "version two"))
+    git("-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qam", "d two")
+    r2 = _head(p)
+    assert "slide limit kept" in stx("publish", "demo-d", "--allow-skew").stdout
+    assert _html_version(p, "demo-d", "octpass1") == f"{r2}-s3"
+
+    # rollback of a publication: both faces; of a limit: the HTML face alone
+    assert f"back on {r1}" in stx("rollback", "demo-d").stdout
+    time.sleep(2)                                             # nginx reloading, as after any rollback
+    assert _html_version(p, "demo-d", "octpass1") == f"{r1}-s3"
+    stx("rollback", "demo-d")
+    time.sleep(2)
+    assert _html_version(p, "demo-d", "octpass1") == f"{r2}-s3"
+    stx("limit", "demo-d", "all", "--allow-skew")
+    assert _html_version(p, "demo-d", "octpass1") == r2
+    assert "Slide s4" in _html_page(p, "demo-d", _login(p["S"], "demo-d.example.org", "/html/_login", "octpass1"))
+    pid = _live_pid(p, "demo-d")
+    assert "live face is unchanged" in stx("rollback", "demo-d").stdout
+    time.sleep(2)
+    assert _html_version(p, "demo-d", "octpass1") == f"{r2}-s3"
+    assert _live_pid(p, "demo-d") == pid
+    status = stx("status").stdout
+    assert "GAP" not in status and "slides 1 to 3" in status
+    refused = stx("limit", "demo-c", "2", "--allow-skew", check=False)
+    assert refused.returncode == 1 and "no HTML face" in refused.stderr

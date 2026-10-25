@@ -6,7 +6,8 @@ a live one (one Streamlit process per site under supervisord, an nginx router ho
 *site* is one document with up to two *faces* (``live``, ``html``), published together, all or nothing:
 code snapshot → HTML export on this machine, checked → copy of the delta over SSH (``rsync
 --link-dest``) → passwords → both faces switch together → restart of that site's process only → check
-of what is actually served, and back to the previous snapshot when a check fails.
+of what is actually served, and back to the previous snapshot when a check fails. A slide limit per
+site (``limit``, #146) changes the HTML face alone, from the published snapshot.
 
 Modules: ``config`` (``[release]`` of stx.toml, the site list), ``state`` (``.stx-release.json``,
 versioned, no secret), ``target`` (where to publish: ``local`` Docker or ``ssh``), ``passwords``

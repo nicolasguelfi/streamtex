@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`stx release limit SITE N|all`: what participants can see, per site**
+  (#146). Participants see slides 1 to N on the HTML face, or all of them.
+  - **The number** is the slide counter's (`n / N`), as projected. The block
+    holding slide N is kept whole, and later blocks are not exported at all.
+  - **Only the HTML face changes.** It is exported again from the release
+    already published (its code, so its numbering), and only it switches: it
+    serves `<release>-s<last slide>`, and `version.txt` is checked.
+  - **What stays as it is:** no password is rewritten, the live face does not
+    restart and the live release is unchanged, so participants stay logged in
+    and the projected version is not reloaded.
+  - **Kept per site** (`up_to_slide` in `.stx-release.json`): every later
+    `publish SITE` applies it, where `--html-env` lived for one command only.
+  - **Rollback:** `rollback SITE` after a limit brings back only the previous
+    HTML release and its limit. After a publication, it moves both faces as
+    before, each with its HTML release. `status` shows `(slides 1 to L)`.
+  - **Environment:** the export uses this machine's media and the project's
+    current environment, as a publication does (`--allow-skew` and
+    `--html-env` as for `publish`).
+
+  Taken from the all-trainings prototype (`limit_one`, board bascule2, n1).
+- **`stx export html --up-to-slide N`** (#146). The export stops after the
+  block that holds slide N; later blocks never run, so nothing of them
+  reaches the page, the navigation or the search index. It writes
+  `stx-limit.json` (the last slide kept, the blocks kept), refuses a document
+  without slide stops, and never saves the page cache of a cut document.
+
 ## [0.7.64] — 2026-10-24 — videos served and bounded
 
 ### Added

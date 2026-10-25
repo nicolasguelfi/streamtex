@@ -12,7 +12,9 @@
                            "static": "stx-static", "live": "stx-live",
                            "static_url": "http://127.0.0.1:8091", "live_url": "http://127.0.0.1:8092"}},
      "sites": {"prod": {"chat1d-slides": {"port": 9001, "release": "5c26474e49dc", "previous": "…",
-                                          "date": "…", "asleep": false, "html_open": false}}}}
+                                          "date": "…", "asleep": false, "html_open": false,
+                                          "up_to_slide": 12, "html_release": "5c26474e49dc-s14",
+                                          "html_previous": "…", "last": "limit"}}}}
 
 The same shape as the prototype's ``state.json``; ``stx release import`` copies it (#136, rel2 passage=a).
 """
@@ -26,7 +28,9 @@ from . import ReleaseError
 
 STATE_FILE = ".stx-release.json"
 #: What a site entry keeps (the prototype's training/kind are replaced by the site list of stx.toml).
-SITE_KEYS = ("port", "release", "previous", "date", "asleep", "html_open", "skew")
+SITE_KEYS = ("port", "release", "previous", "date", "asleep", "html_open", "skew",
+             # the HTML face's own release under a slide limit (#146, as the prototype's bascule2/n1)
+             "html_release", "html_previous", "up_to_slide", "up_to_slide_previous", "last", "html_date")
 
 
 def state_path(root: Path) -> Path:

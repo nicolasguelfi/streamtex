@@ -108,6 +108,14 @@ _export_page_sentinels = False
 #: The HTML export mode the module asks for: "continuous", "paginated" or
 #: "both" (#106) — set by st_book, read by ``stx export html``.
 _html_export_mode = "continuous"
+
+#: ``stx export html --up-to-slide N`` (#146): the build stops after the entry
+#: that holds the N-th stop (the slide counter's N); later entries never run,
+#: so nothing of them reaches the export. The build then records what it kept
+#: in ``_warmup_limit_result``: ``{"up_to_slide", "last_slide", "entries",
+#: "stops"}`` (``stops``: the stops of the kept entries).
+_warmup_up_to_slide: int | None = None
+_warmup_limit_result: dict | None = None
 HTML_EXPORT_MODES = ("continuous", "paginated", "both")
 
 # Optional ExportConfig for headless export — set by CLI ``stx export html``.
@@ -2591,6 +2599,8 @@ def _build_page_cache(module_list, toc_config, marker_config, separator,
         # call returns, so the buffer is preserved regardless.
         _mode = _pagewalk.paginate_by()
         pages: list[dict] = []
+        _limited = _warmup_mode and _warmup_up_to_slide is not None and marker_config is not None
+        _kept = len(module_list)
         with hidden.container(), _isolate_widget_keys(), _suppress_cache_build_dom():
             for i, module in enumerate(module_list):
                 toc_before = len(toc_entries()) if toc_config else 0
@@ -2657,6 +2667,10 @@ def _build_page_cache(module_list, toc_config, marker_config, separator,
                     _mod_name = getattr(module, '__name__', '').rsplit('.', 1)[-1]
                     progress_callback(i + 1, len(module_list), _mod_name)
 
+                if _limited and sum(1 for m in marker_entries() if is_stop(m)) >= _warmup_up_to_slide:
+                    _kept = i + 1          # the entry holding the slide, whole (#146)
+                    break
+
                 if separator and i < len(module_list) - 1:
                     st_include(separator, *block_args, **block_kwargs)
 
@@ -2691,6 +2705,11 @@ def _build_page_cache(module_list, toc_config, marker_config, separator,
 
     if marker_config:
         annotate_marker_numbers(marker_entries())     # #117
+    if _warmup_mode and _warmup_up_to_slide is not None:
+        global _warmup_limit_result
+        _stops = sum(1 for m in marker_entries() if is_stop(m)) if marker_config else 0
+        _warmup_limit_result = {"up_to_slide": _warmup_up_to_slide, "last_slide": _stops,
+                                "entries": _kept, "stops": _stops}
 
     # Store navigation data for CLI export enrichment (sidebar, markers, search)
     if export_config is not None:
@@ -2710,7 +2729,7 @@ def _build_page_cache(module_list, toc_config, marker_config, separator,
         "toc": copy.deepcopy(toc_entries()) if toc_config else [],
         "markers": copy.deepcopy(marker_entries()) if marker_config else [],
         "total": len(pages),                     # pages (#121)
-        "entries": len(module_list),
+        "entries": _kept,                        # all of them, unless --up-to-slide (#146)
         "paginate_by": _mode,
         "pages": pages,
         "search_index": search_index,
@@ -2753,7 +2772,10 @@ def _warmup_build_cache(module_list, toc_config, marker_config, separator,
                           block_args=block_args,
                           block_kwargs=block_kwargs)
     cache = st.session_state.get(_STX_CACHE_KEY)
-    if cache and cache_path:
+    if _warmup_up_to_slide is not None:
+        # a cut document: never the cache the live book would load (#146)
+        logger.info("Warmup: --up-to-slide, the page cache is not saved.")
+    elif cache and cache_path:
         _save_file_cache(cache_path, cache)
         logger.info("Warmup: saved page cache to %s", cache_path)
     elif not cache_path:

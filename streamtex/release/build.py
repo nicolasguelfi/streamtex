@@ -6,7 +6,8 @@
   must not be a modified working copy — unless ``--allow-skew`` (rel version=a).
 - ``snapshot``: ``git archive HEAD`` of the project's and the site's paths, minus the site's excludes.
 - ``export``: ``stx export html`` once per language, checked (the page exists, enough words, no keypad
-  gate), with redirects, ``version.txt`` and identical media shared between languages.
+  gate), with redirects, ``version.txt`` and identical media shared between languages; with a slide
+  limit, up to that slide only (#146).
 """
 
 from __future__ import annotations
@@ -143,14 +144,15 @@ def library_skew(cfg: ReleaseConfig) -> str:
 
 # -- the code snapshot ---------------------------------------------------------------------
 
-def snapshot(cfg: ReleaseConfig, site: Site, work: Path) -> Path:
+def snapshot(cfg: ReleaseConfig, site: Site, work: Path, rev: str = "HEAD") -> Path:
+    """The site's code at *rev*: ``HEAD`` for a publication, the published commit for a limit (#146)."""
     code = work / "code"
     code.mkdir()
     paths = [p for p in (*cfg.snapshot, *site.paths) if (cfg.root / p).exists()]
     missing = [p for p in site.paths if not (cfg.root / p).exists()]
     if missing:
         raise ReleaseError(f"{site.site}: path(s) not in the project: {', '.join(missing)}")
-    arch = subprocess.run(["git", "-C", str(cfg.root), "archive", "--format=tar", "HEAD", *paths],
+    arch = subprocess.run(["git", "-C", str(cfg.root), "archive", "--format=tar", rev, *paths],
                           capture_output=True)
     if arch.returncode:
         raise ReleaseError(f"{site.site}: git archive: {arch.stderr.decode()[-400:]}")
@@ -173,9 +175,17 @@ def redirect(to: str) -> str:
             f'<link rel="canonical" href="{to}"><a href="{to}">{to}</a>\n')
 
 
+#: Written by ``stx export html --up-to-slide`` in its output folder (see ``export_cmd.LIMIT_FILE``).
+LIMIT_FILE = "stx-limit.json"
+
+
 def export(cfg: ReleaseConfig, site: Site, code: Path, work: Path, release: str,
-           html_env: dict[str, str] | None = None) -> Path:
-    """The HTML face: one checked export per language, from the snapshot, with this machine's media."""
+           html_env: dict[str, str] | None = None, up_to_slide: int | None = None) -> tuple[Path, str]:
+    """The HTML face: one checked export per language, from the snapshot, with this machine's media.
+
+    Returns the folder and the HTML release's name: *release*, or ``<release>-s<last slide>`` with
+    *up_to_slide* (#146) — the slides 1 to that one are exported, the block of the last one whole.
+    """
     html = work / "html"
     doc = code / site.doc_dir
     name = site.export_name
@@ -189,11 +199,14 @@ def export(cfg: ReleaseConfig, site: Site, code: Path, work: Path, release: str,
         linked_media = media
     env = {k: v for k, v in os.environ.items()
            if k not in ("STX_PASSWORD", "STX_GATE") and not k.startswith(("STX_URL_", "STX_EXPORT_URL_"))}
+    last: int | None = None
     for lang in cfg.langs or ("",):
         out = html / lang if lang else html
         lang_env = {"STX_LANG": lang} if lang else {}
         with keep_lock(cfg.root):
             view = ["--zoom", f"{site.zoom:g}"] if site.zoom is not None else []
+            if up_to_slide is not None:
+                view += ["--up-to-slide", str(up_to_slide)]
             r = subprocess.run(["uv", "run", "--project", str(cfg.root), "stx", "export", "html", "--output",
                                 str(out), *view, "."], cwd=doc, text=True, capture_output=True,
                                env={**env, **lang_env, **(html_env or {})})
@@ -208,17 +221,25 @@ def export(cfg: ReleaseConfig, site: Site, code: Path, work: Path, release: str,
             raise ReleaseError(f"{site.site}: the {lang or 'HTML'} export holds the keypad gate")
         if words < cfg.min_words:
             raise ReleaseError(f"{site.site}: the {lang or 'HTML'} export has {words} words only (< {cfg.min_words})")
+        if up_to_slide is not None:
+            kept = json.loads((out / LIMIT_FILE).read_text(encoding="utf-8"))["last_slide"]
+            (out / LIMIT_FILE).unlink()
+            if last is not None and kept != last:
+                raise ReleaseError(f"{site.site}: the languages do not stop on the same slide "
+                                   f"({last} and {kept} for {lang}) — their slide stops differ")
+            last = kept
         if lang:
             (out / "index.html").write_text(redirect(f"/html/{lang}/{name}/{name}.html"), encoding="utf-8")
     first = f"{cfg.langs[0]}/" if cfg.langs else ""
     (html / "index.html").write_text(redirect(f"/html/{first}{name}/{name}.html"), encoding="utf-8")
-    (html / "version.txt").write_text(f"{release}\n{site.site}\n{dt.datetime.now().isoformat(timespec='seconds')}\n",
+    name = release if up_to_slide is None else f"{release}-s{last}"
+    (html / "version.txt").write_text(f"{name}\n{site.site}\n{dt.datetime.now().isoformat(timespec='seconds')}\n",
                                       encoding="utf-8")
     if linked_media is not None:
         linked_media.unlink()
     if len(cfg.langs) > 1:
         share_media(html, cfg.langs)
-    return html
+    return html, name
 
 
 def share_media(html: Path, langs: tuple[str, ...]) -> int:

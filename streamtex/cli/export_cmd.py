@@ -1,5 +1,6 @@
 """stx export html — generate static HTML from a StreamTeX project (headless)."""
 
+import json
 import os
 import sys
 import time
@@ -67,6 +68,9 @@ def _read_streamlit_theme(project_dir: str) -> dict[str, str]:
 #: single ``STX_LANG=fr`` drives both the content and the ``<html lang>``.
 LANG_ENV_VAR = "STX_LANG"
 
+#: Written in the output folder by ``--up-to-slide`` (#146): what was kept.
+LIMIT_FILE = "stx-limit.json"
+
 
 def resolve_export_lang(lang_option: str | None) -> str:
     """Resolve the export language: ``--lang`` > ``$STX_LANG`` > ``"en"``."""
@@ -112,8 +116,12 @@ def resolve_export_lang(lang_option: str | None) -> str:
 @click.option("--page-width", type=float, default=None,
               help="Width of the page, in percent of the window (e.g. 90), as the "
                    "panel's HTML export does. Default: the library's page width.")
+@click.option("--up-to-slide", type=int, default=None,
+              help="Export slides 1 to N only (N on the slide counter): the export stops after "
+                   "the block that holds slide N, which is kept whole; later blocks never run. "
+                   "Writes stx-limit.json in the output folder.")
 def export_html(path, output, asset_mode, title, no_nav, theme_mode, theme_bg, theme_text,
-                lang, suffix, html_mode, keep_going, zoom, page_width):
+                lang, suffix, html_mode, keep_going, zoom, page_width, up_to_slide):
     """Generate static HTML from a StreamTeX project without a Streamlit server.
 
     Exports a fully navigable HTML document with sidebar TOC, floating
@@ -131,6 +139,7 @@ def export_html(path, output, asset_mode, title, no_nav, theme_mode, theme_bg, t
         stx export html --html-mode both .              # continuous + one file per page
         stx export html --keep-going .                  # write it even if a block raises
         stx export html --zoom 80 --lang fr --output ./out/fr .   # opens as at 80 %
+        stx export html --up-to-slide 12 .              # slides 1-12 (their blocks whole)
     """
     from ..export import AssetCollector, AssetMode, ExportConfig
 
@@ -142,6 +151,9 @@ def export_html(path, output, asset_mode, title, no_nav, theme_mode, theme_bg, t
         raise SystemExit(1)
     if page_width is not None and not 0 < page_width <= 100:
         console.print(f"[red]Error:[/] --page-width must be a percentage in (0, 100] (got {page_width:g}).")
+        raise SystemExit(1)
+    if up_to_slide is not None and up_to_slide < 1:
+        console.print(f"[red]Error:[/] --up-to-slide must be a slide number, 1 or more (got {up_to_slide}).")
         raise SystemExit(1)
     project_dir = os.path.abspath(path)
     book_py = os.path.join(project_dir, "book.py")
@@ -220,6 +232,8 @@ def export_html(path, output, asset_mode, title, no_nav, theme_mode, theme_bg, t
         _book_mod._warmup_export_config = export_cfg
         _book_mod._export_page_sentinels = True        # where pages start (#106)
         _book_mod._html_export_mode = "continuous"
+        _book_mod._warmup_up_to_slide = up_to_slide    # #146
+        _book_mod._warmup_limit_result = None
 
         t0 = time.time()
         try:
@@ -239,6 +253,7 @@ def export_html(path, output, asset_mode, title, no_nav, theme_mode, theme_bg, t
             _book_mod._warmup_mode = False
             _book_mod._warmup_export_config = None
             _book_mod._export_page_sentinels = False
+            _book_mod._warmup_up_to_slide = None
             os.chdir(original_cwd)
 
         # Retrieve the captured HTML and nav data while session_state is the mock dict
@@ -272,6 +287,18 @@ def export_html(path, output, asset_mode, title, no_nav, theme_mode, theme_bg, t
             f"Is export=True set in st_book()?"
         )
         raise SystemExit(1)
+
+    limit = None
+    if up_to_slide is not None:
+        limit = _book_mod._warmup_limit_result
+        if not limit or not limit["stops"]:
+            console.print("[red]Error:[/] --up-to-slide: the document has no slide stops "
+                          "(markers) to count; nothing is written.")
+            raise SystemExit(1)
+        short = "" if limit["last_slide"] >= up_to_slide else \
+            f" — the document has {limit['last_slide']} slide(s) only"
+        console.print(f"[green]\u2713 Limit:[/] slides 1 to {limit['last_slide']}, "
+                      f"block(s) 1 to {limit['entries']}{short}")
 
     from ..export import strip_page_sentinels
     from ..export_paginate import build_entry_html, build_page_documents, to_subfolder
@@ -345,6 +372,10 @@ def export_html(path, output, asset_mode, title, no_nav, theme_mode, theme_bg, t
     collector = AssetCollector() if use_external else None
     folder = Path(output_dir) / base_name if use_external else Path(output_dir)
     continuous_name = f"{base_name}.html"
+    if limit is not None:
+        # what was kept, for `stx release limit` (#146)
+        Path(output_dir).mkdir(parents=True, exist_ok=True)
+        (Path(output_dir) / LIMIT_FILE).write_text(json.dumps(limit) + "\n", encoding="utf-8")
 
     # Page files first: they register their assets in the shared collector
     if paged is not None:

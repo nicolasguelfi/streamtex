@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.65] — 2026-10-25 — a slide limit per site
+
 ### Added
 
 - **`stx release limit SITE N|all`: what participants can see, per site**

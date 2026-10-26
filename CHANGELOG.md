@@ -7,6 +7,67 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`[admin]` in `.stx-passwords.toml`: one administrator password for every
+  site** (#147).
+  - **Added everywhere.** Its entries are added to the passwords of every face
+    of every site, never in place of them. An open face stays open. A face
+    with no other password belongs to the administrator alone, for example a
+    live face kept for the trainer.
+  - **Changed in one place.** `stx release passwd` applies it to every
+    published site without republishing. Changing it closes only the
+    administrator's sessions.
+  - **No rule on what a password contains.** Only what the login screen could
+    never match is refused, as before: an empty password, whitespace, two
+    labels sharing a password in one list (so a participant's password cannot
+    be the administrator's), more than 32 entries.
+- **One login opens every site that holds the same password** (#147). The
+  session cookie is set for the domain the sites share. A site accepts it when
+  its own records hold the same label with the same password:
+  - the administrator logs in once per face for every site;
+  - a password given to a group of sites opens them all;
+  - a password of one site stays valid on that site only;
+  - a stolen cookie gives no more than the password itself.
+
+  The cookie name ends with a tag of the server key
+  (`stx_session_<tag>`), so two projects sharing a domain never overwrite each
+  other's session. The live face and the HTML face keep one session each.
+- **Full or limited, per password, on the HTML face** (#147).
+  - **Two releases.** A site with a slide limit keeps both: `current` (all the
+    slides) and `limited` (`<release>-s<last slide>`).
+  - **The login service chooses.** It answers `X-Stx-View`, and nginx serves
+    the matching folder. The labels of `[admin]` and those listed in
+    `full = [...]` (at any level of `.stx-passwords.toml`) see all the
+    slides; every other password sees the limited release. A limited
+    participant cannot reach the whole release by guessing a URL.
+  - **What follows both releases:** `publish` (both exports, hard-linked),
+    `limit` (`limit SITE all` only removes the `limited` link, without
+    exporting), `rollback`, `prune` and `status`, which checks each view as a
+    visitor.
+  - **`auth-status`** marks the labels that see all the slides with
+    `[all slides]`.
+
+### Changed
+
+- **Writing the passwords again closes no session.** A record already on the
+  server is kept while its password is unchanged, and one password gets one
+  record on every site and face. Only a changed password ends the sessions
+  of its label.
+- **The login service's interface is now number 2** (`AUTH_INTERFACE`). It
+  adds the optional request header `X-Stx-Domain`, the response header
+  `X-Stx-View`, `sites/<site>/full` and the `limited` folder. Without
+  `X-Stx-Domain`, the sessions stay per site, as before (`stx deploy`).
+
+### Migration
+
+- **Server configuration.** Run `stx release server-config` once: it sends
+  the new nginx configuration (`$stx_domain`, `$stx_dir`) and the new login
+  service. Open sessions end once, because the cookie name changes.
+- **Sites limited under 0.7.65.** A site limited under 0.7.65 holds only its
+  limited HTML release: publish it again before the next `limit`. `limit`
+  says so.
+
 ## [0.7.65] — 2026-10-25 — a slide limit per site
 
 ### Added

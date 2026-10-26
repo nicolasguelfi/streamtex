@@ -16,7 +16,22 @@ supply them, the service listens on 127.0.0.1 only):
 - ``X-Stx-Cookie`` the cookie name (default ``stx_session_<site>``);
 - ``X-Stx-Login``  the form's action as the visitor sees it (default ``/_login``);
 - ``X-Stx-Home``   where to go when the return address is unusable (default ``/``);
+- ``X-Stx-Domain`` the domain the sites share (``example.org``), optional: the
+  session is then valid on every site of the server (#147, below);
 - ``X-Original-URI`` and ``X-Forwarded-Prefix``: the page asked for.
+
+One login for every site (#147). With ``X-Stx-Domain``, the cookie is set
+for that domain and its token no longer names the site: a site accepts it when
+ITS OWN records hold the same label with the same record (same password, same
+generation). A password given to several sites opens them all after one
+login; a password of one site only stays valid there; a stolen cookie gives no
+more than the password itself. The cookie name ends with a tag of the server
+key, so two projects sharing a domain never overwrite each other's session.
+
+Full or limited (#147). ``GET /check`` also answers ``X-Stx-View``:
+``limited`` when the site has a limited release (``<root>/sites/<site>/limited``)
+and the label is not listed in ``<root>/sites/<site>/full`` (one label per
+line), else ``full``; nginx serves the matching folder.
 
 Record file, one entry per line (blank lines and ``#`` comments ignored)::
 
@@ -30,8 +45,9 @@ Security properties:
 - only scrypt records are stored; comparisons run in constant time;
 - the cookie is HttpOnly, Secure, SameSite=Lax, expires, and is signed
   (HMAC-SHA256) with a server key created at first start (mode 600);
-- the signature covers the site, the label and a generation taken from that
-  entry's record: changing or removing one entry ends only its sessions;
+- the signature covers the site (or the shared mark), the label and a
+  generation taken from that entry's record: changing or removing one entry
+  ends only its sessions;
 - a site with no record file, or no usable entry, is closed;
 - the return address only accepts a path on the same site.
 
@@ -49,12 +65,14 @@ contract, numbered by ``AUTH_INTERFACE``:
 
 - the request headers above (``X-Stx-Site``, ``X-Stx-Cookie``,
   ``X-Stx-Login``, ``X-Stx-Home``, ``X-Original-URI``,
-  ``X-Forwarded-Prefix``) and the response header ``X-Stx-Label``;
+  ``X-Forwarded-Prefix``, ``X-Stx-Domain``) and the response headers
+  ``X-Stx-Label`` and ``X-Stx-View``;
 - the environment variables above;
 - the record files ``<root>/sites/<site>/pass``, their line grammar and the
-  scrypt record format; the server key ``<root>/conf/session.key``;
-- the cookie ``stx_session_<site>`` and its token
-  ``<expiry>.<label>.<generation>.<signature>``.
+  scrypt record format; ``<root>/sites/<site>/full`` and the ``limited``
+  folder; the server key ``<root>/conf/session.key``;
+- the cookie ``stx_session_<site>`` (``<name>_<key tag>`` for a shared
+  session) and its token ``<expiry>.<label>.<generation>.<signature>``.
 
 Any change to one of them bumps ``AUTH_INTERFACE`` and is announced in the
 CHANGELOG. ``STX_VERSION`` is the library release the file comes from. Both
@@ -81,7 +99,7 @@ from urllib.parse import parse_qs, urlsplit
 
 #: The library release this file ships with, and its interface number (#135).
 STX_VERSION = "0.7.65"
-AUTH_INTERFACE = 1
+AUTH_INTERFACE = 2
 
 DEFAULT_ROOT = "/var/lib/stx-auth"
 DEFAULT_PORT = 9100
@@ -99,6 +117,8 @@ DEFAULT_LABEL = "default"
 SITE_RE = re.compile(r"^[a-z0-9-]{1,63}$")
 LABEL_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 COOKIE_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+DOMAIN_RE = re.compile(r"^(?=.{3,253}$)[a-z0-9-]{1,63}(\.[a-z0-9-]{1,63})+$")
+SHARED = "*"           # the "site" a shared session is signed for (#147)
 PATH_RE = re.compile(r"^/[A-Za-z0-9._~!$&'()*+,;=:@%/?-]*$")
 PREFIX_RE = re.compile(r"^/[A-Za-z0-9_-]{1,32}$")
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
@@ -236,6 +256,7 @@ class RecordStore:
     def __init__(self, root: Path) -> None:
         self.root = root
         self._cache: dict[str, tuple[tuple[int, int], Records]] = {}
+        self._full: dict[str, tuple[tuple[int, int], frozenset[str]]] = {}
         self._lock = threading.Lock()
 
     def get(self, site: str) -> Records:
@@ -258,6 +279,33 @@ class RecordStore:
         with self._lock:
             self._cache[site] = (stamp, records)
         return records
+
+    def full(self, site: str) -> frozenset[str]:
+        """The labels that see the whole content of a limited site (``sites/<site>/full``)."""
+        path = self.root / "sites" / site / "full"
+        try:
+            st = path.stat()
+        except OSError:
+            return frozenset()
+        stamp = (st.st_mtime_ns, st.st_size)
+        with self._lock:
+            hit = self._full.get(site)
+        if hit is not None and hit[0] == stamp:
+            return hit[1]
+        try:
+            labels = frozenset(ln.strip() for ln in path.read_text(encoding="utf-8").splitlines()
+                               if LABEL_RE.match(ln.strip()))
+        except (OSError, UnicodeDecodeError):
+            return frozenset()
+        with self._lock:
+            self._full[site] = (stamp, labels)
+        return labels
+
+    def view(self, site: str, label: str) -> str:
+        """``limited`` when *site* has a limited release and *label* is not among its full labels."""
+        if not SITE_RE.match(site or "") or not (self.root / "sites" / site / "limited").is_dir():
+            return "full"
+        return "full" if label in self.full(site) else "limited"
 
 
 # ---------------------------------------------------------------------------
@@ -364,6 +412,7 @@ class AuthServer(ThreadingHTTPServer):
         self.root = root
         self.store = RecordStore(root)
         self.key = load_key(root)
+        self.key_tag = hashlib.sha256(self.key).hexdigest()[:8]
         self.session_seconds = session_seconds
         self.scrypt_slots = threading.BoundedSemaphore(MAX_SCRYPT_AT_ONCE)
         super().__init__(address, Handler)
@@ -390,7 +439,17 @@ class Handler(BaseHTTPRequestHandler):
         return self._header("X-Stx-Site", SITE_RE, "")
 
     def cookie_name(self) -> str:
-        return self._header("X-Stx-Cookie", COOKIE_RE, f"stx_session_{self.site()}")
+        name = self._header("X-Stx-Cookie", COOKIE_RE, f"stx_session_{self.site()}")
+        return f"{name}_{self.server.key_tag}" if self.domain() else name
+
+    def domain(self) -> str:
+        """The domain of a shared session (#147): ``X-Stx-Domain``, when the host is one of its sites."""
+        value = (self.headers.get("X-Stx-Domain") or "").strip().lower()
+        host = self.host().split(":")[0].lower()
+        return value if DOMAIN_RE.match(value) and host.endswith("." + value) else ""
+
+    def signed_for(self) -> str:
+        return SHARED if self.domain() else self.site()
 
     def _local_path(self, name: str, default: str) -> str:
         value = (self.headers.get(name) or "").strip()
@@ -417,13 +476,16 @@ class Handler(BaseHTTPRequestHandler):
         accept = self.headers.get("Accept-Language", "") or ""
         return "fr" if "/fr/" in uri or "lang=fr" in uri or accept.startswith("fr") else "en"
 
-    def token(self) -> str:
+    def tokens(self) -> list[str]:
+        """Every value of the session cookie: a browser may send two (an old host cookie and the
+        shared one)."""
         name = self.cookie_name()
+        values = []
         for part in (self.headers.get("Cookie") or "").split(";"):
             key, _, value = part.strip().partition("=")
             if key == name:
-                return value
-        return ""
+                values.append(value)
+        return values[:4]
 
     def host(self) -> str:
         return (self.headers.get("Host") or "").split(",")[0].strip()[:253]
@@ -451,11 +513,15 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/check":
             stamp = {"X-Stx-Auth": f"{AUTH_INTERFACE} {STX_VERSION}"}
             if records.open:
-                return self.send(204, headers={**stamp, "X-Stx-Label": "open"})
-            entry = check_token(self.server.key, site, records, self.token())
+                return self.send(204, headers={**stamp, "X-Stx-Label": "open",
+                                               "X-Stx-View": self.server.store.view(site, "open")})
+            signed = self.signed_for()
+            entry = next((e for t in self.tokens()
+                          if (e := check_token(self.server.key, signed, records, t)) is not None), None)
             if entry is None:
                 return self.send(401, headers=stamp)
-            return self.send(204, headers={**stamp, "X-Stx-Label": entry.label})
+            return self.send(204, headers={**stamp, "X-Stx-Label": entry.label,
+                                           "X-Stx-View": self.server.store.view(site, entry.label)})
         if path == "/login":
             return self.form(safe_path(self.original_uri(), self.home()), error=False)
         return self.send(404)
@@ -482,9 +548,10 @@ class Handler(BaseHTTPRequestHandler):
         if entry is None:
             return self.form(nxt, error=True)
         seconds = self.server.session_seconds
-        token = make_token(self.server.key, site, entry, seconds)
+        token = make_token(self.server.key, self.signed_for(), entry, seconds)
+        domain = self.domain()
         cookie = (f"{self.cookie_name()}={token}; Path=/; Max-Age={seconds}; "
-                  "HttpOnly; Secure; SameSite=Lax")
+                  + (f"Domain={domain}; " if domain else "") + "HttpOnly; Secure; SameSite=Lax")
         return self.send(303, headers={"Location": nxt, "Set-Cookie": cookie})
 
     def _match(self, records: Records, word: str) -> Entry | None:

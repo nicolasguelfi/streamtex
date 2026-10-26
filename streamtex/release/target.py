@@ -7,6 +7,7 @@ The same gestures on both; on ``ssh`` they are prefixed by ssh. Paths are those 
 from __future__ import annotations
 
 import os
+import re
 import shlex
 import subprocess
 import sys
@@ -93,10 +94,11 @@ class Target:
         if r.returncode:
             raise ReleaseError(f"{self.name}: writing {dest} failed: {r.stderr[-400:]}")
 
-    def switch_cmd(self, base: str, release: str) -> str:
-        """Point ``current`` at ``releases/<release>`` atomically (rename over the old link)."""
+    def switch_cmd(self, base: str, release: str, link: str = "current") -> str:
+        """Point *link* (``current``, or ``limited``: #147) at ``releases/<release>`` atomically (rename
+        over the old link)."""
         mv = "mv -fh" if self.kind == "local" and sys.platform == "darwin" else "mv -fT"
-        return f"cd {shlex.quote(base)} && ln -sfn releases/{release} current.new && {mv} current.new current"
+        return f"cd {shlex.quote(base)} && ln -sfn releases/{release} {link}.new && {mv} {link}.new {link}"
 
     # -- HTTP, as a visitor -----------------------------------------------------------------
     def url_of(self, base_key: str, site: str, path: str) -> tuple[str, str | None]:
@@ -139,7 +141,8 @@ class Target:
         except OSError:
             return ""
         raw = headers.get("Set-Cookie", "") if headers else ""
-        return raw.split(";", 1)[0] if raw.startswith("stx_session=") else ""
+        # stx_session=…, or stx_session_<key tag>=… for a session shared by the sites (#147)
+        return raw.split(";", 1)[0] if re.match(r"stx_session(_[0-9a-f]{8})?=", raw) else ""
 
 
 def target_of(state: dict, name: str | None) -> Target:

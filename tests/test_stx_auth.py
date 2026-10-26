@@ -409,6 +409,26 @@ INTERFACES = {
         "token": "1060.T1.0db25f8b5ddde317.f13e6b4c04deb8e405280bfff7bc09d81dc4f8320a4e7a22f6cae5952ade00c1",
         "lines": ["default:" + _REC, "T1:" + _REC, "T1:" + _REC + ":2027-01-31"],
     },
+    2: {   # #147: a session shared by the sites of a domain, the full or limited view
+        "headers": ["X-Forwarded-Prefix", "X-Original-URI", "X-Stx-Auth", "X-Stx-Cookie", "X-Stx-Domain",
+                    "X-Stx-Home", "X-Stx-Label", "X-Stx-Login", "X-Stx-Site", "X-Stx-View"],
+        "env": ["STX_AUTH_PORT", "STX_AUTH_ROOT", "STX_AUTH_SESSION_HOURS"],
+        "patterns": {
+            "SITE_RE": r"^[a-z0-9-]{1,63}$",
+            "LABEL_RE": r"^[A-Za-z0-9_-]{1,64}$",
+            "COOKIE_RE": r"^[A-Za-z0-9_-]{1,64}$",
+            "DOMAIN_RE": r"^(?=.{3,253}$)[a-z0-9-]{1,63}(\.[a-z0-9-]{1,63})+$",
+            "DATE_RE": r"^\d{4}-\d{2}-\d{2}$",
+            "RECORD_RE": r"^scrypt\$\d+\$\d+\$\d+\$[0-9a-f]{16,128}\$[0-9a-f]{32,128}$",
+        },
+        "scrypt": [16384, 8, 1],
+        "defaults": ["/var/lib/stx-auth", 9100, "default"],
+        "paths": ["conf", "full", "limited", "pass", "session.key", "sites"],
+        "cookie": ["stx_session_"],
+        "shared": "*",
+        "token": "1060.T1.0db25f8b5ddde317.f13e6b4c04deb8e405280bfff7bc09d81dc4f8320a4e7a22f6cae5952ade00c1",
+        "lines": ["default:" + _REC, "T1:" + _REC, "T1:" + _REC + ":2027-01-31"],
+    },
 }
 
 
@@ -419,11 +439,12 @@ def _interface():
         "headers": sorted(set(re.findall(r'"(X-[A-Za-z]+(?:-[A-Za-z]+)*)"', code))),
         "env": sorted(set(re.findall(r'"(STX_AUTH_[A-Z_]+)"', code))),
         "patterns": {n: getattr(stx_auth, n).pattern
-                     for n in ("SITE_RE", "LABEL_RE", "COOKIE_RE", "DATE_RE", "RECORD_RE")},
+                     for n in ("SITE_RE", "LABEL_RE", "COOKIE_RE", "DOMAIN_RE", "DATE_RE", "RECORD_RE")},
         "scrypt": [stx_auth.SCRYPT_N, stx_auth.SCRYPT_R, stx_auth.SCRYPT_P],
         "defaults": [stx_auth.DEFAULT_ROOT, stx_auth.DEFAULT_PORT, stx_auth.DEFAULT_LABEL],
-        "paths": sorted(set(re.findall(r'"(sites|pass|conf|session\.key)"', code))),
+        "paths": sorted(set(re.findall(r'"(sites|pass|conf|session\.key|full|limited)"', code))),
         "cookie": sorted(set(re.findall(r"stx_session_", code))),
+        "shared": stx_auth.SHARED,
         "token": make_token(b"k" * 32, "demo", Entry("T1", _REC), 60, now=1000),
         "lines": [format_entry(Entry(stx_auth.DEFAULT_LABEL, _REC)), format_entry(Entry("T1", _REC)),
                   format_entry(Entry("T1", _REC, date(2027, 1, 31)))],
@@ -452,3 +473,121 @@ class TestInterface:
     def test_the_login_page_does_not_show_the_version(self, server):
         resp, _ = _req(server, "GET", "/login", _h())
         assert resp.getheader("X-Stx-Auth") is None
+
+
+# ---------------------------------------------------------------------------
+# #147: one login for every site of a domain; the full or limited view
+# ---------------------------------------------------------------------------
+
+def _shared(site, **extra):
+    return _h(site, **{"X-Stx-Cookie": "stx_session", "X-Stx-Domain": "example.org",
+                       "Host": f"{site}.example.org", **extra})
+
+
+class TestSharedSession:
+    def _two_sites(self, server, admin_b=True):
+        admin = _rec("root-pw")                       # ONE record on both sites, as stx release writes it
+        _write(server, "a", f"ADMIN:{admin}\nPROMO-A:{_rec('pa')}\n")
+        _write(server, "b", (f"ADMIN:{admin}\n" if admin_b else "") + f"PROMO-B:{_rec('pb')}\n")
+
+    def test_the_cookie_is_set_for_the_domain(self, server):
+        self._two_sites(server)
+        resp, _ = _login(server, "root-pw", "a", **{k: v for k, v in _shared("a").items() if k != "X-Stx-Site"})
+        sc = resp.getheader("Set-Cookie")
+        assert resp.status == 303 and "Domain=example.org;" in sc
+        assert sc.startswith(f"stx_session_{server.key_tag}=")
+
+    def test_one_login_opens_the_other_site_holding_the_same_password(self, server):
+        self._two_sites(server)
+        resp, _ = _login(server, "root-pw", "a", **{k: v for k, v in _shared("a").items() if k != "X-Stx-Site"})
+        cookie = _cookie(resp)
+        for site in ("a", "b"):
+            resp, _ = _req(server, "GET", "/check", _shared(site, Cookie=cookie))
+            assert resp.status == 204 and resp.getheader("X-Stx-Label") == "ADMIN"
+
+    def test_a_password_of_one_site_stays_there(self, server):
+        self._two_sites(server)
+        resp, _ = _login(server, "pa", "a", **{k: v for k, v in _shared("a").items() if k != "X-Stx-Site"})
+        cookie = _cookie(resp)
+        assert _req(server, "GET", "/check", _shared("a", Cookie=cookie))[0].status == 204
+        assert _req(server, "GET", "/check", _shared("b", Cookie=cookie))[0].status == 401
+
+    def test_a_site_without_the_label_refuses(self, server):
+        self._two_sites(server, admin_b=False)
+        resp, _ = _login(server, "root-pw", "a", **{k: v for k, v in _shared("a").items() if k != "X-Stx-Site"})
+        assert _req(server, "GET", "/check", _shared("b", Cookie=_cookie(resp)))[0].status == 401
+
+    def test_the_same_label_with_another_password_refuses(self, server):
+        _write(server, "a", f"ADMIN:{_rec('root-pw')}\n")
+        _write(server, "b", f"ADMIN:{_rec('root-pw')}\n")    # same word, another salt: another record
+        resp, _ = _login(server, "root-pw", "a", **{k: v for k, v in _shared("a").items() if k != "X-Stx-Site"})
+        assert _req(server, "GET", "/check", _shared("b", Cookie=_cookie(resp)))[0].status == 401
+
+    def test_a_host_outside_the_domain_keeps_a_site_session(self, server):
+        self._two_sites(server)
+        headers = _shared("a", Host="a.other.net")
+        resp, _ = _login(server, "root-pw", "a", **{k: v for k, v in headers.items() if k != "X-Stx-Site"})
+        sc = resp.getheader("Set-Cookie")
+        assert "Domain=" not in sc and sc.startswith("stx_session=")
+
+    def test_a_site_session_is_not_a_shared_one(self, server):
+        self._two_sites(server)
+        resp, _ = _login(server, "root-pw", "a", **{"X-Stx-Cookie": "stx_session"})
+        old = _cookie(resp).split("=", 1)[1]
+        cookie = f"stx_session_{server.key_tag}={old}"
+        assert _req(server, "GET", "/check", _shared("a", Cookie=cookie))[0].status == 401
+
+    def test_two_values_of_the_cookie_any_valid_one_counts(self, server):
+        self._two_sites(server)
+        resp, _ = _login(server, "root-pw", "a", **{k: v for k, v in _shared("a").items() if k != "X-Stx-Site"})
+        good = _cookie(resp)
+        name = good.split("=", 1)[0]
+        resp, _ = _req(server, "GET", "/check", _shared("b", Cookie=f"{name}=1.x.y.z; {good}"))
+        assert resp.status == 204
+
+    def test_without_the_domain_header_nothing_changes(self, server):
+        self._two_sites(server)
+        resp, _ = _login(server, "root-pw", "a")
+        assert resp.getheader("Set-Cookie").startswith("stx_session_a=")
+        assert "Domain=" not in resp.getheader("Set-Cookie")
+
+
+class TestView:
+    def _limited(self, server, site="demo", full=None):
+        d = Path(server.root) / "sites" / site
+        (d / "releases" / "r1-s3").mkdir(parents=True, exist_ok=True)
+        if not (d / "limited").exists():
+            (d / "limited").symlink_to("releases/r1-s3")
+        if full is not None:
+            (d / "full").write_text("".join(f"{x}\n" for x in full), encoding="utf-8")
+
+    def _view(self, server, word, site="demo"):
+        resp, _ = _login(server, word, site)
+        resp, _ = _req(server, "GET", "/check", _h(site, Cookie=_cookie(resp)))
+        assert resp.status == 204
+        return resp.getheader("X-Stx-View")
+
+    def test_without_a_limited_release_everyone_sees_everything(self, server):
+        _write(server, "demo", f"ADMIN:{_rec('root')}\nP:{_rec('p')}\n")
+        assert self._view(server, "p") == "full"
+
+    def test_a_limited_release_for_the_labels_not_listed(self, server):
+        _write(server, "demo", f"ADMIN:{_rec('root')}\nPA:{_rec('pa')}\nPB:{_rec('pb')}\n")
+        self._limited(server, full=["ADMIN", "PA"])
+        assert [self._view(server, w) for w in ("root", "pa", "pb")] == ["full", "full", "limited"]
+
+    def test_the_full_list_is_read_again_when_it_changes(self, server):
+        _write(server, "demo", f"PB:{_rec('pb')}\n")
+        self._limited(server, full=[])
+        assert self._view(server, "pb") == "limited"
+        full = Path(server.root) / "sites" / "demo" / "full"
+        full.write_text("PB\n", encoding="utf-8")
+        st = full.stat()
+        os.utime(full, ns=(st.st_atime_ns, st.st_mtime_ns + 1_000_000))
+        assert self._view(server, "pb") == "full"
+
+    def test_an_open_site_with_a_limit_is_limited(self, server):
+        _write(server, "demo", "open\n")
+        self._limited(server)
+        resp, _ = _req(server, "GET", "/check", _h())
+        assert resp.status == 204 and resp.getheader("X-Stx-View") == "limited"

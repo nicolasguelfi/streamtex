@@ -3,8 +3,10 @@
 On the target (``<root>`` of the target, ``/srv/<face>`` in the containers)::
 
     static/sites/<site>/releases/<release>/   the HTML export of a release
-    static/sites/<site>/current -> releases/<release>
+    static/sites/<site>/current -> releases/<release>          all the content
+    static/sites/<site>/limited -> releases/<release>-s<n>     with a slide limit only (#146, #147)
     static/sites/<site>/pass                  the HTML face's password records (or "open")
+    static/sites/<site>/full                  the labels that see all the content of a limited site
     live/sites/<site>/releases/<release>/     the code snapshot (its media folder a link to live/media)
     live/sites/<site>/current -> releases/<release>
     live/sites/<site>/pass                    the live face's records
@@ -16,10 +18,12 @@ On the target (``<root>`` of the target, ``/srv/<face>`` in the containers)::
 Both faces switch together (all or nothing); a failed check after the switch puts both back on the
 previous release. Two releases are kept per site: the current one and the previous one.
 
-A slide limit (#146) is kept per site (``up_to_slide``): the HTML face then serves
-``<release>-s<last slide>``, its own release (``html_release``, ``html_previous``). ``limit`` changes it
-alone, from the release already published: the live face, its program and the passwords stay as they
-are, so the participants' sessions stay open; ``rollback`` after a limit undoes the limit alone.
+A slide limit (#146) is kept per site (``up_to_slide``): the HTML face then also holds
+``<release>-s<last slide>`` (``html_release``, ``html_previous``), linked as ``limited``. The login
+service opens it to every password not listed in ``full`` (#147); ``[admin]`` and the ``full`` labels
+see ``current``, all the content. ``limit`` changes the limited release alone, from the release already
+published: the live face, its program and the passwords stay as they are, so the participants' sessions
+stay open; ``rollback`` after a limit undoes the limit alone.
 """
 
 from __future__ import annotations
@@ -68,16 +72,33 @@ def write_maps(t: Target, state: dict) -> None:
 
 
 def html_of(v: dict) -> str | None:
-    """The release the HTML face serves: its own with a slide limit (#146), else the site's."""
+    """The release the participants see on the HTML face: the limited one (#146), else the site's."""
     return v.get("html_release") or v.get("release")
 
 
 def switch(t: Target, site: Site, release: str, html_release: str | None = None,
            faces: list[str] | None = None) -> None:
-    """Each face's ``current`` link; the HTML face's points to *html_release* when it has its own."""
-    for face in faces or _faces_dirs(site):
-        name = (html_release or release) if face == "static" else release
-        t.sh(t.switch_cmd(t.path(face, "sites", site.site), name))
+    """Each face's ``current`` link on *release*; on the HTML face, ``limited`` on *html_release*."""
+    faces = faces or _faces_dirs(site)
+    for face in faces:
+        t.sh(t.switch_cmd(t.path(face, "sites", site.site), release))
+    if "static" in faces:
+        switch_limited(t, site, release, html_release)
+
+
+def switch_limited(t: Target, site: Site, release: str, html_release: str | None) -> None:
+    """The HTML face's ``limited`` link on *html_release*; removed when the site has no limit."""
+    base = t.path("static", "sites", site.site)
+    if html_release and html_release != release:
+        t.sh(t.switch_cmd(base, html_release, "limited"))
+    else:
+        t.sh(f"rm -f {shlex.quote(base + '/limited')}")
+
+
+def server_records(t: Target) -> str:
+    """Every record file already on the target, for :class:`passwords.RecordPool`."""
+    files = " ".join(f"{shlex.quote(t.path(face, 'sites'))}/*/pass" for face in ("static", "live"))
+    return t.sh(f"cat {files} 2>/dev/null", check=False).stdout or ""
 
 
 def reload_all(t: Target, site: Site | None = None) -> None:
@@ -89,14 +110,18 @@ def reload_all(t: Target, site: Site | None = None) -> None:
         t.dexec("live", f"supervisorctl restart {site.site}", check=False)
 
 
-def apply_passwords(t: Target, cfg: ReleaseConfig, state: dict, site: Site, faces: dict) -> None:
-    """The record files of the site's faces; changing them closes the open sessions of that face."""
+def apply_passwords(t: Target, cfg: ReleaseConfig, state: dict, site: Site, faces: dict,
+                    full: frozenset[str] = frozenset(), pool: pw.RecordPool | None = None) -> None:
+    """The record files of the site's faces, and the labels that see all the content; a changed
+    password closes the open sessions of its label only."""
     v = sites_of(state, t.name)[site.site]
+    pool = pool or pw.RecordPool()
     if "html" in site.faces:
         v["html_open"] = faces["html"] is None
-        t.write(t.path("static", "sites", site.site, "pass"), pw.pass_text(faces["html"]), mode=0o600)
+        t.write(t.path("static", "sites", site.site, "pass"), pool.text(faces["html"]), mode=0o600)
+        t.write(t.path("static", "sites", site.site, "full"), pw.full_text(faces["html"], full), mode=0o600)
     if "live" in site.faces:
-        t.write(t.path("live", "sites", site.site, "pass"), pw.pass_text(faces["live"]), mode=0o600)
+        t.write(t.path("live", "sites", site.site, "pass"), pool.text(faces["live"]), mode=0o600)
         t.write(t.path("live", "conf", "programs", f"{site.site}.conf"), program_conf(cfg, site, v["port"]))
 
 
@@ -112,6 +137,26 @@ def served(t: Target, site: Site, v: dict, html_password: str) -> tuple[str, str
         live = "asleep" if v.get("asleep") else \
             ("ok" if t.get("live_url", site.site, "/_stcore/health")[0] == 200 else "down")
     return html, live
+
+
+def check_html(t: Target, site: Site, v: dict, entries: list | None, full: frozenset[str], release: str,
+               html_release: str) -> list[str]:
+    """What the HTML face serves to each view, as a visitor; the empty list when all is right."""
+    if "html" not in site.faces:
+        return []
+    if v.get("html_open"):
+        checks = [("everyone", "", html_release)]
+    elif html_release == release:
+        checks = [("everyone", pw.first_password(entries), release)]
+    else:
+        checks = [(view, word, want) for view, want in (("full", release), ("limited", html_release))
+                  if (word := pw.view_password(entries, full, view)) is not None]
+    problems = []
+    for view, word, want in checks:
+        seen, _ = served(t, site, v, word)
+        if seen != want:
+            problems.append(f"{view} sees {seen}, not {want}")
+    return problems
 
 
 def wait_live(t: Target, site: Site, seconds: int = 90) -> bool:
@@ -137,19 +182,19 @@ def prune(t: Target, site: Site, keep: set[str], keep_html: set[str] | None = No
 
 
 def publish_site(t: Target, cfg: ReleaseConfig, state: dict, site: Site, release: str, faces: dict,
-                 echo: Echo, html_env: dict[str, str] | None = None, skew: str = "") -> None:
+                 echo: Echo, html_env: dict[str, str] | None = None, skew: str = "",
+                 full: frozenset[str] = frozenset(), pool: pw.RecordPool | None = None) -> None:
     echo(f"\n▶ {site.site} @ {release} ({t.name})")
     entries = sites_of(state, t.name)
     v = entries.setdefault(site.site, {})
     previous = v.get("release")
-    check_dir = t.path(_faces_dirs(site)[0], "sites", site.site, "releases",
-                       html_of(v) if _faces_dirs(site)[0] == "static" else previous) if previous else ""
+    check_dir = t.path(_faces_dirs(site)[0], "sites", site.site, "releases", previous) if previous else ""
     if previous and t.sh(f"test -d {shlex.quote(check_dir)}", check=False).returncode:
         previous = None          # the recorded release is not on this target: no hard link, no rollback to it
     old_html = html_of(v) if previous else None
+    static_rel = t.path("static", "sites", site.site, "releases")
     if old_html and "html" in site.faces and t.sh(
-            f"test -d {shlex.quote(t.path('static', 'sites', site.site, 'releases', old_html))}",
-            check=False).returncode:
+            f"test -d {shlex.quote(static_rel + '/' + old_html)}", check=False).returncode:
         old_html = None
     limit = v.get("up_to_slide")                  # kept: a publication does not open the whole document (#146)
     html_release = release
@@ -158,10 +203,12 @@ def publish_site(t: Target, cfg: ReleaseConfig, state: dict, site: Site, release
     with tempfile.TemporaryDirectory(prefix="stx-release-") as w:
         work = Path(w)
         code = build.snapshot(cfg, site, work)
-        html = None
+        html = limited = None
         if "html" in site.faces:
-            html, html_release = build.export(cfg, site, code, work, release, html_env, limit)
-            if limit is not None:
+            html, _ = build.export(cfg, site, code, work, release, html_env)
+            if limit is not None:              # the participants' release beside the whole one (#147)
+                (work / "limited").mkdir()
+                limited, html_release = build.export(cfg, site, code, work / "limited", release, html_env, limit)
                 echo(f"  slide limit kept: slides 1 to {html_release.rsplit('-s', 1)[1]} (asked: {limit})")
         if "live" in site.faces:
             dirs = [t.path("live", "sites", site.site, "releases")]
@@ -181,31 +228,34 @@ def publish_site(t: Target, cfg: ReleaseConfig, state: dict, site: Site, release
                 media.symlink_to(f"{LIVE_ROOT}/media/{cfg.project}/{cfg.media}")
             t.rsync(str(code) + "/", t.path("live", "sites", site.site, "releases", release) + "/", "--delete")
         if html is not None:
-            t.sh("mkdir -p " + shlex.quote(t.path("static", "sites", site.site, "releases")))
-            link = (["--link-dest", t.path("static", "sites", site.site, "releases", old_html)]
-                    if old_html and old_html != html_release else [])
-            t.rsync(str(html) + "/", t.path("static", "sites", site.site, "releases", html_release) + "/",
-                    "--delete", "-H", "-c", *link)
-        rel_dirs = " ".join(shlex.quote(t.path(f, "sites", site.site, "releases",
-                                               html_release if f == "static" else release))
+            t.sh("mkdir -p " + shlex.quote(static_rel))
+            link = ["--link-dest", f"{static_rel}/{previous}"] if previous else []
+            t.rsync(str(html) + "/", f"{static_rel}/{release}/", "--delete", "-H", "-c", *link)
+        if limited is not None:
+            t.rsync(str(limited) + "/", f"{static_rel}/{html_release}/", "--delete", "-H", "-c",
+                    "--link-dest", f"{static_rel}/{release}")
+        rel_dirs = " ".join(shlex.quote(t.path(f, "sites", site.site, "releases", release))
                             for f in _faces_dirs(site))
+        if limited is not None:
+            rel_dirs += " " + shlex.quote(f"{static_rel}/{html_release}")
         t.sh(f"chmod -R a+rX {rel_dirs}")
     if "live" in site.faces:
         t.sh(f"ln -sfn {LIVE_ROOT}/sites/{site.site}/current/{site.doc_dir}/static "
              f"{shlex.quote(t.path('live', 'sites', site.site, 'static'))}")
-    apply_passwords(t, cfg, state, site, faces)
+    apply_passwords(t, cfg, state, site, faces, full, pool)
     write_maps(t, state)
     switch(t, site, release, html_release)        # both faces TOGETHER
     reload_all(t, site)
     ok_live = wait_live(t, site) if "live" in site.faces else True
-    html_seen, _ = served(t, site, v, pw.first_password(faces.get("html")))
-    if not ok_live or ("html" in site.faces and html_seen != html_release):
-        echo(f"  ✗ check after the switch: html={html_seen} live={'ok' if ok_live else 'down'}")
+    problems = check_html(t, site, v, faces.get("html"), full, release, html_release)
+    if not ok_live or problems:
+        echo(f"  ✗ check after the switch: html {'; '.join(problems) or 'ok'}, live {'ok' if ok_live else 'down'}")
         if previous:
             switch(t, site, previous, old_html)
             reload_all(t, site)
             echo(f"  ↩ both faces are back on {previous}")
         raise ReleaseError(f"{site.site}: what is served is not {html_release}")
+    html_seen = html_release
     v.update(release=release, previous=previous, date=dt.datetime.now().isoformat(timespec="seconds"),
              asleep=False, last="publish", up_to_slide_previous=limit)
     if "html" in site.faces:
@@ -218,7 +268,8 @@ def publish_site(t: Target, cfg: ReleaseConfig, state: dict, site: Site, release
     echo(f"  ✓ {site.site}: html {html_seen}, live {'ok' if 'live' in site.faces else '-'}"
          + (f" — port {v['port']}" if v.get("port") else "")
          + ("" if "html" not in site.faces else f", html {'open' if v.get('html_open') else 'protected'}"))
-    if removed := prune(t, site, {release, previous} - {None}, {html_release, old_html} - {None}):
+    if removed := prune(t, site, {release, previous} - {None},
+                        {release, previous, html_release, old_html} - {None}):
         echo(f"  ⌫ {len(removed)} old release(s) removed: {', '.join(removed)}")
 
 
@@ -227,14 +278,14 @@ def _slides(v: dict) -> str:
         f"slides 1 to {html_of(v).rsplit('-s', 1)[1]}"
 
 
-def limit_site(t: Target, cfg: ReleaseConfig, state: dict, site: Site, slide: int | None, html_password: str,
-               echo: Echo, html_env: dict[str, str] | None = None) -> None:
+def limit_site(t: Target, cfg: ReleaseConfig, state: dict, site: Site, slide: int | None, entries: list | None,
+               echo: Echo, html_env: dict[str, str] | None = None, full: frozenset[str] = frozenset()) -> None:
     """What the participants can see: slides 1 to *slide*, or all of them (``None``) — #146.
 
     Only the HTML face is exported again, from the release already published (its code, so its slide
     numbering is the one being projected), then it alone switches. The live face is not touched: no
     password is rewritten and no program restarts, so the participants' sessions stay open. The limit is
-    kept for the site: every later publication applies it.
+    kept for the site: every later publication applies it. The ``full`` labels keep seeing everything.
     """
     if "html" not in site.faces:
         raise ReleaseError(f"{site.site} has no HTML face: a slide limit applies to the HTML face")
@@ -245,35 +296,41 @@ def limit_site(t: Target, cfg: ReleaseConfig, state: dict, site: Site, slide: in
     echo(f"\n▶ {site.site}: HTML face of {release}, " + ("all slides" if slide is None else f"up to slide {slide}")
          + f" ({t.name})")
     base = t.path("static", "sites", site.site, "releases")
+    if t.sh(f"test -d {shlex.quote(base + '/' + release)}", check=False).returncode:
+        raise ReleaseError(f"{site.site}: the whole HTML release {release} is not on {t.name} — publish the "
+                           "site again first (stx release publish), then set the limit")
     has_old = bool(old_html) and not t.sh(f"test -d {shlex.quote(base + '/' + old_html)}", check=False).returncode
-    with tempfile.TemporaryDirectory(prefix="stx-limit-") as w:
-        work = Path(w)
-        code = build.snapshot(cfg, site, work, rev=release)
-        html, name = build.export(cfg, site, code, work, release, html_env, slide)
-        if name == old_html and has_old:
-            v["up_to_slide"] = slide
-            save_state(cfg.root, state)
-            echo(f"  ✓ {site.site}: nothing to change, {name} is what the HTML face serves")
-            return
-        t.sh("mkdir -p " + shlex.quote(base))
-        t.rsync(str(html) + "/", f"{base}/{name}/", "--delete", "-H", "-c",
-                *(["--link-dest", f"{base}/{old_html}"] if has_old and old_html != name else []))
-        t.sh(f"chmod -R a+rX {shlex.quote(base + '/' + name)}")
-    switch(t, site, release, name, faces=["static"])
+    name = release
+    if slide is not None:
+        with tempfile.TemporaryDirectory(prefix="stx-limit-") as w:
+            work = Path(w)
+            code = build.snapshot(cfg, site, work, rev=release)
+            html, name = build.export(cfg, site, code, work, release, html_env, slide)
+            if name != old_html or not has_old:
+                t.rsync(str(html) + "/", f"{base}/{name}/", "--delete", "-H", "-c", "--link-dest", f"{base}/{release}")
+                t.sh(f"chmod -R a+rX {shlex.quote(base + '/' + name)}")
+    if name == old_html and has_old:
+        v["up_to_slide"] = slide
+        save_state(cfg.root, state)
+        echo(f"  ✓ {site.site}: nothing to change, the participants already see {name}")
+        return
+    switch_limited(t, site, release, name)
     t.dexec("static", "nginx -s reload")
-    html_seen, _ = served(t, site, v, html_password)
-    if html_seen != name:
+    problems = check_html(t, site, v, entries, full, release, name)
+    if problems:
         if has_old:
-            switch(t, site, release, old_html, faces=["static"])
+            switch_limited(t, site, release, old_html)
             t.dexec("static", "nginx -s reload")
-            echo(f"  ↩ the HTML face is back on {old_html}")
-        raise ReleaseError(f"{site.site}: what the HTML face serves is not {name} (served: {html_seen})")
+            echo(f"  ↩ the participants see {old_html} again")
+        raise ReleaseError(f"{site.site}: the HTML face is not right after the switch: {'; '.join(problems)}")
+    html_seen = name
     v.update(html_release=name, html_previous=old_html if has_old else None, up_to_slide=slide,
              up_to_slide_previous=old_limit, last="limit",
              html_date=dt.datetime.now().isoformat(timespec="seconds"))
     save_state(cfg.root, state)
     echo(f"  ✓ {site.site}: html {html_seen} ({_slides(v)}) — live face and participants' sessions unchanged")
-    if removed := prune(t, site, {release, v.get("previous")} - {None}, {name, v["html_previous"]} - {None}):
+    if removed := prune(t, site, {release, v.get("previous")} - {None},
+                        {release, v.get("previous"), name, v["html_previous"]} - {None}):
         echo(f"  ⌫ {len(removed)} old release(s) removed: {', '.join(removed)}")
 
 
@@ -287,10 +344,10 @@ def rollback(t: Target, cfg: ReleaseConfig, state: dict, site: Site) -> str:
             raise ReleaseError(f"{site.site}: no previous HTML release")
         v["html_release"], v["html_previous"] = v["html_previous"], v["html_release"]
         v["up_to_slide"], v["up_to_slide_previous"] = v.get("up_to_slide_previous"), v.get("up_to_slide")
-        switch(t, site, v["release"], v["html_release"], faces=["static"])
+        switch_limited(t, site, v["release"], v["html_release"])
         t.dexec("static", "nginx -s reload")
         save_state(cfg.root, state)
-        return f"the HTML face is back on {v['html_release']} ({_slides(v)}); the live face is unchanged"
+        return f"the participants see {v['html_release']} again ({_slides(v)}); the live face is unchanged"
     if not v.get("previous"):
         raise ReleaseError(f"{site.site}: no previous release")
     html_now = html_of(v)
@@ -331,17 +388,25 @@ def status_rows(t: Target, cfg: ReleaseConfig, state: dict, data: dict | None) -
         if site is None:
             rows.append((name, v.get("release", "?"), "not in stx.toml", "", "", v.get("date", ""), "  ← UNKNOWN"))
             continue
-        password = ""
+        password, entries, full = "", None, frozenset()
         if data is not None and not v.get("html_open") and "html" in site.faces:
             try:
-                password = pw.first_password(pw.for_site(data, site)["html"])
+                entries, full = pw.for_site(data, site)["html"], pw.full_labels(data, site)
+                limited = html_of(v) != v.get("release")
+                password = (pw.view_password(entries, full, "limited") if limited else None) \
+                    or pw.first_password(entries)
             except ReleaseError:
                 password = ""
         html, live = served(t, site, v, password)
         if html == "HTTP 401" and not password and not v.get("html_open"):
             html, flag = "? (no password)", ""         # cannot read it: unknown, not a gap
+        elif "html" not in site.faces:
+            flag = ""
+        elif entries is not None:
+            problems = check_html(t, site, v, entries, full, v.get("release"), html_of(v))
+            flag = f"  ← GAP ({'; '.join(problems)})" if problems else ""
         else:
-            flag = "" if "html" not in site.faces or html == html_of(v) else "  ← GAP"
+            flag = "" if html == html_of(v) else "  ← GAP"
         if v.get("skew"):
             flag += "  (skew)"
         if v.get("up_to_slide") is not None and "html" in site.faces:

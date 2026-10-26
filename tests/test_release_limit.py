@@ -1,4 +1,5 @@
-"""stx release limit (#146): the slide limit kept per site, the HTML face alone, its rollback."""
+"""stx release limit (#146, #147): the slide limit kept per site, the HTML face alone, its rollback;
+the whole release stays `current`, the limited one is `limited`."""
 import json
 import subprocess
 import textwrap
@@ -41,13 +42,15 @@ class FakeTarget:
     def path(self, *parts):
         return "/".join(parts)
 
-    def switch_cmd(self, base, release):
-        return f"switch {base} {release}"
+    def switch_cmd(self, base, release, link="current"):
+        return f"switch {base} {release} {link}"
 
     def sh(self, cmd, check=True):
         if cmd.startswith("switch "):
-            _, base, release = cmd.split()
-            self.links[base] = release
+            _, base, release, link = cmd.split()
+            self.links[f"{base}/{link}"] = release
+        elif cmd.startswith("rm -f ") and cmd.endswith("/limited"):
+            self.links.pop(cmd[6:], None)
         return subprocess.CompletedProcess(cmd, 0, "", "")
 
     def dexec(self, app, cmd, check=True):
@@ -68,27 +71,28 @@ def test_rollback_of_a_limit_moves_the_html_face_alone(cfg):
     t, state = FakeTarget(), _state(html_release="r2-s12", html_previous="r2", up_to_slide=10,
                                     up_to_slide_previous=None, last="limit")
     message = ops.rollback(t, cfg, state, cfg.site("deck"))
-    assert "back on r2 (all slides)" in message and "live face is unchanged" in message
-    assert t.links == {"static/sites/deck": "r2"}
+    assert "participants see r2 again (all slides)" in message and "live face is unchanged" in message
+    assert t.links == {}                                          # `limited` removed, `current` untouched
     assert all(app == "static" for app, _ in t.reloads)          # no supervisorctl, no live reload
     v = state["sites"]["prod"]["deck"]
     assert (v["html_release"], v["html_previous"], v["up_to_slide"], v["up_to_slide_previous"]) == \
         ("r2", "r2-s12", None, 10)
     ops.rollback(t, cfg, state, cfg.site("deck"))                 # and back again
-    assert t.links["static/sites/deck"] == "r2-s12" and v["up_to_slide"] == 10
+    assert t.links == {"static/sites/deck/limited": "r2-s12"} and v["up_to_slide"] == 10
 
 
 def test_rollback_of_a_publication_moves_both_faces_with_their_html(cfg):
     t, state = FakeTarget(), _state(html_release="r2-s12", html_previous="r1-s12", up_to_slide=10,
                                     up_to_slide_previous=10, last="publish")
     assert "both faces are back on r1 (HTML r1-s12)" in ops.rollback(t, cfg, state, cfg.site("deck"))
-    assert t.links == {"static/sites/deck": "r1-s12", "live/sites/deck": "r1"}
+    assert t.links == {"static/sites/deck/current": "r1", "static/sites/deck/limited": "r1-s12",
+                       "live/sites/deck/current": "r1"}
 
 
 def test_rollback_of_a_site_without_limit_is_unchanged(cfg):
     t, state = FakeTarget(), _state()
     assert ops.rollback(t, cfg, state, cfg.site("deck")) == "both faces are back on r1"
-    assert t.links == {"static/sites/deck": "r1", "live/sites/deck": "r1"}
+    assert t.links == {"static/sites/deck/current": "r1", "live/sites/deck/current": "r1"}
     assert "html_release" not in state["sites"]["prod"]["deck"]
 
 
@@ -139,3 +143,74 @@ def test_the_state_import_keeps_the_limit(tmp_path):
                                                             "html_release": "r1-s31"}}}}))
     new = import_prototype(tmp_path, src, {"deck"})
     assert new["sites"]["prod"]["deck"] == {"release": "r1", "up_to_slide": 30, "html_release": "r1-s31"}
+
+
+# -- #147: who sees the whole content ----------------------------------------------------------
+
+class Seen(FakeTarget):
+    """Serves, to each password, the release its view opens."""
+
+    def __init__(self, full, release, limited):
+        super().__init__()
+        self.views = {"full": release, "limited": limited}
+        self.full_words = full
+
+    def login(self, site, password):
+        return password
+
+    def get(self, base_key, site, path, cookie=""):
+        view = "full" if cookie in self.full_words else "limited"
+        return 200, self.views[view] + "\n"
+
+
+def _entries(*pairs):
+    from streamtex.cli.deploy_auth_cmd import PlainEntry
+    return [PlainEntry(label, word, None) for label, word in pairs]
+
+
+def test_the_check_reads_each_view(cfg):
+    entries, full = _entries(("PB", "pb"), ("ADMIN", "root")), frozenset({"ADMIN"})
+    v = {"release": "r2"}
+    good = Seen({"root"}, "r2", "r2-s12")
+    assert ops.check_html(good, cfg.site("deck"), v, entries, full, "r2", "r2-s12") == []
+    wrong = Seen({"root", "pb"}, "r2", "r2-s12")                 # the participant would see everything
+    assert ops.check_html(wrong, cfg.site("deck"), v, entries, full, "r2", "r2-s12") == \
+        ["limited sees r2, not r2-s12"]
+
+
+def test_without_a_limit_one_password_is_enough(cfg):
+    t = Seen({"pb"}, "r2", "never")
+    assert ops.check_html(t, cfg.site("deck"), {}, _entries(("PB", "pb")), frozenset(), "r2", "r2") == []
+
+
+def test_the_passwords_write_the_full_labels(cfg):
+    t, written = FakeTarget(), {}
+    t.write = lambda dest, content, mode=None: written.__setitem__(dest, content)
+    state = _state(port=8601)
+    faces = {"html": _entries(("PA", "pa"), ("PB", "pb"), ("ADMIN", "root")), "live": _entries(("ADMIN", "root"))}
+    ops.apply_passwords(t, cfg, state, cfg.site("deck"), faces, frozenset({"ADMIN", "PA"}))
+    assert written["static/sites/deck/full"] == "PA\nADMIN\n"
+    html_admin = next(ln for ln in written["static/sites/deck/pass"].splitlines() if ln.startswith("ADMIN:"))
+    live_admin = next(ln for ln in written["live/sites/deck/pass"].splitlines() if ln.startswith("ADMIN:"))
+    assert html_admin == live_admin                               # one record: one login opens both
+
+
+def test_a_limit_needs_the_whole_release_on_the_server(cfg):
+    class Missing(FakeTarget):
+        def sh(self, cmd, check=True):
+            if cmd.startswith("test -d"):
+                return subprocess.CompletedProcess(cmd, 1, "", "")
+            return super().sh(cmd, check)
+
+    with pytest.raises(ReleaseError, match="publish the site again first"):
+        ops.limit_site(Missing(), cfg, _state(), cfg.site("deck"), 3, None, print)
+
+
+def test_limit_all_removes_the_limited_link_without_exporting(cfg, monkeypatch):
+    monkeypatch.setattr(build, "export", lambda *a, **k: pytest.fail("no export for `all`"))
+    t = Seen(set(), "r2", "r2")
+    state = _state(html_release="r2-s12", html_previous="r2", up_to_slide=10, html_open=True)
+    ops.limit_site(t, cfg, state, cfg.site("deck"), None, None, print)
+    v = state["sites"]["prod"]["deck"]
+    assert (v["html_release"], v["up_to_slide"], v["last"]) == ("r2", None, "limit")
+    assert "static/sites/deck/limited" not in t.links

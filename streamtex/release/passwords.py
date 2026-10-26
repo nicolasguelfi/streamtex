@@ -10,10 +10,24 @@
     [CHAT1D.sites.chat1d]              # one site
     open = true                        # both faces open; or open = ["html"]
 
+    [admin]                            # added to EVERY site, both faces (#147)
+    live = "ADMIN:…"
+    html = "ADMIN:…"
+
 A face's value uses the library's grammar (``deploy_auth_cmd.parse_password_spec``): one password, a
 labelled list as a string, a table, or a list of pairs, each with an optional end date. A later level
 overrides an earlier one, face by face. ``open`` is explicit: an empty string is refused, and a face
 with no password at any level is an error, never an open site.
+
+``[admin]`` (#147) is not a level: its entries are ADDED to the passwords of every face of every site
+(an open face stays open), so the administrator's password is written once. A face given no password at
+any level but ``[admin]`` is the administrator's alone. The labels of ``[admin]`` always see the whole
+content; ``full = ["PROMO-A"]``, at any level, adds labels that see it too on a site with a slide limit.
+No rule is set on what a password contains: only what the login screen could never match is refused.
+
+One record per (label, password) and per run (``RecordPool``): the same password gets the same record
+on every site and face, so one login opens every site that holds it; a record already on the server is
+kept while it still matches, so writing the files again closes no session.
 
 ``convert`` turns the streamtex-all-trainings prototype's file (``[default] < [TRAINING] <
 [TRAINING.kind]``, ``""`` = open) into this one without touching a single password, then checks that
@@ -28,13 +42,15 @@ from pathlib import Path
 
 import click
 
-from ..cli.deploy_auth_cmd import PlainEntry, _check_entries, parse_password_spec, records_text
+from ..cli.deploy_auth_cmd import PlainEntry, _check_entries, parse_password_spec
+from ..deploy.stx_auth import Entry, check_password, format_entry, hash_password, parse_entry
 from . import ReleaseError
 from .config import FACES, ReleaseConfig, Site
 
 PASSWORDS_FILE = ".stx-passwords.toml"
 OPEN = None          # a face resolved to "open"
-_LEVEL_KEYS = {"live", "html", "open"}
+_LEVEL_KEYS = {"live", "html", "open", "full"}
+ADMIN = "admin"
 
 
 def load_file(path: Path) -> dict:
@@ -85,24 +101,102 @@ def resolve_raw(data: dict, site: Site) -> dict:
     return out
 
 
+def _admin(data: dict) -> dict[str, list[PlainEntry]]:
+    """The entries ``[admin]`` adds to each face."""
+    level = data.get(ADMIN)
+    if level is None:
+        return {}
+    if not isinstance(level, dict) or set(level) - set(FACES):
+        raise ReleaseError("[admin]: live and/or html, the administrator's password(s) added to every site")
+    out = {}
+    for face in FACES:
+        if face in level:
+            try:
+                out[face] = parse_password_spec(level[face], f"[admin].{face}")
+            except click.ClickException as e:
+                raise ReleaseError(e.message) from None
+    return out
+
+
+def full_labels(data: dict, site: Site) -> frozenset[str]:
+    """The labels that see the whole content of *site* when it has a slide limit: ``[admin]``'s and the
+    ``full`` list of the last level that sets one."""
+    labels: list = []
+    group = data.get(site.group, {}) if isinstance(data.get(site.group), dict) else {}
+    sites = group.get("sites", {}) if isinstance(group.get("sites"), dict) else {}
+    for where, level in (("[default]", data.get("default", {})), (f"[{site.group}]", group),
+                         (f"[{site.group}.sites.{site.site}]", sites.get(site.site, {}))):
+        if isinstance(level, dict) and "full" in level:
+            labels = level["full"]
+            if not isinstance(labels, list) or not all(isinstance(x, str) for x in labels):
+                raise ReleaseError(f"{where}.full: a list of password labels, such as [\"PROMO-A\"]")
+    return frozenset(labels) | {e.label for e in _admin(data).get("html", [])}
+
+
 def for_site(data: dict, site: Site) -> dict[str, list[PlainEntry] | None]:
     """The checked passwords of each published face of *site* (``None`` = open)."""
     raw = resolve_raw(data, site)
+    admin = _admin(data)
     result: dict[str, list[PlainEntry] | None] = {}
     for face in site.faces:
-        if face not in raw:
+        if face not in raw and face not in admin:
             raise ReleaseError(f"no '{face}' password for site {site.site} (group {site.group}) in "
                                f"{PASSWORDS_FILE} — an omission never opens a site: write open = [\"{face}\"]")
+        if raw.get(face, "") is OPEN:
+            result[face] = None
+            continue
         try:
-            result[face] = None if raw[face] is OPEN else parse_password_spec(raw[face], f"{site.site}.{face}")
+            own = parse_password_spec(raw[face], f"{site.site}.{face}") if face in raw else []
+            entries = own + admin.get(face, [])
+            if own and admin.get(face):
+                _check_entries(entries, f"{site.site}.{face} with [admin]")
         except click.ClickException as e:
             raise ReleaseError(e.message) from None
+        result[face] = entries
     return result
 
 
-def pass_text(entries: list[PlainEntry] | None) -> str:
+class RecordPool:
+    """One record per (label, password) for a run; *existing*: the record files already on the server."""
+
+    def __init__(self, existing: str = "") -> None:
+        self._known: dict[str, list[str]] = {}
+        for line in existing.splitlines():
+            e = parse_entry(line.strip())
+            if e is not None and e.record not in self._known.setdefault(e.label, []):
+                self._known[e.label].append(e.record)
+        self._made: dict[tuple[str, str], str] = {}
+
+    def record(self, label: str, password: str) -> str:
+        key = (label, password)
+        if key not in self._made:
+            self._made[key] = next((r for r in self._known.get(label, []) if check_password(r, password)),
+                                   None) or hash_password(password)
+        return self._made[key]
+
+    def text(self, entries: list[PlainEntry] | None) -> str:
+        if entries is None:
+            return "open\n"
+        return "".join(format_entry(Entry(e.label, self.record(e.label, e.password), e.valid_until)) + "\n"
+                       for e in entries)
+
+
+def pass_text(entries: list[PlainEntry] | None, pool: RecordPool | None = None) -> str:
     """The record file of a face: ``open``, or one hashed line per password, labels and dates kept."""
-    return "open\n" if entries is None else records_text(entries)
+    return (pool or RecordPool()).text(entries)
+
+
+def full_text(entries: list[PlainEntry] | None, full: frozenset[str]) -> str:
+    """The labels of the HTML face that see the whole content (``sites/<site>/full``)."""
+    return "".join(f"{e.label}\n" for e in entries or [] if e.label in full)
+
+
+def view_password(entries: list[PlainEntry] | None, full: frozenset[str], view: str) -> str | None:
+    """A password that opens *view* (``full`` / ``limited``), to check what is served; None if none does."""
+    for e in entries or []:
+        if (e.label in full) == (view == "full"):
+            return e.password
+    return None
 
 
 def first_password(entries: list[PlainEntry] | None) -> str:

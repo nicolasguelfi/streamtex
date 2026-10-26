@@ -343,3 +343,77 @@ def test_slide_limit_end_to_end(project):
     assert "GAP" not in status and "slides 1 to 3" in status
     refused = stx("limit", "demo-c", "2", "--allow-skew", check=False)
     assert refused.returncode == 1 and "no HTML face" in refused.stderr
+
+
+ACCESS = """
+    [default]
+    live = "LIVE-ALL:livepass1"
+    html = [["PROMO-OCT", "octpass1"], ["PROMO-FULL", "fullpass1"]]
+    [demo.sites.demo-b]
+    open = ["html"]
+    [demo.sites.demo-a]
+    html = "ONLY-A:onlya1"
+    [demo-d]
+    full = ["PROMO-FULL"]
+    [admin]
+    live = "ADMIN:rootpass1"
+    html = "ADMIN:rootpass1"
+"""
+
+
+def test_access_end_to_end(project):
+    """#147: one [admin] password on every site, one login across sites, full or limited per password."""
+    p, stx, git = project, project["stx"], project["git"]
+    git("checkout", "-q", "--", ".")
+    bck = p["root"] / "docs" / "a" / "blocks" / "bck_main.py"            # repaired after the broken publish
+    if "broken on purpose" in bck.read_text():
+        bck.write_text(bck.read_text().replace("\nraise RuntimeError('broken on purpose')\n", "\n"))
+        git("-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qam", "repaired")
+    (p["root"] / ".stx-passwords.toml").write_text(textwrap.dedent(ACCESS))
+    stx("publish", "demo-a", "demo-c", "demo-d", "--allow-skew")
+    r = _head(p)
+    stx("limit", "demo-d", "2", "--allow-skew")
+    assert (p["host"] / "static" / "sites" / "demo-d" / "full").read_text() == "PROMO-FULL\nADMIN\n"
+    assert "ADMIN [all slides]" in stx("auth-status", "demo-d").stdout
+
+    # the administrator: one login on the HTML face of demo-a, every HTML site opens, all the slides
+    admin = _login(p["S"], "demo-a.example.org", "/html/_login", "rootpass1")
+    assert admin.startswith("stx_session_")
+    for site in ("demo-a", "demo-d"):
+        code, _, body = _req(p["S"] + "/html/version.txt", f"{site}.example.org", cookie=admin)
+        assert code == 200 and body.split("\n")[0] == r, site
+    assert "Slide s4" in _html_page(p, "demo-d", admin)
+    # ... and one login on the live face opens every live site
+    live = _login(p["L"], "demo-a.example.org", "/_login", "rootpass1")
+    for site in ("demo-a", "demo-c", "demo-d"):
+        assert _req(p["L"] + "/", f"{site}.example.org", cookie=live)[0] == 200, site
+
+    # the participants of demo-d: limited, or all the slides for the label listed in `full`
+    assert _html_version(p, "demo-d", "octpass1") == f"{r}-s3"
+    participant = _login(p["S"], "demo-d.example.org", "/html/_login", "octpass1")
+    page = _html_page(p, "demo-d", participant)
+    assert "Slide s3 of document d" in page and "Slide s4" not in page
+    assert _html_version(p, "demo-d", "fullpass1") == r
+    # a password of demo-a only stays on demo-a
+    only = _login(p["S"], "demo-a.example.org", "/html/_login", "onlya1")
+    assert _req(p["S"] + "/html/version.txt", "demo-a.example.org", cookie=only)[0] == 200
+    assert _req(p["S"] + "/html/version.txt", "demo-d.example.org", cookie=only)[0] == 401
+    assert _login(p["S"], "demo-a.example.org", "/html/_login", "octpass1") == ""
+
+    # writing the passwords again closes no session; changing one closes only its label's
+    stx("passwd")
+    assert _req(p["S"] + "/html/version.txt", "demo-d.example.org", cookie=admin)[0] == 200
+    pwf = p["root"] / ".stx-passwords.toml"
+    pwf.write_text(pwf.read_text().replace('["PROMO-OCT", "octpass1"]', '["PROMO-OCT", "octpass2"]'))
+    stx("passwd")
+    assert _req(p["S"] + "/html/version.txt", "demo-d.example.org", cookie=participant)[0] == 401
+    assert _req(p["S"] + "/html/version.txt", "demo-d.example.org", cookie=admin)[0] == 200
+
+    # back to all the slides for everyone, and the limit again by rollback
+    stx("limit", "demo-d", "all", "--allow-skew")
+    assert _html_version(p, "demo-d", "octpass2") == r
+    stx("rollback", "demo-d")
+    time.sleep(2)
+    assert _html_version(p, "demo-d", "octpass2") == f"{r}-s3"
+    assert _html_version(p, "demo-d", "rootpass1") == r
+    assert "GAP" not in stx("status").stdout

@@ -81,8 +81,11 @@ def publish_cmd(sites, groups, target, allow_skew, html_env):
     run_checks(cfg, chosen)
     data = _passwords(cfg)
     faces = {s.site: pw.for_site(data, s) for s in chosen}     # every password checked before any copy
+    full = {s.site: pw.full_labels(data, s) for s in chosen}
+    pool = pw.RecordPool(ops.server_records(t))                # one record per password, on every site
     for s in chosen:
-        ops.publish_site(t, cfg, state, s, release_name, faces[s.site], click.echo, env, skew)
+        ops.publish_site(t, cfg, state, s, release_name, faces[s.site], click.echo, env, skew,
+                         full[s.site], pool)
 
 
 @release.command("status")
@@ -124,7 +127,8 @@ def limit_cmd(site, slide, target, allow_skew, html_env):
     HTML face is exported again, from the release already published, and switched:
     no password is rewritten and the live face does not restart, so participants
     stay logged in. The limit is kept: every later `publish SITE` applies it, and
-    `rollback SITE` undoes it alone.
+    `rollback SITE` undoes it alone. The [admin] passwords and the labels listed in
+    `full` (.stx-passwords.toml) keep seeing all the slides.
 
     \b
     Examples:
@@ -140,8 +144,11 @@ def limit_cmd(site, slide, target, allow_skew, html_env):
     cfg, state, t = _ctx(target)
     s = cfg.site(site)
     _skew(cfg, t, allow_skew)
-    html_pw = "" if "html" not in s.faces else pw.first_password(pw.for_site(_passwords(cfg), s)["html"])
-    ops.limit_site(t, cfg, state, s, up_to, html_pw, click.echo, _html_env(html_env))
+    entries, full = None, frozenset()
+    if "html" in s.faces:
+        data = _passwords(cfg)
+        entries, full = pw.for_site(data, s)["html"], pw.full_labels(data, s)
+    ops.limit_site(t, cfg, state, s, up_to, entries, click.echo, _html_env(html_env), full)
 
 
 @release.command("rollback")
@@ -159,8 +166,8 @@ def rollback_cmd(site, target):
 def passwd_cmd(sites, target):
     """Write the password records of SITES (default: every published site) without publishing again.
 
-    HTML face: effective at once; live face: the site's process restarts. Changing a record closes the
-    open sessions of that face."""
+    HTML face: effective at once; live face: the site's process restarts. A changed password closes the
+    open sessions of its label only; an unchanged one keeps its sessions."""
     cfg, state, t = _ctx(target)
     data = _passwords(cfg)
     published = sites_of(state, t.name)
@@ -168,8 +175,10 @@ def passwd_cmd(sites, target):
     for name in names:
         if name not in published:
             raise ReleaseError(f"{name} is not published on {t.name}")
+    pool = pw.RecordPool(ops.server_records(t))
+    for name in names:
         site = cfg.site(name)
-        ops.apply_passwords(t, cfg, state, site, pw.for_site(data, site))
+        ops.apply_passwords(t, cfg, state, site, pw.for_site(data, site), pw.full_labels(data, site), pool)
     ops.write_maps(t, state)
     t.dexec("static", "nginx -s reload")
     t.dexec("live", "nginx -s reload")
@@ -190,13 +199,15 @@ def auth_status_cmd(sites):
     data = _passwords(cfg)
     for site in (cfg.select(sites) if sites else cfg.sites):
         faces = pw.for_site(data, site)
+        full = pw.full_labels(data, site)
         parts = []
         for face, entries in faces.items():
             if entries is None:
                 parts.append(f"{face}: open")
             else:
-                parts.append(f"{face}: " + ", ".join(e.label + (f" (until {e.valid_until})" if e.valid_until else "")
-                                                     for e in entries))
+                parts.append(f"{face}: " + ", ".join(
+                    e.label + (f" (until {e.valid_until})" if e.valid_until else "")
+                    + (" [all slides]" if face == "html" and e.label in full else "") for e in entries))
         click.echo(f"{site.site:<28}" + " · ".join(parts))
 
 

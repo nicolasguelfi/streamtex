@@ -83,7 +83,14 @@ def import_prototype(root: Path, source: Path, known_sites: set[str], force: boo
     unknown: list[str] = []
     for target, entries in sites.items():
         for site, v in entries.items():
-            new["sites"].setdefault(target, {})[site] = {k: v[k] for k in SITE_KEYS if k in v}
+            entry = {k: v[k] for k in SITE_KEYS if k in v and k != "last"}   # its "last" means another thing
+            cuts = {str(n): v["views"][label] for label, n in (v.get("limits") or {}).items()
+                    if isinstance(n, int) and label in (v.get("views") or {})}
+            if v.get("up_to_slide") and v.get("html_release") not in (None, v.get("release")):
+                cuts.setdefault(str(v["up_to_slide"]), v["html_release"])
+            if cuts:                         # the prototype's cuts, as stx release names them (#148)
+                entry["cuts"] = cuts
+            new["sites"].setdefault(target, {})[site] = entry
             if site not in known_sites:
                 unknown.append(f"{target}/{site}")
     save_state(root, new)

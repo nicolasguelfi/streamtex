@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`stx release status` crashed** (`KeyError`) on a site whose session
+  level had no known cut, for example right after `import` and
+  `convert-passwords` (reported by all-trainings, 2026-10-26). It now
+  reports the gap and names `stx release passwd SITE` to make the cut.
+- **`import` takes the prototype's cuts over** (its `views` and `limits`)
+  as `cuts`, and no longer takes its `last`, whose meaning differs.
+- **A limit rollback without previous levels is refused**, and no rollback
+  ever removes the levels in service: removing them would have shown every
+  slide to every session.
+- **A listing of the releases that fails** (an SSH connection cut, for
+  example) stops the export of cuts instead of re-exporting what is served,
+  and prunes nothing.
+
 ## [0.7.68] — 2026-10-26 — a rollback that cannot break a site
 
 ### Fixed

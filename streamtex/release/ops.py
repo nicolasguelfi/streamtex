@@ -141,12 +141,16 @@ def check_levels(t: Target, site: Site, v: dict, entries: list | None, levels: d
         levels = {"open": "all"} if v.get("html_open") else {e.label: "all" for e in (entries or [])[:1]}
     expected = {lv.CLOSED: lv.CLOSED, lv.CURRENT: release, **{f"releases/{n}": n for n in names.values()}}
     seen_folders: dict[str, str] = {}
+    problems = []
     for label, level in sorted(levels.items()):
-        where = lv.folder(lv.now_of(level, default), names)
+        value = lv.now_of(level, default)
+        if isinstance(value, int) and value not in names:
+            problems.append(f"{label}: no cut known for slide {value} — `stx release passwd {site.site}` makes it")
+            continue
+        where = lv.folder(value, names)
         if where in seen_folders or (label not in words and not v.get("html_open")):
             continue
         seen_folders[where] = label
-    problems = []
     for where, label in seen_folders.items():
         got, _ = served(t, site, v, words.get(label, ""))
         if got != expected[where]:
@@ -169,7 +173,10 @@ def prune(t: Target, site: Site, keep: set[str], keep_html: set[str] | None = No
     for face in _faces_dirs(site):
         base = t.path(face, "sites", site.site, "releases")
         kept = keep_html if face == "static" and keep_html is not None else keep
-        for r in t.sh(f"ls -1 {shlex.quote(base)} 2>/dev/null", check=False).stdout.split():
+        listing = t.sh(f"ls -1 {shlex.quote(base)} 2>/dev/null", check=False)
+        if listing.returncode:                  # unreadable (or absent): remove nothing
+            continue
+        for r in listing.stdout.split():
             if r not in kept:
                 t.sh(f"rm -rf {shlex.quote(base + '/' + r)}")
                 removed.append(f"{face}/{r}")
@@ -189,7 +196,7 @@ def ensure_cuts(t: Target, cfg: ReleaseConfig, site: Site, release: str, need: s
     """The export of each slide number in *need*, from *release* (its code: its numbering); one already on
     the target is not made again. Returns {N: release folder name}."""
     base = t.path("static", "sites", site.site, "releases")
-    present = set(t.sh(f"ls -1 {shlex.quote(base)} 2>/dev/null", check=False).stdout.split())
+    present = set(t.sh(f"ls -1 {shlex.quote(base)}").stdout.split())   # a failed listing stops here
     names = {int(n): name for n, name in (known or {}).items() if int(n) in need and name in present}
     missing = sorted(need - set(names))
     if not missing:
@@ -225,11 +232,17 @@ def write_levels(t: Target, site: Site, text: str) -> None:
 
 
 def restore_levels(t: Target, site: Site) -> None:
-    """Swap ``levels`` and ``levels.previous`` (a rollback); no previous file: no levels at all."""
+    """Swap ``levels`` and ``levels.previous`` (a rollback). Without a previous file, the levels in
+    service stay: removing them would show everything to every session."""
     base = shlex.quote(t.path("static", "sites", site.site))
     t.sh(f"cd {base} && if [ -f levels.previous ]; then mv levels levels.tmp 2>/dev/null; "
-         f"mv levels.previous levels; [ -f levels.tmp ] && mv levels.tmp levels.previous; true; "
-         f"else rm -f levels; fi")
+         f"mv levels.previous levels; [ -f levels.tmp ] && mv levels.tmp levels.previous; true; fi")
+
+
+def _has_previous_levels(t: Target, site: Site) -> bool:
+    """False when the site has levels in service but no previous ones to go back to."""
+    base = shlex.quote(t.path("static", "sites", site.site))
+    return t.sh(f"cd {base} && [ -f levels ] && [ ! -f levels.previous ]", check=False).returncode != 0
 
 
 def apply_levels(t: Target, cfg: ReleaseConfig, state: dict, site: Site, release: str, entries: list | None,
@@ -393,6 +406,9 @@ def rollback(t: Target, cfg: ReleaseConfig, state: dict, site: Site) -> str:
     if not v:
         raise ReleaseError(f"{site.site} is not published on {t.name}")
     if v.get("last") == "limit":
+        if "html" in site.faces and not _has_previous_levels(t, site):
+            raise ReleaseError(f"{site.site}: no previous levels on {t.name} — nothing changed; set the "
+                               "levels you want with `stx release limit … --label` or `stx release passwd`")
         restore_levels(t, site)
         v["cuts"], v["cuts_previous"] = v.get("cuts_previous"), v.get("cuts")
         v["up_to_slide"], v["up_to_slide_previous"] = v.get("up_to_slide_previous"), v.get("up_to_slide")

@@ -205,8 +205,18 @@ def test_no_levels_means_everyone_sees_current(cfg):
     assert "static/sites/deck/levels" not in t.files and any("rm -f" in c and c.endswith("levels") for c in t.cmds)
 
 
+class WithPrevious(FakeTarget):
+    """A site whose previous levels file is on the target."""
+
+    def sh(self, cmd, check=True):
+        r = super().sh(cmd, check)
+        if "[ ! -f levels.previous ]" in cmd:
+            return subprocess.CompletedProcess(cmd, 1, "", "")
+        return r
+
+
 def test_rollback_of_a_limit_restores_the_levels_alone(cfg):
-    t, state = FakeTarget(), _state(cuts={"12": "r2-s12"}, cuts_previous={}, up_to_slide=None,
+    t, state = WithPrevious(), _state(cuts={"12": "r2-s12"}, cuts_previous={}, up_to_slide=None,
                                     up_to_slide_previous=30, last="limit")
     message = ops.rollback(t, cfg, state, cfg.site("deck"))
     assert "previous levels are back (slides 1 to 30 by default)" in message and "live face is unchanged" in message
@@ -299,9 +309,11 @@ def test_the_state_import_keeps_the_limit(tmp_path):
     for key in ("up_to_slide", "up_to_slide_previous", "last"):
         assert key in SITE_KEYS
     src = tmp_path / "state.json"
-    src.write_text(json.dumps({"sites": {"prod": {"deck": {"release": "r1", "up_to_slide": 30}}}}))
+    src.write_text(json.dumps({"sites": {"prod": {"deck": {"release": "r1", "up_to_slide": 30,
+                                                             "html_release": "r1-s31"}}}}))
     new = import_prototype(tmp_path, src, {"deck"})
-    assert new["sites"]["prod"]["deck"] == {"release": "r1", "up_to_slide": 30}
+    assert new["sites"]["prod"]["deck"] == {"release": "r1", "up_to_slide": 30, "html_release": "r1-s31",
+                                            "cuts": {"30": "r1-s31"}}
 
 
 def test_a_rollback_to_a_release_no_longer_on_the_target_is_refused(cfg):
@@ -317,3 +329,44 @@ def test_a_rollback_to_a_release_no_longer_on_the_target_is_refused(cfg):
     with pytest.raises(ReleaseError, match=r"previous release r1 is no longer on prod \(static/r1\) — nothing changed"):
         ops.rollback(t, cfg, state, cfg.site("deck"))
     assert t.links == {} and state["sites"]["prod"]["deck"]["release"] == "r2"
+
+
+def test_a_limit_rollback_without_previous_levels_is_refused(cfg):
+    """Removing the levels in service would show every slide to every session."""
+    t, state = FakeTarget(), _state(last="limit")
+    with pytest.raises(ReleaseError, match="no previous levels on prod — nothing changed"):
+        ops.rollback(t, cfg, state, cfg.site("deck"))
+    assert not any("mv levels" in c or "rm -f levels" in c for c in t.cmds)
+
+
+def test_an_unknown_cut_is_a_gap_not_a_crash(cfg):
+    t = Seen({"root": "r2"})
+    problems = ops.check_levels(t, cfg.site("deck"), {}, _entries(("S1", "a"), ("ADMIN", "root")),
+                                {"S1": 304, "ADMIN": "all"}, "r2", {})
+    assert problems == ["S1: no cut known for slide 304 — `stx release passwd deck` makes it"]
+
+
+def test_a_failed_listing_prunes_nothing_and_exports_nothing(cfg):
+    class Cut(FakeTarget):
+        def sh(self, cmd, check=True):
+            self.cmds.append(cmd)
+            if cmd.startswith("ls -1"):
+                if check:
+                    raise ReleaseError("prod: `ls` failed: Connection reset by peer")
+                return subprocess.CompletedProcess(cmd, 255, "", "Connection reset by peer")
+            return subprocess.CompletedProcess(cmd, 0, "", "")
+
+    t = Cut()
+    assert ops.prune(t, cfg.site("deck"), {"r2"}, {"r2"}) == []
+    assert not any(c.startswith("rm -rf") for c in t.cmds)
+    with pytest.raises(ReleaseError, match="Connection reset"):
+        ops.ensure_cuts(t, cfg, cfg.site("deck"), "r2", {12}, {}, print)
+
+
+def test_the_import_takes_the_prototype_cuts(tmp_path):
+    src = tmp_path / "state.json"
+    src.write_text(json.dumps({"sites": {"prod": {"gai4as-slides": {
+        "release": "1e07", "html_release": "1e07", "last": "limit",
+        "views": {"S1016": "1e07-s304", "ADMIN": "1e07"}, "limits": {"S1016": 304, "ADMIN": "all"}}}}}))
+    v = import_prototype(tmp_path, src, {"gai4as-slides"})["sites"]["prod"]["gai4as-slides"]
+    assert v["cuts"] == {"304": "1e07-s304"} and "last" not in v

@@ -473,3 +473,11 @@ def test_convert_keeps_the_session_lines_and_their_levels(tmp_path):
     levels = pw.levels_for(data, cfg.site("chat1d-slides"))
     assert levels == {"ADMIN": "all", "S1027": 304, "S1103": None}
     assert pw.write_limit(new, cfg.site("chat1d-slides"), ["S1103"], 50) == ["S1103: not open yet → 50"]
+
+
+def test_ssh_shares_one_connection():
+    """The server resets new SSH connections beyond about 18 in a burst: one shared connection."""
+    from streamtex.release.target import Target
+    argv = Target("prod", {"type": "ssh", "root": "/srv", "host": "me@example.org"}).ssh_argv()
+    assert "ControlMaster=auto" in argv and any(a.startswith("ControlPath=") for a in argv)
+    assert argv[-1] == "me@example.org"

@@ -33,6 +33,11 @@ LIVE_ROOT = "/srv/live"
 STATIC_ROOT = "/srv/static"
 
 
+#: The shared SSH connection's socket (%C: a hash of host, port and user — short enough for the socket
+#: path limit).
+CONTROL_PATH = "~/.ssh/stx-cm-%C"
+
+
 class Target:
     def __init__(self, name: str, cfg: dict):
         self.name, self.cfg = name, cfg
@@ -49,8 +54,12 @@ class Target:
 
     # -- commands -----------------------------------------------------------------------
     def ssh_argv(self) -> list[str]:
+        """One shared connection for every command and copy (ControlMaster): the server resets new
+        connections beyond about 18 in a burst (seen by all-trainings, 2026-10-26)."""
         key = os.path.expanduser(self.cfg.get("ssh_key", ""))
-        return ["ssh", *(["-i", key] if key else []), "-o", "BatchMode=yes", self.cfg["host"]]
+        return ["ssh", *(["-i", key] if key else []), "-o", "BatchMode=yes",
+                "-o", "ControlMaster=auto", "-o", f"ControlPath={CONTROL_PATH}", "-o", "ControlPersist=120",
+                self.cfg["host"]]
 
     def sh(self, cmd: str, check: bool = True) -> subprocess.CompletedProcess:
         argv = ["sh", "-c", cmd] if self.kind == "local" else [*self.ssh_argv(), cmd]

@@ -58,6 +58,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   that `.stx-passwords.toml` still holds the new levels.
 - **`status`** checks every level in force as a visitor and lists the
   levels.
+- **One shared SSH connection** for every command and copy of a run
+  (`ControlMaster`, socket `~/.ssh/stx-cm-%C`). The server resets new
+  connections beyond about 18 in a burst (reported by all-trainings on
+  2026-10-26); a `passwd` over 36 sites would have been cut off.
 
 ### Migration
 

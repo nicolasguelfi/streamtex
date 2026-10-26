@@ -254,7 +254,9 @@ def test_release_end_to_end(project):
     # passwords changed without publishing
     pwf = p["root"] / ".stx-passwords.toml"
     pwf.write_text(pwf.read_text().replace('["PROMO-NOV", "novpass1", "2099-12-31"]', '["PROMO-DEC", "decpass1"]'))
+    pid = _live_pid(p, "demo-a")
     stx("passwd")
+    assert _live_pid(p, "demo-a") == pid             # the login service reads the records: no restart
     assert _login(p["S"], "demo-a.example.org", "/html/_login", "novpass1") == ""
     assert _html_version(p, "demo-a", "decpass1") == r1
 

@@ -5,9 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.7.69] — 2026-10-26 — after all-trainings' switchover
+
+All-trainings switched to `stx release` on the evening of 2026-10-26; this
+release fixes what the switchover found.
+
+### Changed
+
+- **`stx release passwd` restarts no site process.** The login service reads
+  the records, so a participant of the live face stays connected; only a
+  site whose program changed restarts (`supervisorctl update`). Changing a
+  password during a course no longer cuts the live face of every site.
+
+### Added
+
+- **`STX_PASSWORDS_FILE`** names another passwords file (relative to the
+  project root, or absolute) for every `stx release` command: a rehearsal
+  with dummy passwords leaves the real `.stx-passwords.toml` in place.
 
 ### Fixed
+
+- **A local target on macOS**: macOS's own rsync (openrsync) stops on an
+  assertion with `-H` and `--link-dest` together when the export holds hard
+  links. On a local target with openrsync, `-H` is dropped and
+  `--link-dest` kept.
 
 - **`stx release status` crashed** (`KeyError`) on a site whose session
   level had no known cut, for example right after `import` and

@@ -6,6 +6,7 @@ The same gestures on both; on ``ssh`` they are prefixed by ssh. Paths are those 
 
 from __future__ import annotations
 
+import functools
 import os
 import re
 import shlex
@@ -36,6 +37,16 @@ STATIC_ROOT = "/srv/static"
 #: The shared SSH connection's socket (%C: a hash of host, port and user — short enough for the socket
 #: path limit).
 CONTROL_PATH = "~/.ssh/stx-cm-%C"
+
+
+@functools.cache
+def _openrsync() -> bool:
+    """Whether the local ``rsync`` is openrsync (macOS's own since Sequoia)."""
+    try:
+        r = subprocess.run(["rsync", "--version"], text=True, capture_output=True)
+    except OSError:
+        return False
+    return "openrsync" in (r.stdout + r.stderr)
 
 
 class Target:
@@ -74,6 +85,11 @@ class Target:
 
     def rsync(self, src: str, dest: str, *opts: str) -> None:
         if self.kind == "local":
+            if _openrsync() and "--link-dest" in opts:
+                # macOS's own rsync stops on an assertion (io.c:900) with -H and --link-dest together when
+                # the source holds hard links (all-trainings, 2026-10-26): keep --link-dest, the space
+                # saving, and drop -H, which only matters for hard links inside one export
+                opts = tuple(o for o in opts if o != "-H")
             argv = ["rsync", "-a", *opts, src, dest]
         else:
             ssh = " ".join(shlex.quote(x) for x in self.ssh_argv()[:-1])

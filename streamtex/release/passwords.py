@@ -50,6 +50,7 @@ every site gets exactly the same passwords, labels and end dates as before (rel2
 from __future__ import annotations
 
 import datetime as dt
+import os
 import re
 import tomllib
 from pathlib import Path
@@ -62,6 +63,9 @@ from . import ReleaseError
 from .config import FACES, ReleaseConfig, Site
 
 PASSWORDS_FILE = ".stx-passwords.toml"
+#: Another passwords file (relative to the project root, or absolute), for a rehearsal with dummy
+#: passwords that leaves the real file in place (all-trainings, 2026-10-26).
+PASSWORDS_ENV = "STX_PASSWORDS_FILE"
 OPEN = None          # a face resolved to "open"
 _LEVEL_KEYS = {"live", "html", "open", "full"}
 ADMIN = "admin"
@@ -71,9 +75,16 @@ LINE_KEYS = {"seance": "label", "mot": "password", "limite": "limit", "fin": "un
 DEFAULT = "default"        # a label's level: the site's (state up_to_slide), else all the slides
 
 
+def passwords_path(root: Path) -> Path:
+    """The passwords file of the project at *root*: ``$STX_PASSWORDS_FILE`` when set, else
+    ``.stx-passwords.toml``."""
+    return root / (os.environ.get(PASSWORDS_ENV) or PASSWORDS_FILE)
+
+
 def load_file(path: Path) -> dict:
     if not path.is_file():
-        raise ReleaseError(f"{path.name} not found at the project root (git-ignored): it gives, for every "
+        where = f"at {path}" if os.environ.get(PASSWORDS_ENV) else "at the project root (git-ignored)"
+        raise ReleaseError(f"{path.name} not found {where}: it gives, for every "
                            "site, the passwords of the live and html faces, or open = true")
     try:
         return tomllib.loads(path.read_text(encoding="utf-8"))

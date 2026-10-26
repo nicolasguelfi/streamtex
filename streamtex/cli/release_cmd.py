@@ -24,7 +24,7 @@ def _ctx(target: str | None):
 
 
 def _passwords(cfg):
-    return pw.load_file(cfg.root / pw.PASSWORDS_FILE)
+    return pw.load_file(pw.passwords_path(cfg.root))
 
 
 _target = click.option("--target", "target", default=None, help="Target name in .stx-release.json "
@@ -154,8 +154,9 @@ def limit_cmd(site, slide, labels, target, allow_skew, html_env):
     _skew(cfg, t, allow_skew)
     if labels:
         names = [x.strip() for x in labels.split(",") if x.strip()]
-        for line in pw.write_limit(cfg.root / pw.PASSWORDS_FILE, s, names, value):
-            click.echo(f"  {pw.PASSWORDS_FILE}: {line}")
+        path = pw.passwords_path(cfg.root)
+        for line in pw.write_limit(path, s, names, value):
+            click.echo(f"  {path.name}: {line}")
     elif value is None:
         raise ReleaseError("`none` closes sessions one by one: give them with --label")
     data = _passwords(cfg)
@@ -182,9 +183,10 @@ def rollback_cmd(site, target):
 def passwd_cmd(sites, target):
     """Write the password records of SITES (default: every published site) without publishing again.
 
-    HTML face: effective at once, with each session's level as written in the file; live face: the
-    site's process restarts. A changed password closes the open sessions of its label only; an unchanged
-    one keeps its sessions."""
+    Effective at once on both faces, with each session's level as written in the file: the login service
+    reads the records, so no site process restarts (a live participant stays connected). A changed
+    password closes the open sessions of its label only; an unchanged one keeps its sessions.
+    ``STX_PASSWORDS_FILE`` names another passwords file (a rehearsal with dummy passwords)."""
     cfg, state, t = _ctx(target)
     data = _passwords(cfg)
     published = sites_of(state, t.name)
@@ -203,10 +205,7 @@ def passwd_cmd(sites, target):
     t.dexec("static", "nginx -s reload")
     t.dexec("live", "nginx -s reload")
     t.dexec("live", "supervisorctl reread")
-    t.dexec("live", "supervisorctl update")
-    for name in names:
-        if "live" in cfg.site(name).faces:
-            t.dexec("live", f"supervisorctl restart {name}", check=False)
+    t.dexec("live", "supervisorctl update")       # restarts only a site whose program changed
     save_state(cfg.root, state)
     click.echo(f"passwords written for {len(names)} site(s)")
 

@@ -107,7 +107,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
 #: The library release this file ships with, and its interface number (#135).
-STX_VERSION = "0.7.68"
+STX_VERSION = "0.7.69"
 AUTH_INTERFACE = 3
 
 DEFAULT_ROOT = "/var/lib/stx-auth"

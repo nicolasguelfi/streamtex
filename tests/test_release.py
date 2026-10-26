@@ -1,7 +1,9 @@
 """stx release (#136, #111): site list, passwords per site and their conversion, state import, Dockerfiles."""
 import json
+import subprocess
 import textwrap
 from datetime import date
+from pathlib import Path
 
 import pytest
 
@@ -481,3 +483,32 @@ def test_ssh_shares_one_connection():
     argv = Target("prod", {"type": "ssh", "root": "/srv", "host": "me@example.org"}).ssh_argv()
     assert "ControlMaster=auto" in argv and any(a.startswith("ControlPath=") for a in argv)
     assert argv[-1] == "me@example.org"
+
+
+def test_local_openrsync_drops_hard_links_with_link_dest(monkeypatch):
+    """macOS's rsync stops on -H with --link-dest (all-trainings, 2026-10-26): -H goes, --link-dest stays."""
+    from streamtex.release import target
+    seen = []
+    monkeypatch.setattr(target, "_openrsync", lambda: True)
+    monkeypatch.setattr(target.subprocess, "run",
+                        lambda argv, **kw: seen.append(argv) or subprocess.CompletedProcess(argv, 0, "", ""))
+    t = target.Target("local", {"type": "local", "root": "/tmp/x"})
+    t.rsync("a/", "b/", "--delete", "-H", "-c", "--link-dest", "prev")
+    t.rsync("a/", "c/", "--delete", "-H")
+    assert seen[0] == ["rsync", "-a", "--delete", "-c", "--link-dest", "prev", "a/", "b/"]
+    assert "-H" in seen[1]
+    monkeypatch.setattr(target, "_openrsync", lambda: False)
+    t.rsync("a/", "d/", "-H", "--link-dest", "prev")
+    assert "-H" in seen[2]
+
+
+def test_passwords_file_from_the_environment(monkeypatch, tmp_path):
+    """STX_PASSWORDS_FILE names another file (a rehearsal with dummy passwords); unset: the usual one."""
+    monkeypatch.delenv(pw.PASSWORDS_ENV, raising=False)
+    assert pw.passwords_path(tmp_path) == tmp_path / ".stx-passwords.toml"
+    monkeypatch.setenv(pw.PASSWORDS_ENV, "rehearsal.toml")
+    assert pw.passwords_path(tmp_path) == tmp_path / "rehearsal.toml"
+    monkeypatch.setenv(pw.PASSWORDS_ENV, str(tmp_path / "abs.toml"))
+    assert pw.passwords_path(Path("/elsewhere")) == tmp_path / "abs.toml"
+    with pytest.raises(ReleaseError, match="abs.toml not found at"):
+        pw.load_file(pw.passwords_path(tmp_path))

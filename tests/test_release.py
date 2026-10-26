@@ -440,3 +440,36 @@ def test_rebuild_needs_the_dockerfile_pushed(tmp_path):
     g("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "lock")
     g("push", "-q", "origin", "main")
     coolify.require_pushed_dockerfile(cfg, _repo_target(), "live")
+
+
+SESSIONS = """
+    [default]
+    live = "TRAINER:t1"
+    html = "PROMO-OCT:o1"
+
+    [CHAT1D.home]
+    html = ""
+
+    [CHAT1D.slides]
+    html = [
+      { seance = "ADMIN", mot = "root", limite = "all" },
+      { seance = "S1027", mot = "a1", limite = 304, fin = "2026-12-31" },
+      { seance = "S1103", mot = "b2" },
+    ]
+"""
+
+
+def test_convert_keeps_the_session_lines_and_their_levels(tmp_path):
+    """#148: the all-trainings file, one line per session (acces3/f1), converted as it is."""
+    import tomllib
+    cfg = load_config(_project(tmp_path, SITES))
+    old, new = tmp_path / "old.toml", tmp_path / "new.toml"
+    old.write_text(textwrap.dedent(SESSIONS))
+    report = pw.convert(cfg, old, new)
+    assert any("chat1d-slides" in r and "S1027 304" in r and "S1103 None" in r for r in report)
+    text = new.read_text()
+    assert '  { seance = "S1027", mot = "a1", limite = 304, fin = "2026-12-31" },\n' in text   # one per line
+    data = tomllib.loads(text)
+    levels = pw.levels_for(data, cfg.site("chat1d-slides"))
+    assert levels == {"ADMIN": "all", "S1027": 304, "S1103": None}
+    assert pw.write_limit(new, cfg.site("chat1d-slides"), ["S1103"], 50) == ["S1103: not open yet → 50"]

@@ -429,6 +429,27 @@ INTERFACES = {
         "token": "1060.T1.0db25f8b5ddde317.f13e6b4c04deb8e405280bfff7bc09d81dc4f8320a4e7a22f6cae5952ade00c1",
         "lines": ["default:" + _REC, "T1:" + _REC, "T1:" + _REC + ":2027-01-31"],
     },
+    3: {   # #148: the folder of each session's level, read from sites/<site>/levels, schedules included
+        "headers": ["X-Forwarded-Prefix", "X-Original-URI", "X-Stx-Auth", "X-Stx-Cookie", "X-Stx-Domain",
+                    "X-Stx-Home", "X-Stx-Label", "X-Stx-Login", "X-Stx-Site", "X-Stx-View"],
+        "env": ["STX_AUTH_PORT", "STX_AUTH_ROOT", "STX_AUTH_SESSION_HOURS"],
+        "patterns": {
+            "SITE_RE": r"^[a-z0-9-]{1,63}$",
+            "LABEL_RE": r"^[A-Za-z0-9_-]{1,64}$",
+            "COOKIE_RE": r"^[A-Za-z0-9_-]{1,64}$",
+            "DOMAIN_RE": r"^(?=.{3,253}$)[a-z0-9-]{1,63}(\.[a-z0-9-]{1,63})+$",
+            "VIEW_RE": r"^(current|closed|releases/[A-Za-z0-9_-][A-Za-z0-9._-]{0,127})$",
+            "DATE_RE": r"^\d{4}-\d{2}-\d{2}$",
+            "RECORD_RE": r"^scrypt\$\d+\$\d+\$\d+\$[0-9a-f]{16,128}\$[0-9a-f]{32,128}$",
+        },
+        "scrypt": [16384, 8, 1],
+        "defaults": ["/var/lib/stx-auth", 9100, "default"],
+        "paths": ["conf", "levels", "pass", "session.key", "sites"],
+        "cookie": ["stx_session_"],
+        "shared": "*",
+        "token": "1060.T1.0db25f8b5ddde317.f13e6b4c04deb8e405280bfff7bc09d81dc4f8320a4e7a22f6cae5952ade00c1",
+        "lines": ["default:" + _REC, "T1:" + _REC, "T1:" + _REC + ":2027-01-31"],
+    },
 }
 
 
@@ -439,10 +460,11 @@ def _interface():
         "headers": sorted(set(re.findall(r'"(X-[A-Za-z]+(?:-[A-Za-z]+)*)"', code))),
         "env": sorted(set(re.findall(r'"(STX_AUTH_[A-Z_]+)"', code))),
         "patterns": {n: getattr(stx_auth, n).pattern
-                     for n in ("SITE_RE", "LABEL_RE", "COOKIE_RE", "DOMAIN_RE", "DATE_RE", "RECORD_RE")},
+                     for n in ("SITE_RE", "LABEL_RE", "COOKIE_RE", "DOMAIN_RE", "VIEW_RE", "DATE_RE", "RECORD_RE")
+                     if hasattr(stx_auth, n)},
         "scrypt": [stx_auth.SCRYPT_N, stx_auth.SCRYPT_R, stx_auth.SCRYPT_P],
         "defaults": [stx_auth.DEFAULT_ROOT, stx_auth.DEFAULT_PORT, stx_auth.DEFAULT_LABEL],
-        "paths": sorted(set(re.findall(r'"(sites|pass|conf|session\.key|full|limited)"', code))),
+        "paths": sorted(set(re.findall(r'"(sites|pass|conf|session\.key|full|limited|levels)"', code))),
         "cookie": sorted(set(re.findall(r"stx_session_", code))),
         "shared": stx_auth.SHARED,
         "token": make_token(b"k" * 32, "demo", Entry("T1", _REC), 60, now=1000),
@@ -553,13 +575,14 @@ class TestSharedSession:
 
 
 class TestView:
-    def _limited(self, server, site="demo", full=None):
-        d = Path(server.root) / "sites" / site
-        (d / "releases" / "r1-s3").mkdir(parents=True, exist_ok=True)
-        if not (d / "limited").exists():
-            (d / "limited").symlink_to("releases/r1-s3")
-        if full is not None:
-            (d / "full").write_text("".join(f"{x}\n" for x in full), encoding="utf-8")
+    """#148: the folder of the session's level, from sites/<site>/levels."""
+
+    def _levels(self, server, text, site="demo"):
+        p = Path(server.root) / "sites" / site / "levels"
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(text, encoding="utf-8")
+        st = p.stat()
+        os.utime(p, ns=(st.st_atime_ns, st.st_mtime_ns + 1_000_000))
 
     def _view(self, server, word, site="demo"):
         resp, _ = _login(server, word, site)
@@ -567,27 +590,37 @@ class TestView:
         assert resp.status == 204
         return resp.getheader("X-Stx-View")
 
-    def test_without_a_limited_release_everyone_sees_everything(self, server):
+    def test_without_a_levels_file_everyone_sees_current(self, server):
         _write(server, "demo", f"ADMIN:{_rec('root')}\nP:{_rec('p')}\n")
-        assert self._view(server, "p") == "full"
+        assert self._view(server, "p") == "current"
 
-    def test_a_limited_release_for_the_labels_not_listed(self, server):
-        _write(server, "demo", f"ADMIN:{_rec('root')}\nPA:{_rec('pa')}\nPB:{_rec('pb')}\n")
-        self._limited(server, full=["ADMIN", "PA"])
-        assert [self._view(server, w) for w in ("root", "pa", "pb")] == ["full", "full", "limited"]
+    def test_each_session_its_folder(self, server):
+        _write(server, "demo", f"ADMIN:{_rec('root')}\nPA:{_rec('pa')}\nPB:{_rec('pb')}\nPC:{_rec('pc')}\n")
+        self._levels(server, "ADMIN\tcurrent\nPA\treleases/r1-s12\nPB\tclosed\n")
+        assert [self._view(server, w) for w in ("root", "pa", "pb", "pc")] == \
+            ["current", "releases/r1-s12", "closed", "closed"]          # PC: not in the file, closed
 
-    def test_the_full_list_is_read_again_when_it_changes(self, server):
+    def test_a_schedule_follows_the_clock(self, server):
+        store = server.store
+        self._levels(server, "PA\t1000=releases/r1-s5;2000=current\n")
+        assert [store.view("demo", "PA", now=t) for t in (999, 1000, 1999, 2000, 9999)] == \
+            ["closed", "releases/r1-s5", "releases/r1-s5", "current", "current"]
+
+    def test_the_file_is_read_again_when_it_changes(self, server):
         _write(server, "demo", f"PB:{_rec('pb')}\n")
-        self._limited(server, full=[])
-        assert self._view(server, "pb") == "limited"
-        full = Path(server.root) / "sites" / "demo" / "full"
-        full.write_text("PB\n", encoding="utf-8")
-        st = full.stat()
-        os.utime(full, ns=(st.st_atime_ns, st.st_mtime_ns + 1_000_000))
-        assert self._view(server, "pb") == "full"
+        self._levels(server, "PB\tclosed\n")
+        assert self._view(server, "pb") == "closed"
+        self._levels(server, "PB\treleases/r1-s3\n")
+        assert self._view(server, "pb") == "releases/r1-s3"
 
-    def test_an_open_site_with_a_limit_is_limited(self, server):
+    @pytest.mark.parametrize("spec", ["../../etc", "releases/../x", "/srv", "releases/a b", "x=current",
+                                      "releases/.hidden"])
+    def test_a_folder_outside_the_site_is_closed(self, server, spec):
+        self._levels(server, f"PA\t{spec}\n")
+        assert server.store.view("demo", "PA") == "closed"
+
+    def test_an_open_site_has_its_level_too(self, server):
         _write(server, "demo", "open\n")
-        self._limited(server)
+        self._levels(server, "open\treleases/r1-s3\n")
         resp, _ = _req(server, "GET", "/check", _h())
-        assert resp.status == 204 and resp.getheader("X-Stx-View") == "limited"
+        assert resp.status == 204 and resp.getheader("X-Stx-View") == "releases/r1-s3"

@@ -28,10 +28,18 @@ login; a password of one site only stays valid there; a stolen cookie gives no
 more than the password itself. The cookie name ends with a tag of the server
 key, so two projects sharing a domain never overwrite each other's session.
 
-Full or limited (#147). ``GET /check`` also answers ``X-Stx-View``:
-``limited`` when the site has a limited release (``<root>/sites/<site>/limited``)
-and the label is not listed in ``<root>/sites/<site>/full`` (one label per
-line), else ``full``; nginx serves the matching folder.
+What each session sees (#148). ``GET /check`` also answers ``X-Stx-View``: the
+folder of the label's level, read from ``<root>/sites/<site>/levels``, one line
+per label::
+
+    S1027	releases/r2-s120
+    S1103	closed
+    S1110	1762761600=releases/r2-s52;1762779600=current
+
+A scheduled level is the last step whose time (epoch seconds) has passed, and
+``closed`` before the first one. ``closed`` and a label missing from the file
+mean "not open yet"; without the file, everyone sees ``current``. nginx serves
+``<root>/sites/<site>/<folder>``.
 
 Record file, one entry per line (blank lines and ``#`` comments ignored)::
 
@@ -66,11 +74,12 @@ contract, numbered by ``AUTH_INTERFACE``:
 - the request headers above (``X-Stx-Site``, ``X-Stx-Cookie``,
   ``X-Stx-Login``, ``X-Stx-Home``, ``X-Original-URI``,
   ``X-Forwarded-Prefix``, ``X-Stx-Domain``) and the response headers
-  ``X-Stx-Label`` and ``X-Stx-View``;
+  ``X-Stx-Label`` and ``X-Stx-View`` (``current``, ``closed`` or
+  ``releases/<name>``);
 - the environment variables above;
 - the record files ``<root>/sites/<site>/pass``, their line grammar and the
-  scrypt record format; ``<root>/sites/<site>/full`` and the ``limited``
-  folder; the server key ``<root>/conf/session.key``;
+  scrypt record format; ``<root>/sites/<site>/levels`` and its line grammar;
+  the server key ``<root>/conf/session.key``;
 - the cookie ``stx_session_<site>`` (``<name>_<key tag>`` for a shared
   session) and its token ``<expiry>.<label>.<generation>.<signature>``.
 
@@ -98,8 +107,8 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
 #: The library release this file ships with, and its interface number (#135).
-STX_VERSION = "0.7.66"
-AUTH_INTERFACE = 2
+STX_VERSION = "0.7.67"
+AUTH_INTERFACE = 3
 
 DEFAULT_ROOT = "/var/lib/stx-auth"
 DEFAULT_PORT = 9100
@@ -119,6 +128,7 @@ LABEL_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 COOKIE_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 DOMAIN_RE = re.compile(r"^(?=.{3,253}$)[a-z0-9-]{1,63}(\.[a-z0-9-]{1,63})+$")
 SHARED = "*"           # the "site" a shared session is signed for (#147)
+VIEW_RE = re.compile(r"^(current|closed|releases/[A-Za-z0-9_-][A-Za-z0-9._-]{0,127})$")
 PATH_RE = re.compile(r"^/[A-Za-z0-9._~!$&'()*+,;=:@%/?-]*$")
 PREFIX_RE = re.compile(r"^/[A-Za-z0-9_-]{1,32}$")
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
@@ -256,7 +266,7 @@ class RecordStore:
     def __init__(self, root: Path) -> None:
         self.root = root
         self._cache: dict[str, tuple[tuple[int, int], Records]] = {}
-        self._full: dict[str, tuple[tuple[int, int], frozenset[str]]] = {}
+        self._levels: dict[str, tuple[tuple[int, int], dict]] = {}
         self._lock = threading.Lock()
 
     def get(self, site: str) -> Records:
@@ -280,32 +290,53 @@ class RecordStore:
             self._cache[site] = (stamp, records)
         return records
 
-    def full(self, site: str) -> frozenset[str]:
-        """The labels that see the whole content of a limited site (``sites/<site>/full``)."""
-        path = self.root / "sites" / site / "full"
+    def levels(self, site: str) -> dict[str, tuple[tuple[int, str], ...]] | None:
+        """``sites/<site>/levels``: {label: ((from, folder), …)}; None without the file."""
+        path = self.root / "sites" / site / "levels"
         try:
             st = path.stat()
         except OSError:
-            return frozenset()
+            return None
         stamp = (st.st_mtime_ns, st.st_size)
         with self._lock:
-            hit = self._full.get(site)
+            hit = self._levels.get(site)
         if hit is not None and hit[0] == stamp:
             return hit[1]
         try:
-            labels = frozenset(ln.strip() for ln in path.read_text(encoding="utf-8").splitlines()
-                               if LABEL_RE.match(ln.strip()))
+            text = path.read_text(encoding="utf-8")
         except (OSError, UnicodeDecodeError):
-            return frozenset()
+            return {}                                  # unreadable: every label closed
+        levels = {}
+        for line in text.splitlines():
+            label, sep, spec = line.strip().partition("\t")
+            if not sep or not LABEL_RE.match(label):
+                continue
+            steps = []
+            for part in spec.split(";"):
+                when, eq, where = part.rpartition("=")
+                if eq and not when.isdigit():
+                    steps = None
+                    break
+                if VIEW_RE.match(where) and ".." not in where:
+                    steps.append((int(when) if eq else 0, where))
+            levels[label] = tuple(sorted(steps)) if steps else ((0, "closed"),)
         with self._lock:
-            self._full[site] = (stamp, labels)
-        return labels
+            self._levels[site] = (stamp, levels)
+        return levels
 
-    def view(self, site: str, label: str) -> str:
-        """``limited`` when *site* has a limited release and *label* is not among its full labels."""
-        if not SITE_RE.match(site or "") or not (self.root / "sites" / site / "limited").is_dir():
-            return "full"
-        return "full" if label in self.full(site) else "limited"
+    def view(self, site: str, label: str, now: float | None = None) -> str:
+        """The folder *label* sees on *site* now: ``current``, ``closed`` or ``releases/<name>``."""
+        if not SITE_RE.match(site or ""):
+            return "closed"
+        levels = self.levels(site)
+        if levels is None:
+            return "current"
+        moment = now if now is not None else time.time()
+        seen = "closed"
+        for start, where in levels.get(label, ()):
+            if start <= moment:
+                seen = where
+        return seen
 
 
 # ---------------------------------------------------------------------------

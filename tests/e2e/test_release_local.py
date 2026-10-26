@@ -313,15 +313,15 @@ def test_slide_limit_end_to_end(project):
     assert _live_pid(p, "demo-d") == pid                      # the live face did not restart
     assert passes == {f: (p["host"] / f / "sites" / "demo-d" / "pass").stat().st_mtime_ns
                       for f in ("static", "live")}            # no password rewritten
-    assert "nothing to change" in stx("limit", "demo-d", "3", "--allow-skew").stdout
-    assert "slides 1 to 3" in stx("status").stdout
+    assert "already there" in stx("limit", "demo-d", "3", "--allow-skew").stdout   # same block: same cut
+    assert "up to 3" in stx("status").stdout
 
     # a new release keeps the limit
     bck = p["root"] / "docs" / "d" / "blocks" / "bck_one.py"
     bck.write_text(bck.read_text().replace("version one", "version two"))
     git("-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qam", "d two")
     r2 = _head(p)
-    assert "slide limit kept" in stx("publish", "demo-d", "--allow-skew").stdout
+    assert "level up to slide 3" in stx("publish", "demo-d", "--allow-skew").stdout
     assert _html_version(p, "demo-d", "octpass1") == f"{r2}-s3"
 
     # rollback of a publication: both faces; of a limit: the HTML face alone
@@ -340,9 +340,10 @@ def test_slide_limit_end_to_end(project):
     assert _html_version(p, "demo-d", "octpass1") == f"{r2}-s3"
     assert _live_pid(p, "demo-d") == pid
     status = stx("status").stdout
-    assert "GAP" not in status and "slides 1 to 3" in status
+    assert "GAP" not in status and "up to 3" in status
     refused = stx("limit", "demo-c", "2", "--allow-skew", check=False)
     assert refused.returncode == 1 and "no HTML face" in refused.stderr
+
 
 
 ACCESS = """
@@ -353,67 +354,88 @@ ACCESS = """
     open = ["html"]
     [demo.sites.demo-a]
     html = "ONLY-A:onlya1"
-    [demo-d]
-    full = ["PROMO-FULL"]
+    [demo-d.sites.demo-d]
+    html = [
+      { seance = "S-ONE", mot = "onepass1", limite = 1 },
+      { seance = "S-TWO", mot = "twopass1", limite = 2 },
+      { seance = "S-ALL", mot = "allpass1", limite = "all" },
+      { seance = "S-NONE", mot = "nonepass1" },
+      { seance = "S-LATER", mot = "laterpass1", limite = [["2020-01-01T00:00", 1], ["2099-01-01T00:00", "all"]] },
+    ]
     [admin]
     live = "ADMIN:rootpass1"
     html = "ADMIN:rootpass1"
 """
 
 
+def _seen(p, site, cookie):
+    """What the HTML face serves to this session: its release, "closed" (not open yet) or the code."""
+    code, _, body = _req(p["S"] + "/html/version.txt", f"{site}.example.org", cookie=cookie)
+    if code == 200 and "stx-closed" in body:
+        return "closed"
+    return body.split("\n")[0] if code == 200 else code
+
+
 def test_access_end_to_end(project):
-    """#147: one [admin] password on every site, one login across sites, full or limited per password."""
+    """#147, #148: [admin] everywhere, one login across sites, a level per session (a cut, all, closed,
+    a schedule), `limit --label` writing the file, sessions kept, rollback."""
     p, stx, git = project, project["stx"], project["git"]
     git("checkout", "-q", "--", ".")
     bck = p["root"] / "docs" / "a" / "blocks" / "bck_main.py"            # repaired after the broken publish
     if "broken on purpose" in bck.read_text():
         bck.write_text(bck.read_text().replace("\nraise RuntimeError('broken on purpose')\n", "\n"))
         git("-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qam", "repaired")
-    (p["root"] / ".stx-passwords.toml").write_text(textwrap.dedent(ACCESS))
-    stx("publish", "demo-a", "demo-c", "demo-d", "--allow-skew")
+    pwf = p["root"] / ".stx-passwords.toml"
+    pwf.write_text(textwrap.dedent(ACCESS))
+    out = stx("publish", "demo-a", "demo-c", "demo-d", "--allow-skew").stdout
     r = _head(p)
-    stx("limit", "demo-d", "2", "--allow-skew")
-    assert (p["host"] / "static" / "sites" / "demo-d" / "full").read_text() == "PROMO-FULL\nADMIN\n"
-    assert "ADMIN [all slides]" in stx("auth-status", "demo-d").stdout
+    assert "level up to slide 1" in out and "level up to slide 2" in out
+    levels = (p["host"] / "static" / "sites" / "demo-d" / "levels").read_text()
+    assert f"S-ONE\treleases/{r}-s1\n" in levels and f"S-TWO\treleases/{r}-s3\n" in levels
+    assert "S-NONE\tclosed\n" in levels and "ADMIN\tcurrent\n" in levels and "S-ALL\tcurrent\n" in levels
 
     # the administrator: one login on the HTML face of demo-a, every HTML site opens, all the slides
     admin = _login(p["S"], "demo-a.example.org", "/html/_login", "rootpass1")
     assert admin.startswith("stx_session_")
-    for site in ("demo-a", "demo-d"):
-        code, _, body = _req(p["S"] + "/html/version.txt", f"{site}.example.org", cookie=admin)
-        assert code == 200 and body.split("\n")[0] == r, site
+    assert _seen(p, "demo-a", admin) == r and _seen(p, "demo-d", admin) == r
     assert "Slide s4" in _html_page(p, "demo-d", admin)
-    # ... and one login on the live face opens every live site
-    live = _login(p["L"], "demo-a.example.org", "/_login", "rootpass1")
+    live = _login(p["L"], "demo-a.example.org", "/_login", "rootpass1")          # one login per face
     for site in ("demo-a", "demo-c", "demo-d"):
         assert _req(p["L"] + "/", f"{site}.example.org", cookie=live)[0] == 200, site
 
-    # the participants of demo-d: limited, or all the slides for the label listed in `full`
-    assert _html_version(p, "demo-d", "octpass1") == f"{r}-s3"
-    participant = _login(p["S"], "demo-d.example.org", "/html/_login", "octpass1")
-    page = _html_page(p, "demo-d", participant)
+    # each session its level
+    s = {w: _login(p["S"], "demo-d.example.org", "/html/_login", f"{w}pass1")
+         for w in ("one", "two", "all", "none", "later")}
+    assert [_seen(p, "demo-d", s[w]) for w in ("one", "two", "all", "none", "later")] == \
+        [f"{r}-s1", f"{r}-s3", r, "closed", f"{r}-s1"]
+    page = _html_page(p, "demo-d", s["two"])
     assert "Slide s3 of document d" in page and "Slide s4" not in page
-    assert _html_version(p, "demo-d", "fullpass1") == r
-    # a password of demo-a only stays on demo-a
-    only = _login(p["S"], "demo-a.example.org", "/html/_login", "onlya1")
-    assert _req(p["S"] + "/html/version.txt", "demo-a.example.org", cookie=only)[0] == 200
-    assert _req(p["S"] + "/html/version.txt", "demo-d.example.org", cookie=only)[0] == 401
-    assert _login(p["S"], "demo-a.example.org", "/html/_login", "octpass1") == ""
+    code, _, closed = _req(p["S"] + "/html/en/d/d.html", "demo-d.example.org", cookie=s["none"])
+    assert code == 200 and "pas encore ouvert" in closed and "Slide" not in closed
+    assert _req(p["S"] + "/html/nothing-here.html", "demo-d.example.org", cookie=admin)[0] == 404   # a real 404
+    only = _login(p["S"], "demo-a.example.org", "/html/_login", "onlya1")       # a password of demo-a only
+    assert _seen(p, "demo-a", only) == r and _seen(p, "demo-d", only) == 401
 
-    # writing the passwords again closes no session; changing one closes only its label's
-    stx("passwd")
-    assert _req(p["S"] + "/html/version.txt", "demo-d.example.org", cookie=admin)[0] == 200
-    pwf = p["root"] / ".stx-passwords.toml"
-    pwf.write_text(pwf.read_text().replace('["PROMO-OCT", "octpass1"]', '["PROMO-OCT", "octpass2"]'))
-    stx("passwd")
-    assert _req(p["S"] + "/html/version.txt", "demo-d.example.org", cookie=participant)[0] == 401
-    assert _req(p["S"] + "/html/version.txt", "demo-d.example.org", cookie=admin)[0] == 200
+    # limit --label: the file's line changes, the open sessions see their new level on the next page
+    before = pwf.read_text()
+    stx("limit", "demo-d", "none", "--label", "S-TWO", "--allow-skew")
+    stx("limit", "demo-d", "2", "--label", "S-NONE", "--allow-skew")
+    after = pwf.read_text()
+    assert after == before.replace('mot = "twopass1", limite = 2 }', 'mot = "twopass1" }').replace(
+        'mot = "nonepass1" }', 'mot = "nonepass1", limite = 2 }')
+    assert _seen(p, "demo-d", s["two"]) == "closed" and _seen(p, "demo-d", s["none"]) == f"{r}-s3"
+    assert "[not open yet]" in stx("auth-status", "demo-d").stdout
 
-    # back to all the slides for everyone, and the limit again by rollback
-    stx("limit", "demo-d", "all", "--allow-skew")
-    assert _html_version(p, "demo-d", "octpass2") == r
-    stx("rollback", "demo-d")
-    time.sleep(2)
-    assert _html_version(p, "demo-d", "octpass2") == f"{r}-s3"
-    assert _html_version(p, "demo-d", "rootpass1") == r
+    # rollback of a limit: the previous levels; the sessions are still open
+    assert "still holds the new levels" in stx("rollback", "demo-d").stdout    # the last change only
+    assert _seen(p, "demo-d", s["none"]) == "closed" and _seen(p, "demo-d", s["two"]) == "closed"
+    pwf.write_text(before)
+
+    # writing the passwords again closes no session; a changed password closes only its own
+    stx("passwd")
+    assert _seen(p, "demo-d", admin) == r and _seen(p, "demo-d", s["one"]) == f"{r}-s1"
+    pwf.write_text(before.replace('"onepass1"', '"onepass2"'))
+    stx("passwd")
+    assert _seen(p, "demo-d", s["one"]) == 401
+    assert _seen(p, "demo-d", admin) == r and _seen(p, "demo-d", s["all"]) == r
     assert "GAP" not in stx("status").stdout

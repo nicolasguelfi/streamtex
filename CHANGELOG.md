@@ -7,6 +7,73 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.67] — 2026-10-26 — a level per session
+
+### Added
+
+- **A level per session on the HTML face** (#148). This is the model of the
+  all-trainings prototype (its boards acces1 to acces3), in `stx release`.
+  - **One line per session** in `.stx-passwords.toml`:
+    `html = [ { seance = "S1027", mot = "…", limite = 120, fin = "2026-12-31" }, … ]`.
+    The English keys `label`, `password`, `limit` and `until` are accepted too.
+  - **The levels:** `limite = N` gives slides 1 to N (the block of slide N
+    whole), `"all"` gives everything, and a session with no `limite` sees a
+    "not open yet" page (fr/en).
+  - **The other forms** (a string, pairs, a table) give every label the
+    site's level (`stx release limit SITE N`), else all the slides.
+  - **`[admin]` and `full = [...]`** see all the slides.
+- **Scheduled openings** (#148). For example,
+  `limite = [["2026-11-10T09:00", 50], ["2026-11-10T14:00", "all"]]`, in
+  the local time of the machine that publishes. The login service reads the
+  schedule at each page, so a level changes by itself, with no program on the
+  server; the cuts are exported beforehand.
+- **`stx release limit SITE N|all|none --label L[,L…]`** (#148).
+  - **It writes `limite`** on those sessions' lines, in the site's own
+    section, and nothing else; the file is parsed again before it is
+    written.
+  - **Then it applies the level** from the published release: no password
+    rewritten, the live face untouched. Open sessions see their new level on
+    their next page.
+  - **Without `--label`**, it sets the site's level, as in 0.7.65.
+- **`stx release passwd`** applies the levels written in the file too.
+  **`auth-status`** shows each session's level, `[not open yet]` included.
+- **`convert-passwords`** reads the prototype's session lines as they are,
+  checks that every session keeps its password, end date and level, and
+  writes one session per line.
+
+### Changed
+
+- **One export per distinct level.** Each cut is kept as
+  `releases/<release>-s<last slide>`, hard-linked to the whole release, and a
+  cut already on the server is not exported again.
+- **The login service's interface is now number 3.** It reads
+  `sites/<site>/levels` (one line per label: `current`, `closed`,
+  `releases/<name>`, or a schedule) and answers the folder in `X-Stx-View`;
+  nginx serves it, or the "not open yet" page.
+  - Without a `levels` file, everyone sees `current`.
+  - A label missing from the file is closed.
+  - The `limited` link and the `full` file of 0.7.66 are gone; `full = [...]`
+    stays in the password file and means `limite = "all"`.
+- **`rollback` after a limit** brings back the previous levels file, and says
+  that `.stx-passwords.toml` still holds the new levels.
+- **`status`** checks every level in force as a visitor and lists the
+  levels.
+
+### Migration
+
+- **Server configuration.** Run `stx release server-config`: it sends the new
+  nginx configuration and the "not open yet" page (`closed.html`).
+- **Coming from the prototype:**
+  1. `stx release import`;
+  2. `convert-passwords`;
+  3. `stx release passwd`, which writes every `levels` file and exports the
+     missing cuts — the cuts the prototype already made, under the same names,
+     are kept;
+  4. **then** `server-config`.
+
+  Before `passwd`, a site without a `levels` file would show `current` to
+  everyone.
+
 ## [0.7.66] — 2026-10-26 — one admin password, one login, full or limited
 
 ### Added

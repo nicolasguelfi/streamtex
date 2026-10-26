@@ -10,6 +10,7 @@ import subprocess
 import click
 
 from ..release import ReleaseError, build, coolify, ops
+from ..release import levels as lv
 from ..release import passwords as pw
 from ..release.config import load_config, run_checks
 from ..release.state import STATE_FILE, import_prototype, load_state, save_state, sites_of
@@ -81,11 +82,11 @@ def publish_cmd(sites, groups, target, allow_skew, html_env):
     run_checks(cfg, chosen)
     data = _passwords(cfg)
     faces = {s.site: pw.for_site(data, s) for s in chosen}     # every password checked before any copy
-    full = {s.site: pw.full_labels(data, s) for s in chosen}
+    levels = {s.site: pw.levels_for(data, s) for s in chosen}
     pool = pw.RecordPool(ops.server_records(t))                # one record per password, on every site
     for s in chosen:
         ops.publish_site(t, cfg, state, s, release_name, faces[s.site], click.echo, env, skew,
-                         full[s.site], pool)
+                         levels[s.site], pool)
 
 
 @release.command("status")
@@ -113,42 +114,57 @@ def status_cmd(target):
 @release.command("limit")
 @click.argument("site")
 @click.argument("slide")
+@click.option("--label", "labels", default=None, metavar="L[,L…]",
+              help="The session(s) whose level changes: written on their line of .stx-passwords.toml.")
 @_target
 @click.option("--allow-skew", is_flag=True,
               help="Export although the exporting streamtex is not the live image's.")
 @click.option("--html-env", "html_env", multiple=True, metavar="KEY=VALUE",
               help="An environment variable for the HTML export.")
-def limit_cmd(site, slide, target, allow_skew, html_env):
-    """What participants see on SITE's HTML face: slides 1 to SLIDE, or `all`.
+def limit_cmd(site, slide, labels, target, allow_skew, html_env):
+    """What participants see on SITE's HTML face: slides 1 to SLIDE, `all`, or `none`.
 
     \b
-    The number is the slide counter's (n / N), as projected; the block that holds
-    that slide is kept whole, and later blocks are not exported at all. Only the
-    HTML face is exported again, from the release already published, and switched:
-    no password is rewritten and the live face does not restart, so participants
-    stay logged in. The limit is kept: every later `publish SITE` applies it, and
-    `rollback SITE` undoes it alone. The [admin] passwords and the labels listed in
-    `full` (.stx-passwords.toml) keep seeing all the slides.
+    With --label, the level of those sessions: `limite` is written on their line of
+    .stx-passwords.toml (in the site's own section, nothing else changes; `none`
+    removes it: "not open yet"), then applied. Without --label, the level of every
+    label that has none of its own. The number is the slide counter's (n / N), as
+    projected; the block that holds that slide is kept whole. Only the HTML face
+    changes, from the release already published: no password is rewritten, the
+    live face does not restart, participants stay logged in and see their new level
+    on their next page. `rollback SITE` undoes it. [admin] always sees everything.
 
     \b
     Examples:
-        stx release limit gai4as-slides 120
-        stx release limit gai4as-slides all
+        stx release limit gai4as-slides 120 --label GAI4AS261027
+        stx release limit gai4as-slides all --label GAI4AS261027,GAI4AS261103
+        stx release limit gai4as-slides none --label GAI4AS261110
+        stx release limit gai4as-slides 120          # the labels without their own level
     """
-    if slide == "all":
-        up_to = None
+    if slide in ("all", "none"):
+        value = None if slide == "none" else "all"
     elif slide.isdigit() and int(slide) >= 1:
-        up_to = int(slide)
+        value = int(slide)
     else:
-        raise ReleaseError(f"{slide!r}: a slide number (1 or more) or `all`")
+        raise ReleaseError(f"{slide!r}: a slide number (1 or more), `all` or `none`")
     cfg, state, t = _ctx(target)
     s = cfg.site(site)
+    if "html" not in s.faces:
+        raise ReleaseError(f"{s.site} has no HTML face: a slide limit applies to the HTML face")
     _skew(cfg, t, allow_skew)
-    entries, full = None, frozenset()
-    if "html" in s.faces:
-        data = _passwords(cfg)
-        entries, full = pw.for_site(data, s)["html"], pw.full_labels(data, s)
-    ops.limit_site(t, cfg, state, s, up_to, entries, click.echo, _html_env(html_env), full)
+    if labels:
+        names = [x.strip() for x in labels.split(",") if x.strip()]
+        for line in pw.write_limit(cfg.root / pw.PASSWORDS_FILE, s, names, value):
+            click.echo(f"  {pw.PASSWORDS_FILE}: {line}")
+    elif value is None:
+        raise ReleaseError("`none` closes sessions one by one: give them with --label")
+    data = _passwords(cfg)
+    entries, levels = pw.for_site(data, s)["html"], pw.levels_for(data, s)
+    if labels:
+        ops.limit_site(t, cfg, state, s, entries, levels, click.echo, _html_env(html_env))
+    else:
+        ops.limit_site(t, cfg, state, s, entries, levels, click.echo, _html_env(html_env),
+                       slide=None if value == "all" else value, default=True)
 
 
 @release.command("rollback")
@@ -166,8 +182,9 @@ def rollback_cmd(site, target):
 def passwd_cmd(sites, target):
     """Write the password records of SITES (default: every published site) without publishing again.
 
-    HTML face: effective at once; live face: the site's process restarts. A changed password closes the
-    open sessions of its label only; an unchanged one keeps its sessions."""
+    HTML face: effective at once, with each session's level as written in the file; live face: the
+    site's process restarts. A changed password closes the open sessions of its label only; an unchanged
+    one keeps its sessions."""
     cfg, state, t = _ctx(target)
     data = _passwords(cfg)
     published = sites_of(state, t.name)
@@ -178,7 +195,10 @@ def passwd_cmd(sites, target):
     pool = pw.RecordPool(ops.server_records(t))
     for name in names:
         site = cfg.site(name)
-        ops.apply_passwords(t, cfg, state, site, pw.for_site(data, site), pw.full_labels(data, site), pool)
+        faces = pw.for_site(data, site)
+        ops.apply_passwords(t, cfg, state, site, faces, pool)
+        if "html" in site.faces:                  # the levels written in the file too (#148)
+            ops.limit_site(t, cfg, state, site, faces["html"], pw.levels_for(data, site), click.echo)
     ops.write_maps(t, state)
     t.dexec("static", "nginx -s reload")
     t.dexec("live", "nginx -s reload")
@@ -199,7 +219,7 @@ def auth_status_cmd(sites):
     data = _passwords(cfg)
     for site in (cfg.select(sites) if sites else cfg.sites):
         faces = pw.for_site(data, site)
-        full = pw.full_labels(data, site)
+        levels = pw.levels_for(data, site)
         parts = []
         for face, entries in faces.items():
             if entries is None:
@@ -207,7 +227,9 @@ def auth_status_cmd(sites):
             else:
                 parts.append(f"{face}: " + ", ".join(
                     e.label + (f" (until {e.valid_until})" if e.valid_until else "")
-                    + (" [all slides]" if face == "html" and e.label in full else "") for e in entries))
+                    + (f" [{lv.describe(levels.get(e.label), None)}]" if face == "html" and levels.get(e.label)
+                       not in (None, pw.DEFAULT) else " [not open yet]" if face == "html" and e.label in levels
+                       and levels[e.label] is None else "") for e in entries))
         click.echo(f"{site.site:<28}" + " · ".join(parts))
 
 

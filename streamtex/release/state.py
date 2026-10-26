@@ -30,7 +30,9 @@ STATE_FILE = ".stx-release.json"
 #: What a site entry keeps (the prototype's training/kind are replaced by the site list of stx.toml).
 SITE_KEYS = ("port", "release", "previous", "date", "asleep", "html_open", "skew",
              # the HTML face's own release under a slide limit (#146, as the prototype's bascule2/n1)
-             "html_release", "html_previous", "up_to_slide", "up_to_slide_previous", "last", "html_date")
+             "html_release", "html_previous", "up_to_slide", "up_to_slide_previous", "last", "html_date",
+             # each slide number's cut of the release, now and before (#148)
+             "cuts", "cuts_previous")
 
 
 def state_path(root: Path) -> Path:

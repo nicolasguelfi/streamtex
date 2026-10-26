@@ -8,6 +8,7 @@ COPY nginx.conf /etc/nginx/nginx.conf
 COPY stx-http.conf /opt/stx/stx-http.conf
 COPY stx_auth.py /opt/stx/stx_auth.py
 COPY stx_auth_lib.py /opt/stx/stx_auth_lib.py
+COPY closed.html /opt/stx/closed.html
 COPY 20-stx-auth.sh /docker-entrypoint.d/20-stx-auth.sh
 # The volume may be empty on first start: nginx must start anyway.
 COPY 10-stx-init.sh /docker-entrypoint.d/10-stx-init.sh

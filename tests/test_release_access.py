@@ -117,9 +117,6 @@ def test_a_record_already_on_the_server_is_kept(cfg):
     assert after.entry("PROMO-B") != before.entry("PROMO-B")         # only this label's sessions end
 
 
-def test_the_view_passwords(cfg):
-    entries = pw.for_site(_data(), cfg.site("deck-a"))["html"]
-    full = pw.full_labels(_data(), cfg.site("deck-a"))
-    assert pw.view_password(entries, full, "full") == "pa"
-    assert pw.view_password(entries, full, "limited") == "pb"
-    assert pw.full_text(entries, full) == "PROMO-A\nADMIN\n"
+def test_the_levels_of_admin_and_full(cfg):
+    levels = pw.levels_for(_data(), cfg.site("deck-a"))
+    assert levels == {"PROMO-A": "all", "PROMO-B": pw.DEFAULT, "ADMIN": "all"}

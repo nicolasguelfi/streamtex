@@ -14,6 +14,13 @@
     live = "ADMIN:…"
     html = "ADMIN:…"
 
+    [GAI.sites.gai-slides]             # one line per session, each with its level (#148)
+    html = [
+      { seance = "S1027", mot = "…", limite = 120, fin = "2026-12-31" },
+      { seance = "S1103", mot = "…" },                   # no limit: "not open yet"
+      { seance = "S1110", mot = "…", limite = [["2026-11-10T09:00", 50], ["2026-11-10T14:00", "all"]] },
+    ]
+
 A face's value uses the library's grammar (``deploy_auth_cmd.parse_password_spec``): one password, a
 labelled list as a string, a table, or a list of pairs, each with an optional end date. A later level
 overrides an earlier one, face by face. ``open`` is explicit: an empty string is refused, and a face
@@ -24,6 +31,12 @@ with no password at any level is an error, never an open site.
 any level but ``[admin]`` is the administrator's alone. The labels of ``[admin]`` always see the whole
 content; ``full = ["PROMO-A"]``, at any level, adds labels that see it too on a site with a slide limit.
 No rule is set on what a password contains: only what the login screen could never match is refused.
+
+A face written one line per session (#148, the all-trainings form; English keys ``label``, ``password``,
+``limit``, ``until`` too) gives each session its level on the HTML face: ``limite = N`` (slides 1 to N),
+``"all"``, a schedule ``[["2026-11-10T09:00", 50], ["2026-11-10T14:00", "all"]]`` (local time of this
+machine; ``"none"`` closes), or no ``limite``: the session sees "not open yet". The other forms give
+every label the site's level (``stx release limit SITE N``, else all the slides).
 
 One record per (label, password) and per run (``RecordPool``): the same password gets the same record
 on every site and face, so one login opens every site that holds it; a record already on the server is
@@ -36,6 +49,7 @@ every site gets exactly the same passwords, labels and end dates as before (rel2
 
 from __future__ import annotations
 
+import datetime as dt
 import re
 import tomllib
 from pathlib import Path
@@ -51,6 +65,10 @@ PASSWORDS_FILE = ".stx-passwords.toml"
 OPEN = None          # a face resolved to "open"
 _LEVEL_KEYS = {"live", "html", "open", "full"}
 ADMIN = "admin"
+#: The keys of a session line (#148): all-trainings' and their English aliases.
+LINE_KEYS = {"seance": "label", "mot": "password", "limite": "limit", "fin": "until",
+             "label": "label", "password": "password", "limit": "limit", "until": "until"}
+DEFAULT = "default"        # a label's level: the site's (state up_to_slide), else all the slides
 
 
 def load_file(path: Path) -> dict:
@@ -101,6 +119,64 @@ def resolve_raw(data: dict, site: Site) -> dict:
     return out
 
 
+def _limit(value, where: str):
+    """A session's level: None (closed), "all", N, or a schedule ((epoch seconds, level), …)."""
+    if value is None or value == "none":
+        return None
+    if value == "all":
+        return "all"
+    if isinstance(value, int) and not isinstance(value, bool) and value >= 1:
+        return value
+    if isinstance(value, list) and value:
+        steps = []
+        for step in value:
+            if not (isinstance(step, list) and len(step) == 2):
+                raise ReleaseError(f"{where}: a schedule is [[\"YYYY-MM-DDTHH:MM\", N | \"all\" | \"none\"], …]")
+            when, level = step
+            try:
+                moment = when if isinstance(when, dt.datetime) else dt.datetime.fromisoformat(str(when))
+            except ValueError:
+                raise ReleaseError(f"{where}: {when!r} is not a time (YYYY-MM-DDTHH:MM)") from None
+            inner = _limit(level, where)
+            if isinstance(inner, tuple):
+                raise ReleaseError(f"{where}: a schedule step is N, \"all\" or \"none\"")
+            steps.append((int(moment.astimezone().timestamp()), inner))
+        return tuple(sorted(steps))
+    raise ReleaseError(f"{where}: limite is a slide number (1 or more), \"all\", \"none\" or a schedule")
+
+
+def _lines(value, where: str) -> tuple[list, dict] | None:
+    """A face written one line per session: (its pairs for parse_password_spec, {label: level})."""
+    if not (isinstance(value, list) and value and all(isinstance(c, dict) for c in value)):
+        return None
+    pairs, levels = [], {}
+    for c in value:
+        line: dict = {}
+        for key, v in c.items():
+            if key not in LINE_KEYS:
+                raise ReleaseError(f"{where}: unknown key '{key}' — seance, mot, limite, fin "
+                                   "(or label, password, limit, until)")
+            if LINE_KEYS[key] in line:
+                raise ReleaseError(f"{where}: '{key}' and its alias are both given")
+            line[LINE_KEYS[key]] = v
+        label, word = line.get("label"), line.get("password")
+        if not isinstance(label, str) or not isinstance(word, str):
+            raise ReleaseError(f"{where}: each line needs seance = \"LABEL\" and mot = \"…\"")
+        pairs.append([label, word] + ([str(line["until"])] if line.get("until") else []))
+        levels[label] = _limit(line.get("limit"), f"{where}.{label}")
+    return pairs, levels
+
+
+def _own(raw, where: str) -> tuple[list[PlainEntry], dict]:
+    """The entries of a face's own value and the level of each label."""
+    lines = _lines(raw, where)
+    try:
+        entries = parse_password_spec(lines[0] if lines else raw, where)
+    except click.ClickException as e:
+        raise ReleaseError(e.message) from None
+    return entries, (lines[1] if lines else {e.label: DEFAULT for e in entries})
+
+
 def _admin(data: dict) -> dict[str, list[PlainEntry]]:
     """The entries ``[admin]`` adds to each face."""
     level = data.get(ADMIN)
@@ -145,15 +221,31 @@ def for_site(data: dict, site: Site) -> dict[str, list[PlainEntry] | None]:
         if raw.get(face, "") is OPEN:
             result[face] = None
             continue
-        try:
-            own = parse_password_spec(raw[face], f"{site.site}.{face}") if face in raw else []
-            entries = own + admin.get(face, [])
-            if own and admin.get(face):
+        own = _own(raw[face], f"{site.site}.{face}")[0] if face in raw else []
+        entries = own + admin.get(face, [])
+        if own and admin.get(face):
+            try:
                 _check_entries(entries, f"{site.site}.{face} with [admin]")
-        except click.ClickException as e:
-            raise ReleaseError(e.message) from None
+            except click.ClickException as e:
+                raise ReleaseError(e.message) from None
         result[face] = entries
     return result
+
+
+def levels_for(data: dict, site: Site) -> dict:
+    """What each label sees on the HTML face (#148): {label: None | "all" | N | schedule | DEFAULT}.
+
+    ``[admin]`` and the ``full`` labels see all the slides; an open face: ``{"open": DEFAULT}``."""
+    if "html" not in site.faces:
+        return {}
+    raw = resolve_raw(data, site).get("html")
+    if raw is OPEN:
+        return {"open": DEFAULT}
+    levels = _own(raw, f"{site.site}.html")[1] if raw is not None else {}
+    for label in full_labels(data, site):
+        if label in levels or label in {e.label for e in _admin(data).get("html", [])}:
+            levels[label] = "all"
+    return levels
 
 
 class RecordPool:
@@ -184,19 +276,6 @@ class RecordPool:
 def pass_text(entries: list[PlainEntry] | None, pool: RecordPool | None = None) -> str:
     """The record file of a face: ``open``, or one hashed line per password, labels and dates kept."""
     return (pool or RecordPool()).text(entries)
-
-
-def full_text(entries: list[PlainEntry] | None, full: frozenset[str]) -> str:
-    """The labels of the HTML face that see the whole content (``sites/<site>/full``)."""
-    return "".join(f"{e.label}\n" for e in entries or [] if e.label in full)
-
-
-def view_password(entries: list[PlainEntry] | None, full: frozenset[str], view: str) -> str | None:
-    """A password that opens *view* (``full`` / ``limited``), to check what is served; None if none does."""
-    for e in entries or []:
-        if (e.label in full) == (view == "full"):
-            return e.password
-    return None
 
 
 def first_password(entries: list[PlainEntry] | None) -> str:
@@ -241,17 +320,16 @@ def _new_level(level: dict) -> dict:
 
 
 def _normalize(raw: dict, faces: tuple[str, ...], where: str) -> dict:
+    """{face: OPEN | "<missing>" | (sorted (label, password, end date), sorted (label, level))}."""
     out = {}
     for face in faces:
         v = raw.get(face, "<missing>")
         if v is OPEN or v == "<missing>":
             out[face] = v
             continue
-        try:
-            entries = parse_password_spec(v, f"{where}.{face}")
-        except click.ClickException as e:
-            raise ReleaseError(e.message) from None
-        out[face] = sorted((e.label, e.password, e.valid_until) for e in entries)
+        entries, levels = _own(v, f"{where}.{face}")
+        out[face] = (sorted((e.label, e.password, e.valid_until) for e in entries),
+                     sorted((label, repr(level)) for label, level in levels.items()))
     return out
 
 
@@ -304,12 +382,14 @@ def convert(cfg: ReleaseConfig, old_path: Path, new_path: Path) -> list[str]:
                 problems.append(f"{site.site}.{face}: no password in the old file either")
             elif before[face] is not OPEN:
                 try:
-                    _check_entries([PlainEntry(lb, pw, d) for lb, pw, d in before[face]], f"{site.site}.{face}")
+                    _check_entries([PlainEntry(lb, pw, d) for lb, pw, d in before[face][0]], f"{site.site}.{face}")
                 except click.ClickException as e:
                     problems.append(e.message)
         report.append(f"{site.site}: " + ", ".join(
-            f"{face} {'open' if after.get(face) is OPEN else f'{len(after[face])} password(s)'}"
-            for face in site.faces if after.get(face) != "<missing>"))
+            f"{face} {'open' if after.get(face) is OPEN else f'{len(after[face][0])} password(s)'}"
+            for face in site.faces if after.get(face) != "<missing>")
+            + ("" if not isinstance(after.get("html"), tuple) else
+               " — levels: " + ", ".join(f"{lb} {lvl}" for lb, lvl in after["html"][1] if lvl != repr(DEFAULT))))
     if problems:
         raise ReleaseError("conversion refused, nothing written:\n  " + "\n  ".join(problems))
     new_path.write_text(dumps(new), encoding="utf-8")
@@ -335,8 +415,12 @@ def _str(s: str) -> str:
 def _value(v) -> str:
     if isinstance(v, bool):
         return "true" if v else "false"
+    if isinstance(v, int):
+        return str(v)
     if isinstance(v, str):
         return _str(v)
+    if isinstance(v, list) and v and all(isinstance(x, dict) for x in v):
+        return "[\n" + "".join(f"  {_value(x)},\n" for x in v) + "]"        # one session per line (#148)
     if isinstance(v, list):
         return "[" + ", ".join(_value(x) for x in v) + "]"
     if isinstance(v, dict):
@@ -361,3 +445,65 @@ def dumps(data: dict) -> str:
     for name, t in data.items():
         table(_key(name), t)
     return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# `stx release limit SITE N --label L`: the session's line, its `limite` alone (#148)
+# ---------------------------------------------------------------------------
+
+_LIMIT_VALUE = r'(?:\d+|"[^"]*"|\[\[.*?\]\])'
+
+
+def _section_span(text: str, site: Site) -> tuple[int, int] | None:
+    """Where the site's own section ``[group.sites.site]`` starts and ends in *text*."""
+    name = r'\s*\.\s*'.join(rf'(?:"{re.escape(p)}"|{re.escape(p)})' for p in (site.group, "sites", site.site))
+    m = re.search(rf"^\[\s*{name}\s*\]\s*$", text, flags=re.M)
+    if not m:
+        return None
+    nxt = re.search(r"^\s*\[", text[m.end():], flags=re.M)
+    return m.end(), m.end() + nxt.start() if nxt else len(text)
+
+
+def write_limit(path: Path, site: Site, labels: list[str], value) -> list[str]:
+    """Set ``limite`` (N, "all", or None: removed, "not open yet") on the line of each label in the site's
+    own section of *path*, touching nothing else; returns what changed (labels and levels, never a
+    password). The file is checked again before it is written."""
+    text = path.read_text(encoding="utf-8")
+    span = _section_span(text, site)
+    where = f"[{site.group}.sites.{site.site}]"
+    if span is None:
+        raise ReleaseError(f"{site.site}: no section {where} in {path.name} — the levels are per document: "
+                           f"put the site's html lines there, one per session")
+    start, end = span
+    section = text[start:end]
+    changes = []
+    for label in labels:
+        line = re.search(rf'\{{[^{{}}\n]*\b(seance|label)\s*=\s*"{re.escape(label)}"[^{{}}\n]*\}}', section)
+        if not line:
+            raise ReleaseError(f"{site.site}: no line for session {label} in {where} — add "
+                               f'{{ seance = "{label}", mot = "…", limite = N }} to its html list')
+        table = line.group(0)
+        key = "limite" if line.group(1) == "seance" else "limit"
+        old = re.search(rf"\b(limite|limit)\s*=\s*({_LIMIT_VALUE})", table)
+        if value is None:
+            new_table = re.sub(rf",\s*\b(limite|limit)\s*=\s*{_LIMIT_VALUE}|\b(limite|limit)\s*=\s*"
+                               rf"{_LIMIT_VALUE}\s*,?\s*", "", table, count=1)
+        else:
+            literal = str(value) if isinstance(value, int) else f'"{value}"'
+            new_table = (table[:old.start(2)] + literal + table[old.end(2):] if old
+                         else re.sub(r"\s*\}$", f", {key} = {literal} }}", table))
+        section = section[:line.start()] + new_table + section[line.end():]
+        changes.append(f"{label}: {old.group(2) if old else 'not open yet'} → "
+                       f"{value if value is not None else 'not open yet'}")
+    new_text = text[:start] + section + text[end:]
+    try:
+        data = tomllib.loads(new_text)
+    except tomllib.TOMLDecodeError as e:
+        raise ReleaseError(f"{path.name}: the change would break the file ({e}) — nothing written") from None
+    got = levels_for(data, site)
+    for label in labels:
+        if got.get(label) != value:
+            raise ReleaseError(f"{site.site}: {label} would be {got.get(label)!r}, not {value!r} — nothing "
+                               "written (is its line given at another level too?)")
+    path.write_text(new_text, encoding="utf-8")
+    return changes

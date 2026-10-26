@@ -302,3 +302,18 @@ def test_the_state_import_keeps_the_limit(tmp_path):
     src.write_text(json.dumps({"sites": {"prod": {"deck": {"release": "r1", "up_to_slide": 30}}}}))
     new = import_prototype(tmp_path, src, {"deck"})
     assert new["sites"]["prod"]["deck"] == {"release": "r1", "up_to_slide": 30}
+
+
+def test_a_rollback_to_a_release_no_longer_on_the_target_is_refused(cfg):
+    """After `import`, the prototype may have pruned the previous HTML export: switching to it would break
+    the site."""
+    class Pruned(FakeTarget):
+        def sh(self, cmd, check=True):
+            self.cmds.append(cmd)
+            gone = cmd.startswith("test -d") and "static/sites/deck/releases/r1" in cmd
+            return subprocess.CompletedProcess(cmd, 1 if gone else 0, "", "")
+
+    t, state = Pruned(), _state(last="publish")
+    with pytest.raises(ReleaseError, match=r"previous release r1 is no longer on prod \(static/r1\) — nothing changed"):
+        ops.rollback(t, cfg, state, cfg.site("deck"))
+    assert t.links == {} and state["sites"]["prod"]["deck"]["release"] == "r2"

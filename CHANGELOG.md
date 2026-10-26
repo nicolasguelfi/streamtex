@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.68] — 2026-10-26 — a rollback that cannot break a site
+
+### Fixed
+
+- **`stx release rollback` refuses a previous release that is no longer on
+  the target.** It checks each face, and the HTML cuts of the previous
+  levels, before switching; if one is missing, it says which and changes
+  nothing. After `stx release import`, the prototype's pruning may already
+  have removed the previous HTML export (seen by all-trainings on
+  2026-10-26): switching to it would have broken the site.
+
 ## [0.7.67] — 2026-10-26 — a level per session
 
 ### Added

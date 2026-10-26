@@ -379,6 +379,14 @@ def limit_site(t: Target, cfg: ReleaseConfig, state: dict, site: Site, entries: 
         echo(f"  ⌫ {len(removed)} old release(s) removed: {', '.join(removed)}")
 
 
+def _missing_on_target(t: Target, site: Site, release: str, cuts) -> list[str]:
+    """The folders of *release* (each face, and its HTML cuts) that are not on the target."""
+    wanted = [(face, release) for face in _faces_dirs(site)] + [("static", c) for c in cuts]
+    return [f"{face}/{name}" for face, name in wanted
+            if t.sh(f"test -d {shlex.quote(t.path(face, 'sites', site.site, 'releases', name))}",
+                    check=False).returncode]
+
+
 def rollback(t: Target, cfg: ReleaseConfig, state: dict, site: Site) -> str:
     """Undo the last change: the levels (the HTML face alone), else a publication (both faces)."""
     v = sites_of(state, t.name).get(site.site)
@@ -394,6 +402,10 @@ def rollback(t: Target, cfg: ReleaseConfig, state: dict, site: Site) -> str:
                 f"`stx release passwd {site.site}` applies the file again")
     if not v.get("previous"):
         raise ReleaseError(f"{site.site}: no previous release")
+    missing = _missing_on_target(t, site, v["previous"], (v.get("cuts_previous") or {}).values())
+    if missing:
+        raise ReleaseError(f"{site.site}: the previous release {v['previous']} is no longer on {t.name} "
+                           f"({', '.join(missing)}) — nothing changed; publish the version you want instead")
     v["release"], v["previous"] = v["previous"], v["release"]
     v["cuts"], v["cuts_previous"] = v.get("cuts_previous"), v.get("cuts")
     v["up_to_slide"], v["up_to_slide_previous"] = v.get("up_to_slide_previous"), v.get("up_to_slide")

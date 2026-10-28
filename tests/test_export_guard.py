@@ -19,7 +19,7 @@ EXPECTED_ST_HTML_COUNTS = {
     "grid.py": 1,           # 1 fused CSS+marker call inside the container
     "list.py": 2,           # 1 fused per-item bullet+marker + 1 list-root marker
     "zoom.py": 2,           # 1 CSS injection (inject_zoom_logic) + 1 marker (st_zoom)
-    "presentation.py": 1,  # CSS injection (presentation mode)
+    "presentation.py": 2,  # CSS injection (presentation mode), a page of several slides scrolls (#153)
     "link_preview.py": 2,   # CSS + JS scaffold
     "bib_preview.py": 2,    # 1 base CSS scaffold + 1 config-driven style override (JS via components.html)
     "book.py": 4,           # 1 load_css + 1 populate_toc (no-search branch) + 1 populate_markers + 1 block horizontal CSS

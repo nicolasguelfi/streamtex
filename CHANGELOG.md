@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **Presentation mode: the slides of a page holding several slides were
+  out of the window** (#153): with `enforce_ratio` (the default) the page
+  was clipped at the screen's height and centred, so its first slide sat
+  above the screen and the next below it (measured: titles at -205 px and
+  796 px in an 800 px window; already so in 0.7.65). Such a page now grows
+  and scrolls as without presentation mode, and the navigation shows each
+  slide (titles at 429 px and 458 px). A page of one slide keeps the
+  clipping.
+
 ## [0.7.74] — 2026-10-28 — stx release safety points (board ordre1, wave 1)
 
 ### Added

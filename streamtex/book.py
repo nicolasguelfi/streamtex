@@ -58,7 +58,7 @@ from .marker import (
 )
 from .marker_runtime import inject_marker_runtime
 from .pdf_export import PdfConfig
-from .presentation import get_presentation_config, st_presentation_footer
+from .presentation import get_presentation_config, presentation_page_scrolls, st_presentation_footer
 from .presentation_profile import (
     _ACTIVE_PROFILE_KEY,
     PresentationProfile,
@@ -2308,6 +2308,11 @@ def _render_page(module, page: dict, pages: list[dict], block_args, block_kwargs
     st_include(module, *block_args, _inspector_config=inspector, **block_kwargs)
 
 
+def _stops_on_page(markers: list[dict], page: int) -> int:
+    """How many slides (navigation stops) *page* holds."""
+    return sum(1 for m in markers if is_stop(m) and m.get("page_idx", 0) == page)
+
+
 def _footer_first_slide(markers: list[dict], page: int, initial_marker: int | None) -> int:
     """The slide number the footer shows on its first paint (#117).
 
@@ -3652,6 +3657,8 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
 
     # --- Presentation footer (auto-rendered when PresentationConfig is active) ---
     _pres_cfg = get_presentation_config()
+    if _pres_cfg is not None and _stops_on_page(cache.get("markers", []), current_page) > 1:
+        presentation_page_scrolls(_pres_cfg)         # several slides on this page (#153)
     if _pres_cfg is not None and _pres_cfg.footer:
         _n = stop_count() if _pres_cfg.counter_mode == "slide" else 0
         if _n:

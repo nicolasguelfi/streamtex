@@ -47,7 +47,9 @@ class PresentationConfig:
     """CSS aspect-ratio value ("16/9", "4/3", "16/10")."""
 
     enforce_ratio: bool = True
-    """When True, apply aspect-ratio + overflow:hidden to the slide container."""
+    """When True, the page is clipped at the screen's height (overflow hidden).
+    A page holding several slides is not clipped: it scrolls, so the
+    navigation reaches each of its slides (#153)."""
 
     # Footer
     footer: bool = True
@@ -285,6 +287,22 @@ def _inject_presentation_css(config: PresentationConfig) -> None:
     if css_parts:
         css = "<style>\n" + "\n".join(css_parts) + "\n</style>"
         st.html(css)
+
+
+def presentation_page_scrolls(config: PresentationConfig) -> None:
+    """Let the current page scroll when it holds several slides (#153).
+
+    With ``enforce_ratio`` the page is clipped at the screen's height and,
+    with ``center_content``, centred in it: a page of two slides (two
+    screens high) had its first slide above the screen and the second below
+    it, out of the navigation's reach. Such a page now grows and scrolls as
+    without presentation mode, so the navigation reaches each slide. A page
+    of one slide keeps the clipping.
+    """
+    if not config.enforce_ratio:
+        return
+    st.html("<style>.stMain .block-container { max-height: none !important; overflow: visible !important; "
+            "justify-content: flex-start !important; flex: 0 0 auto !important; }</style>")
 
 
 # ---------------------------------------------------------------------------

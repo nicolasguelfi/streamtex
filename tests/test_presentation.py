@@ -662,3 +662,30 @@ class TestPageTextAlign:
     def test_unknown_value_raises_value_error(self):
         with pytest.raises(ValueError, match="unknown value"):
             PresentationConfig(text_align="middle")
+
+
+# ── A page of several slides scrolls (#153) ───────────────────────────────
+
+
+class TestPageOfSeveralSlides:
+    """With enforce_ratio, a page clipped at 100vh and centred put its first slide above the screen."""
+
+    @patch("streamtex.presentation.st")
+    def test_the_page_is_released(self, mock_st):
+        from streamtex.presentation import presentation_page_scrolls
+        presentation_page_scrolls(PresentationConfig())
+        css = mock_st.html.call_args[0][0]
+        assert "max-height: none" in css and "overflow: visible" in css and "flex-start" in css
+
+    @patch("streamtex.presentation.st")
+    def test_nothing_without_enforce_ratio(self, mock_st):
+        from streamtex.presentation import presentation_page_scrolls
+        presentation_page_scrolls(PresentationConfig(enforce_ratio=False))   # the page already grows
+        mock_st.html.assert_not_called()
+
+    def test_stops_are_counted_per_page(self):
+        from streamtex.book import _stops_on_page
+        markers = [{"page_idx": 0}, {"page_idx": 0, "stop": True}, {"page_idx": 0, "stop": False},
+                   {"page_idx": 1}]
+        assert _stops_on_page(markers, 0) == 2 and _stops_on_page(markers, 1) == 1
+        assert _stops_on_page(markers, 2) == 0

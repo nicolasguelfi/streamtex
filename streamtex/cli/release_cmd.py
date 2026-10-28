@@ -296,7 +296,8 @@ def media_report_cmd(site, show, html_env):
     """What SITE's live face would serve with `[release] media_per_site = true` (#142), on this machine.
 
     Exports SITE's HTML from the commit, as publish does, then sorts its static folder: the files the
-    export shows and those media_keep names are kept, the others would no longer be served. Nothing is
+    export shows or links to under app/static/ and those media_keep names are kept, the others would no
+    longer be served. Nothing is
     sent: the server is not read nor changed."""
     import tempfile
     from pathlib import Path
@@ -316,9 +317,10 @@ def media_report_cmd(site, show, html_env):
         raise ReleaseError(f"{site}: {s.doc_dir}/static is not a folder — the live face serves no media")
     kept, dropped = sorted(mp.kept), mp.dropped
     by_export = sum(1 for why in mp.kept.values() if why == "export")
+    by_link = sum(1 for why in mp.kept.values() if why == "export link")
     click.echo(f"{site} — static folder {mp.static} ({len(mp.files)} files, {md.human(mp.size(mp.files))})")
     click.echo(f"  kept: {len(kept)} file(s), {md.human(mp.size(kept))} — {by_export} shown by the HTML "
-               f"export, {len(kept) - by_export} named by media_keep")
+               f"export, {by_link} linked by it, {len(kept) - by_export - by_link} named by media_keep")
     click.echo(f"  no longer served: {len(dropped)} file(s), {md.human(mp.size(dropped))}")
     if mp.unmatched:
         click.echo(f"  {mp.unmatched} export file(s) match no static file (inlined or generated: nothing to keep)")

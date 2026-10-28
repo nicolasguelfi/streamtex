@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **Media per site forgot the files offered by a link** (#142, reported
+  by all-trainings): a download link of the HTML export
+  (`href='https://<site>…/app/static/downloads/x.zip' download`) stays a
+  link, its file is not copied into `data/`, so `media_per_site` would
+  have dropped it (gai4as-practice: 1076 such files, every download of its
+  project sheets). Every file the export links to under `app/static/`
+  (link, image, video, CSS `url()`; full address or not; any site) is now
+  kept, and `stx release media-report` counts them apart ("linked by it").
+
 ## [0.7.76] — 2026-10-28 — media per site on the live face (board media1, wave 2: #142)
 
 ### Added

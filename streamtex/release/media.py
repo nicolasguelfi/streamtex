@@ -7,6 +7,9 @@ document. With ``[release] media_per_site = true``, each release of the code hol
 
 * the files its HTML export shows: each file of the export's ``data/`` folders, found again in the
   static folder by its content (size, then SHA-256) — the export copies a served file unchanged;
+* the files its HTML export links to under ``app/static/`` — a download offered by a link, at the
+  site's address or another's (``href='https://<site>…/app/static/downloads/x.zip'``): the export
+  leaves such a link as it is, and the live face must serve its file;
 * the files ``media_keep`` names (``[release]`` and the site's table): glob patterns relative to the
   static folder, as in ``/app/static/<path>``; ``*`` also crosses ``/``.
 
@@ -24,6 +27,7 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from fnmatch import fnmatchcase
 from pathlib import Path
+from urllib.parse import unquote
 
 from .config import ReleaseConfig, Site
 
@@ -31,6 +35,8 @@ SERVED = ".stx-served"
 
 #: A path under the static folder named in a site's own files: ``static/…`` or ``app/static/…``.
 _NAMED_RE = re.compile(r"""(?:app/)?static/([\w.~/-]+)""")
+#: A link of the export to a served file, absolute or not: the path after ``app/static/``.
+_LINKED_RE = re.compile(r"""app/static/([^"'\s()<>?#\\]+)""")
 _TEXT = {".py", ".md", ".html", ".css", ".js", ".toml", ".json", ".txt", ".yaml", ".yml"}
 
 
@@ -40,7 +46,8 @@ class MediaPlan:
 
     static: Path | None                       # the site's static folder, resolved (None: it has none)
     files: dict[str, int] = field(default_factory=dict)       # every file of it → its size
-    kept: dict[str, str] = field(default_factory=dict)        # served → why: "export" or the pattern
+    kept: dict[str, str] = field(default_factory=dict)        # served → why: "export", "export link",
+                                                              # or the media_keep pattern
     unmatched: int = 0                        # export files found in no static file (inlined, generated)
     named: list[str] = field(default_factory=list)            # named in the site's files, not kept
 
@@ -117,6 +124,12 @@ def _plan(cfg: ReleaseConfig, site: Site, code: Path, html: Path) -> MediaPlan:
                     mp.kept.setdefault(rel, "export")
                     found = True
         mp.unmatched += not found
+    for f in sorted(html.rglob("*")):
+        if f.is_file() and f.suffix in (".html", ".css", ".js"):
+            for m in _LINKED_RE.findall(f.read_text(encoding="utf-8", errors="replace")):
+                rel = unquote(m.replace("&amp;", "&")).rstrip("/")
+                if rel in mp.files:
+                    mp.kept.setdefault(rel, "export link")
     for pat in keep_patterns(cfg, site):
         for rel in mp.files:
             if fnmatchcase(rel, pat):

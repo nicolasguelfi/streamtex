@@ -98,6 +98,22 @@ def test_plan_keeps_the_export_media_and_the_patterns(tmp_path, monkeypatch):
     assert not (code / "assets").exists()              # the media link is taken away again
 
 
+def test_plan_keeps_the_files_the_export_links_to(tmp_path, monkeypatch):
+    """A download offered by a link stays a link in the export (all-trainings, gai4as-practice: 539
+    links per language to the site's own /app/static/): its file is kept."""
+    cfg = _project(tmp_path, monkeypatch)
+    (tmp_path / "assets" / "downloads" / "deck" / "my file.zip").write_bytes(b"Z")
+    code = _snapshot(tmp_path, book="")
+    page = ("<a href='https://deck.example.org/app/static/downloads/deck/y.pdf' download>y</a>"
+            '<a href="app/static/downloads/deck/my%20file.zip?v=2">z</a>'
+            "<a href='https://other.example.org/app/static/downloads/missing.pdf'>gone</a>")
+    html = _export(tmp_path, {"fr/deck/deck.html": page.encode(),
+                              "fr/deck/data/style.css": b"div{background:url(app/static/media/c.png)}"})
+    mp = md.plan(cfg, cfg.site("deck"), code, html)
+    assert mp.kept == {"downloads/deck/y.pdf": "export link", "downloads/deck/my file.zip": "export link",
+                       "media/c.png": "export link"}
+
+
 def test_plan_of_a_document_without_static(tmp_path, monkeypatch):
     cfg = _project(tmp_path, monkeypatch)
     code = tmp_path / "work" / "code"
@@ -223,7 +239,7 @@ def test_media_report(tmp_path, monkeypatch):
     monkeypatch.setattr(build, "export", lambda c, s, code_, w, r, env: (html, r))
     r = CliRunner().invoke(media_report_cmd, ["deck", "--list", "dropped"])
     assert r.exit_code == 0, r.output
-    assert "kept: 3 file(s)" in r.output and "1 shown by the HTML export, 2 named by media_keep" in r.output
+    assert "kept: 3 file(s)" in r.output and "1 shown by the HTML export, 0 linked by it, 2 named by media_keep" in r.output
     assert "no longer served: 2 file(s)" in r.output
     assert "media/b.mp4" in r.output and "media/c.png" in r.output
     assert "media_per_site = false: nothing changes" in r.output

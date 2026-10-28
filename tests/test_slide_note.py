@@ -300,3 +300,53 @@ class TestPlaces:
         stx.set_slide_notes(SlideNote("FIX", place="screen-top"))
         out = apply_slide_notes("<html><body>x</body></html>")
         assert out.index("FIX") < out.index("</body>") and ".stx-sn-html { display: inline" in out
+
+
+# ---------------------------------------------------------------------------
+# Downloads, the pdf mode, new lines (board note5)
+# ---------------------------------------------------------------------------
+
+from streamtex.slide_note import has_choice  # noqa: E402
+
+
+class TestDownloads:
+    def test_validation_and_default(self):
+        assert SlideNote("x").downloads == "always"
+        with pytest.raises(ValueError, match="downloads="):
+            SlideNote("x", downloads="sometimes")
+
+    def test_pdf_text_falls_back_on_html_then_default(self):
+        assert SlideNote({"html": "H", "pdf": "P"}).text_for("pdf") == "P"
+        assert SlideNote({"html": "H", "default": "D"}).text_for("pdf") == "H"
+        assert SlideNote({"slides": "S", "default": "D"}).text_for("pdf") == "D"
+
+    def test_a_new_line_in_a_text(self, clean):
+        stx.set_slide_notes(SlideNote("ONE\nTWO", place="across"))
+        assert "ONE<br>TWO" in slide_notes_html(foot=True)
+
+    def test_notes_carry_their_number(self, clean):
+        stx.set_slide_notes(SlideNote("A"), SlideNote("B", place="screen-top"))
+        assert 'data-stx-note="0"' in slide_notes_html(foot=True)
+        assert 'data-stx-note="1"' in screen_notes_html()
+
+    def test_published_html_keeps_every_note(self, clean):
+        stx.set_slide_notes(SlideNote("MARK", place="across", downloads="never"))
+        out = apply_slide_notes("<body>x</body>")
+        assert 'data-stx-note="0"] { display: none' not in out
+
+    def test_download_leaves_out_never_and_unticked_choice(self, clean):
+        stx.set_slide_notes(SlideNote("KEEP"), SlideNote("NEVER", downloads="never"),
+                            SlideNote("CHOICE", place="across", downloads="choice"))
+        assert has_choice()
+        kept = apply_slide_notes("<body>x</body>", download=True, chosen=True)
+        assert '[data-stx-note="1"] { display: none' in kept and 'data-stx-note="2"] { display' not in kept
+        assert 'data-stx-note="0"] { display' not in kept
+        dropped = apply_slide_notes("<body>x</body>", download=True, chosen=False)
+        assert '[data-stx-note="2"] { display: none' in dropped
+
+    def test_pdf_shows_the_pdf_texts(self, clean):
+        stx.set_slide_notes(SlideNote({"html": "H", "pdf": "P"}))
+        assert '<span class="stx-sn-pdf">P</span>' in slide_notes_html(foot=True)
+        pdf = apply_slide_notes("<body>x</body>", pdf=True)
+        assert pdf.rfind(".stx-sn-pdf { display: inline") > pdf.rfind(".stx-sn-html { display: inline")
+        assert not has_choice()

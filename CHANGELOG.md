@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.73] — 2026-10-28 — slide notes in downloaded files
+
+### Added
+
+- **`SlideNote(downloads=…)`** (board `note5`): whether a note goes into a
+  file downloaded from the app ("Download as…", HTML and PDF) — `always`
+  (default), `never`, or `choice`: a box "Slide notes (watermark…)" in the
+  panel, ticked by default. The published HTML always carries the note.
+- **A `pdf` mode** for a note's text: the PDF shows it, else the `html`
+  text, else `default`.
+- **A `\n` in a note's text starts a new line**, whatever the place (a
+  watermark on several lines needs no CSS).
+
+### Fixed
+
+- **A downloaded or auto-exported PDF lacked the notes' rules** (0.7.72):
+  it would have shown a note's texts for every mode one after the other.
+  It now carries them and shows the `pdf` texts.
+
 ## [0.7.72] — 2026-10-28 — slide notes the designer places
 
 ### Added

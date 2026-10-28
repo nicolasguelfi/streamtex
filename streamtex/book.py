@@ -325,6 +325,13 @@ def _offer_export_downloads(html: str, base_name: str,
             # ── Content (applies to both formats) ────────────────
             st.markdown("**Content**")
 
+            # Slide notes left to the reader (note5): one box, ticked by default
+            from .slide_note import has_choice
+            want_notes = True
+            if has_choice():
+                want_notes = st.checkbox("Slide notes (watermark…)", value=True,
+                                         key=f"_stx_want_notes_{_pk}")
+
             # Scope (paginated view only)
             export_scope = "Full document"
             if paginated:
@@ -542,7 +549,8 @@ def _offer_export_downloads(html: str, base_name: str,
 
                 html_download = apply_html_print_rule(html_download, rules)   # #107
                 from .slide_note import apply_slide_notes
-                html_download = apply_slide_notes(html_download)             # note3
+                html_download = apply_slide_notes(html_download, download=True,   # note3, note5
+                                                  chosen=want_notes)
                 collector = get_asset_collector()
                 # Served media (configure_image_path) must survive off the
                 # server: materialise them into the collector / as data
@@ -586,7 +594,10 @@ def _offer_export_downloads(html: str, base_name: str,
                         )
                         _toc = st.session_state.get(_STX_CACHE_KEY, {}).get("toc")
                         _report = PdfLoadReport()
-                        results["pdf"] = export_pdf(effective_html, config=cfg, toc=_toc,
+                        from .slide_note import apply_slide_notes
+                        _pdf_html = apply_slide_notes(effective_html, pdf=True, download=True,
+                                                      chosen=want_notes)     # note5
+                        results["pdf"] = export_pdf(_pdf_html, config=cfg, toc=_toc,
                                                     report=_report)
                         if _report.timed_out:  # shown with the download button
                             results["pdf_warning"] = _report.message(cfg.load_timeout_ms)
@@ -660,7 +671,8 @@ def _run_auto_exports(
                 if not pdf_cfg.base_url:
                     pdf_cfg.base_url = _resolve_pdf_base_url()  # issue #44
                 _toc = st.session_state.get(_STX_CACHE_KEY, {}).get("toc")
-                export_pdf(html, output_path=path, config=pdf_cfg, toc=_toc)
+                from .slide_note import apply_slide_notes
+                export_pdf(apply_slide_notes(html, pdf=True), output_path=path, config=pdf_cfg, toc=_toc)
             else:
                 from pathlib import Path as _P
                 collector = get_asset_collector()

@@ -20,9 +20,13 @@ Each note has
     ``bar-title``, ``bar-before-counter``;
 - a **text per display mode**: a text, a leaf ``{"en": …, "fr": …}``, or a dict of modes —
   ``slides`` (the app, paginated), ``document`` (the app, continuous), ``html`` (both HTML forms),
-  ``phone`` (a screen under 600 px), ``default`` — whose values are texts, leaves, or ``None``
-  (no note in that mode); a missing mode takes ``default``;
+  ``phone`` (a screen under 600 px), ``pdf``, ``default`` — whose values are texts, leaves, or
+  ``None`` (no note in that mode); a missing mode takes ``default`` (``pdf``: ``html``, then
+  ``default``). A ``\n`` in a text starts a new line;
 - an **opacity** and a **style**, with defaults by place;
+- **downloads** (board ``note5``): whether the note goes into a file downloaded from the app
+  ("Download as…", HTML and PDF) — ``always`` (default), ``never``, or ``choice`` (a box in the
+  panel, ticked by default). The published HTML always carries it;
 - a **layer**: ``under`` (default) draws the note beneath the content, so that a text of the slide
   placed over it hides it (NG, board ``note3``); ``over`` draws it above. Under the content a
   link stays clickable through a transparent copy of the link above it.
@@ -46,8 +50,9 @@ SLIDE_PLACES = ("below", "above", "left", "right", "across")
 SCREEN_PLACES = ("screen-top", "screen-bottom", "screen-left", "screen-right")
 BAR_PLACES = ("bar-after-title", "bar-title", "bar-before-counter")
 PLACES = SLIDE_PLACES + SCREEN_PLACES + BAR_PLACES
-MODES = ("slides", "document", "html", "phone", "default")
+MODES = ("slides", "document", "html", "phone", "pdf", "default")
 LAYERS = ("under", "over")
+DOWNLOADS = ("always", "never", "choice")
 
 #: The look of ``set_slide_note`` (0.7.70): a small grey line, centred.
 SLIDE_NOTE_STYLE = Style("font-size: 0.75rem; color: #888; text-align: center; line-height: 1.3;",
@@ -85,12 +90,15 @@ class SlideNote:
     opacity: Optional[float] = None
     style: Optional[Style] = None
     layer: str = "under"
+    downloads: str = "always"
 
     def __post_init__(self):
         if self.place not in PLACES:
             raise ValueError(f"SlideNote: place={self.place!r} — one of {', '.join(PLACES)}")
         if self.layer not in LAYERS:
             raise ValueError(f"SlideNote: layer={self.layer!r} — 'under' or 'over'")
+        if self.downloads not in DOWNLOADS:
+            raise ValueError(f"SlideNote: downloads={self.downloads!r} — 'always', 'never' or 'choice'")
         if self.opacity is not None and not 0 <= self.opacity <= 1:
             raise ValueError("SlideNote: opacity goes from 0 (invisible) to 1")
         if not isinstance(self.text, (str, dict)) or not self.text:
@@ -105,6 +113,8 @@ class SlideNote:
         from .i18n import T
         value = self.text
         if _by_mode(value):
+            if mode == "pdf" and "pdf" not in value:
+                mode = "html"                     # the PDF is made from the HTML (note5)
             value = value.get(mode, value.get("default"))
         return None if value is None else T(value)
 
@@ -169,12 +179,13 @@ def _app_mode() -> str:
 def _variants(note: SlideNote) -> str:
     """The note's text for the app, the HTML and a phone: one span each, CSS shows the right one."""
     from .deeplink import marker_href
-    texts = {"app": note.text_for(_app_mode()), "html": note.text_for("html"), "phone": note.text_for("phone")}
+    texts = {"app": note.text_for(_app_mode()), "html": note.text_for("html"),
+             "phone": note.text_for("phone"), "pdf": note.text_for("pdf")}
 
     def one(text):
         if not text:
             return ""
-        t = _html.escape(text)
+        t = _html.escape(text).replace("\n", "<br>")          # a new line (note5)
         if note.link:
             t = (f'<a href="{_html.escape(marker_href(note.link))}" target="_blank" rel="noopener" '
                  f'style="color: inherit; text-decoration: none;">{t}</a>')
@@ -202,6 +213,11 @@ _SCREEN_POS = {
 _FLEX = "display: flex; align-items: center; justify-content: center;"
 
 
+def _tag(note: SlideNote) -> str:
+    """The note's number among the session's notes: a download leaves out a note by it (note5)."""
+    return f' data-stx-note="{get_slide_notes().index(note)}"'
+
+
 def _inner(note: SlideNote) -> str:
     style, opacity = note.look
     kind = _kind(note.place)
@@ -210,7 +226,8 @@ def _inner(note: SlideNote) -> str:
         extra = " writing-mode: vertical-rl;"
     elif kind == "across":
         extra = " transform: rotate(-30deg);"
-    return f'<div class="stx-slide-note" style="{style} opacity: {opacity};{extra}">{_variants(note)}</div>'
+    return (f'<div class="stx-slide-note"{_tag(note)} style="{style} opacity: {opacity};{extra}">'
+            f"{_variants(note)}</div>")
 
 
 def _positioned(note: SlideNote, pos: str, fixed: bool) -> str:
@@ -218,11 +235,12 @@ def _positioned(note: SlideNote, pos: str, fixed: bool) -> str:
     box = "position: fixed;" if fixed else "position: absolute;"
     flex = _FLEX if _kind(note.place) in ("vertical", "across") else ""
     inner = _inner(note)
+    tag = _tag(note)
     if note.layer == "over":
-        return f'<div class="stx-sn-over" style="{box} {pos} {flex}">{inner}</div>'
-    out = f'<div class="stx-sn-under" style="{box} {pos} {flex}">{inner}</div>'
+        return f'<div class="stx-sn-over"{tag} style="{box} {pos} {flex}">{inner}</div>'
+    out = f'<div class="stx-sn-under"{tag} style="{box} {pos} {flex}">{inner}</div>'
     if note.link:
-        out += f'<div class="stx-sn-click" style="{box} {pos} {flex}">{inner}</div>'
+        out += f'<div class="stx-sn-click"{tag} style="{box} {pos} {flex}">{inner}</div>'
     return out
 
 
@@ -268,12 +286,15 @@ _CSS = (".stx-sn-under { z-index: -1; pointer-events: none; }"
         ".stx-sn-over a, .stx-sn-click a { pointer-events: auto; }"
         ".stx-sn-click { z-index: 900; pointer-events: none; }"
         ".stx-sn-click, .stx-sn-click * { color: transparent !important; }"
-        ".stx-sn-html, .stx-sn-phone { display: none; }")
+        ".stx-sn-html, .stx-sn-phone, .stx-sn-pdf { display: none; }")
 _PHONE = ("@media (max-width: 600px) { .stx-sn-app, .stx-sn-html { display: none !important; }"
           " .stx-sn-phone { display: inline !important; } }")
 _APP_CSS = ".stApp { isolation: isolate; }" + _CSS + _PHONE
 _EXPORT_CSS = ("body { isolation: isolate; }" + _CSS
                + ".stx-sn-app { display: none !important; } .stx-sn-html { display: inline !important; }" + _PHONE)
+#: A PDF shows the pdf texts, whatever the page's width (note5).
+_PDF_CSS = (_EXPORT_CSS + ".stx-sn-app, .stx-sn-html, .stx-sn-phone { display: none !important; }"
+            " .stx-sn-pdf { display: inline !important; }")
 
 
 def st_slide_notes_page() -> None:
@@ -293,12 +314,28 @@ def st_slide_notes_page() -> None:
     st.html(f"<style>{css}</style>{screen_notes_html()}")
 
 
-def apply_slide_notes(html: str) -> str:
-    """An exported HTML document with the notes' rules and the notes fixed on the screen, before
-    ``</body>``: in the tail every page file of a paginated export shares."""
-    if not html or not any(isinstance(n, SlideNote) for n in get_slide_notes()):
+def has_choice() -> bool:
+    """Whether a note leaves its download to the reader (a box in "Download as…", note5)."""
+    return any(isinstance(n, SlideNote) and n.downloads == "choice" for n in get_slide_notes())
+
+
+def apply_slide_notes(html: str, *, pdf: bool = False, download: bool = False, chosen: bool = True) -> str:
+    """An exported document with the notes' rules and the notes fixed on the screen, before
+    ``</body>``: in the tail every page file of a paginated export shares.
+
+    *pdf*: the document a PDF is made from (the pdf texts). *download*: a file downloaded from the
+    app ("Download as…", note5) — a note with ``downloads="never"`` is left out, and one with
+    ``"choice"`` unless the reader kept the box ticked (*chosen*).
+    """
+    notes = get_slide_notes()
+    if not html or not any(isinstance(n, SlideNote) for n in notes):
         return html
-    block = f'<style>{_EXPORT_CSS}</style><div class="stx-sn-export">{screen_notes_html()}</div>'
+    css = _PDF_CSS if pdf else _EXPORT_CSS
+    if download:
+        out = [i for i, n in enumerate(notes) if isinstance(n, SlideNote)
+               and (n.downloads == "never" or (n.downloads == "choice" and not chosen))]
+        css += "".join(f'[data-stx-note="{i}"] {{ display: none !important; }}' for i in out)
+    block = f'<style>{css}</style><div class="stx-sn-export">{screen_notes_html()}</div>'
     if "</body>" in html:
         i = html.rfind("</body>")
         return html[:i] + block + html[i:]

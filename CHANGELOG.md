@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.71] — 2026-10-28 — the note's link keeps the reader's language
+
+### Fixed
+
+- **The link of `set_slide_note(link=…)` and `marker_href()` lost `?lang=`
+  and the app's other parameters** whenever the book exports
+  (`st_book` fills its export buffer at every render), so a French reader
+  landed on the legal notice in English (reported by all-trainings,
+  2026-10-28). The link now always keeps the app's parameters; an exported
+  file reads `?marker=` and ignores the rest. Outside a session (the `stx`
+  CLIs) the link is the marker alone, as before.
+
 ## [0.7.70] — 2026-10-28 — a note at the foot of every slide
 
 ### Added

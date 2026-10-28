@@ -168,20 +168,19 @@ def page_url(base: str, *, marker: Optional[str] = None,
 def marker_href(key: str) -> str:
     """A link to the marker *key* that works in the app and in its HTML exports.
 
-    In the app: ``?marker=<key>``, keeping the app's other parameters (a
-    project's ``?lang=``). In an export: ``?marker=<key>`` alone, which the
-    continuous file reads, and which the paginated export points at its
-    entry file (board ``note1``, l1)::
+    ``?marker=<key>``, keeping the app's other parameters (a project's
+    ``?lang=``) — also while the app fills its export buffer, as ``st_book``
+    does at every render: the exported file reads ``?marker=`` and ignores
+    the rest, and the paginated export points the link at its entry file
+    (board ``note1``, l1). Outside a session (the ``stx`` CLIs): the
+    marker alone::
 
         stx.st_write(("Legal notice", stx.marker_href("legal-notice")))
     """
-    from .export import is_export_active
-    params: dict = {}
-    if not is_export_active():
-        try:
-            import streamlit as st
-            params = {k: v for k, v in st.query_params.to_dict().items()
-                      if k not in (MARKER_PARAM, PAGE_PARAM, SLIDE_PARAM)}
-        except Exception:  # noqa: BLE001 — outside a session: no parameters to keep
-            params = {}
+    try:
+        import streamlit as st
+        params = {k: v for k, v in st.query_params.to_dict().items()
+                  if k not in (MARKER_PARAM, PAGE_PARAM, SLIDE_PARAM)}
+    except Exception:  # noqa: BLE001 — outside a session: no parameters to keep
+        params = {}
     return page_url("?" + urlencode(params), marker=key)

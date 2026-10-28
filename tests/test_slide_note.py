@@ -133,8 +133,20 @@ class TestMarkerHref:
             q.to_dict.return_value = {"lang": "fr", "marker": "old", "page": "3"}
             assert stx.marker_href("legal-notice") == "?lang=fr&marker=legal-notice"
 
-    def test_in_an_export_the_marker_alone(self):
-        with patch("streamtex.export.is_export_active", return_value=True):
+    def test_the_app_keeps_its_parameters_while_it_fills_the_export_buffer(self):
+        """st_book fills the export buffer while the app renders (all-trainings, 2026-10-28): the link of a
+        French reader must stay French; the exported file reads ?marker= and ignores the rest."""
+        with patch("streamtex.export.is_export_active", return_value=True), \
+             patch("streamlit.query_params") as q:
+            q.to_dict.return_value = {"lang": "fr", "ctx": "ul"}
+            assert stx.marker_href("legal-notice") == "?lang=fr&ctx=ul&marker=legal-notice"
+
+    def test_without_parameters_the_marker_alone(self):
+        with patch("streamlit.query_params") as q:
+            q.to_dict.return_value = {}
+            assert stx.marker_href("legal-notice") == "?marker=legal-notice"
+        with patch("streamlit.query_params") as q:
+            q.to_dict.side_effect = RuntimeError("no session")
             assert stx.marker_href("legal-notice") == "?marker=legal-notice"
 
 

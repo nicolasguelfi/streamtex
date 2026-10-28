@@ -512,3 +512,124 @@ def test_passwords_file_from_the_environment(monkeypatch, tmp_path):
     assert pw.passwords_path(Path("/elsewhere")) == tmp_path / "abs.toml"
     with pytest.raises(ReleaseError, match="abs.toml not found at"):
         pw.load_file(pw.passwords_path(tmp_path))
+
+
+# -- #149: an application built from a Dockerfile kept in Coolify, rebuilt without a paste -------------
+
+class CoolifyDb:
+    """The server as rebuild_pasted uses it over ssh: Coolify's database (psql), files under the root."""
+
+    kind, name = "ssh", "prod"
+
+    def __init__(self, dockerfile, broken=False, garble=False):
+        self.cfg = {**_repo_target(), "repo": "", "live_uuid": "old1"}
+        self.db = {"old1": dockerfile}
+        self.files, self.cmds = {}, []
+        self.broken, self.garble = broken, garble
+
+    def path(self, *parts):
+        return "/".join(["/data/stx/docs", *parts])
+
+    def sh(self, cmd, check=True, input=None):
+        import base64
+        import re
+        self.cmds.append(cmd)
+        out = ""
+        if cmd.startswith("docker exec -i coolify-db psql"):
+            if self.broken:
+                return subprocess.CompletedProcess(cmd, 1, "", 'ERROR:  column "dockerfile" does not exist')
+            uuid = re.search(r"uuid = '([^']+)'", input).group(1)
+            m = re.search(r"dockerfile = \$stx_dockerfile\$(.*)\$stx_dockerfile\$, updated_at", input, re.S)
+            if m and uuid in self.db:
+                self.db[uuid] = m.group(1) + ("garbled" if self.garble else "")
+                out = f"{len(self.db[uuid])}\n"
+            elif not m and uuid in self.db:
+                b64 = base64.b64encode(self.db[uuid].encode()).decode()
+                out = "stx:" + "\n".join(b64[i:i + 76] for i in range(0, len(b64), 76)) + "\n"
+        elif cmd.startswith("ls -1"):
+            out = "\n".join(sorted(p.rsplit("/", 1)[1] for p in self.files)) + "\n"
+        elif cmd.startswith("cat "):
+            out = self.files[cmd.split(" ", 1)[1].strip("'")]
+        return subprocess.CompletedProcess(cmd, 0, out, "")
+
+    def write(self, dest, content, mode=None):
+        self.files[dest] = content
+
+
+@pytest.fixture
+def pasted(tmp_path, monkeypatch):
+    from streamtex.release import coolify
+    cfg = _locked(tmp_path)
+    fake = FakeCoolify([{"uuid": "old1", "name": "docs-live", "dockerfile": "FROM python"}])
+    monkeypatch.setattr(coolify, "Coolify", lambda root, env: fake)
+    return cfg, fake
+
+
+def test_rebuild_writes_today_s_dockerfile_in_coolify(pasted):
+    from streamtex.release import coolify
+    cfg, fake = pasted
+    t, said = CoolifyDb("FROM python:3.11\n# old\n"), []
+    assert coolify.rebuild_pasted(cfg, t, "live", said.append) is True
+    today = coolify.compose_dockerfile(cfg, "live")
+    assert t.db["old1"] == today                                               # written unchanged
+    [(backup, old)] = t.files.items()
+    assert backup.startswith("/data/stx/docs/dockerfiles/Dockerfile.live.") and old == "FROM python:3.11\n# old\n"
+    assert ("GET", "/deploy?uuid=old1", None) in fake.calls                     # then rebuilt
+    assert any(m.startswith("  difference: ") for m in said) and any("read back" in m for m in said)
+
+
+def test_rebuild_dry_run_writes_nothing(pasted):
+    from streamtex.release import coolify
+    cfg, fake = pasted
+    t, said = CoolifyDb("FROM python\n"), []
+    assert coolify.rebuild_pasted(cfg, t, "live", said.append, dry_run=True) is False
+    assert t.db["old1"] == "FROM python\n" and not t.files
+    assert not any(p.startswith("/deploy") for _, p, _ in fake.calls)
+    assert "  dry run: nothing written, nothing rebuilt" in said
+
+
+def test_rebuild_restore_puts_back_the_last_one_kept(pasted):
+    from streamtex.release import coolify
+    cfg, _fake = pasted
+    t = CoolifyDb("FROM python:3.11\n# before\n")
+    coolify.rebuild_pasted(cfg, t, "live", lambda m: None)
+    assert t.db["old1"] != "FROM python:3.11\n# before\n"
+    coolify.rebuild_pasted(cfg, t, "live", lambda m: None, restore=True)
+    assert t.db["old1"] == "FROM python:3.11\n# before\n"
+    assert len(t.files) == 2                                                   # today's kept in turn
+
+
+def test_rebuild_stops_when_the_database_is_not_as_expected(pasted):
+    from streamtex.release import coolify
+    cfg, fake = pasted
+    with pytest.raises(ReleaseError, match="paste `stx release setup --show <face>`"):
+        coolify.rebuild_pasted(cfg, CoolifyDb("FROM python\n", broken=True), "live", print)
+    t = CoolifyDb("FROM python\n", garble=True)
+    with pytest.raises(ReleaseError, match="read back from Coolify .* is not the one written"):
+        coolify.rebuild_pasted(cfg, t, "live", print)
+    assert not any(p.startswith("/deploy") for _, p, _ in fake.calls)          # never rebuilt
+    with pytest.raises(ReleaseError, match="holds"):
+        coolify.write_pasted(CoolifyDb(""), "old1", "x $stx_dockerfile$ y")
+    with pytest.raises(ReleaseError, match="restore|no Dockerfile kept"):
+        coolify.rebuild_pasted(cfg, CoolifyDb("FROM python\n"), "live", print, restore=True)
+
+
+def test_rebuild_pasted_refuses_a_repository_application(pasted):
+    from streamtex.release import coolify
+    cfg, fake = pasted
+    fake.apps["old1"]["dockerfile"] = ""
+    with pytest.raises(ReleaseError, match="built from a repository"):
+        coolify.rebuild_pasted(cfg, CoolifyDb("FROM python\n"), "live", print)
+
+
+def test_rebuild_options_are_for_a_dockerfile_kept_in_coolify(tmp_path, monkeypatch):
+    from click.testing import CliRunner
+
+    from streamtex.cli.release_cmd import rebuild_cmd
+    from streamtex.release.state import save_state
+    cfg = _locked(tmp_path)
+    save_state(cfg.root, {"default_target": "prod", "targets": {"prod": {"type": "ssh", "host": "h",
+                                                                           **_repo_target()}}, "sites": {}})
+    monkeypatch.chdir(cfg.root)
+    r = CliRunner().invoke(rebuild_cmd, ["--dry-run"])
+    assert r.exit_code == 1 and "built from the repository" in r.output

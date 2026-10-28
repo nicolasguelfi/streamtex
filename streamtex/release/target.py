@@ -72,9 +72,9 @@ class Target:
                 "-o", "ControlMaster=auto", "-o", f"ControlPath={CONTROL_PATH}", "-o", "ControlPersist=120",
                 self.cfg["host"]]
 
-    def sh(self, cmd: str, check: bool = True) -> subprocess.CompletedProcess:
+    def sh(self, cmd: str, check: bool = True, input: str | None = None) -> subprocess.CompletedProcess:
         argv = ["sh", "-c", cmd] if self.kind == "local" else [*self.ssh_argv(), cmd]
-        r = subprocess.run(argv, text=True, capture_output=True)
+        r = subprocess.run(argv, input=input, text=True, capture_output=True)
         if check and r.returncode:
             raise ReleaseError(f"{self.name}: `{cmd[:120]}` failed: {(r.stderr or r.stdout)[-600:]}")
         return r

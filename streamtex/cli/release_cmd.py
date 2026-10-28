@@ -55,10 +55,8 @@ def _skew(cfg, t, allow_skew: bool) -> tuple[str, str]:
     running = ops.image_version(t)
     wanted = (cfg.lock_dir / "stx-version").read_text(encoding="utf-8").strip()
     if not skew and running and running != wanted:
-        how = ("stx release rebuild" if "live" in coolify.repo_faces(t.cfg)
-               else "stx release setup --show live, paste, redeploy")
         skew = (f"the live application runs streamtex {running}, {cfg.dir}/stx-version says {wanted} — "
-                f"rebuild it ({how})")
+                "rebuild it (stx release rebuild)")
     if skew and not allow_skew:
         raise ReleaseError(f"{skew} — publish with the image's streamtex, or pass --allow-skew for a trial")
     if skew:
@@ -357,11 +355,27 @@ def lock_cmd():
 @release.command("rebuild")
 @_target
 @click.option("--face", type=click.Choice(["static", "live"]), default="live", show_default=True)
-def rebuild_cmd(target, face):
-    """Rebuild an application built from the repository (after lock, commit, push) and wait for it."""
+@click.option("--dry-run", "dry_run", is_flag=True,
+              help="Dockerfile kept in Coolify: show the difference, write nothing, rebuild nothing.")
+@click.option("--restore", is_flag=True,
+              help="Dockerfile kept in Coolify: put back the last one kept on the server, then rebuild.")
+def rebuild_cmd(target, face, dry_run, restore):
+    """Rebuild an application after `stx release lock`, and wait for it.
+
+    Built from the repository: from the Dockerfile committed and pushed. Built from a Dockerfile kept in
+    Coolify: today's is written in Coolify's database over ssh (the API cannot), the one in place kept
+    on the server first (#149)."""
     cfg, _state, t = _ctx(target)
-    coolify.rebuild(cfg, t.cfg, face, click.echo)
-    if face == "live":
+    if face in coolify.repo_faces(t.cfg):
+        if dry_run or restore:
+            raise ReleaseError("--dry-run and --restore are for an application built from a Dockerfile kept "
+                               "in Coolify; this one is built from the repository")
+        coolify.rebuild(cfg, t.cfg, face, click.echo)
+    elif not coolify.rebuild_pasted(cfg, t, face, click.echo, dry_run, restore):
+        return
+    if face == "live" and restore:
+        click.echo(f"  live application on streamtex {ops.image_version(t) or '?'}")
+    elif face == "live":
         running = ops.image_version(t)
         wanted = (cfg.lock_dir / "stx-version").read_text(encoding="utf-8").strip()
         if running != wanted:

@@ -5,11 +5,16 @@
 (no repository). ``stx-version`` and ``requirements.txt`` come from the project's lock folder.
 
 What the API cannot do (4.0.0-beta.468) is printed as manual steps, then checked where possible:
-mounting the host folder (Persistent Storage → Directory Mount ``<root>/<face>`` → ``/srv/<face>``), and
-replacing the Dockerfile of an existing application (Configuration → Dockerfile, Save, Redeploy).
+mounting the host folder (Persistent Storage → Directory Mount ``<root>/<face>`` → ``/srv/<face>``).
 The Coolify token is read from the target's env file (``coolify_env``), never printed.
 
-A public repository removes the paste: with ``"repo": "owner/name"`` in the target, the faces of
+The API also refuses to replace the Dockerfile of an existing application. ``stx release rebuild``
+writes it where Coolify's interface does, the column ``applications.dockerfile`` of Coolify's database,
+over ssh (#149): the difference shown first, the previous Dockerfile kept on the server
+(``<root>/dockerfiles/``, put back by ``rebuild --restore``), the written one read back, then the
+application rebuilt. A Coolify whose database changed stops it with a clear message.
+
+A public repository needs no database: with ``"repo": "owner/name"`` in the target, the faces of
 ``repo_faces`` (default ``["live"]``) are built by Coolify from ``<dir>/Dockerfile.<face>``, written by
 ``stx release lock`` and committed. A new streamtex is then ``lock``, commit, push, ``stx release
 rebuild``. An application created from a pasted Dockerfile cannot be switched (the API cannot clear it):
@@ -19,6 +24,8 @@ rebuild``. An application created from a pasted Dockerfile cannot be switched (t
 from __future__ import annotations
 
 import base64
+import datetime as dt
+import difflib
 import json
 import re
 import shlex
@@ -204,8 +211,8 @@ def setup(cfg: ReleaseConfig, tcfg: dict, echo) -> dict:
             elif not _inline(app):
                 echo(f"  {name}: built from {app.get('git_repository')} ({app.get('dockerfile_location')})")
             else:
-                echo(f"  TO DO in Coolify ({name}): Configuration → Dockerfile, paste the output of "
-                     f"`stx release setup --show {face}`, Save, Redeploy (the API cannot change it)")
+                echo(f"  {name}: built from a Dockerfile kept in Coolify — `stx release rebuild --face {face}` "
+                     "writes today's and rebuilds")
         _health(co, uuid)
         echo(f"  TO DO in Coolify ({name}): Persistent Storage → Directory Mount "
              f"{tcfg['root']}/{face} → /srv/{face}, then Redeploy")
@@ -317,8 +324,8 @@ def deploy(co: Coolify, uuid: str, echo, restart: bool = False) -> None:
 
 def rebuild(cfg: ReleaseConfig, tcfg: dict, face: str, echo) -> None:
     if face not in repo_faces(tcfg):
-        raise ReleaseError(f"the {face} application is built from a pasted Dockerfile — paste "
-                           f"`stx release setup --show {face}` in Coolify (Configuration → Dockerfile), Save, Redeploy")
+        raise ReleaseError(f"the {face} application is built from a Dockerfile pasted in Coolify — "
+                           "rebuild_pasted writes it there")
     require_pushed_dockerfile(cfg, tcfg, face)
     co = Coolify(cfg.root, tcfg["coolify_env"])
     uuid = tcfg[f"{face}_uuid"]
@@ -369,4 +376,108 @@ def migrate(cfg: ReleaseConfig, tcfg: dict, face: str, mounted, echo) -> bool:
     co.call("POST", f"/applications/{old}/stop")
     echo(f"  {name + INLINE_SUFFIX}: stopped (kept for a rollback; delete it in Coolify when sure)")
     del tcfg[old_key]
+    return True
+
+
+# -- built from a pasted Dockerfile: written in Coolify's database (#149) -----------------------------
+
+_PSQL = "docker exec -i {db} psql -U coolify -d coolify -v ON_ERROR_STOP=1 -qtA"
+_TAG = "$stx_dockerfile$"                 # dollar quoting: the Dockerfile goes in unchanged
+BACKUPS = "dockerfiles"                   # under the target's root, beside static/ and live/: never served
+
+
+def _psql(t, sql: str) -> str:
+    db = t.cfg.get("coolify_db", "coolify-db")
+    r = t.sh(_PSQL.format(db=shlex.quote(db)), check=False, input=sql)
+    if r.returncode:
+        raise ReleaseError(f"Coolify's database ({db}) refused the request — if Coolify changed, paste "
+                           f"`stx release setup --show <face>` in Coolify instead: {(r.stderr or r.stdout)[-400:]}")
+    return r.stdout
+
+
+def _uuid(tcfg: dict, face: str) -> str:
+    uuid = tcfg.get(f"{face}_uuid", "")
+    if not re.fullmatch(r"[A-Za-z0-9-]+", uuid):
+        raise ReleaseError(f"no valid {face}_uuid in the target — run `stx release setup --apply` first")
+    return uuid
+
+
+def read_pasted(t, uuid: str) -> str:
+    """The Dockerfile Coolify keeps for the application (base64: the text comes back unchanged)."""
+    out = _psql(t, "SELECT 'stx:' || coalesce(encode(convert_to(dockerfile, 'UTF8'), 'base64'), '') "
+                   f"FROM applications WHERE uuid = '{uuid}';\n")
+    if not out.lstrip().startswith("stx:"):
+        raise ReleaseError(f"no application {uuid} in Coolify's database")
+    return base64.b64decode("".join(out.strip().removeprefix("stx:").split())).decode("utf-8")
+
+
+def write_pasted(t, uuid: str, text: str) -> None:
+    """Write *text* as the application's Dockerfile, then read it back: it must be *text* exactly."""
+    if _TAG in text:
+        raise ReleaseError(f"the Dockerfile holds {_TAG}")
+    out = _psql(t, f"UPDATE applications SET dockerfile = {_TAG}{text}{_TAG}, updated_at = now() "
+                   f"WHERE uuid = '{uuid}' RETURNING length(dockerfile);\n")
+    if not out.strip():
+        raise ReleaseError(f"no application {uuid} in Coolify's database: nothing written")
+    if read_pasted(t, uuid) != text:
+        raise ReleaseError(f"the Dockerfile read back from Coolify ({out.strip()} characters) is not the one "
+                           f"written ({len(text)}) — check it in Coolify (Configuration → Dockerfile)")
+
+
+def _diff(old: str, new: str, echo, limit: int = 60) -> None:
+    lines = list(difflib.unified_diff(old.splitlines(), new.splitlines(), "in Coolify", "to write", n=0,
+                                      lineterm=""))
+    plus = sum(1 for x in lines if x.startswith("+") and not x.startswith("+++"))
+    minus = sum(1 for x in lines if x.startswith("-") and not x.startswith("---"))
+    echo(f"  difference: {plus} line(s) added, {minus} removed")
+    for x in lines[2:limit + 2]:
+        echo(f"    {x}")
+    if len(lines) > limit + 2:
+        echo(f"    … ({len(lines) - limit - 2} more line(s))")
+
+
+def _backups(t, face: str) -> list[str]:
+    folder = t.path(BACKUPS)
+    r = t.sh(f"ls -1 {shlex.quote(folder)} 2>/dev/null || true", check=False)
+    return sorted(x for x in r.stdout.split() if x.startswith(f"Dockerfile.{face}."))
+
+
+def rebuild_pasted(cfg: ReleaseConfig, t, face: str, echo, dry_run: bool = False, restore: bool = False) -> bool:
+    """Rebuild a face built from a Dockerfile pasted in Coolify (#149): write today's Dockerfile — or,
+    with *restore*, the last one kept — in Coolify's database, the one in place kept first under
+    ``<root>/dockerfiles/``, then rebuild and wait. *dry_run* shows the difference and writes nothing.
+    Returns True when the application was rebuilt."""
+    if t.kind != "ssh":
+        raise ReleaseError(f"target {t.name} is local: its containers are built by `stx release local up`")
+    uuid, name = _uuid(t.cfg, face), t.cfg[f"{face}_app"]
+    co = Coolify(cfg.root, t.cfg["coolify_env"])
+    if not _inline(co.call("GET", f"/applications/{uuid}")):
+        raise ReleaseError(f"{name} is built from a repository — `stx release rebuild` builds it from there")
+    current = read_pasted(t, uuid)
+    if restore:
+        kept = _backups(t, face)
+        if not kept:
+            raise ReleaseError(f"no Dockerfile kept for {face} under {t.path(BACKUPS)}")
+        source = t.path(BACKUPS, kept[-1])
+        wanted = t.sh(f"cat {shlex.quote(source)}").stdout
+        echo(f"  {name}: back to {source}")
+    else:
+        wanted = compose_dockerfile(cfg, face)
+        echo(f"  {name}: the Dockerfile of today's lock ({len(wanted)} characters)")
+    if current == wanted:
+        echo("  difference: none — Coolify already has it")
+    else:
+        _diff(current, wanted, echo)
+    if dry_run:
+        echo("  dry run: nothing written, nothing rebuilt")
+        return False
+    if current != wanted:
+        stamp = dt.datetime.now().strftime("%Y%m%d-%H%M%S-%f")     # never the name of another one
+        backup = t.path(BACKUPS, f"Dockerfile.{face}.{stamp}")
+        t.write(backup, current)
+        echo(f"  the Dockerfile in place kept: {backup} (`stx release rebuild --face {face} --restore` puts it back)")
+        write_pasted(t, uuid, wanted)
+        echo(f"  written in Coolify and read back ({len(wanted)} characters)")
+    echo(f"  {name}: rebuilding")
+    deploy(co, uuid, echo)
     return True

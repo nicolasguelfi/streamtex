@@ -66,13 +66,20 @@ def _skew(cfg, t, allow_skew: bool) -> str:
 @release.command("publish")
 @click.argument("sites", nargs=-1)
 @click.option("--group", "groups", multiple=True, help="Publish every site of this group (repeatable).")
+@click.option("--all", "all_", is_flag=True, help="Publish every site not marked explicit.")
 @_target
 @click.option("--allow-skew", is_flag=True,
               help="Publish although the exporting streamtex is not the live image's (marked in status).")
 @click.option("--html-env", "html_env", multiple=True, metavar="KEY=VALUE",
               help="An environment variable for the HTML export only (e.g. a partial deck).")
-def publish_cmd(sites, groups, target, allow_skew, html_env):
-    """Publish SITES (default: every site not marked explicit): both faces together, all or nothing."""
+def publish_cmd(sites, groups, all_, target, allow_skew, html_env):
+    """Publish SITES, the sites of --group, or --all (every site not marked explicit): both faces
+    together, all or nothing."""
+    if all_ and (sites or groups):
+        raise ReleaseError("--all publishes every site: name no site and no group with it")
+    if not (sites or groups or all_):
+        # a forgotten argument would publish every site (#145, G10)
+        raise ReleaseError("name the sites to publish, a --group, or --all for every site")
     cfg, state, t = _ctx(target)
     chosen = cfg.select(sites, groups)
     env = _html_env(html_env)
@@ -311,10 +318,16 @@ def prune_cmd(target):
 @click.option("--show", type=click.Choice(["static", "live"]), help="Print the composed Dockerfile and stop.")
 @click.option("--domains", is_flag=True, help="Set both applications' domains from the site list.")
 @click.option("--deploy", is_flag=True, help="With --domains: redeploy both applications.")
+@click.option("--dry-run", "dry_run", is_flag=True,
+              help="With --domains: show what each application would get against what it has; write nothing.")
 @click.option("--migrate", type=click.Choice(["static", "live"]),
               help="Move this face from its pasted Dockerfile to the repository (run it twice: see its output).")
-def setup_cmd(target, apply_, show, domains, deploy, migrate):
+def setup_cmd(target, apply_, show, domains, deploy, dry_run, migrate):
     """The two Coolify applications of an ssh target, through the API; prints the manual steps."""
+    if dry_run and not domains:
+        raise ReleaseError("--dry-run goes with --domains (setup alone already only shows its plan)")
+    if dry_run and deploy:
+        raise ReleaseError("--dry-run writes nothing: it cannot --deploy")
     cfg, state, t = _ctx(target)
     if show:
         click.echo(coolify.compose_dockerfile(cfg, show), nl=False)
@@ -334,7 +347,9 @@ def setup_cmd(target, apply_, show, domains, deploy, migrate):
                    if done else f"{STATE_FILE}: the new application recorded")
         return
     if domains:
-        coolify.apply_domains(cfg, t.cfg, click.echo, deploy)
+        coolify.apply_domains(cfg, t.cfg, click.echo, deploy, dry_run)
+        if dry_run:
+            click.echo("dry run: nothing written (drop --dry-run to write the domains)")
         return
     for line in coolify.plan(cfg, t.cfg):
         click.echo(line)

@@ -236,13 +236,29 @@ def _create_from_repo(co: Coolify, cfg: ReleaseConfig, tcfg: dict, face: str, pr
     return created["uuid"]
 
 
-def apply_domains(cfg: ReleaseConfig, tcfg: dict, echo, deploy: bool = False) -> None:
+def _split_domains(value) -> list[str]:
+    return [d.strip() for d in str(value or "").split(",") if d.strip()]
+
+
+def apply_domains(cfg: ReleaseConfig, tcfg: dict, echo, deploy: bool = False, dry_run: bool = False) -> None:
+    """Set both applications' domains from the site list; *dry_run* shows what each would get against
+    what it has, and writes nothing (#145, G9)."""
     co = Coolify(cfg.root, tcfg["coolify_env"])
     wanted = domains_for(cfg, tcfg)
     for face in ("static", "live"):
         uuid = tcfg.get(f"{face}_uuid")
         if not uuid:
             raise ReleaseError(f"no {face}_uuid in the target — run `stx release setup --apply` first")
+        if dry_run:
+            now, want = _split_domains(co.call("GET", f"/applications/{uuid}").get("fqdn")), \
+                _split_domains(wanted[face])
+            added, removed = [d for d in want if d not in now], [d for d in now if d not in want]
+            echo(f"  {tcfg[f'{face}_app']}: {len(want)} domain(s), {len(added)} added, {len(removed)} removed")
+            for d in added:
+                echo(f"    + {d}")
+            for d in removed:
+                echo(f"    - {d}")
+            continue
         if wanted[face]:
             co.call("PATCH", f"/applications/{uuid}", {"domains": wanted[face]})
         echo(f"  {tcfg[f'{face}_app']}: domains {wanted[face] or '—'}")

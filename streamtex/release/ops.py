@@ -136,9 +136,12 @@ def check_levels(t: Target, site: Site, v: dict, entries: list | None, levels: d
     if "html" not in site.faces:
         return []
     default = v.get("up_to_slide")
-    words = {e.label: e.password for e in entries or []}
+    valid = pw.usable(entries)              # an expired password cannot log in (#145, G12)
+    if entries and not valid and not v.get("html_open"):
+        return ["every password of the html face has expired — nobody can log in"]
+    words = {e.label: e.password for e in valid}
     if not levels:                          # no levels file: everyone sees `current`
-        levels = {"open": "all"} if v.get("html_open") else {e.label: "all" for e in (entries or [])[:1]}
+        levels = {"open": "all"} if v.get("html_open") else {e.label: "all" for e in valid[:1]}
     expected = {lv.CLOSED: lv.CLOSED, lv.CURRENT: release, **{f"releases/{n}": n for n in names.values()}}
     seen_folders: dict[str, str] = {}
     problems = []
@@ -282,6 +285,9 @@ def publish_site(t: Target, cfg: ReleaseConfig, state: dict, site: Site, release
         html = None
         if "html" in site.faces:
             html, _ = build.export(cfg, site, code, work, release, html_env)
+            build.verify_export(cfg, site, html)
+            if cfg.verify:
+                echo(f"  ✓ export accepted by {cfg.verify}")
         if "live" in site.faces:
             dirs = [t.path("live", "sites", site.site, "releases")]
             if cfg.media:
@@ -466,7 +472,7 @@ def status_rows(t: Target, cfg: ReleaseConfig, state: dict, data: dict | None) -
             except ReleaseError:
                 entries = None
         names = {int(n): x for n, x in (v.get("cuts") or {}).items()}
-        word = next((e.password for e in entries or []
+        word = next((e.password for e in pw.usable(entries)
                      if lv.now_of(levels.get(e.label), v.get("up_to_slide")) == "all"), None)
         html, live = served(t, site, v, word or pw.first_password(entries))
         if html == "HTTP 401" and entries is None and not v.get("html_open"):

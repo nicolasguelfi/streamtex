@@ -40,6 +40,19 @@ jobs:
             echo "bumped=false" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Guard — a CHANGELOG entry for the new version (issue #3)
+        if: steps.version.outputs.bumped == 'true'
+        # Nothing is uploaded for a version whose CHANGELOG.md has no
+        # "## [x.y.z]" heading, or an empty one (0.5.9 and 0.5.10 had none).
+        run: |
+          NEW="${{ steps.version.outputs.new }}"
+          BODY=$(awk -v v="$NEW" 'index($0, "## [" v "]") == 1 {found=1; next} /^## \[/ {if (found) exit} found {print}' CHANGELOG.md | tr -d '[:space:]')
+          if [ -z "$BODY" ]; then
+            echo "::error::CHANGELOG.md has no entry for $NEW — add a \"## [$NEW]\" section, then push again"
+            exit 1
+          fi
+          echo "OK: CHANGELOG.md has an entry for $NEW"
+
       - name: Install uv
         if: steps.version.outputs.bumped == 'true'
         uses: astral-sh/setup-uv@v4

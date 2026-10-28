@@ -58,7 +58,7 @@ from pathlib import Path
 import click
 
 from ..cli.deploy_auth_cmd import PlainEntry, _check_entries, parse_password_spec
-from ..deploy.stx_auth import Entry, check_password, format_entry, hash_password, parse_entry
+from ..deploy.stx_auth import Entry, _today, check_password, format_entry, hash_password, parse_entry
 from . import ReleaseError
 from .config import FACES, ReleaseConfig, Site
 
@@ -289,9 +289,17 @@ def pass_text(entries: list[PlainEntry] | None, pool: RecordPool | None = None) 
     return (pool or RecordPool()).text(entries)
 
 
+def usable(entries: list[PlainEntry] | None) -> list[PlainEntry]:
+    """The entries whose end date has not passed, by the login service's day: the ones a check can log
+    in with (#145, G12)."""
+    today = _today()
+    return [e for e in entries or [] if e.valid_until is None or e.valid_until >= today]
+
+
 def first_password(entries: list[PlainEntry] | None) -> str:
-    """The password ``stx release`` logs in with to check what is served."""
-    return entries[0].password if entries else ""
+    """The password ``stx release`` logs in with to check what is served: the first one still valid."""
+    valid = usable(entries)
+    return valid[0].password if valid else ""
 
 
 # ---------------------------------------------------------------------------

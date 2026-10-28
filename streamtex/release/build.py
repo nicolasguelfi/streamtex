@@ -139,7 +139,54 @@ def library_skew(cfg: ReleaseConfig) -> str:
                            text=True, capture_output=True)
         if r.returncode == 0 and r.stdout.strip():
             return f"streamtex comes from a working copy with uncommitted changes ({path})"
+        # the same version number, but commits after its tag: code the image does not have (#145, G15)
+        tag = f"v{info['version']}"
+        if subprocess.run(["git", "-C", path, "rev-parse", "--verify", "--quiet", f"{tag}^{{commit}}"],
+                          text=True, capture_output=True).returncode:
+            return f"streamtex comes from a working copy without the tag {tag} ({path}) — git fetch --tags"
+        r = subprocess.run(["git", "-C", path, "rev-list", "--count", f"{tag}..HEAD", "--", "streamtex"],
+                           text=True, capture_output=True)
+        ahead = int(r.stdout.strip() or 0) if r.returncode == 0 else 0
+        if ahead:
+            return (f"streamtex comes from a working copy {ahead} commit(s) ahead of {tag} in streamtex/ "
+                    f"({path}): the live image does not have them")
     return ""
+
+
+#: The line the project's python prints with the verdict of ``[release] verify``.
+_VERDICT = "stx-verify-verdict "
+
+
+def verify_export(cfg: ReleaseConfig, site: Site, html: Path) -> None:
+    """The project's own check of a site's HTML export, before anything is copied (#144).
+
+    ``[release] verify = "module:function"`` is called in the project's environment, as the export, as
+    ``function(site_name, html_dir)``: ``None`` accepts; a message, ``False`` or an exception refuses, and
+    the publication stops with the site still serving what it served.
+    """
+    if not cfg.verify:
+        return
+    mod, func = cfg.verify.split(":", 1)
+    code = (
+        "import importlib, json, sys\n"
+        "from pathlib import Path\n"
+        f"sys.path.insert(0, {str(cfg.root)!r})\n"
+        f"fn = getattr(importlib.import_module({mod!r}), {func!r})\n"
+        "try:\n"
+        f"    r = fn({site.site!r}, Path({str(html)!r}))\n"
+        "except Exception as e:\n"
+        "    r = f'{type(e).__name__}: {e}'\n"
+        "ok = r is None or r is True or r == ''\n"
+        f"print({_VERDICT!r} + json.dumps('' if ok else (r if isinstance(r, str) else f'it returned {{r!r}}')))\n")
+    try:
+        out = _project_python(cfg, code)
+    except ReleaseError as e:
+        raise ReleaseError(f"{site.site}: [release] verify = '{cfg.verify}' could not run — {e}") from None
+    verdicts = [line[len(_VERDICT):] for line in out.splitlines() if line.startswith(_VERDICT)]
+    refusal = json.loads(verdicts[-1]) if verdicts else "it gave no verdict"
+    if refusal:
+        raise ReleaseError(f"{site.site}: [release] verify refused the export — {refusal} "
+                           "(nothing copied: the site serves what it served)")
 
 
 # -- the code snapshot ---------------------------------------------------------------------

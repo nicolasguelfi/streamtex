@@ -13,6 +13,8 @@
     lock_exclude = ["trainings-pack"]  # local packages kept out of the live image's requirements
     lock_no_sources = false        # true: requirements resolved without [tool.uv.sources] (git packs)
     apt = ["texlive-latex-base"]   # system packages added to the live image
+    verify = "shared.release_checks:verify"   # verify(site, html_dir) after the HTML export, before any
+                                   # copy: returns None to accept, a message (or raises) to refuse
     sites_from = "shared.release:sites"   # a function of the project returning the sites, or:
 
     [[release.sites]]
@@ -41,7 +43,8 @@ FACES = ("live", "html")
 SITE_RE = re.compile(r"^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$")
 _SITE_KEYS = {"site", "book", "group", "faces", "paths", "exclude", "explicit", "legacy", "zoom"}
 _RELEASE_KEYS = {"project", "langs", "snapshot", "media", "media_exclude", "pythonpath", "lock_exclude",
-                 "lock_no_sources", "apt", "min_words", "port_base", "dir", "sites", "sites_from", "checks"}
+                 "lock_no_sources", "apt", "min_words", "port_base", "dir", "sites", "sites_from", "checks",
+                 "verify"}
 _APT_RE = re.compile(r"^[a-z0-9][a-z0-9.+-]+$")
 
 
@@ -87,6 +90,7 @@ class ReleaseConfig:
     port_base: int = 9000
     dir: str = ".stx-release"
     checks: str | None = None
+    verify: str | None = None             # the project's check of each HTML export (#144)
     by_name: dict[str, Site] = field(default_factory=dict)
 
     def __post_init__(self):
@@ -194,6 +198,9 @@ def load_config(root: Path | None = None) -> ReleaseConfig:
     bad = [p for p in apt if not isinstance(p, str) or not _APT_RE.match(p)]
     if bad:
         raise ReleaseError(f"[release] apt: not a package name: {bad}")
+    verify = data.get("verify")
+    if verify is not None and not (isinstance(verify, str) and re.fullmatch(r"[\w.]+:\w+", verify)):
+        raise ReleaseError(f"[release] verify = {verify!r} — expected 'module:function'")
     return ReleaseConfig(
         root=root, project=project, sites=sites, langs=langs,
         snapshot=tuple(data.get("snapshot", ())), media=data.get("media"),
@@ -201,7 +208,7 @@ def load_config(root: Path | None = None) -> ReleaseConfig:
         pythonpath=tuple(data.get("pythonpath", ())), lock_exclude=tuple(data.get("lock_exclude", ())),
         lock_no_sources=bool(data.get("lock_no_sources", False)), apt=apt,
         min_words=int(data.get("min_words", 100)), port_base=int(data.get("port_base", 9000)),
-        dir=str(data.get("dir", ".stx-release")), checks=data.get("checks"))
+        dir=str(data.get("dir", ".stx-release")), checks=data.get("checks"), verify=verify)
 
 
 def run_checks(cfg: ReleaseConfig, sites: list[Site]) -> None:

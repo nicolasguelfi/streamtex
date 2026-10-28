@@ -5,6 +5,43 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.74] — 2026-10-28 — stx release safety points (board ordre1, wave 1)
+
+### Added
+
+- **`[release] verify = "module:function"`** (#144): the project's own
+  check of each site's HTML export, called after the export and before
+  anything is copied, in the project's environment, as
+  `verify(site_name, html_dir)`. `None` accepts; a message, `False` or an
+  exception refuses, and the publication stops while the site keeps
+  serving what it served. Not called by `stx release limit` (a partial
+  export) nor for a live-only site.
+- **`stx release setup --domains --dry-run`** (#145, G9): shows, for each
+  application, the domains it would get against those it has (added,
+  removed), and writes nothing.
+- **A guard in `auto-tag.yml`** (#3): no upload to PyPI for a version whose
+  `CHANGELOG.md` has no `## [x.y.z]` entry, or an empty one; the same rule
+  runs in the tests (`tests/test_changelog.py`).
+
+### Changed
+
+- **`stx release publish` with no site and no group now stops** (#145,
+  G10): name the sites, a `--group`, or pass `--all` to publish every site
+  not marked explicit. A forgotten argument republished every site.
+
+### Fixed
+
+- **The check after the switch logged in with an expired password**
+  (#145, G12): it used the first password of the list, even past its end
+  date, saw `HTTP 401` and put the previous release back. It now uses the
+  first password still valid (by the login service's day); when every
+  password of the HTML face has expired, it says so. `stx release status`
+  reads with a valid password too.
+- **An editable streamtex ahead of its tag passed for the released
+  version** (#145, G15): with an editable library, the skew check also
+  compares `HEAD` with the tag `v<version>` and reports the commits ahead
+  in `streamtex/`, or a missing tag.
+
 ## [0.7.73] — 2026-10-28 — slide notes in downloaded files
 
 ### Added

@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.70] — 2026-10-28 — a note at the foot of every slide
+
+### Added
+
+- **`set_slide_note(note, link=, style=)`** (board `note1`): a note closes
+  every `st_slide`, declared once in `book.py`, in the app and in every
+  HTML export. *note* is a text or a leaf `{"en": …, "fr": …}` (the
+  module's language), drawn as one small grey line — a link to the marker
+  *link* if given, opened in a new tab so that the reader keeps the slide —
+  or a function that draws the note itself. A text note sits just under
+  the slide box, in its bottom margin, and adds no height: no existing
+  slide moves. With `box=False` the note follows the content. Stored per
+  session, like `set_slide_container`: two modules served by one process
+  keep their own note. `SLIDE_NOTE_STYLE` is the default look.
+- **`st_slide_note()`** draws the same note on a page without `st_slide`.
+- **`marker_href(key)`**: a link to a marker that works in the app
+  (`?marker=key`, keeping the app's other parameters such as `?lang=`) and
+  in the exports.
+
+### Changed
+
+- **A link `?marker=`, `?slide=` or `?page=` on a page of the paginated
+  HTML export** points at the entry file (or the continuous file), which
+  knows every page. The page file already forwarded such a link (measured
+  on 2026-10-28); the entry file is the address the export guarantees.
+
 ## [0.7.69] — 2026-10-26 — after all-trainings' switchover
 
 All-trainings switched to `stx release` on the evening of 2026-10-26; this

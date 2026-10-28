@@ -301,7 +301,7 @@ def export_html(path, output, asset_mode, title, no_nav, theme_mode, theme_bg, t
                       f"block(s) 1 to {limit['entries']}{short}")
 
     from ..export import strip_page_sentinels
-    from ..export_paginate import build_entry_html, build_page_documents, to_subfolder
+    from ..export_paginate import build_entry_html, build_page_documents, to_entry_links, to_subfolder
 
     mode = html_mode or _book_mod._html_export_mode
     raw_html = full_html
@@ -386,7 +386,7 @@ def export_html(path, output, asset_mode, title, no_nav, theme_mode, theme_bg, t
         for fname, doc, here in docs:
             doc = _enrich(doc, {"mode": "paginated", "files": files_by_page, "here": here,
                                 "prefix": "", "other": other})
-            doc = _materialize(doc, collector)
+            doc = to_entry_links(_materialize(doc, collector), f"../{continuous_name}")
             if collector is not None:
                 doc = to_subfolder(collector.rewrite_html(doc))
             (pages_dir / fname).write_text(doc, encoding="utf-8")

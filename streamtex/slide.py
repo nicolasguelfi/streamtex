@@ -534,6 +534,97 @@ def get_slide_container() -> _Style:
     return _slide_container if _slide_container is not None else SLIDE_CONTAINER
 
 
+#: The look of a text note (:func:`set_slide_note`): a small grey line, centred.
+SLIDE_NOTE_STYLE = _Style("font-size: 0.75rem; color: #888; text-align: center; line-height: 1.3;",
+                          "stx_slide_note")
+
+
+@dataclass(frozen=True)
+class _TextNote:
+    text: object                      # a text, or a leaf {"en": …, "fr": …}
+    link: Optional[str]
+    style: _Style
+
+
+_slide_note = None
+_NOTE_KEY = "_stx_slide_note"
+
+
+def set_slide_note(note=None, *, link: Optional[str] = None, style: Optional[_Style] = None) -> None:
+    """Set the note drawn at the foot of every :func:`st_slide` (``None`` = no note).
+
+    One line in ``book.py``, before ``st_book`` (board ``note1``)::
+
+        stx.set_slide_note({"fr": "© 2026 … — lecture réservée aux participants",
+                            "en": "© 2026 … — for the participants only"}, link="legal-notice")
+
+    *note* is a text or a leaf ``{"en": …, "fr": …}`` (the module's language
+    is used), drawn as one small line, a link to the marker *link* if given
+    (it opens in a new tab: the reader keeps the slide) — or a function
+    drawing the note itself, called after every slide. A text note sits in
+    the bottom margin of the slide box and adds no height; with
+    ``box=False``, and for a function, the note follows the content.
+    :func:`st_slide_note` draws it on a page without ``st_slide``.
+
+    Stored per session, as :func:`set_slide_container` (#122): two modules
+    served by one process do not share their note.
+    """
+    global _slide_note
+    if callable(note):
+        if link is not None or style is not None:
+            raise ValueError("set_slide_note: link= and style= go with a text; a function draws its own note")
+    elif note is not None:
+        if not isinstance(note, (str, dict)) or not note:
+            raise TypeError("set_slide_note: a text, a leaf {'en': …, 'fr': …}, a function, or None")
+        note = _TextNote(note, link, style if style is not None else SLIDE_NOTE_STYLE)
+    elif link is not None or style is not None:
+        raise ValueError("set_slide_note: link= and style= need a note")
+    if _in_session():
+        if note is None:
+            st.session_state.pop(_NOTE_KEY, None)
+        else:
+            st.session_state[_NOTE_KEY] = note
+    else:
+        _slide_note = note
+
+
+def get_slide_note():
+    """The note set by :func:`set_slide_note` for this session (``None``: none)."""
+    if _in_session():
+        note = st.session_state.get(_NOTE_KEY)
+        if note is not None:
+            return note
+    return _slide_note
+
+
+def _note_html(note: _TextNote, foot: bool) -> str:
+    import html
+
+    from .deeplink import marker_href
+    from .i18n import T
+    text = html.escape(T(note.text))
+    if note.link:
+        text = (f'<a href="{html.escape(marker_href(note.link))}" target="_blank" rel="noopener" '
+                f'style="color: inherit; text-decoration: none;">{text}</a>')
+    line = f'<div class="stx-slide-note" style="{note.style}">{text}</div>'
+    if not foot:
+        return line
+    # just under the box, in its bottom margin (10vh in SLIDE_CONTAINER): a wrapper of no height (p1)
+    return ('<div class="stx-slide-note-foot" style="position: relative; height: 0; overflow: visible;">'
+            f'<div style="position: absolute; left: 0; right: 0; bottom: 7vh;">{line}</div></div>')
+
+
+def st_slide_note(*, _foot: bool = False) -> None:
+    """Draw the note of :func:`set_slide_note` here — on a page without ``st_slide``; nothing if none."""
+    note = get_slide_note()
+    if note is None:
+        return
+    if isinstance(note, _TextNote):
+        _render(_note_html(note, _foot))
+    else:
+        note()
+
+
 def _slide_marker(marker, key, roles) -> tuple[str, Optional[MarkerRoles]] | None:
     """``(label, roles)`` of the slide's explicit marker, ``None`` if none (#122)."""
     if marker is False:
@@ -590,6 +681,8 @@ def st_slide(cut: bool = False, style: Optional[_Style] = None, *,
     :param roles: the marker's roles (as ``st_marker(roles=)``), e.g.
         ``MarkerRoles.HIDDEN`` or ``MarkerRoles(listed=False, toc_lvl="2")``.
     :param box: ``False`` = no box, the content flows (forms B and D).
+
+    The note of :func:`set_slide_note`, if any, closes every slide.
     :param zoom, spacing, config: settings of the break (``cut=True`` only),
         as ``st_slide_break`` takes them.
     """
@@ -620,7 +713,9 @@ def st_slide(cut: bool = False, style: Optional[_Style] = None, *,
             st_marker(label, key=key, roles=r)
     if not box:
         yield
+        st_slide_note()
         return
     container = get_slide_container()
     with st_block(container + style if style is not None else container):
         yield
+    st_slide_note(_foot=True)

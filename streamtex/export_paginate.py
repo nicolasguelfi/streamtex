@@ -144,6 +144,20 @@ def to_subfolder(html: str) -> str:
     return re.sub(r'url\((["\']?)data/', r"url(\1../data/", html)
 
 
+#: A link of a page to a marker, a slide or a page of the document (``?marker=``, ``?slide=``, ``?page=``).
+_DEEP_HREF_RE = re.compile(r'href="\?([^"#]*\b(?:marker|slide|page)=[^"]*)"')
+
+
+def to_entry_links(html: str, entry: str) -> str:
+    """A page's links ``?marker=``, ``?slide=``, ``?page=`` → *entry* (``../deck.html``).
+
+    The entry file (or the continuous file) knows every page and sends the
+    link to the right one: the address the export guarantees, whatever a
+    page file's own script does (board ``note1``, l1).
+    """
+    return _DEEP_HREF_RE.sub(lambda m: f'href="{entry}?{m.group(1)}"', html)
+
+
 _ENTRY_TEMPLATE = """<!DOCTYPE html>
 <html lang="__LANG__"><head><meta charset="UTF-8"><title>__TITLE__</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"></head>

@@ -163,3 +163,25 @@ def page_url(base: str, *, marker: Optional[str] = None,
             raise ValueError("page_url: page is 1-based (>= 1)")
         items.append((PAGE_PARAM, str(int(page))))
     return urlunsplit((scheme, netloc, path, urlencode(items), fragment))
+
+
+def marker_href(key: str) -> str:
+    """A link to the marker *key* that works in the app and in its HTML exports.
+
+    In the app: ``?marker=<key>``, keeping the app's other parameters (a
+    project's ``?lang=``). In an export: ``?marker=<key>`` alone, which the
+    continuous file reads, and which the paginated export points at its
+    entry file (board ``note1``, l1)::
+
+        stx.st_write(("Legal notice", stx.marker_href("legal-notice")))
+    """
+    from .export import is_export_active
+    params: dict = {}
+    if not is_export_active():
+        try:
+            import streamlit as st
+            params = {k: v for k, v in st.query_params.to_dict().items()
+                      if k not in (MARKER_PARAM, PAGE_PARAM, SLIDE_PARAM)}
+        except Exception:  # noqa: BLE001 — outside a session: no parameters to keep
+            params = {}
+    return page_url("?" + urlencode(params), marker=key)

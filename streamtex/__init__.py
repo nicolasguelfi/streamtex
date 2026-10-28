@@ -65,7 +65,7 @@ try:
 
     # Marker Navigation
     from .marker import st_marker, MarkerConfig, MarkerRoles
-    from .deeplink import page_url
+    from .deeplink import marker_href, page_url
 
     # Section spacing
     from .spacing import (
@@ -80,6 +80,7 @@ try:
         set_slide_break_config, get_slide_break_config,
         add_slide_break_options,
         st_slide, set_slide_container, get_slide_container, SLIDE_CONTAINER,
+        set_slide_note, get_slide_note, st_slide_note, SLIDE_NOTE_STYLE,
     )
 
     # Presentation profiles (display configurations)
@@ -288,6 +289,7 @@ __all__ = [
     "ProjectMeta",
     "ReuseArchitectureError",
     "SLIDE_CONTAINER",
+    "SLIDE_NOTE_STYLE",
     "ScaleConfig",
     "ScaleCurve",
     "SlideBreakConfig",
@@ -333,6 +335,7 @@ __all__ = [
     "get_presentation_config",
     "get_slide_break_config",
     "get_slide_container",
+    "get_slide_note",
     "get_spacing",
     "get_static_sources",
     "inject_link_preview_scaffold",
@@ -356,6 +359,7 @@ __all__ = [
     "load_json",
     "load_text",
     "load_toml",
+    "marker_href",
     "next_project",
     "page_url",
     "parse_bibtex_string",
@@ -380,6 +384,7 @@ __all__ = [
     "set_presentation_config",
     "set_slide_break_config",
     "set_slide_container",
+    "set_slide_note",
     "set_spacing",
     "set_static_sources",
     "set_zoom",
@@ -424,6 +429,7 @@ __all__ = [
     "st_sequence",
     "st_slide",
     "st_slide_break",
+    "st_slide_note",
     "st_space",
     "st_span",
     "st_table",

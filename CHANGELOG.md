@@ -5,6 +5,48 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.72] — 2026-10-28 — slide notes the designer places
+
+### Added
+
+- **`set_slide_notes(SlideNote(…), …)`** (board `note3`): one or several
+  notes, each set by the document's designer.
+  - **place**:
+    - in the slide, drawn with every `st_slide` in the app and the HTML:
+      `below` (the 0.7.70 line), `above`, `left` and `right` (vertical
+      text, read from top to bottom), `across` (a watermark);
+    - fixed on the screen, drawn once per page in the app and the HTML:
+      `screen-top`, `screen-bottom` (above the presentation bar when there
+      is one), `screen-left`, `screen-right`;
+    - in the presentation bar, in the app only (the HTML has no bar):
+      `bar-after-title`, `bar-title`, `bar-before-counter`.
+  - **text per display mode**: a text, a leaf `{"en": …, "fr": …}`, or a
+    dict of modes — `slides` (the app, paginated), `document` (the app,
+    continuous), `html`, `phone` (under 600 px), `default` — whose values
+    may be `None` (no note in that mode); a missing mode takes `default`.
+  - **`opacity`** and **`style`**, with defaults by place (a line 0.7, a
+    watermark 0.08).
+  - **`layer`**: `under` (default) draws the note beneath the content, so
+    that a text placed over it hides it (NG's decision); a link stays
+    clickable through a transparent copy above it. `over` draws it above.
+  - `link=` as in 0.7.70.
+- `SlideNote`, `get_slide_notes()`.
+
+### Changed
+
+- **`set_slide_note(text, link=)`** (0.7.70) is now the note
+  `SlideNote(text, place="below", opacity=1)`: same place and look, drawn
+  under the content. `get_slide_note()` returns the first note.
+- Every exported HTML file carries the notes' rules and the notes fixed on
+  the screen (each page file of a paginated export too).
+
+### Notes
+
+- A slide place follows the box of `SLIDE_CONTAINER` (80vh high, 10vh
+  margins): under a slide taller than the screen, it follows the box.
+- `screen-left` sits at the window's edge: under an open sidebar (the
+  app's or the HTML's) it is hidden, as any note under the content.
+
 ## [0.7.71] — 2026-10-28 — the note's link keeps the reader's language
 
 ### Fixed

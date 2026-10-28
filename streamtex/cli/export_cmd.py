@@ -329,6 +329,8 @@ def export_html(path, output, asset_mode, title, no_nav, theme_mode, theme_bg, t
         html_in = lazy_load_images(html_in, nav_markers)       # each output file (#115)
         from ..printing import apply_html_print_rule
         html_in = apply_html_print_rule(html_in, print_rules)  # #107
+        from ..slide_note import apply_slide_notes
+        html_in = apply_slide_notes(html_in)                   # note3: in every output file
         if no_nav or not nav_data:
             return html_in
         from ..export_enrich import enrich_export_html

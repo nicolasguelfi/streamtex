@@ -80,7 +80,10 @@ try:
         set_slide_break_config, get_slide_break_config,
         add_slide_break_options,
         st_slide, set_slide_container, get_slide_container, SLIDE_CONTAINER,
-        set_slide_note, get_slide_note, st_slide_note, SLIDE_NOTE_STYLE,
+        set_slide_note, get_slide_note, st_slide_note,
+    )
+    from .slide_note import (
+        SlideNote, set_slide_notes, get_slide_notes, SLIDE_NOTE_STYLE,
     )
 
     # Presentation profiles (display configurations)
@@ -290,6 +293,7 @@ __all__ = [
     "ReuseArchitectureError",
     "SLIDE_CONTAINER",
     "SLIDE_NOTE_STYLE",
+    "SlideNote",
     "ScaleConfig",
     "ScaleCurve",
     "SlideBreakConfig",
@@ -336,6 +340,7 @@ __all__ = [
     "get_slide_break_config",
     "get_slide_container",
     "get_slide_note",
+    "get_slide_notes",
     "get_spacing",
     "get_static_sources",
     "inject_link_preview_scaffold",
@@ -385,6 +390,7 @@ __all__ = [
     "set_slide_break_config",
     "set_slide_container",
     "set_slide_note",
+    "set_slide_notes",
     "set_spacing",
     "set_static_sources",
     "set_zoom",

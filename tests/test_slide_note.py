@@ -32,6 +32,7 @@ def out():
         yield
 
     with patch("streamtex.slide._render", side_effect=lambda h: rec.append(("html", h))), \
+         patch("streamtex.export.st_html", side_effect=lambda h: rec.append(("html", h))), \
          patch("streamtex.marker._render", side_effect=lambda h: rec.append(("marker", h))), \
          patch("streamtex.space._render", side_effect=lambda h: rec.append(("space", h))), \
          patch("streamtex.container.st_block", fake_block), \
@@ -64,8 +65,11 @@ class TestNote:
         assert len(notes) == 2 and out[-1][0] == "html" and out[2][1] == notes[0]
         n = notes[0]
         assert "stx-slide-note-foot" in n and "height: 0" in n            # no height added (p1)
+        assert "bottom: 7vh" in n and "opacity: 1.0" in n                  # the 0.7.70 rendering
         assert 'href="?marker=legal-notice" target="_blank"' in n
         assert "© 2026 ACME — participants only" in n and "font-size: 0.75rem" in n
+        # under the content (note3), its link clickable through a transparent copy above it
+        assert "stx-sn-under" in n and "stx-sn-click" in n
 
     def test_box_false_puts_the_note_after_the_content(self, out):
         stx.set_slide_note("note")
@@ -195,8 +199,104 @@ def test_export_every_slide_carries_the_note_and_its_link(note_project, tmp_path
     assert r.exit_code == 0, r.output
     folder = out / "deck"
     cont = (folder / "deck.html").read_text()
-    assert cont.count("NOTE-LINE") == 6 and 'href="?marker=legal"' in cont      # continuous: the file itself
+    # each slide: the note under the content, plus its transparent clickable copy
+    assert cont.count("NOTE-LINE") == 12 and 'href="?marker=legal"' in cont     # continuous: the file itself
+    assert "stx-sn-export" in cont and "isolation: isolate" in cont
     for f in ("bck_intro.html", "bck_rag.html", "bck_legal.html"):
         page = (folder / "pages" / f).read_text()
-        assert page.count("NOTE-LINE") == 2
+        assert page.count("NOTE-LINE") == 4 and "stx-sn-export" in page
         assert 'href="../deck.html?marker=legal" target="_blank"' in page and 'href="?marker=' not in page
+
+
+# ---------------------------------------------------------------------------
+# Several notes: place, text per mode, opacity, layer (board note3)
+# ---------------------------------------------------------------------------
+
+from streamtex.slide_note import (  # noqa: E402
+    SlideNote,
+    apply_slide_notes,
+    bar_notes_html,
+    screen_notes_html,
+    slide_notes_html,
+)
+
+
+@pytest.fixture
+def clean():
+    stx.set_slide_notes()
+    yield
+    stx.set_slide_notes()
+
+
+class TestSlideNote:
+    def test_validation(self):
+        with pytest.raises(ValueError, match="place="):
+            SlideNote("x", place="middle")
+        with pytest.raises(ValueError, match="opacity"):
+            SlideNote("x", opacity=2)
+        with pytest.raises(ValueError, match="layer="):
+            SlideNote("x", layer="top")
+        with pytest.raises(ValueError, match="unknown mode"):
+            SlideNote({"slides": "a", "tablet": "b"})
+        with pytest.raises(TypeError):
+            SlideNote("")
+        with pytest.raises(TypeError):
+            stx.set_slide_notes("plain text")
+
+    def test_text_per_mode_falls_back_on_default(self):
+        n = SlideNote({"slides": "S", "html": {"fr": "H-fr", "en": "H-en"}, "phone": None, "default": "D"})
+        assert n.text_for("slides") == "S" and n.text_for("document") == "D"
+        assert n.text_for("phone") is None
+        with patch("streamtex.i18n.current_lang", return_value="fr"):
+            assert n.text_for("html") == "H-fr"
+        assert SlideNote({"fr": "lang leaf"}).text_for("html") == "lang leaf"   # a leaf, not modes
+
+    def test_defaults_by_place(self):
+        assert SlideNote("x", place="across").look[1] == 0.08
+        assert SlideNote("x", place="screen-left").look[1] == 0.7
+        assert SlideNote("x", opacity=0.3).look[1] == 0.3
+
+
+class TestPlaces:
+    def test_slide_places_around_the_box(self, clean):
+        stx.set_slide_notes(SlideNote("UP", place="above"), SlideNote("SIDE", place="left"),
+                            SlideNote("MARK", place="across"), SlideNote("SCREEN", place="screen-top"))
+        h = slide_notes_html(foot=True)
+        assert "UP" in h and "bottom: 91vh" in h
+        assert "SIDE" in h and "writing-mode: vertical-rl" in h
+        assert "MARK" in h and "rotate(-30deg)" in h and "opacity: 0.08" in h
+        assert "SCREEN" not in h                                    # drawn once, not per slide
+        lines = slide_notes_html(foot=False)                        # box=False / st_slide_note
+        assert "position" not in lines and "UP" in lines
+
+    def test_screen_notes_fixed_and_layered(self, clean):
+        stx.set_slide_notes(SlideNote("UNDER", place="screen-bottom", link="legal"),
+                            SlideNote("OVER", place="screen-right", layer="over"))
+        h = screen_notes_html()
+        assert h.count("position: fixed") == 3                      # under + its clickable copy + over
+        assert "stx-sn-under" in h and "stx-sn-click" in h and "stx-sn-over" in h
+        assert "var(--stx-sn-bottom" in h                           # above the presentation bar
+
+    def test_text_per_mode_gives_one_span_per_target(self, clean):
+        stx.set_slide_notes(SlideNote({"slides": "APP", "html": "HTML", "phone": "PH"}, place="below"))
+        h = slide_notes_html(foot=True)
+        assert '<span class="stx-sn-app">APP</span>' in h
+        assert '<span class="stx-sn-html">HTML</span>' in h and '<span class="stx-sn-phone">PH</span>' in h
+
+    def test_bar_places(self, clean):
+        stx.set_slide_notes(SlideNote("BEFORE", place="bar-before-counter"),
+                            SlideNote("INSTEAD", place="bar-title"))
+        assert "BEFORE" in bar_notes_html("bar-before-counter") and bar_notes_html("bar-after-title") == ""
+        from streamtex.presentation import PresentationConfig, st_presentation_footer
+        rec = []
+        with patch("streamtex.presentation._render", side_effect=rec.append):
+            st_presentation_footer(3, 9, title="Deck", config=PresentationConfig(footer=True))
+        bar = rec[-1]
+        assert "INSTEAD" in bar and "Deck" not in bar
+        assert bar.index("BEFORE") < bar.index("3 / 9")
+
+    def test_export_carries_rules_and_screen_notes(self, clean):
+        assert apply_slide_notes("<html><body>x</body></html>") == "<html><body>x</body></html>"
+        stx.set_slide_notes(SlideNote("FIX", place="screen-top"))
+        out = apply_slide_notes("<html><body>x</body></html>")
+        assert out.index("FIX") < out.index("</body>") and ".stx-sn-html { display: inline" in out

@@ -26,6 +26,7 @@ EXPECTED_ST_HTML_COUNTS = {
     "inspector.py": 3,      # 1 global CSS + 1 sidebar width CSS + 1 hidden marker (edit button)
     "block_helpers.py": 1,  # 1 fused CSS+marker call (_render_md_body)
     "marker_runtime.py": 1, # 1 fused <style>+<script> injection for the marker runtime
+    "slide_note.py": 1,     # rules + notes fixed on the screen, once per page (the export adds its own)
 }
 
 STREAMTEX_DIR = Path(__file__).resolve().parent.parent / "streamtex"

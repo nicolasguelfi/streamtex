@@ -320,6 +320,15 @@ def st_presentation_footer(
         if display_title
         else ""
     )
+    # Slide notes in the bar (note3): in place of the title, after it, before the counter
+    from .slide_note import bar_notes_html
+    in_title = bar_notes_html("bar-title")
+    if in_title:
+        title_html = f'<span class="stx-pf-title">{in_title}</span>'
+    after, before = bar_notes_html("bar-after-title"), bar_notes_html("bar-before-counter")
+    if after:
+        title_html = (f'<span class="stx-pf-left" style="display: flex; gap: 1em; align-items: center;">'
+                      f"{title_html}{after}</span>")
 
     if cfg.counter_mode == "slide":
         prefix = "Slide"
@@ -327,13 +336,15 @@ def st_presentation_footer(
     else:
         prefix = "Bloc"
         attr = ""
+    counter_html = f'<span class="stx-pf-counter"{attr}>{prefix} {current_slide} / {total_slides}</span>'
+    if before:
+        counter_html = (f'<span class="stx-pf-right" style="display: flex; gap: 1em; align-items: center;">'
+                        f"{before}{counter_html}</span>")
 
     html = (
         f'<div class="stx-presentation-footer">'
         f"  {title_html}"
-        f'  <span class="stx-pf-counter"{attr}>'
-        f"    {prefix} {current_slide} / {total_slides}"
-        f"  </span>"
+        f"  {counter_html}"
         f"</div>"
     )
     _render(html)

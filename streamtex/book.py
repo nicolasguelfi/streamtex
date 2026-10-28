@@ -541,6 +541,8 @@ def _offer_export_downloads(html: str, base_name: str,
                         pass
 
                 html_download = apply_html_print_rule(html_download, rules)   # #107
+                from .slide_note import apply_slide_notes
+                html_download = apply_slide_notes(html_download)             # note3
                 collector = get_asset_collector()
                 # Served media (configure_image_path) must survive off the
                 # server: materialise them into the collector / as data
@@ -670,6 +672,8 @@ def _run_auto_exports(
                 _html_out = lazy_load_images(                 # #115
                     _html_out, st.session_state.get(_STX_CACHE_KEY, {}).get("markers"))
                 _html_out = apply_html_print_rule(_html_out, get_print_state())   # #107
+                from .slide_note import apply_slide_notes
+                _html_out = apply_slide_notes(_html_out)                          # note3
                 if collector:
                     # External mode: write HTML + data/ folder to disk
                     out_dir = str(_P(path).parent)
@@ -1068,6 +1072,10 @@ def _st_book_impl(module_list, toc_config: TOCConfig = None, marker_config: Mark
             }
         })();
         </script>""", height=1)
+
+    # Slide notes (note3): their rules and the notes fixed on the screen, once per page
+    from .slide_note import st_slide_notes_page
+    st_slide_notes_page()
 
     if st.session_state[_STX_VIEW_MODE_KEY] == "Paginated":
         _paginated_book(module_list, toc_config, marker_config, separator,

@@ -119,17 +119,28 @@ def require_lock(cfg: ReleaseConfig) -> None:
             f"{have_ver.strip() or '?'} in the image): `stx release lock`, commit, then rebuild the live application")
 
 
-def library_skew(cfg: ReleaseConfig) -> str:
-    """Why the exporting streamtex is not the image's, or ``""`` (rel version=a)."""
-    info = json.loads(_project_python(cfg, (
+def library_info(cfg: ReleaseConfig) -> dict:
+    """The streamtex that exports here: its ``version``, and its ``direct_url`` when installed from a folder."""
+    return json.loads(_project_python(cfg, (
         "import json, importlib.metadata as m, streamtex\n"
         "d = m.distribution('streamtex')\n"
         "u = d.read_text('direct_url.json')\n"
         "print(json.dumps({'version': streamtex.__version__, 'direct_url': json.loads(u) if u else None}))")))
+
+
+def library_skew(cfg: ReleaseConfig, info: dict | None = None) -> str:
+    """Why the exporting streamtex is not the image's, or ``""`` (rel version=a)."""
+    info = info if info is not None else library_info(cfg)
     want = (cfg.lock_dir / "stx-version").read_text(encoding="utf-8").strip() \
         if (cfg.lock_dir / "stx-version").exists() else ""
     if want and info["version"] != want:
         return f"streamtex {info['version']} exports here, the live image runs {want}"
+    return copy_skew(info)
+
+
+def copy_skew(info: dict) -> str:
+    """Why an editable streamtex holds code that its version's release has not, or ``""``: such a gap
+    never ends with a rebuild of the image, unlike a gap of version only (#150)."""
     url = info.get("direct_url") or {}
     if url.get("dir_info", {}).get("editable"):
         path = url.get("url", "").removeprefix("file://")

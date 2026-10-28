@@ -46,9 +46,12 @@ def _html_env(items) -> dict[str, str]:
     return env
 
 
-def _skew(cfg, t, allow_skew: bool) -> str:
-    """Why the exporting streamtex is not the live image's, refused unless --allow-skew (rel version=a)."""
-    skew = build.library_skew(cfg)
+def _skew(cfg, t, allow_skew: bool) -> tuple[str, str]:
+    """Why the exporting streamtex is not the live image's, refused unless --allow-skew (rel version=a);
+    with the exporting version when the gap is one of version only — a rebuild of the image at that
+    version ends it (#150) — else ``""``."""
+    info = build.library_info(cfg)
+    skew = build.library_skew(cfg, info)
     running = ops.image_version(t)
     wanted = (cfg.lock_dir / "stx-version").read_text(encoding="utf-8").strip()
     if not skew and running and running != wanted:
@@ -60,7 +63,7 @@ def _skew(cfg, t, allow_skew: bool) -> str:
         raise ReleaseError(f"{skew} — publish with the image's streamtex, or pass --allow-skew for a trial")
     if skew:
         click.echo(f"  ⚠ {skew} (--allow-skew: the sites are marked in status)")
-    return skew
+    return skew, ("" if not skew or build.copy_skew(info) else info["version"])
 
 
 @release.command("publish")
@@ -85,7 +88,7 @@ def publish_cmd(sites, groups, all_, target, allow_skew, html_env):
     env = _html_env(html_env)
     release_name = build.require_committed(cfg.root)
     build.require_lock(cfg)
-    skew = _skew(cfg, t, allow_skew)
+    skew, skew_version = _skew(cfg, t, allow_skew)
     run_checks(cfg, chosen)
     data = _passwords(cfg)
     faces = {s.site: pw.for_site(data, s) for s in chosen}     # every password checked before any copy
@@ -93,7 +96,7 @@ def publish_cmd(sites, groups, all_, target, allow_skew, html_env):
     pool = pw.RecordPool(ops.server_records(t))                # one record per password, on every site
     for s in chosen:
         ops.publish_site(t, cfg, state, s, release_name, faces[s.site], click.echo, env, skew,
-                         levels[s.site], pool)
+                         levels[s.site], pool, skew_version=skew_version)
 
 
 @release.command("status")
@@ -111,7 +114,7 @@ def status_cmd(target):
     wanted = wanted_path.read_text(encoding="utf-8").strip() if wanted_path.exists() else "?"
     gap = "" if running == wanted else "  ← GAP"
     click.echo(f"target {t.name} · HEAD {head} · live image streamtex {running} (stx-version {wanted}){gap}\n")
-    rows = ops.status_rows(t, cfg, state, data)
+    rows = ops.status_rows(t, cfg, state, data, running)
     w = max([28] + [len(r[0]) + 2 for r in rows])
     click.echo(f"{'site':<{w}}{'published':<14}{'served (html)':<19}{'live':<8}{'html':<11}date")
     for name, rel, html, live, access, date, flag in rows:

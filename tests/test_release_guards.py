@@ -136,6 +136,43 @@ def test_an_editable_library_without_its_tag_is_a_skew(tmp_path, monkeypatch, cf
     assert "without the tag v1.2.3" in build.library_skew(cfg)
 
 
+# -- #150: a gap of version only is resolved once the live image runs the exporting version ----------
+
+@pytest.mark.parametrize("exports, running, copy, said, version", [
+    ("1.2.4", "1.2.3", "", "streamtex 1.2.4 exports here", "1.2.4"),             # a newer library, tried
+    ("1.2.3", "1.2.2", "", "the live application runs streamtex 1.2.2", "1.2.3"),  # the image not rebuilt yet
+    ("1.2.3", "1.2.3", "a working copy 1 commit(s) ahead", "ahead", ""),         # no rebuild ends it
+    ("1.2.4", "1.2.3", "a working copy 1 commit(s) ahead", "1.2.4 exports here", ""),
+    ("1.2.3", "1.2.3", "", "", ""),
+])
+def test_the_skew_says_the_version_that_ends_it(cfg, monkeypatch, exports, running, copy, said, version):
+    from streamtex.cli.release_cmd import _skew
+    cfg.lock_dir.mkdir(parents=True, exist_ok=True)
+    (cfg.lock_dir / "stx-version").write_text("1.2.3\n")
+    monkeypatch.setattr(build, "library_info", lambda c: {"version": exports, "direct_url": None})
+    monkeypatch.setattr(build, "copy_skew", lambda info: copy)
+    monkeypatch.setattr(ops, "image_version", lambda t: running)
+
+    class T:
+        cfg = {}
+
+    skew, ends = _skew(cfg, T(), allow_skew=True)
+    assert said in skew and (skew == "") == (said == "") and ends == version
+
+
+def test_the_mark_is_resolved_not_erased():
+    v = {}
+    ops.record_skew(v, "streamtex 1.2.4 exports here, the live image runs 1.2.3", "1.2.4")
+    assert ops.skew_flag(v, "1.2.3") == "  (skew)"
+    assert ops.skew_flag(v, "1.2.4") == "  (skew, resolved: the live image runs 1.2.4)"
+    assert v["skew"].startswith("streamtex 1.2.4")                       # status only reads
+    ops.record_skew(v, "a working copy ahead of v1.2.4")
+    assert "skew_version" not in v and ops.skew_flag(v, "1.2.4") == "  (skew)"
+    ops.record_skew(v, "")
+    assert v == {} and ops.skew_flag(v, "1.2.4") == ""
+    assert ops.skew_flag({"skew": "published before #150"}, "1.2.4") == "  (skew)"   # no version recorded
+
+
 # -- G9: the domains shown before they are written -------------------------------------------------
 
 class FakeCoolify:

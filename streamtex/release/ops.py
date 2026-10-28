@@ -280,7 +280,7 @@ def _levels_line(levels: dict, default: int | None) -> str:
 
 def publish_site(t: Target, cfg: ReleaseConfig, state: dict, site: Site, release: str, faces: dict,
                  echo: Echo, html_env: dict[str, str] | None = None, skew: str = "",
-                 levels: dict | None = None, pool: pw.RecordPool | None = None) -> None:
+                 levels: dict | None = None, pool: pw.RecordPool | None = None, skew_version: str = "") -> None:
     echo(f"\n▶ {site.site} @ {release} ({t.name})")
     entries = sites_of(state, t.name)
     v = entries.setdefault(site.site, {})
@@ -363,10 +363,7 @@ def publish_site(t: Target, cfg: ReleaseConfig, state: dict, site: Site, release
              cuts={str(n): name for n, name in names.items()}, up_to_slide_previous=v.get("up_to_slide"))
     for old in ("html_release", "html_previous"):
         v.pop(old, None)
-    if skew:
-        v["skew"] = skew
-    else:
-        v.pop("skew", None)
+    record_skew(v, skew, skew_version)
     save_state(cfg.root, state)
     echo(f"  ✓ {site.site}: html {release}, live {'ok' if 'live' in site.faces else '-'}"
          + (f" — port {v['port']}" if v.get("port") else "")
@@ -375,6 +372,26 @@ def publish_site(t: Target, cfg: ReleaseConfig, state: dict, site: Site, release
         echo(f"  levels: {_levels_line(levels, v.get('up_to_slide'))}")
     if removed := prune(t, site, {release, previous} - {None}, _html_keep(v)):
         echo(f"  ⌫ {len(removed)} old release(s) removed: {', '.join(removed)}")
+
+
+def record_skew(v: dict, skew: str, version: str = "") -> None:
+    """A site published with --allow-skew is marked; with *version*, the exporting streamtex, when the
+    gap was one of version only: the mark is then resolved once the live image runs it (#150)."""
+    v.pop("skew", None)
+    v.pop("skew_version", None)
+    if skew:
+        v["skew"] = skew
+        if version:
+            v["skew_version"] = version
+
+
+def skew_flag(v: dict, running: str) -> str:
+    """The mark status shows: kept, never erased, but said resolved when the image caught up (#150)."""
+    if not v.get("skew"):
+        return ""
+    if v.get("skew_version") and v["skew_version"] == running:
+        return f"  (skew, resolved: the live image runs {running})"
+    return "  (skew)"
 
 
 def _slides(v: dict) -> str:
@@ -524,7 +541,7 @@ def image_version(t: Target) -> str:
     return r.stdout.strip() if r.returncode == 0 else ""
 
 
-def status_rows(t: Target, cfg: ReleaseConfig, state: dict, data: dict | None) -> list[tuple]:
+def status_rows(t: Target, cfg: ReleaseConfig, state: dict, data: dict | None, running: str = "") -> list[tuple]:
     rows = []
     for name, v in sorted(sites_of(state, t.name).items()):
         site = cfg.by_name.get(name)
@@ -550,8 +567,7 @@ def status_rows(t: Target, cfg: ReleaseConfig, state: dict, data: dict | None) -
             flag = f"  ← GAP ({'; '.join(problems)})" if problems else ""
         else:
             flag = "" if html == v.get("release") else "  ← GAP"
-        if v.get("skew"):
-            flag += "  (skew)"
+        flag += skew_flag(v, running)
         if levels and "html" in site.faces and any(lvl != "all" for lvl in levels.values()):
             flag += f"  ({_levels_line(levels, v.get('up_to_slide'))})"
         access = "-" if "html" not in site.faces else ("open" if v.get("html_open") else "protected")

@@ -5,6 +5,48 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.78] — 2026-10-28 — rebuild without a paste, skew resolved, links to other sites checked (board vague3, wave 3: #150, #149, #155)
+
+### Added
+
+- **`stx release rebuild` for an application built from a Dockerfile kept
+  in Coolify** (#149, board vague3 t149=p1): Coolify's API refuses to
+  replace that Dockerfile, so the rebuild of such a live (or static)
+  application meant `stx release setup --show live`, a paste in
+  Coolify's interface, Save, Redeploy. `rebuild` now writes today's
+  Dockerfile where that interface does — the column
+  `applications.dockerfile` of Coolify's database (`coolify-db`, or the
+  target's `coolify_db`), over ssh — after showing the difference with
+  the one in place, which is kept under `<root>/dockerfiles/`. The
+  written Dockerfile is read back and must be the same, then the
+  application is rebuilt and its streamtex checked against
+  `stx-version`. `--dry-run` shows the difference and writes nothing;
+  `--restore` puts back the last Dockerfile kept, then rebuilds. A
+  database that refuses the request (Coolify changed) stops it with a
+  message that names the paste as the way out. An application built from
+  the repository is rebuilt as before.
+- **Links to another site's files are checked** (#155, board vague3
+  nouveaux=n1): with `media_per_site`, a file is kept by the site whose
+  export links to it, but a link to `https://<other site>…/app/static/x`
+  is served by that other site, and only while it keeps the file.
+  `publish` now records, per site, the export's links to the files of
+  another site of the project (`foreign_links` in `.stx-release.json`),
+  and, after all its sites, checks in the live container that each
+  file is served by the site its address names; the files that would
+  answer 404 are named. `stx release media-report` lists those links.
+
+### Changed
+
+- **The skew mark is said resolved** (#150, board vague3 t150=s1): a site
+  published with `--allow-skew` stays marked `(skew)` in
+  `stx release status` until it is published again. When the gap was one
+  of version only (not a working copy ahead of its tag), publish now
+  records the exporting version (`skew_version`), and status shows
+  `(skew, resolved: the live image runs X)` once the live image runs it.
+  The mark is never erased; status only reads. Sites published before
+  this version keep a plain `(skew)`.
+- The skew message names `stx release rebuild` for every target.
+
 ## [0.7.77] — 2026-10-28 — media per site keeps the files the HTML export links to (#142)
 
 ### Fixed

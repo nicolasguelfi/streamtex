@@ -287,6 +287,54 @@ def remove_cmd(site, target, yes, force):
                    "`--domains --deploy` writes them (redeploys both applications, out of class).")
 
 
+@release.command("media-report")
+@click.argument("site")
+@click.option("--list", "show", type=click.Choice(["kept", "dropped"]), default=None,
+              help="Also list the files kept, or those no longer served.")
+@click.option("--html-env", "html_env", multiple=True, help="KEY=VALUE for the HTML export, as for publish.")
+def media_report_cmd(site, show, html_env):
+    """What SITE's live face would serve with `[release] media_per_site = true` (#142), on this machine.
+
+    Exports SITE's HTML from the commit, as publish does, then sorts its static folder: the files the
+    export shows and those media_keep names are kept, the others would no longer be served. Nothing is
+    sent: the server is not read nor changed."""
+    import tempfile
+    from pathlib import Path
+
+    from ..release import media as md
+
+    cfg = load_config()
+    s = cfg.site(site)
+    if "html" not in s.faces:
+        raise ReleaseError(f"{site} has no HTML face: its live face serves its whole static folder")
+    with tempfile.TemporaryDirectory(prefix="stx-media-") as w:
+        work = Path(w)
+        code = build.snapshot(cfg, s, work)
+        html, _ = build.export(cfg, s, code, work, "media-report", _html_env(html_env))
+        mp = md.plan(cfg, s, code, html)
+    if mp.static is None:
+        raise ReleaseError(f"{site}: {s.doc_dir}/static is not a folder — the live face serves no media")
+    kept, dropped = sorted(mp.kept), mp.dropped
+    by_export = sum(1 for why in mp.kept.values() if why == "export")
+    click.echo(f"{site} — static folder {mp.static} ({len(mp.files)} files, {md.human(mp.size(mp.files))})")
+    click.echo(f"  kept: {len(kept)} file(s), {md.human(mp.size(kept))} — {by_export} shown by the HTML "
+               f"export, {len(kept) - by_export} named by media_keep")
+    click.echo(f"  no longer served: {len(dropped)} file(s), {md.human(mp.size(dropped))}")
+    if mp.unmatched:
+        click.echo(f"  {mp.unmatched} export file(s) match no static file (inlined or generated: nothing to keep)")
+    if mp.named:
+        click.echo(f"  ! named in the site's files but not kept — add them to media_keep if the live face "
+                   f"needs them ({len(mp.named)}):")
+        for p in mp.named:
+            click.echo(f"      {p}")
+    if show:
+        click.echo(f"{'Kept' if show == 'kept' else 'No longer served'}:")
+        for p in (kept if show == "kept" else dropped):
+            click.echo(f"  {p}" + (f"   ({mp.kept[p]})" if show == "kept" else ""))
+    click.echo(f"[release] media_per_site = {'true: applied' if cfg.media_per_site else 'false: nothing changes'}"
+               " at the next publication")
+
+
 @release.command("lock")
 def lock_cmd():
     """Write the live image's requirements.txt and stx-version from uv.lock (then rebuild the live app).

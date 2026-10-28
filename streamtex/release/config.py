@@ -9,6 +9,9 @@
     snapshot = ["content", "shared", "trainings_pack"]   # in every code snapshot, besides the site's paths
     media = "assets"               # copied once per project, linked into every snapshot (optional)
     media_exclude = [".DS_Store", "*-original.*"]
+    media_per_site = true          # the live face serves only the site's own media (#142; default false):
+                                   # those its HTML export shows, plus media_keep — see release/media.py
+    media_keep = ["media/videos/*"]   # globs under the site's static folder, served by every site
     pythonpath = ["trainings_pack"]  # PYTHONPATH of the live process, relative to the snapshot
     lock_exclude = ["trainings-pack"]  # local packages kept out of the live image's requirements
     lock_no_sources = false        # true: requirements resolved without [tool.uv.sources] (git packs)
@@ -26,6 +29,7 @@
     exclude = ["trainings/CHAT1D/pack"]   # removed from the snapshot
     explicit = false               # true: published only when named (a home page)
     zoom = 80                      # the HTML face opens as at this browser zoom, in percent (optional)
+    media_keep = ["downloads/chat1d/*"]   # served by this site besides [release] media_keep (#142)
 """
 
 from __future__ import annotations
@@ -41,10 +45,10 @@ from . import ReleaseError
 
 FACES = ("live", "html")
 SITE_RE = re.compile(r"^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$")
-_SITE_KEYS = {"site", "book", "group", "faces", "paths", "exclude", "explicit", "legacy", "zoom"}
+_SITE_KEYS = {"site", "book", "group", "faces", "paths", "exclude", "explicit", "legacy", "zoom", "media_keep"}
 _RELEASE_KEYS = {"project", "langs", "snapshot", "media", "media_exclude", "pythonpath", "lock_exclude",
                  "lock_no_sources", "apt", "min_words", "port_base", "dir", "sites", "sites_from", "checks",
-                 "verify"}
+                 "verify", "media_per_site", "media_keep"}
 _APT_RE = re.compile(r"^[a-z0-9][a-z0-9.+-]+$")
 
 
@@ -61,6 +65,7 @@ class Site:
     explicit: bool = False
     legacy: tuple[str, ...] = ()          # the prototype's (training, kind), for convert-passwords
     zoom: float | None = None             # the HTML face's zoom in percent (stx export html --zoom)
+    media_keep: tuple[str, ...] = ()      # globs served by this site's live face besides its export's (#142)
 
     @property
     def doc_dir(self) -> str:
@@ -91,6 +96,8 @@ class ReleaseConfig:
     dir: str = ".stx-release"
     checks: str | None = None
     verify: str | None = None             # the project's check of each HTML export (#144)
+    media_per_site: bool = False          # the live face serves only the site's own media (#142)
+    media_keep: tuple[str, ...] = ()      # globs served by every site's live face besides its export's
     by_name: dict[str, Site] = field(default_factory=dict)
 
     def __post_init__(self):
@@ -139,6 +146,13 @@ def _call(spec: str, root: Path, what: str):
         sys.path.remove(str(root))
 
 
+def _globs(raw: object, where: str) -> tuple[str, ...]:
+    if not isinstance(raw, list) or not all(isinstance(x, str) and x and not x.startswith("/") for x in raw):
+        raise ReleaseError(f"{where}: media_keep — a list of globs under the static folder, "
+                           "such as [\"media/videos/*\"]")
+    return tuple(raw)
+
+
 def _site(raw: object, where: str) -> Site:
     if not isinstance(raw, dict):
         raise ReleaseError(f"{where}: a site is a table")
@@ -162,7 +176,8 @@ def _site(raw: object, where: str) -> Site:
         raise ReleaseError(f"{where} ({name}): zoom {zoom!r} — a positive percentage, such as 80")
     return Site(site=name, book=book, group=str(raw.get("group") or name), faces=faces, paths=paths,
                 exclude=tuple(raw.get("exclude", ())), explicit=bool(raw.get("explicit", False)), legacy=legacy,
-                zoom=float(zoom) if zoom is not None else None)
+                zoom=float(zoom) if zoom is not None else None,
+                media_keep=_globs(raw.get("media_keep", []), f"{where} ({name})"))
 
 
 def load_config(root: Path | None = None) -> ReleaseConfig:
@@ -201,6 +216,9 @@ def load_config(root: Path | None = None) -> ReleaseConfig:
     verify = data.get("verify")
     if verify is not None and not (isinstance(verify, str) and re.fullmatch(r"[\w.]+:\w+", verify)):
         raise ReleaseError(f"[release] verify = {verify!r} — expected 'module:function'")
+    per_site = data.get("media_per_site", False)
+    if not isinstance(per_site, bool):
+        raise ReleaseError(f"[release] media_per_site = {per_site!r} — true or false")
     return ReleaseConfig(
         root=root, project=project, sites=sites, langs=langs,
         snapshot=tuple(data.get("snapshot", ())), media=data.get("media"),
@@ -208,7 +226,8 @@ def load_config(root: Path | None = None) -> ReleaseConfig:
         pythonpath=tuple(data.get("pythonpath", ())), lock_exclude=tuple(data.get("lock_exclude", ())),
         lock_no_sources=bool(data.get("lock_no_sources", False)), apt=apt,
         min_words=int(data.get("min_words", 100)), port_base=int(data.get("port_base", 9000)),
-        dir=str(data.get("dir", ".stx-release")), checks=data.get("checks"), verify=verify)
+        dir=str(data.get("dir", ".stx-release")), checks=data.get("checks"), verify=verify,
+        media_per_site=per_site, media_keep=_globs(data.get("media_keep", []), "[release]"))
 
 
 def run_checks(cfg: ReleaseConfig, sites: list[Site]) -> None:

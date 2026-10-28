@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Media per site on the live face** (#142, board media1):
+  `[release] media_per_site = true` makes each site's live face serve
+  under `/app/static/` only the files its site uses, instead of its whole
+  static folder (in all-trainings, every document's `static` is the
+  shared `assets` folder: 2777 files, 1.1 GB, served to every site). Kept:
+  the files its HTML export shows, found again in the static folder by
+  their content, and the files named by `media_keep` globs (`[release]`
+  for every site, a site's table for that site). Each release holds a
+  folder `.stx-served` of links to them; the router's link follows the
+  release, so a rollback to an earlier release serves its whole folder
+  again. The code is unchanged: a block reading a file still finds it. A
+  site without an HTML face keeps its whole folder. Off by default.
+- **`stx release media-report SITE [--list kept|dropped]`** (#142):
+  exports SITE's HTML from the commit, on this machine, and shows what
+  its live face would serve: the files kept (by the export, by
+  `media_keep`), those no longer served, and the files named in the
+  site's own files that would not be kept. Nothing is sent.
+
 ## [0.7.75] — 2026-10-28 — stx release remove, slides of a page in presentation mode, one click on Generate (board ordre1, wave 2)
 
 ### Added

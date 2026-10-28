@@ -11,6 +11,7 @@ On the target (``<root>`` of the target, ``/srv/<face>`` in the containers)::
     live/sites/<site>/current -> releases/<release>
     live/sites/<site>/pass                    the live face's records
     live/sites/<site>/static -> current/<doc>/static   the site's media, served by the router
+                             -> current/.stx-served    with media_per_site: its own media alone (#142)
     live/media/<project>/<media>/             the project's media, shared by every snapshot
     live/conf/programs/<site>.conf            the site's supervisord program
     live/conf/ports.map                       site → port, read by the router
@@ -38,6 +39,7 @@ from pathlib import Path
 
 from . import ReleaseError, build
 from . import levels as lv
+from . import media as md
 from . import passwords as pw
 from .config import SITE_RE, ReleaseConfig, Site
 from .state import STATE_FILE, save_state, sites_of
@@ -78,9 +80,21 @@ def html_of(v: dict) -> str | None:
 
 
 def switch(t: Target, site: Site, release: str, faces: list[str] | None = None) -> None:
-    """Each face's ``current`` link on *release*."""
-    for face in faces or _faces_dirs(site):
+    """Each face's ``current`` link on *release*; the live face's media follow it."""
+    dirs = faces or _faces_dirs(site)
+    for face in dirs:
         t.sh(t.switch_cmd(t.path(face, "sites", site.site), release))
+    if "live" in dirs:
+        link_static(t, site)
+
+
+def link_static(t: Target, site: Site) -> None:
+    """The media the router serves for *site*: the release's ``.stx-served`` when it has one (#142),
+    else its whole ``<doc>/static`` — a rollback to a release of before brings its media back."""
+    cur = f"{LIVE_ROOT}/sites/{site.site}/current"
+    t.sh(f"cd {shlex.quote(t.path('live', 'sites', site.site))} && "
+         f"if [ -d current/{md.SERVED} ]; then ln -sfn {shlex.quote(f'{cur}/{md.SERVED}')} static; "
+         f"else ln -sfn {shlex.quote(f'{cur}/{site.doc_dir}/static')} static; fi")
 
 
 def server_records(t: Target) -> str:
@@ -288,6 +302,18 @@ def publish_site(t: Target, cfg: ReleaseConfig, state: dict, site: Site, release
             build.verify_export(cfg, site, html)
             if cfg.verify:
                 echo(f"  ✓ export accepted by {cfg.verify}")
+        if cfg.media_per_site and "live" in site.faces:
+            if html is None:
+                echo(f"  ! media per site: {site.site} has no HTML face — its live face serves its whole "
+                     "static folder")
+            elif (mp := md.plan(cfg, site, code, html)).static is not None:
+                md.build_served(code, site, mp.kept)
+                echo(f"  ✓ media per site: {len(mp.kept)} of {len(mp.files)} file(s) served "
+                     f"({md.human(mp.size(mp.kept))})")
+                if mp.named:
+                    echo(f"  ! named in the site's files, not served: {', '.join(mp.named[:5])}"
+                         + (f" (+{len(mp.named) - 5})" if len(mp.named) > 5 else "")
+                         + " — add them to media_keep")
         if "live" in site.faces:
             dirs = [t.path("live", "sites", site.site, "releases")]
             if cfg.media:
@@ -315,9 +341,6 @@ def publish_site(t: Target, cfg: ReleaseConfig, state: dict, site: Site, release
                 media.symlink_to(f"{LIVE_ROOT}/media/{cfg.project}/{cfg.media}")
             t.rsync(str(code) + "/", t.path("live", "sites", site.site, "releases", release) + "/", "--delete")
             t.sh(f"chmod -R a+rX {shlex.quote(t.path('live', 'sites', site.site, 'releases', release))}")
-    if "live" in site.faces:
-        t.sh(f"ln -sfn {LIVE_ROOT}/sites/{site.site}/current/{site.doc_dir}/static "
-             f"{shlex.quote(t.path('live', 'sites', site.site, 'static'))}")
     apply_passwords(t, cfg, state, site, faces, pool)
     write_maps(t, state)
     if "html" in site.faces:

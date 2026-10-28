@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`stx release remove SITE [--yes] [--force]`** (#143): takes a site off
+  the server — stops and removes its supervisord program, drops its line
+  of `ports.map`, reloads the web servers, removes its folders on both
+  faces and its entry in `.stx-release.json`. It shows what it will remove
+  and asks first; it refuses a site still declared in `stx.toml` unless
+  `--force`. No other site is touched and the project's media stay. The
+  domains are left to `stx release setup --domains` (it redeploys both
+  applications): `remove` prints the command.
+
 ### Fixed
 
 - **Presentation mode: the slides of a page holding several slides were

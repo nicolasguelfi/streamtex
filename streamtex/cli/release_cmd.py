@@ -259,6 +259,34 @@ def wake_cmd(site, target):
     click.echo(f"{site}: live face running again")
 
 
+@release.command("remove")
+@click.argument("site")
+@_target
+@click.option("--yes", is_flag=True, help="Do not ask for confirmation.")
+@click.option("--force", is_flag=True, help="Remove a site still declared in stx.toml.")
+def remove_cmd(site, target, yes, force):
+    """Take SITE off the server (#143): its program, its port, its folders, its state entry.
+
+    Refused while SITE is still declared in stx.toml, unless --force. No other site is touched and the
+    project's media stay. The domains are not changed here: `stx release setup --domains --dry-run`
+    shows them, then `--domains --deploy` writes them (it redeploys both applications)."""
+    cfg, state, t = _ctx(target)
+    if site in cfg.by_name and not force:
+        raise ReleaseError(f"{site} is still declared in stx.toml — remove it there first, or pass --force")
+    plan = ops.remove_plan(t, state, site)
+    if not plan:
+        raise ReleaseError(f"{site}: nothing on {t.name}")
+    click.echo(f"On {t.name}, this removes:")
+    for line in plan:
+        click.echo(f"  - {line}")
+    if not yes and not click.confirm("Remove?", default=False):
+        raise ReleaseError("nothing removed")
+    ops.remove_site(t, cfg, state, site, click.echo)
+    if site not in cfg.by_name:
+        click.echo("Domains: `stx release setup --domains --dry-run` shows the one to drop; "
+                   "`--domains --deploy` writes them (redeploys both applications, out of class).")
+
+
 @release.command("lock")
 def lock_cmd():
     """Write the live image's requirements.txt and stx-version from uv.lock (then rebuild the live app).

@@ -39,8 +39,8 @@ from pathlib import Path
 from . import ReleaseError, build
 from . import levels as lv
 from . import passwords as pw
-from .config import ReleaseConfig, Site
-from .state import save_state, sites_of
+from .config import SITE_RE, ReleaseConfig, Site
+from .state import STATE_FILE, save_state, sites_of
 from .target import LIVE_ROOT, Target
 
 TEMPLATES = Path(__file__).parent / "templates"
@@ -450,6 +450,49 @@ def sleep_wake(t: Target, cfg: ReleaseConfig, state: dict, site: Site, asleep: b
     t.dexec("live", f"supervisorctl {'stop' if asleep else 'start'} {site.site}", check=False)
     t.dexec("live", "nginx -s reload")
     save_state(cfg.root, state)
+
+
+def remove_plan(t: Target, state: dict, name: str) -> list[str]:
+    """What ``stx release remove`` takes off the target for site *name* (#143): ``[]`` when nothing."""
+    if not SITE_RE.match(name):
+        raise ReleaseError(f"{name!r} is not a site name")
+    out = []
+    for face in ("static", "live"):
+        d = t.path(face, "sites", name)
+        if t.sh(f"test -d {shlex.quote(d)}", check=False).returncode == 0:
+            out.append(f"folder {d}")
+    conf = t.path("live", "conf", "programs", f"{name}.conf")
+    if t.sh(f"test -f {shlex.quote(conf)}", check=False).returncode == 0:
+        out.append(f"program {conf} (stopped first)")
+    v = sites_of(state, t.name).get(name)
+    if v is not None:
+        if v.get("port"):
+            out.append(f"line '{name} {v['port']};' of {t.path('live', 'conf', 'ports.map')}")
+        out.append(f"entry {name} of {STATE_FILE} (target {t.name})")
+    return out
+
+
+def remove_site(t: Target, cfg: ReleaseConfig, state: dict, name: str, echo: Echo) -> None:
+    """Take site *name* off the target: its program, its port, its folders and its state entry. No
+    other site is touched; the project's media stay (shared by every site)."""
+    if not SITE_RE.match(name):
+        raise ReleaseError(f"{name!r} is not a site name")
+    conf = t.path("live", "conf", "programs", f"{name}.conf")
+    t.dexec("live", f"supervisorctl stop {name}", check=False)
+    t.sh(f"rm -f {shlex.quote(conf)}")
+    sites_of(state, t.name).pop(name, None)
+    write_maps(t, state)
+    t.dexec("live", "supervisorctl reread", check=False)
+    t.dexec("live", "supervisorctl update", check=False)
+    t.dexec("static", "nginx -s reload", check=False)
+    t.dexec("live", "nginx -s reload", check=False)
+    for face in ("static", "live"):
+        d = t.path(face, "sites", name)
+        if not (SITE_RE.match(name) and d.rstrip("/").endswith(f"sites/{name}")):
+            raise ReleaseError(f"refused to remove {d!r}")
+        t.sh(f"rm -rf {shlex.quote(d)}")
+    save_state(cfg.root, state)
+    echo(f"  ✓ {name} removed from {t.name}")
 
 
 def image_version(t: Target) -> str:

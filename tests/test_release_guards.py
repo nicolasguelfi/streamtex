@@ -256,3 +256,78 @@ def test_a_refused_export_copies_nothing(tmp_path, monkeypatch):
     with pytest.raises(ReleaseError, match="verify refused"):
         ops.publish_site(t, cfg, state, cfg.site("deck"), "r2", {"live": None, "html": None}, lambda m: None)
     assert not any(c == "rsync" or c.startswith("switch") or "mkdir" in c for c in t.cmds)
+
+
+# -- #143: stx release remove ---------------------------------------------------------------------
+
+class LocalTarget:
+    """Runs the shell commands in a temporary root; records what goes to the containers."""
+
+    name = "prod"
+
+    def __init__(self, root):
+        self.root, self.dexecs = root, []
+
+    def path(self, *parts):
+        return str(self.root.joinpath(*parts))
+
+    def sh(self, cmd, check=True):
+        return subprocess.run(["sh", "-c", cmd], text=True, capture_output=True)
+
+    def write(self, dest, content, mode=None):
+        from pathlib import Path
+        Path(dest).parent.mkdir(parents=True, exist_ok=True)
+        Path(dest).write_text(content)
+
+    def dexec(self, app, cmd, check=True):
+        self.dexecs.append((app, cmd))
+        return subprocess.CompletedProcess(cmd, 0, "", "")
+
+
+def _two_sites_on(tmp_path):
+    root = tmp_path / "srv"
+    for site in ("old", "deck"):
+        (root / "static" / "sites" / site / "releases" / "r1").mkdir(parents=True)
+        (root / "live" / "sites" / site / "releases" / "r1").mkdir(parents=True)
+        (root / "live" / "conf" / "programs").mkdir(parents=True, exist_ok=True)
+        (root / "live" / "conf" / "programs" / f"{site}.conf").write_text("[program]\n")
+    (root / "live" / "media" / "demo").mkdir(parents=True)
+    state = {"sites": {"prod": {"old": {"release": "r1", "port": 9001}, "deck": {"release": "r1", "port": 9002}}}}
+    return LocalTarget(root), state
+
+
+def test_remove_takes_one_site_off_and_nothing_else(cfg, tmp_path):
+    t, state = _two_sites_on(tmp_path)
+    plan = ops.remove_plan(t, state, "old")
+    assert len(plan) == 5 and any("ports.map" in p for p in plan)
+    ops.remove_site(t, cfg, state, "old", lambda m: None)
+    root = t.root
+    assert not (root / "static/sites/old").exists() and not (root / "live/sites/old").exists()
+    assert not (root / "live/conf/programs/old.conf").exists()
+    assert (root / "static/sites/deck/releases/r1").is_dir() and (root / "live/conf/programs/deck.conf").exists()
+    assert (root / "live/media/demo").is_dir()
+    assert (root / "live/conf/ports.map").read_text() == "deck 9002;\n"
+    assert list(state["sites"]["prod"]) == ["deck"]
+    assert ("live", "supervisorctl stop old") in t.dexecs and ("live", "supervisorctl update") in t.dexecs
+    assert ops.remove_plan(t, state, "old") == []
+
+
+def test_remove_refuses_a_bad_name(cfg, tmp_path):
+    t, state = _two_sites_on(tmp_path)
+    for bad in ("../static", "a b", ""):
+        with pytest.raises(ReleaseError, match="not a site name"):
+            ops.remove_plan(t, state, bad)
+        with pytest.raises(ReleaseError, match="not a site name"):
+            ops.remove_site(t, cfg, state, bad, lambda m: None)
+
+
+def test_remove_refuses_a_declared_site(cfg, monkeypatch, tmp_path):
+    from streamtex.cli import release_cmd
+    t, state = _two_sites_on(tmp_path)
+    monkeypatch.setattr(release_cmd, "_ctx", lambda target: (cfg, state, t))
+    r = CliRunner().invoke(release_cmd.remove_cmd, ["deck"])
+    assert r.exit_code == 1 and "still declared in stx.toml" in r.output
+    r = CliRunner().invoke(release_cmd.remove_cmd, ["old"], input="n\n")
+    assert r.exit_code == 1 and "nothing removed" in r.output and (t.root / "live/sites/old").is_dir()
+    r = CliRunner().invoke(release_cmd.remove_cmd, ["old", "--yes"])
+    assert r.exit_code == 0 and not (t.root / "live/sites/old").exists() and "--domains --dry-run" in r.output

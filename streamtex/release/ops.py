@@ -293,6 +293,7 @@ def publish_site(t: Target, cfg: ReleaseConfig, state: dict, site: Site, release
     if "live" in site.faces and not v.get("port"):
         v["port"] = max([cfg.port_base - 1] + [s.get("port") or 0 for s in entries.values()]) + 1
     names: dict[int, str] = {}
+    foreign: dict[str, list[str]] = {}
     with tempfile.TemporaryDirectory(prefix="stx-release-") as w:
         work = Path(w)
         code = build.snapshot(cfg, site, work)
@@ -306,8 +307,9 @@ def publish_site(t: Target, cfg: ReleaseConfig, state: dict, site: Site, release
             if html is None:
                 echo(f"  ! media per site: {site.site} has no HTML face — its live face serves its whole "
                      "static folder")
-            elif (mp := md.plan(cfg, site, code, html)).static is not None:
+            elif (mp := md.plan(cfg, site, code, html, t.suffix)).static is not None:
                 md.build_served(code, site, mp.kept)
+                foreign = mp.foreign
                 echo(f"  ✓ media per site: {len(mp.kept)} of {len(mp.files)} file(s) served "
                      f"({md.human(mp.size(mp.kept))})")
                 if mp.named:
@@ -364,6 +366,10 @@ def publish_site(t: Target, cfg: ReleaseConfig, state: dict, site: Site, release
     for old in ("html_release", "html_previous"):
         v.pop(old, None)
     record_skew(v, skew, skew_version)
+    if foreign:
+        v["foreign_links"] = foreign
+    else:
+        v.pop("foreign_links", None)
     save_state(cfg.root, state)
     echo(f"  ✓ {site.site}: html {release}, live {'ok' if 'live' in site.faces else '-'}"
          + (f" — port {v['port']}" if v.get("port") else "")
@@ -372,6 +378,44 @@ def publish_site(t: Target, cfg: ReleaseConfig, state: dict, site: Site, release
         echo(f"  levels: {_levels_line(levels, v.get('up_to_slide'))}")
     if removed := prune(t, site, {release, previous} - {None}, _html_keep(v)):
         echo(f"  ⌫ {len(removed)} old release(s) removed: {', '.join(removed)}")
+
+
+def foreign_gaps(t: Target, cfg: ReleaseConfig, state: dict) -> tuple[int, list[tuple[str, str, str]]]:
+    """Every link of a site's export to another site's ``/app/static/`` file, recorded at publish, checked
+    in the live container as its router serves it: (how many, those the other site does not serve) —
+    (site, other site, file) (#155)."""
+    links = [(a, b, rel) for a, v in sorted(sites_of(state, t.name).items())
+             for b, rels in sorted((v.get("foreign_links") or {}).items()) for rel in rels]
+    gaps, ask = [], {}
+    for a, b, rel in links:
+        other = cfg.by_name.get(b)
+        if other is None or "live" not in other.faces:
+            gaps.append((a, b, rel))
+        else:
+            ask.setdefault(f"{LIVE_ROOT}/sites/{b}/static/{rel}", []).append((a, b, rel))
+    if ask:
+        script = ("for p in " + " ".join(shlex.quote(x) for x in ask)
+                  + "; do [ -f \"$p\" ] || printf '%s\\n' \"$p\"; done")
+        r = t.dexec("live", "sh -c " + shlex.quote(script), check=False)
+        if r.returncode:
+            raise ReleaseError(f"{t.name}: the links to other sites' files could not be checked: "
+                               f"{(r.stderr or r.stdout)[-300:]}")
+        for missing in r.stdout.splitlines():
+            gaps += ask.get(missing, [])
+    return len(links), sorted(gaps)
+
+
+def check_foreign_links(t: Target, cfg: ReleaseConfig, state: dict, echo: Echo) -> None:
+    n, gaps = foreign_gaps(t, cfg, state)
+    if not n:
+        return
+    if not gaps:
+        echo(f"✓ links to other sites' files: {n}, all served by those sites")
+        return
+    echo(f"! links to other sites' files: {len(gaps)} of {n} not served by the site their address names "
+         "(a visitor gets 404) — that site must show or link to the file, or name it in its media_keep:")
+    for a, b, rel in gaps:
+        echo(f"    {a} → {b}: /app/static/{rel}")
 
 
 def record_skew(v: dict, skew: str, version: str = "") -> None:

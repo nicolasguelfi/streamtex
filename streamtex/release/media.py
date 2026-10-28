@@ -13,6 +13,10 @@ document. With ``[release] media_per_site = true``, each release of the code hol
 * the files ``media_keep`` names (``[release]`` and the site's table): glob patterns relative to the
   static folder, as in ``/app/static/<path>``; ``*`` also crosses ``/``.
 
+A link to another site's file (``https://<other site>…/app/static/x.zip``) is served by that site, and
+only while that site keeps the file: ``foreign`` lists such links, publish records them and checks,
+after each publication, that the other site still serves each file (#155).
+
 The code itself is unchanged: a block that reads a file of the static folder still finds it. A site
 without an HTML face keeps serving its whole static folder. ``stx release media-report SITE`` shows
 the plan without changing anything.
@@ -37,6 +41,8 @@ SERVED = ".stx-served"
 _NAMED_RE = re.compile(r"""(?:app/)?static/([\w.~/-]+)""")
 #: A link of the export to a served file, absolute or not: the path after ``app/static/``.
 _LINKED_RE = re.compile(r"""app/static/([^"'\s()<>?#\\]+)""")
+#: The same link with its address: the host, whose first label names the site that serves it.
+_HOSTED_RE = re.compile(r"""https?://([A-Za-z0-9.-]+)(?::\d+)?/app/static/([^"'\s()<>?#\\]+)""")
 _TEXT = {".py", ".md", ".html", ".css", ".js", ".toml", ".json", ".txt", ".yaml", ".yml"}
 
 
@@ -50,6 +56,8 @@ class MediaPlan:
                                                               # or the media_keep pattern
     unmatched: int = 0                        # export files found in no static file (inlined, generated)
     named: list[str] = field(default_factory=list)            # named in the site's files, not kept
+    foreign: dict[str, list[str]] = field(default_factory=dict)  # another site of the project → the
+                                                              # files the export links to on it (#155)
 
     @property
     def dropped(self) -> list[str]:
@@ -84,7 +92,20 @@ def keep_patterns(cfg: ReleaseConfig, site: Site) -> tuple[str, ...]:
     return (*cfg.media_keep, *site.media_keep)
 
 
-def plan(cfg: ReleaseConfig, site: Site, code: Path, html: Path) -> MediaPlan:
+def _rel(match: str) -> str:
+    return unquote(match.replace("&amp;", "&")).rstrip("/")
+
+
+def site_of_host(cfg: ReleaseConfig, host: str, suffix: str = "") -> str:
+    """The project's site an address names (its first label, without a provisional *suffix*), or ``""``."""
+    label = host.split(".", 1)[0].lower()
+    for name in (label, label.removesuffix(suffix) if suffix else label):
+        if name in cfg.by_name:
+            return name
+    return ""
+
+
+def plan(cfg: ReleaseConfig, site: Site, code: Path, html: Path, suffix: str = "") -> MediaPlan:
     """The files the live face of *site* serves, from its snapshot *code* and its HTML export *html*,
     both on this machine; the snapshot's media folder is linked to the project's while it is read."""
     linked = None
@@ -95,13 +116,13 @@ def plan(cfg: ReleaseConfig, site: Site, code: Path, html: Path) -> MediaPlan:
         linked.parent.mkdir(parents=True, exist_ok=True)
         linked.symlink_to(cfg.root / cfg.media)
     try:
-        return _plan(cfg, site, code, html)
+        return _plan(cfg, site, code, html, suffix)
     finally:
         if linked is not None:
             linked.unlink()
 
 
-def _plan(cfg: ReleaseConfig, site: Site, code: Path, html: Path) -> MediaPlan:
+def _plan(cfg: ReleaseConfig, site: Site, code: Path, html: Path, suffix: str) -> MediaPlan:
     folder = code / site.doc_dir / "static"
     if not folder.is_dir():
         return MediaPlan(static=None)
@@ -124,12 +145,19 @@ def _plan(cfg: ReleaseConfig, site: Site, code: Path, html: Path) -> MediaPlan:
                     mp.kept.setdefault(rel, "export")
                     found = True
         mp.unmatched += not found
+    foreign: dict[str, set[str]] = defaultdict(set)
     for f in sorted(html.rglob("*")):
         if f.is_file() and f.suffix in (".html", ".css", ".js"):
-            for m in _LINKED_RE.findall(f.read_text(encoding="utf-8", errors="replace")):
-                rel = unquote(m.replace("&amp;", "&")).rstrip("/")
+            text = f.read_text(encoding="utf-8", errors="replace")
+            for m in _LINKED_RE.findall(text):
+                rel = _rel(m)
                 if rel in mp.files:
                     mp.kept.setdefault(rel, "export link")
+            for host, m in _HOSTED_RE.findall(text):
+                other = site_of_host(cfg, host, suffix)
+                if other and other != site.site:
+                    foreign[other].add(_rel(m))
+    mp.foreign = {k: sorted(v) for k, v in sorted(foreign.items())}
     for pat in keep_patterns(cfg, site):
         for rel in mp.files:
             if fnmatchcase(rel, pat):

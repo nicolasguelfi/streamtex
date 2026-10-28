@@ -186,7 +186,7 @@ def _publish(tmp_path, monkeypatch, cfg, faces=("live", "html")):
     seen = {}
 
     class Target:
-        name = "prod"
+        name, suffix = "prod", ""
 
         def path(self, *parts):
             return "/".join(parts)
@@ -244,3 +244,82 @@ def test_media_report(tmp_path, monkeypatch):
     assert "media/b.mp4" in r.output and "media/c.png" in r.output
     assert "media_per_site = false: nothing changes" in r.output
     assert Path(cfg.root / "assets" / "media" / "a.mp4").exists()     # the project untouched
+
+
+# -- #155: a link to another site's file is that site's to serve -----------------------------------
+
+OTHER = 'media_keep = []\n[[release.sites]]\nsite = "other"\nbook = "docs/other/book.py"'
+
+
+def test_plan_lists_the_links_to_other_sites(tmp_path, monkeypatch):
+    cfg = _project(tmp_path, monkeypatch, site_extra=OTHER)
+    code = _snapshot(tmp_path, book="")
+    page = ("<a href='https://other.example.org/app/static/downloads/x.pdf'>x</a>"
+            '<a href="https://other-next.example.org/app/static/media/a.mp4">a</a>'          # a provisional name
+            '<a href="https://deck.example.org/app/static/media/c.png">own</a>'
+            '<a href="https://nobody.example.org/app/static/media/b.mp4">not a site</a>')
+    html = _export(tmp_path, {"fr/deck/deck.html": page.encode()})
+    mp = md.plan(cfg, cfg.site("deck"), code, html, suffix="-next")
+    assert mp.foreign == {"other": ["downloads/x.pdf", "media/a.mp4"]}
+    assert md.site_of_host(cfg, "OTHER.example.org") == "other" and md.site_of_host(cfg, "x.org") == ""
+
+
+class Container:
+    """The live container: its own paths (/srv/live → a folder here), a shell."""
+
+    name = "prod"
+
+    def dexec(self, app, cmd, check=True):
+        assert app == "live"
+        return subprocess.run(["sh", "-c", cmd], text=True, capture_output=True)
+
+
+def _served_by_other(tmp_path, monkeypatch):
+    srv = tmp_path / "srv"
+    monkeypatch.setattr(ops, "LIVE_ROOT", str(srv))
+    served = srv / "sites" / "other" / "static"
+    (served / "downloads").mkdir(parents=True)
+    (tmp_path / "x.pdf").write_bytes(b"X")
+    (served / "downloads" / "x.pdf").symlink_to(tmp_path / "x.pdf")         # served: a link to the file
+    (served / "media").mkdir()
+    (served / "media" / "dangling.mp4").symlink_to(tmp_path / "gone.mp4")   # a link to nothing: not served
+
+
+def test_links_to_files_the_other_site_does_not_serve_are_found(tmp_path, monkeypatch):
+    cfg = _project(tmp_path, monkeypatch, site_extra=OTHER)
+    _served_by_other(tmp_path, monkeypatch)
+    state = {"sites": {"prod": {
+        "deck": {"foreign_links": {"other": ["downloads/x.pdf", "media/a.mp4", "media/dangling.mp4"],
+                                   "removed-site": ["y.zip"]}},
+        "other": {}}}}
+    n, gaps = ops.foreign_gaps(Container(), cfg, state)
+    assert n == 4 and gaps == [("deck", "other", "media/a.mp4"), ("deck", "other", "media/dangling.mp4"),
+                               ("deck", "removed-site", "y.zip")]
+    said = []
+    ops.check_foreign_links(Container(), cfg, state, said.append)
+    assert said[0].startswith("! links to other sites' files: 3 of 4 not served")
+    assert "    deck → other: /app/static/media/a.mp4" in said
+
+
+def test_links_all_served_are_said_once(tmp_path, monkeypatch):
+    cfg = _project(tmp_path, monkeypatch, site_extra=OTHER)
+    _served_by_other(tmp_path, monkeypatch)
+    said = []
+    ops.check_foreign_links(Container(), cfg, {"sites": {"prod": {
+        "deck": {"foreign_links": {"other": ["downloads/x.pdf"]}}}}}, said.append)
+    assert said == ["✓ links to other sites' files: 1, all served by those sites"]
+    said.clear()
+    ops.check_foreign_links(Container(), cfg, {"sites": {"prod": {"deck": {}}}}, said.append)
+    assert said == []                                                          # no link: nothing said
+
+
+def test_media_report_lists_the_links_to_other_sites(tmp_path, monkeypatch):
+    cfg = _project(tmp_path, monkeypatch, site_extra=OTHER)
+    code = _snapshot(tmp_path)
+    html = _export(tmp_path, {"en/deck/deck.html": b"<a href='https://other.example.org/app/static/z.zip'>z</a>"})
+    monkeypatch.setattr(build, "snapshot", lambda c, s, w: code)
+    monkeypatch.setattr(build, "export", lambda c, s, code_, w, r, env: (html, r))
+    r = CliRunner().invoke(media_report_cmd, ["deck"])
+    assert r.exit_code == 0, r.output
+    assert "links to other sites' files: 1" in r.output and "      other: /app/static/z.zip" in r.output
+    assert cfg.site("other")

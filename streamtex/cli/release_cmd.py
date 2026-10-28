@@ -95,6 +95,7 @@ def publish_cmd(sites, groups, all_, target, allow_skew, html_env):
     for s in chosen:
         ops.publish_site(t, cfg, state, s, release_name, faces[s.site], click.echo, env, skew,
                          levels[s.site], pool, skew_version=skew_version)
+    ops.check_foreign_links(t, cfg, state, click.echo)        # after all: a site published may stop one (#155)
 
 
 @release.command("status")
@@ -330,6 +331,13 @@ def media_report_cmd(site, show, html_env):
                    f"needs them ({len(mp.named)}):")
         for p in mp.named:
             click.echo(f"      {p}")
+    if mp.foreign:
+        n = sum(len(v) for v in mp.foreign.values())
+        click.echo(f"  links to other sites' files: {n} — served by those sites, not this one; publish "
+                   "checks that each still serves its file:")
+        for other, rels in mp.foreign.items():
+            for p in rels:
+                click.echo(f"      {other}: /app/static/{p}")
     if show:
         click.echo(f"{'Kept' if show == 'kept' else 'No longer served'}:")
         for p in (kept if show == "kept" else dropped):

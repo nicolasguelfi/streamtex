@@ -17,6 +17,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and scrolls as without presentation mode, and the navigation shows each
   slide (titles at 429 px and 458 px). A page of one slide keeps the
   clipping.
+- **The first "Generate" of a session needed a second click** (#151): in
+  a paginated book with the scope "Full document", the panel rebuilt the
+  full document, then reran the app, and a form counts as submitted on one
+  run only, so nothing came out. The request is now carried over the rerun:
+  one click gives the file (reproduced with AppTest: 2 clicks before, 1
+  after; the file holds the whole document).
 
 ## [0.7.74] — 2026-10-28 — stx release safety points (board ordre1, wave 1)
 

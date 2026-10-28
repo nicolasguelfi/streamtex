@@ -482,6 +482,10 @@ def _offer_export_downloads(html: str, base_name: str,
 
             submitted = st.form_submit_button("Generate")
 
+        # A Generate that had to rebuild the full document first is carried over its rerun (#151):
+        # a form counts as submitted on one run only, so the reader had to click a second time.
+        _pending_key = f"_stx_export_pending_{_pk}"
+        submitted = submitted or st.session_state.pop(_pending_key, False)
         if submitted:
             results = {}
             # Resolve which HTML to use based on scope
@@ -494,6 +498,7 @@ def _offer_export_downloads(html: str, base_name: str,
                     if rebuild_fn:
                         with st.spinner("Generating full document..."):
                             rebuild_fn()
+                        st.session_state[_pending_key] = True
                         st.rerun()
                 if full_book_html:
                     # Built once per session with the view of that moment:

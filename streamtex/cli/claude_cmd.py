@@ -286,6 +286,12 @@ def install_profile(claude_repo: str, profile: str, target: str) -> list[str]:
     if rendered and rendered not in installed:
         installed.append(rendered)
 
+    # The styles reference, generated from the code after the read-only copies (#6)
+    from .styles_cmd import refresh_reference
+    styles_ref = refresh_reference(target)
+    if styles_ref:
+        installed.append(styles_ref)
+
     return sorted(installed)
 
 
@@ -294,6 +300,7 @@ _GENERATED_PATHS = frozenset({
     os.path.join(".claude", ".stx-profile"),
     os.path.join(".claude", "CLAUDE.md"),   # profile text when the root CLAUDE.md is the user's
     os.path.join(".claude", "stx.lock"),    # project mode lock file
+    os.path.join(".claude", "references", "streamtex_styles_api.md"),   # stx styles dump (#6)
 })
 
 
@@ -1208,6 +1215,12 @@ def _update_single_target(
                     "  [dim]Your root CLAUDE.md is your own: it was left untouched; "
                     "Claude Code reads both files.[/dim]"
                 )
+
+    # The styles reference, regenerated when the version or its inputs changed (#6)
+    from .styles_cmd import refresh_reference
+    styles_ref = refresh_reference(target)
+    if styles_ref:
+        updated.append(styles_ref)
 
     if updated:
         console.print(f"\n[green]Updated {len(updated)} file(s).[/green]")

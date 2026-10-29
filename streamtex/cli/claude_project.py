@@ -391,10 +391,13 @@ def sync_project(
 
     claude_dir = os.path.join(target, ".claude")
     if remove:
-        for rel in (os.path.join(".claude", ".stx-profile"), LOCK_PATH):
+        from .styles_cmd import REFERENCE
+        for rel in (os.path.join(".claude", ".stx-profile"), LOCK_PATH, REFERENCE):
             p = os.path.join(target, rel)
             if os.path.isfile(p):
+                os.chmod(p, 0o644)
                 os.remove(p)
+        _remove_empty_dirs(target, [REFERENCE])
         if lock and lock.claude_md and lock.claude_md_sha:
             p = os.path.join(target, lock.claude_md)
             if os.path.isfile(p) and sha256_file(p) == lock.claude_md_sha:
@@ -439,6 +442,10 @@ def sync_project(
         claude_md=claude_md, claude_md_sha=claude_md_sha, files=new_files,
     ))
     _ensure_gitignore(target, console)
+    # The styles reference, generated from the code (#6): never in the lock, never pruned
+    from .styles_cmd import refresh_reference
+    if refresh_reference(target):
+        console.print("  [green]✓[/green] .claude/references/streamtex_styles_api.md (generated)")
     return plan
 
 

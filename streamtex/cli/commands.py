@@ -64,6 +64,7 @@ from .run_cmd import run as stx_run
 from .screenshot_cmd import screenshot as stx_screenshot
 from .shortcuts import run_lint, run_test
 from .status_cmd import status as workspace_status
+from .styles_cmd import styles as styles_group
 from .sync_cmd import sync as stx_sync
 from .upgrade_cmd import upgrade as project_upgrade
 from .validate_cmd import validate as stx_validate
@@ -217,6 +218,7 @@ cli.add_command(ds_group, name="ds")
 cli.add_command(kit_group, name="kit")
 cli.add_command(artifact_group, name="artifact")
 cli.add_command(stx_validate, name="validate")
+cli.add_command(styles_group, name="styles")
 
 
 # --- Dev subgroup ----------------------------------------------------------

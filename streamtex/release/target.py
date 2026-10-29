@@ -12,6 +12,7 @@ import re
 import shlex
 import subprocess
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -37,6 +38,23 @@ STATIC_ROOT = "/srv/static"
 #: The shared SSH connection's socket (%C: a hash of host, port and user — short enough for the socket
 #: path limit).
 CONTROL_PATH = "~/.ssh/stx-cm-%C"
+
+#: A connection cut while it opens, before any command ran (#152): measured on 2026-10-29, a network device
+#: between the machine and the server cuts the 20th connection opened within a few seconds, and every next
+#: one for about a minute (once 50 s were not enough). Such a failure is retried after these waits (seconds).
+RETRY_WAITS = (5, 15, 30, 60)
+_CUT_AT_OPEN = re.compile(r"kex_exchange_identification|Connection (?:reset|closed) by \S+ port \d+")
+
+
+def _run(argv: list[str], input: str | None = None) -> subprocess.CompletedProcess:
+    """Run an ssh (or rsync over ssh) command; retry it when the connection was cut while opening."""
+    for wait in (*RETRY_WAITS, None):
+        r = subprocess.run(argv, input=input, text=True, capture_output=True)
+        if not r.returncode or wait is None or not _CUT_AT_OPEN.search(r.stderr or ""):
+            return r
+        print(f"  the SSH connection was cut while opening; new try in {wait} s", file=sys.stderr, flush=True)
+        time.sleep(wait)
+    return r
 
 
 @functools.cache
@@ -65,16 +83,18 @@ class Target:
 
     # -- commands -----------------------------------------------------------------------
     def ssh_argv(self) -> list[str]:
-        """One shared connection for every command and copy (ControlMaster): the server resets new
-        connections beyond about 18 in a burst (seen by all-trainings, 2026-10-26)."""
+        """One shared connection for every command and copy (ControlMaster): new connections beyond about
+        18 in a burst are cut (seen by all-trainings, 2026-10-26; by a network device on the way, #152)."""
         key = os.path.expanduser(self.cfg.get("ssh_key", ""))
         return ["ssh", *(["-i", key] if key else []), "-o", "BatchMode=yes",
                 "-o", "ControlMaster=auto", "-o", f"ControlPath={CONTROL_PATH}", "-o", "ControlPersist=120",
                 self.cfg["host"]]
 
     def sh(self, cmd: str, check: bool = True, input: str | None = None) -> subprocess.CompletedProcess:
-        argv = ["sh", "-c", cmd] if self.kind == "local" else [*self.ssh_argv(), cmd]
-        r = subprocess.run(argv, input=input, text=True, capture_output=True)
+        if self.kind == "local":
+            r = subprocess.run(["sh", "-c", cmd], input=input, text=True, capture_output=True)
+        else:
+            r = _run([*self.ssh_argv(), cmd], input=input)
         if check and r.returncode:
             raise ReleaseError(f"{self.name}: `{cmd[:120]}` failed: {(r.stderr or r.stdout)[-600:]}")
         return r
@@ -94,7 +114,7 @@ class Target:
         else:
             ssh = " ".join(shlex.quote(x) for x in self.ssh_argv()[:-1])
             argv = ["rsync", "-a", "-e", ssh, *opts, src, f"{self.cfg['host']}:{dest}"]
-        r = subprocess.run(argv, text=True, capture_output=True)
+        r = subprocess.run(argv, text=True, capture_output=True) if self.kind == "local" else _run(argv)
         if r.returncode:
             raise ReleaseError(f"{self.name}: rsync to {dest} failed: {r.stderr[-600:]}")
 
@@ -115,7 +135,7 @@ class Target:
         cmd = f"mkdir -p {shlex.quote(os.path.dirname(dest))} && cat > {shlex.quote(dest)}"
         if mode is not None:
             cmd += f" && chmod {mode:o} {shlex.quote(dest)}"
-        r = subprocess.run([*self.ssh_argv(), cmd], input=content, text=True, capture_output=True)
+        r = _run([*self.ssh_argv(), cmd], input=content)
         if r.returncode:
             raise ReleaseError(f"{self.name}: writing {dest} failed: {r.stderr[-400:]}")
 

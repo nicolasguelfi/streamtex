@@ -485,6 +485,54 @@ def test_ssh_shares_one_connection():
     assert argv[-1] == "me@example.org"
 
 
+def _cut_then(monkeypatch, stderrs):
+    """subprocess.run answers each *stderrs* in turn (None: success); returns the calls and the waits."""
+    from streamtex.release import target
+    calls, waits = [], []
+
+    def run(argv, **kw):
+        err = stderrs[len(calls)]
+        calls.append(argv)
+        return subprocess.CompletedProcess(argv, 0 if err is None else 255, "", err or "")
+    monkeypatch.setattr(target.subprocess, "run", run)
+    monkeypatch.setattr(target.time, "sleep", waits.append)
+    return target.Target("prod", {"type": "ssh", "root": "/srv", "host": "me@example.org"}), calls, waits
+
+
+@pytest.mark.parametrize("err", ["kex_exchange_identification: read: Connection reset by peer",
+                                 "Connection reset by 203.0.113.9 port 22",
+                                 "Connection closed by 203.0.113.9 port 22"])
+def test_ssh_cut_while_opening_is_tried_again(monkeypatch, capsys, err):
+    """#152: a network device cuts a burst of new connections for about a minute; the command never ran."""
+    t, calls, waits = _cut_then(monkeypatch, [err, err, None])
+    assert t.sh("true").returncode == 0
+    assert len(calls) == 3 and waits == [5, 15]
+    assert "new try in 5 s" in capsys.readouterr().err
+
+
+def test_ssh_gives_up_after_the_last_wait(monkeypatch):
+    err = "Connection reset by 203.0.113.9 port 22"
+    t, calls, waits = _cut_then(monkeypatch, [err] * 5)
+    with pytest.raises(ReleaseError, match="Connection reset"):
+        t.sh("true")
+    assert len(calls) == 5 and waits == [5, 15, 30, 60]
+
+
+def test_ssh_failure_of_the_command_is_not_tried_again(monkeypatch):
+    """Only a cut while opening is retried: a command that ran and failed is not run twice."""
+    t, calls, waits = _cut_then(monkeypatch, ["mkdir: permission denied"])
+    assert t.sh("mkdir /x", check=False).returncode == 255
+    assert len(calls) == 1 and waits == []
+
+
+def test_rsync_and_write_are_tried_again(monkeypatch):
+    err = "kex_exchange_identification: Connection closed by remote host"
+    t, calls, waits = _cut_then(monkeypatch, [err, None, err, None])
+    t.rsync("/a/", "/srv/b/")
+    t.write("/srv/b/f", "x")
+    assert [c[0] for c in calls] == ["rsync", "rsync", "ssh", "ssh"] and waits == [5, 5]
+
+
 def test_local_openrsync_drops_hard_links_with_link_dest(monkeypatch):
     """macOS's rsync stops on -H with --link-dest (all-trainings, 2026-10-26): -H goes, --link-dest stays."""
     from streamtex.release import target

@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Glossary: `gloss("LLM")` and `st_glossary()`** (#12, board vague4
+  t12=g1): a term is defined once and its definition shows wherever it
+  is used. `st_book(..., glossary_sources=["glossary.yaml"])` loads YAML
+  or JSON (`LLM: Large Language Model`, or `LLM: {title: ..., note:
+  ..., abbreviation: ...}`) and the `@glossary{...}` entries of a `.bib`
+  (those given in `bib_sources` too). `st_write(s.big, "How ",
+  gloss("LLM"), " models learn")` underlines the term with dots; its
+  definition (title in bold, then the note) shows under it on hover and
+  on keyboard focus, in CSS only (`default.css`), so it works live and
+  in the exported HTML. In print the definition is hidden and the
+  underline stays; `st_glossary(title="Glossary", only_used=True,
+  toc_lvl=...)` gives the alphabetical list (anchors `gloss-<key>`),
+  and remembers the terms used on other pages in paginated mode.
+  `gloss("LLM", text="large language models")` changes the words shown.
+  An unknown key gives `[key?]` and a warning, or a `KeyError` with
+  `GlossaryConfig(strict=True)` (`glossary_config=`).
+  The terms live in their own `GlossaryRegistry`: they take no citation
+  number and never appear in `st_bibliography()`. TOC labels and marker
+  names leave the definition out ("How LLM models learn").
+  New exports: `gloss`, `st_glossary`, `load_glossary`,
+  `GlossaryConfig`, `GlossaryRegistry`, `get_glossary_registry`,
+  `reset_glossary_registry`, `set_glossary_config`,
+  `get_glossary_config`. PyYAML, already installed through
+  `mermaid-py`, is now a declared dependency.
+
 ### Fixed
 
 - **`stx styles dump --check` no longer judges the generic `s.project.*`

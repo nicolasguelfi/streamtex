@@ -25,6 +25,8 @@ from .link_preview import inject_link_preview_scaffold  # noqa: F401
 
 _STRIP_HTML_RE = re.compile(r'<.*?>')
 _BR_RE = re.compile(r'<br\s*/?>', re.IGNORECASE)
+# The definition a gloss() term carries: not part of a label (#12).
+_GLOSS_TIP_RE = re.compile(r'<span class="stx-gloss-tip"[^>]*>.*?</span>', re.S)
 
 # Monotonic counter — avoids os.urandom syscall from uuid4 on every call.
 # Thread-safe under CPython GIL (next() on itertools.count is atomic).
@@ -41,8 +43,11 @@ def strip_html(html_string):
 
 
 def plain_label(html_string):
-    """The text of *html_string* on one line: tags removed, white space collapsed."""
-    return " ".join(strip_html(html_string).split())
+    """The text of *html_string* on one line: tags removed, white space collapsed.
+
+    The hover definition of a ``gloss()`` term is left out (#12).
+    """
+    return " ".join(strip_html(_GLOSS_TIP_RE.sub('', html_string)).split())
 
 
 def generate_key(prefix: str = "block"):

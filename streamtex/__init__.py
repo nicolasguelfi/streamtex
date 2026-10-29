@@ -178,6 +178,14 @@ try:
         st_refs, BibRefs, generate_bib_stubs,
     )
 
+    # Glossary: hover definitions, CSS only (#12)
+    from .glossary import (
+        GlossaryConfig, GlossaryRegistry,
+        set_glossary_config, get_glossary_config,
+        get_glossary_registry, reset_glossary_registry,
+        load_glossary, gloss, st_glossary,
+    )
+
     # Link behavior configuration
     from .link_config import LinkConfig, set_link_config, get_link_config
 
@@ -290,6 +298,8 @@ __all__ = [
     "ProfileConfig",
     "ProjectBlockRegistry",
     "ProjectMeta",
+    "GlossaryConfig",
+    "GlossaryRegistry",
     "ReuseArchitectureError",
     "SLIDE_CONTAINER",
     "SLIDE_NOTE_STYLE",
@@ -320,6 +330,8 @@ __all__ = [
     "exec_static",
     "export_bibtex",
     "export_pdf",
+    "load_glossary",
+    "reset_glossary_registry",
     "extract_frames",
     "extract_math",
     "extract_tikz",
@@ -329,6 +341,9 @@ __all__ = [
     "get_ai_image_config",
     "get_available_models",
     "get_bib_config",
+    "get_glossary_config",
+    "get_glossary_registry",
+    "gloss",
     "get_bib_registry",
     "get_block_helper_config",
     "get_block_spacing",
@@ -381,6 +396,7 @@ __all__ = [
     "save_image_version",
     "set_ai_image_config",
     "set_bib_config",
+    "set_glossary_config",
     "set_block_helper_config",
     "set_block_spacing",
     "set_gsheet_config",
@@ -402,6 +418,7 @@ __all__ = [
     "st_audio",
     "st_bar_chart",
     "st_bibliography",
+    "st_glossary",
     "st_block",
     "st_book",
     "st_br",

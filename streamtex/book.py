@@ -726,24 +726,44 @@ def _resolve_sidebar_max_level(toc_config: TOCConfig, paginated: bool) -> int | 
     return 1 if paginated else 2
 
 
-def _setup_bibliography(bib_sources, bib_config):
-    """Load bibliography sources and set config (called at start of st_book)."""
+def _setup_bibliography(bib_sources, bib_config, glossary_sources=None, glossary_config=None):
+    """Load bibliography and glossary sources and set config (called at start of st_book).
+
+    The ``@glossary`` entries of a bibliography source go to the glossary, so
+    they never take a citation number (#12).
+    """
     from .bib import get_bib_registry, load_bib, reset_bib_registry, set_bib_config
+    from .glossary import (
+        get_glossary_registry,
+        is_glossary,
+        load_glossary,
+        reset_glossary_registry,
+        set_glossary_config,
+    )
 
     reset_bib_registry()
+    reset_glossary_registry()
 
     if bib_config is not None:
         set_bib_config(bib_config)
+    if glossary_config is not None:
+        set_glossary_config(glossary_config)
 
-    if bib_sources:
-        registry = get_bib_registry()
-        for source_path in bib_sources:
-            try:
-                entries = load_bib(source_path)
-                registry.register_many(entries)
-                logger.debug(f"Loaded {len(entries)} bib entries from {source_path}")
-            except Exception as e:
-                logger.warning(f"Failed to load bibliography from {source_path}: {e}")
+    registry = get_bib_registry()
+    glossary = get_glossary_registry()
+    for source_path in bib_sources or []:
+        try:
+            entries = load_bib(source_path)
+            registry.register_many([e for e in entries if not is_glossary(e)])
+            glossary.register_many([e for e in entries if is_glossary(e)])
+            logger.debug(f"Loaded {len(entries)} bib entries from {source_path}")
+        except Exception as e:
+            logger.warning(f"Failed to load bibliography from {source_path}: {e}")
+    for source_path in glossary_sources or []:
+        try:
+            glossary.register_many(load_glossary(source_path))
+        except Exception as e:
+            logger.warning(f"Failed to load glossary from {source_path}: {e}")
 
 
 def _inject_bib_preview_if_enabled():
@@ -779,7 +799,8 @@ def _st_book_impl(module_list, toc_config: TOCConfig = None, marker_config: Mark
             lang: str | None = None,
             html_export_zoom: int = 0,
             notice=None,
-            printable: bool | PrintConfig = True):
+            printable: bool | PrintConfig = True,
+            glossary_sources=None, glossary_config=None):
     """Generates a web page e-book from a list of block modules.
 
     :param separator: Optional module with a build() function, rendered between each block.
@@ -811,6 +832,10 @@ def _st_book_impl(module_list, toc_config: TOCConfig = None, marker_config: Mark
     :param banner: Optional BannerConfig for full banner customisation (overrides banner_color).
     :param bib_sources: Optional list of paths to .bib, .json, .ris, or .csl-json files.
     :param bib_config: Optional BibConfig to configure bibliography formatting.
+    :param glossary_sources: Optional list of glossary files for ``gloss()``:
+        ``.yaml``/``.yml``, ``.json`` (``{"LLM": "Large Language Model"}``)
+        or ``.bib`` (its ``@glossary`` entries). See ``streamtex.glossary``.
+    :param glossary_config: Optional GlossaryConfig (``strict=True``: an unknown key raises).
     :param inspector: Optional InspectorConfig to enable the block inspector panel.
     :param page_width: Page width as % of browser width (default 90).
     :param zoom: Default zoom level as % (default 100).
@@ -901,7 +926,7 @@ def _st_book_impl(module_list, toc_config: TOCConfig = None, marker_config: Mark
     if _warmup_mode:
         # The references first: an HTML export without them shows every
         # citation as [key?] and an empty bibliography.
-        _setup_bibliography(bib_sources, bib_config)
+        _setup_bibliography(bib_sources, bib_config, glossary_sources, glossary_config)
         _warmup_build_cache(module_list, toc_config, marker_config,
                             separator,
                             block_args=_block_args,
@@ -936,7 +961,7 @@ def _st_book_impl(module_list, toc_config: TOCConfig = None, marker_config: Mark
         st.session_state[_STX_THEME_BG_KEY] = _bg
         st.session_state[_STX_THEME_TEXT_KEY] = _txt
     # --- Bibliography setup ---
-    _setup_bibliography(bib_sources, bib_config)
+    _setup_bibliography(bib_sources, bib_config, glossary_sources, glossary_config)
     # --- Presentation profiles ---
     default_profile = build_default_profile(page_width, zoom, paginate)
     user_profiles = presentation_profiles or []
@@ -2752,7 +2777,9 @@ def _build_page_cache(module_list, toc_config, marker_config, separator,
     # Persist cited bibliography keys so st_bibliography(only_cited=True) works
     # in paginated mode (cite() calls only run during cache build, not per-page).
     from .bib import get_bib_registry as _get_bib_registry
+    from .glossary import get_glossary_registry as _get_glossary_registry
     _bib_cited = list(_get_bib_registry()._cited)
+    _gloss_used = list(_get_glossary_registry()._used)          # st_glossary(only_used=True) (#12)
 
     st.session_state[_STX_CACHE_KEY] = {
         "hash": cache_hash,
@@ -2764,6 +2791,7 @@ def _build_page_cache(module_list, toc_config, marker_config, separator,
         "pages": pages,
         "search_index": search_index,
         "cited_keys": _bib_cited,
+        "glossary_used": _gloss_used,
         "doc_version": st.session_state.get("_stx_doc_version", ""),
         "lib_version": st.session_state.get("_stx_lib_version", ""),
         # Data files the blocks read through stx.load_*/watch_file during
@@ -3553,6 +3581,10 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
         for _key in cache["cited_keys"]:
             if _key not in _bib_reg._cited:
                 _bib_reg._cited.append(_key)
+    if cache.get("glossary_used"):
+        from .glossary import get_glossary_registry as _get_gloss_reg
+        for _key in cache["glossary_used"]:
+            _get_gloss_reg().use(_key)
 
     # --- Banner — page titles for navigation labels ---
     page_titles = _get_page_titles(cache, total)

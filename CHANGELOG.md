@@ -33,6 +33,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `reset_glossary_registry`, `set_glossary_config`,
   `get_glossary_config`. PyYAML, already installed through
   `mermaid-py`, is now a declared dependency.
+- **Stage mode** (#105, board vague4 t105=e1): a document lays itself
+  out against the window (`vw`, `vh`, slide breaks), so an author on a
+  16:10 laptop never saw the 1920×1080 projector's layout. The stage
+  renders the document in an `<iframe>` of the chosen size — the one
+  construct that gives a page a viewport of its own — scaled to the
+  window, centred, with black bands, a scale readout and a Full screen
+  button, like Chrome's device mode. A **Stage 1920×1080** link under
+  the zoom controls (Settings) opens the current page on the stage in a
+  new tab; the HTML export's sidebar has the same link, so it works on a
+  published site with the same password cookie. The URL opens it too:
+  `?stage=1920x1080` (`?stage=1` takes the document's size). The frame
+  loads the same URL without `stage`, so `?marker=`, `?lang=` and
+  `#anchor` deep links pass through, and it gets the keyboard focus, so
+  the arrow keys turn the slides. `st_book(stage=(1920, 1080))` sets the
+  size per document (`[w, h]` or `"WxH"` too, also in `[book.defaults]`);
+  `stage=False` removes the link. Measured in Chromium, window 1000×600:
+  inside the frame `innerWidth × innerHeight` = 1920 × 1080 and a
+  50vw × 50vh box 960 × 540 px, frame scaled to 0.52; on a copy of
+  all-trainings (gai4as slides, 446 slides) at 1728×1117: 1920 × 1080
+  at 0.9, → goes to slide 2.
 
 ### Fixed
 

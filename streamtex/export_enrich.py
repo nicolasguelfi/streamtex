@@ -170,6 +170,14 @@ body.stx-sidebar-resizing .streamtex-page { transition: none !important; }
   color: var(--stx-export-sidebar-fg, #555);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+.stx-export-sidebar .stx-stage-link {
+  display: block; text-align: center; padding: 5px 10px; margin-bottom: 10px;
+  border: 1px solid var(--stx-export-sidebar-input-border, #ccc); border-radius: 6px;
+  font-size: 13px; text-decoration: none;
+  color: var(--stx-export-sidebar-fg, #333);
+  background: var(--stx-export-sidebar-input-bg, #fff);
+}
+.stx-export-sidebar .stx-stage-link:hover { border-color: var(--stx-export-link, #1155cc); }
 .stx-export-sidebar .stx-search-box {
   width: 100%; padding: 6px 10px;
   border: 1px solid var(--stx-export-sidebar-input-border, #ccc);
@@ -270,8 +278,11 @@ if _LOGO_TINY_PATH.exists():
 
 def _build_sidebar_html(toc: list[dict], has_search: bool = False,
                         doc_version: str = "", lib_version: str = "",
-                        page_nav: dict | None = None, notice: str = "") -> str:
+                        page_nav: dict | None = None, notice: str = "",
+                        stage: tuple[int, int] | None = None) -> str:
     """Build the sidebar TOC HTML from cache data.
+
+    *stage* (#105): ``(w, h)`` adds the link that opens the page on the stage.
 
     In a paginated export file (*page_nav*, #106) the table of contents is the
     whole module's: an entry of another page links to ``<file>#<anchor>``, the
@@ -298,6 +309,13 @@ def _build_sidebar_html(toc: list[dict], has_search: bool = False,
         f'{_logo_img}<span>Powered with StreamTeX</span></a>'
         '</div>'
     )
+    if stage:
+        w, h = stage
+        parts.append(
+            f'<a id="stx-stage-link" class="stx-stage-link" href="?stage={w}x{h}" target="_blank" '
+            f'rel="noopener" title="Open this page in a virtual screen of {w}\u00d7{h}, '
+            f'scaled to the window (as on the projector)">Stage {w}\u00d7{h}</a>'
+        )
     if has_search:
         parts.append(
             '<input id="stx-search" class="stx-search-box" '
@@ -988,8 +1006,12 @@ def enrich_export_html(
     lib_version: str = "",
     page_nav: dict | None = None,
     notice: str = "",
+    stage: tuple[int, int] | None = None,
 ) -> str:
     """Transform raw export HTML into a fully navigable static document.
+
+    *stage* (#105): ``(w, h)`` — a sidebar link opens the page on the stage,
+    and ``?stage=WxH`` in the file's URL shows it (``streamtex.stage``).
 
     *page_nav* (#106): in a paginated export, ``{"mode": "paginated", "files":
     [file per page], "here": [pages of this file], "prefix": "",
@@ -1076,7 +1098,7 @@ def enrich_export_html(
     if has_toc:
         sidebar_html = _build_sidebar_html(toc, has_search=has_search,
                                            doc_version=doc_version, lib_version=lib_version,
-                                           page_nav=page_nav, notice=notice)
+                                           page_nav=page_nav, notice=notice, stage=stage)
         raw_html = raw_html.replace("<body>", "<body>\n" + sidebar_html, 1)
 
     # --- Build JS block ---
@@ -1103,6 +1125,10 @@ def enrich_export_html(
             "__SEARCH_INDEX__", json.dumps(str_index, ensure_ascii=False)
         )
         extra_js_parts.append(search_js)
+
+    if stage:
+        from .stage import export_stage_js
+        extra_js_parts.append(export_stage_js(tuple(stage)))
 
     # --- Inject JS before </body> ---
     if extra_js_parts:

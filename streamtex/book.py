@@ -85,6 +85,7 @@ from .spacing import (
     resolve_block_spacing,
     set_active_profile,
 )
+from .stage import STAGE_KEY
 from .styles import Style
 from .toc import NumberingMode, TOCConfig, reset_toc_registry, toc_entries
 from .utils import inject_link_preview_scaffold
@@ -536,6 +537,7 @@ def _offer_export_downloads(html: str, base_name: str,
                             doc_version=_cache.get("doc_version", ""),
                             lib_version=_cache.get("lib_version", ""),
                             notice=rules["notice"],
+                            stage=st.session_state.get(STAGE_KEY),
                         )
                         # Apply custom title override
                         if enrich_title:
@@ -800,7 +802,8 @@ def _st_book_impl(module_list, toc_config: TOCConfig = None, marker_config: Mark
             html_export_zoom: int = 0,
             notice=None,
             printable: bool | PrintConfig = True,
-            glossary_sources=None, glossary_config=None):
+            glossary_sources=None, glossary_config=None,
+            stage=(1920, 1080)):
     """Generates a web page e-book from a list of block modules.
 
     :param separator: Optional module with a build() function, rendered between each block.
@@ -836,6 +839,11 @@ def _st_book_impl(module_list, toc_config: TOCConfig = None, marker_config: Mark
         ``.yaml``/``.yml``, ``.json`` (``{"LLM": "Large Language Model"}``)
         or ``.bib`` (its ``@glossary`` entries). See ``streamtex.glossary``.
     :param glossary_config: Optional GlossaryConfig (``strict=True``: an unknown key raises).
+    :param stage: Size of the stage (#105): ``(1920, 1080)`` (default),
+        ``[w, h]`` or ``"WxH"``. A link under the zoom controls, and in the
+        HTML export's sidebar, opens the document in a virtual screen of this
+        size scaled to the window, with black bands (``?stage=WxH`` in the
+        URL). ``False``: no stage.
     :param inspector: Optional InspectorConfig to enable the block inspector panel.
     :param page_width: Page width as % of browser width (default 90).
     :param zoom: Default zoom level as % (default 100).
@@ -887,6 +895,10 @@ def _st_book_impl(module_list, toc_config: TOCConfig = None, marker_config: Mark
     _block_kwargs = dict(block_kwargs or {})
     # --- Usage notice and print rules (#107): read by the panel and every export ---
     st.session_state[PRINT_KEY] = print_state(printable, notice, _block_kwargs.get("lang"))
+    # --- Stage size (#105): the sidebar link, and the HTML export's ---
+    from .stage import parse_stage, render_stage, requested_stage
+    _stage = parse_stage(stage)
+    st.session_state[STAGE_KEY] = _stage
     # --- Resolve PdfConfig from exports list if not provided directly ---
     if pdf_config is None and exports:
         for _ecfg in exports:
@@ -931,6 +943,12 @@ def _st_book_impl(module_list, toc_config: TOCConfig = None, marker_config: Mark
                             separator,
                             block_args=_block_args,
                             block_kwargs=_block_kwargs)
+        return
+
+    # --- Stage (#105): this tab only frames the document, which has its own gate ---
+    _stage_now = requested_stage(_query_params(), _stage)
+    if _stage_now:
+        render_stage(_stage_now)
         return
 
     # --- Password gate (env-driven, no-op locally) ---
@@ -1077,6 +1095,9 @@ def _st_book_impl(module_list, toc_config: TOCConfig = None, marker_config: Mark
                 )
             add_zoom_options(default_page_width=page_width, default_zoom=zoom,
                              container=_stx_settings)
+            if _stage:
+                from .stage import stage_link
+                stage_link(_query_params(), _stage, container=_stx_settings)
             add_wrap_all_option(container=_stx_settings)
             _stx_settings.divider()
             add_slide_break_options(container=_stx_settings)
@@ -1972,6 +1993,14 @@ def st_sequence(items, *args, separator=_BREAK, markers=True, **kwargs) -> None:
 _STX_CACHE_KEY = "_stx_page_cache"
 _STX_PAGE_KEY = "_stx_current_page"
 _STX_INITIAL_MARKER_KEY = "_stx_initial_marker"
+
+
+def _query_params() -> dict:
+    """The URL's query parameters; ``{}`` outside a real script run (tests, headless)."""
+    try:
+        return st.query_params.to_dict()
+    except Exception:  # noqa: BLE001 -- no script context / mocked st
+        return {}
 
 
 def _initial_page_from_url(cache, total) -> tuple[int, int | None]:
@@ -3815,6 +3844,7 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
 BOOK_DEFAULT_KEYS = frozenset({
     "paginate", "paginate_by", "html_export_mode", "page_width", "zoom", "export", "export_title", "loading",
     "chrome_banner", "banner_color", "doc_version", "lang", "html_export_zoom",
+    "stage",                                                     # stage = [1920, 1080] (#105)
 })
 
 
@@ -3887,7 +3917,7 @@ _DEFAULTS_DOC = """Generates a web page e-book from a list of block modules.
     taken from ``[book.defaults]`` of the project's ``stx.toml`` when it
     declares them (``paginate``, ``page_width``, ``zoom``, ``export``,
     ``export_title``, ``loading``, ``chrome_banner``, ``banner_color``,
-    ``doc_version``, ``lang``), then from the defaults below.
+    ``doc_version``, ``lang``, ``stage``), then from the defaults below.
     ``doc_version="auto"`` reads ``[project].version`` of ``pyproject.toml``.
     """
 

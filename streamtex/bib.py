@@ -1065,7 +1065,9 @@ def st_bibliography(*, style=None, title: str = "References",
                     toc_lvl: Optional[str] = None,
                     only_cited: bool = True,
                     format: Optional[BibFormat] = None,
-                    label_style: Optional[CitationStyle] = None) -> None:
+                    label_style: Optional[CitationStyle] = None,
+                    chunk_size: Optional[int] = None,
+                    slide_break_config=None) -> None:
     """Render the full bibliography list.
 
     Args:
@@ -1082,9 +1084,16 @@ def st_bibliography(*, style=None, title: str = "References",
             shows inline: ``(Dart et al., 2013)`` in AUTHOR_YEAR, ``[3]`` in
             NUMERIC and SUPERSCRIPT. Pass ``CitationStyle.NUMERIC`` to keep
             ``[N]`` beside author-year citations.
+        chunk_size: When set, at most this many entries per slide: a
+            ``st_slide_break()`` separates the chunks, each repeats the title
+            with its rank (``References (2/5)``) and the numbering goes on.
+            The TOC gets the plain title once. ``None``: one list (#23).
+        slide_break_config: The ``SlideBreakConfig`` of the breaks between
+            chunks (default: the global one).
     """
     from .container import st_block
     from .export import _render
+    from .slide import st_slide_break
     from .space import st_space
     from .styles import StxStyles
     from .write import st_write
@@ -1099,28 +1108,39 @@ def st_bibliography(*, style=None, title: str = "References",
     # Sort
     entries = _sort_entries(entries, cfg.sort_by)
 
-    # Title
-    ts = title_style or (StxStyles.big + StxStyles.bold)
-    if title:
-        st_write(ts, title, toc_lvl=toc_lvl)
-        st_space("v", 2)
+    if chunk_size is not None and chunk_size < 1:
+        raise ValueError(f"st_bibliography: chunk_size must be at least 1, not {chunk_size}")
+    size = chunk_size or len(entries)
+    chunks = [entries[i:i + size] for i in range(0, len(entries), size)]
 
-    # Build inline CSS from Style objects
+    ts = title_style or (StxStyles.big + StxStyles.bold)
     entry_css = entry_style.css if entry_style else ""
     number_css = number_style.css if number_style else "font-weight:bold;"
     labels = label_style or cfg.citation_style
 
-    # Entries
-    with st_block(style):
-        for i, entry in enumerate(entries):
-            formatted = format_entry(entry, fmt, number=0)
-            num_html = f'<span style="{number_css}">{_entry_label(entry, i + 1, labels)}</span> '
-            anchor_id = f"bib-{entry.key}"
-            _render(
-                f'<p id="{anchor_id}" style="margin-bottom:10px;text-indent:-2.5em;'
-                f'padding-left:2.5em;line-height:1.6;overflow-wrap:anywhere;{entry_css}">'
-                f'{num_html}{formatted}</p>'
-            )
+    first = 1
+    for k, chunk in enumerate(chunks, 1):
+        if k > 1:
+            st_slide_break(marker_label=f"{title or 'References'} {k}/{len(chunks)}",
+                           config=slide_break_config)
+        if title:
+            rank = f" ({k}/{len(chunks)})" if len(chunks) > 1 else ""
+            if k == 1:
+                st_write(ts, title + rank, toc_lvl=toc_lvl, label=title if toc_lvl else "")
+            else:
+                st_write(ts, title + rank)
+            st_space("v", 2)
+        with st_block(style):
+            for i, entry in enumerate(chunk, first):
+                formatted = format_entry(entry, fmt, number=0)
+                num_html = f'<span style="{number_css}">{_entry_label(entry, i, labels)}</span> '
+                anchor_id = f"bib-{entry.key}"
+                _render(
+                    f'<p id="{anchor_id}" style="margin-bottom:10px;text-indent:-2.5em;'
+                    f'padding-left:2.5em;line-height:1.6;overflow-wrap:anywhere;{entry_css}">'
+                    f'{num_html}{formatted}</p>'
+                )
+        first += len(chunk)
 
 
 def _entry_label(entry: BibEntry, number: int, style: CitationStyle) -> str:

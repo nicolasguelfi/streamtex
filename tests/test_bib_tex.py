@@ -141,3 +141,47 @@ def test_numbered_lists_keep_their_numbers(monkeypatch, style):
 def test_label_style_overrides_the_citation_style(monkeypatch):
     from streamtex.bib import CitationStyle
     assert _labels(monkeypatch, "AUTHOR_YEAR", label_style=CitationStyle.NUMERIC) == ["[1]", "[2]"]
+
+
+# -- a long list split over slides (#23, part 2) -------------------------------------------
+
+def _chunks(n, **kw):
+    """Render *n* entries; the calls in order: ("title", text, toc_lvl), ("break", label), ("entry", label)."""
+    from unittest.mock import patch
+    reg = bib.get_bib_registry()
+    reg.register_many(parse_bibtex_string("\n".join(
+        f"@misc{{k{i:02d}, author = {{A{i:02d}}}, year = {{2000}}, title = {{T}}}}" for i in range(n))))
+    bib.set_bib_config(BibConfig(sort_by="key"))
+    seen = []
+    with patch("streamtex.export._render", side_effect=lambda h, **k: seen.append(
+                ("entry", re.search(r'<span style="[^"]*">(.*?)</span>', h).group(1)))), \
+         patch("streamtex.write.st_write", side_effect=lambda s, t, toc_lvl=None, label="", **k: seen.append(
+             ("title", t, toc_lvl, label))), \
+         patch("streamtex.slide.st_slide_break", side_effect=lambda **k: seen.append(("break", k["marker_label"]))), \
+         patch("streamtex.space.st_space"), patch("streamtex.container.st_block"):
+        bib.st_bibliography(only_cited=False, label_style=bib.CitationStyle.NUMERIC, toc_lvl="1", **kw)
+    return seen
+
+
+def test_chunk_size_splits_the_list_over_slides():
+    seen = _chunks(5, chunk_size=2)
+    assert [s for s in seen if s[0] != "entry"] == [
+        ("title", "References (1/3)", "1", "References"), ("break", "References 2/3"),
+        ("title", "References (2/3)", None, ""), ("break", "References 3/3"), ("title", "References (3/3)", None, "")]
+    assert [s[1] for s in seen if s[0] == "entry"] == ["[1]", "[2]", "[3]", "[4]", "[5]"]   # numbering goes on
+    assert seen.index(("break", "References 2/3")) == 3                                      # after 2 entries
+
+
+def test_without_chunk_size_nothing_changes():
+    seen = _chunks(5)
+    assert [s for s in seen if s[0] != "entry"] == [("title", "References", "1", "References")]
+    assert len(seen) == 6
+
+
+def test_one_chunk_keeps_the_plain_title():
+    assert [s for s in _chunks(3, chunk_size=10) if s[0] != "entry"] == [("title", "References", "1", "References")]
+
+
+def test_chunk_size_must_be_positive():
+    with pytest.raises(ValueError, match="chunk_size"):
+        _chunks(3, chunk_size=0)

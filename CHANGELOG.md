@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.80] — 2026-10-29 — glossary, stage mode, two fixes from all-trainings (board vague4, wave 4b: #12, #105)
+
 ### Added
 
 - **Glossary: `gloss("LLM")` and `st_glossary()`** (#12, board vague4

@@ -8,7 +8,8 @@ indexed scale from ``compute_scale()`` and writes ``.claude/references/streamtex
 
 ``--check`` reports the drifts instead: a fallback that differs from ``default.css``, a shortcut whose
 docstring says another size, an indexed scale in ``default.css`` that differs from ``compute_scale()``,
-and every ``s.xxx`` cited in ``.claude/`` that does not exist.
+and every ``s.xxx`` cited in ``.claude/`` that resolves nowhere (a name the same file defines with
+``Style(...)``, ``s.text_*`` and a line saying the name "does not exist" are left out).
 """
 
 from __future__ import annotations
@@ -29,6 +30,8 @@ _PROJECT_STYLES = os.path.join("custom", "styles.py")
 _VAR_RE = re.compile(r"var\((--stx-[\w-]+),\s*([^)]+)\)")
 _CITE_RE = re.compile(r"(?<![\w.])s\.([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*)")
 _HASH_RE = re.compile(r"inputs ([0-9a-f]{12})")
+_DEFINED_RE = re.compile(r"^\s*(\w+)\s*=\s*(?:Style|ns)\(", flags=re.M)
+_DENIED_RE = re.compile(r"does (?:\*\*)?not(?:\*\*)? exist")
 
 
 def _styles_root():
@@ -279,10 +282,14 @@ def drifts(project: Path, styles=None) -> list[str]:
     for f in sorted([*claude.glob("references/**/*.md"), *claude.glob("commands/**/*.md")]):
         if f.name == os.path.basename(REFERENCE):
             continue
-        for n, line in enumerate(f.read_text(encoding="utf-8", errors="ignore").splitlines(), 1):
+        text = f.read_text(encoding="utf-8", errors="ignore")
+        defined = set(_DEFINED_RE.findall(text))                # an example's own `heading = Style(...)`
+        for n, line in enumerate(text.splitlines(), 1):
+            if _DENIED_RE.search(line):
+                continue                                        # "`s.idx_6` does not exist"
             for m in _CITE_RE.finditer(line):
                 cited = m.group(1)
-                if line[m.end():m.end() + 1] == "*" or cited == "project" \
+                if line[m.end():m.end() + 1] == "*" or cited == "project" or cited.split(".")[0] in defined \
                         or (cited.startswith("project.") and styles is None):
                     continue                                    # s.text_* , the s.project namespace
                 if not resolves(cited, root):

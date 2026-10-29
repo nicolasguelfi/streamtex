@@ -5,6 +5,63 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.79] — 2026-10-29 — styles reference from the code, bibliography over slides, SSH retry (board vague4, wave 4a: #6, #23, #152, #154)
+
+### Added
+
+- **`stx styles dump`** (#6, board vague4 t6=d1): Claude writes blocks
+  from references written by hand, which drift from the style code and
+  never listed the project's styles. The command walks `StxStyles` and
+  the project's `Styles` (`custom/styles.py`, or the module named by
+  `[claude] styles = "shared.styles"` in `stx.toml`), resolves every
+  `var(--stx-X, fallback)` against `default.css` on desktop, tablet and
+  mobile, takes the indexed scale from `compute_scale()`, and writes
+  `.claude/references/streamtex_styles_api.md` (read-only): shortcuts,
+  named sizes, the pt scale, the indexed scale, the other styles, the
+  project styles. `--format full` gives each style's CSS; `-o -` prints.
+  `--check` reports the drifts and exits 1: a fallback or a shortcut
+  docstring that differs from `default.css`, an indexed scale in
+  `default.css` that differs from `compute_scale()`, an `s.xxx` cited in
+  `.claude/references` or `.claude/commands` that does not exist (a name
+  the same file defines with `Style(...)`, `s.text_*`, and a line saying
+  the name "does not exist" are left out). The profile's citations of
+  styles that do not exist were fixed in streamtex-claude.
+- **`stx claude install`, `update` and project sync write that
+  reference** (#6): after the read-only copies, and again only when the
+  streamtex version or one of its inputs (default.css, the style
+  modules, the project's styles file) changed. It is never pruned;
+  removing a project-mode profile removes it. A project styles file
+  that fails to import gives a warning and the library part.
+- **`st_bibliography(chunk_size=N)`** (#23 part 2, board vague4 t23=b1):
+  at most N entries per slide, a `st_slide_break()` between chunks
+  (`slide_break_config=` sets it), the title repeated with its rank
+  ("References (2/5)"), the numbering going on, and the table of
+  contents getting the plain title once. Without `chunk_size`, nothing
+  changes.
+
+### Changed
+
+- **`stx release`: an SSH connection cut while opening is tried again**
+  (#152, board vague4 t152=r1). Measured on 2026-10-29: 30 plain
+  connections opened in 7 s, the 20th and every next one cut for about a
+  minute; the server's log shows them reset by the client's side while
+  the client sees the server reset them — a network device on the way,
+  not sshd (`MaxStartups` only counts simultaneous connections) nor the
+  firewall. `Target.sh`, `rsync` and `write` now retry such a failure
+  (`kex_exchange_identification`, `Connection reset/closed by … port N`)
+  after 5, 15, 30 and 60 s with a message; a command that ran and failed
+  is not run again. Replayed with the retry: 30 connections out of 30.
+
+### Documentation
+
+- **The live face's `/app/static/` media stay public** (#154, board
+  vague4 t154=m3): served without the password, even on a protected
+  site (no listing; whoever has a file's exact address can download
+  it). Measured: a protected site's file downloads without a session,
+  and the HTML face of 6 sites links 1,094 downloads there. Kept so on
+  purpose and written in the deploy manual and cheatsheets; nothing
+  changed on the server.
+
 ## [0.7.78] — 2026-10-28 — rebuild without a paste, skew resolved, links to other sites checked (board vague3, wave 3: #150, #149, #155)
 
 ### Added

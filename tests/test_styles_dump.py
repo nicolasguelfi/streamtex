@@ -156,3 +156,10 @@ def test_stx_toml_names_the_styles_module(project):
     (project / "stx.toml").write_text('[claude]\nstyles = "shared.styles"\n')
     styles, pfile, warn = sd.load_project_styles(project)
     assert not warn and pfile == project / "shared" / "styles.py" and hasattr(styles, "project")
+
+
+def test_check_skips_what_the_file_defines_or_denies(project):
+    (project / ".claude" / "references" / "guide.md").write_text(
+        "class Styles(StxStyles):\n    heading = Style('font-size: 40px;', 'heading')\n"
+        "st_write(s.heading, 'x')\n`s.idx_6` does **not** exist: use s.text.sizes.idx_6.\nst_write(s.body, 'y')\n")
+    assert [p.split(": ", 1)[1] for p in sd.drifts(project)] == ["s.body does not exist"]

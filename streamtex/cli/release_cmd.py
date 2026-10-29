@@ -27,6 +27,16 @@ def _passwords(cfg):
     return pw.load_file(pw.passwords_path(cfg.root))
 
 
+def _require_running(t, apps) -> None:
+    """The containers the command needs run, checked before an export: a wrong --target used to fail at the
+    first reload, after the export (all-trainings, 2026-10-29: 25 s, then "No such container: stx-static")."""
+    down = [a for a in sorted(set(apps)) if not t.running(a)]
+    if down:
+        hint = "start them (stx release local up) or " if t.kind == "local" else ""
+        raise ReleaseError(f"target {t.name}: the {' and '.join(down)} container(s) do not run — "
+                           f"{hint}choose another --target")
+
+
 _target = click.option("--target", "target", default=None, help="Target name in .stx-release.json "
                        "(default: its default_target).")
 
@@ -83,6 +93,7 @@ def publish_cmd(sites, groups, all_, target, allow_skew, html_env):
         raise ReleaseError("name the sites to publish, a --group, or --all for every site")
     cfg, state, t = _ctx(target)
     chosen = cfg.select(sites, groups)
+    _require_running(t, ["static" if f == "html" else "live" for s in chosen for f in s.faces])
     env = _html_env(html_env)
     release_name = build.require_committed(cfg.root)
     build.require_lock(cfg)
@@ -160,6 +171,7 @@ def limit_cmd(site, slide, labels, target, allow_skew, html_env):
     s = cfg.site(site)
     if "html" not in s.faces:
         raise ReleaseError(f"{s.site} has no HTML face: a slide limit applies to the HTML face")
+    _require_running(t, ["static"])
     _skew(cfg, t, allow_skew)
     if labels:
         names = [x.strip() for x in labels.split(",") if x.strip()]

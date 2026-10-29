@@ -125,6 +125,12 @@ class Target:
         name = f"$(docker ps -q --filter name={uuid} | head -1)" if uuid else shlex.quote(self.cfg[app])
         return self.sh(f"docker exec {name} {cmd}", check=check)
 
+    def running(self, app: str) -> bool:
+        """Whether the container of *app* (``static`` or ``live``) runs."""
+        uuid = self.cfg.get(f"{app}_uuid")
+        flt = f"name={uuid}" if uuid else f"name=^{self.cfg.get(app, app)}$"
+        return bool(self.sh(f"docker ps -q --filter {shlex.quote(flt)} | head -1", check=False).stdout.strip())
+
     def write(self, dest: str, content: str, mode: int | None = None) -> None:
         if self.kind == "local":
             Path(dest).parent.mkdir(parents=True, exist_ok=True)

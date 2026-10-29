@@ -9,7 +9,8 @@ indexed scale from ``compute_scale()`` and writes ``.claude/references/streamtex
 ``--check`` reports the drifts instead: a fallback that differs from ``default.css``, a shortcut whose
 docstring says another size, an indexed scale in ``default.css`` that differs from ``compute_scale()``,
 and every ``s.xxx`` cited in ``.claude/`` that resolves nowhere (a name the same file defines with
-``Style(...)``, ``s.text_*`` and a line saying the name "does not exist" are left out).
+``Style(...)``, ``s.text_*``, ``s.project.*`` — generic examples, not the project's styles — and a line
+saying the name "does not exist" are left out).
 """
 
 from __future__ import annotations
@@ -289,9 +290,9 @@ def drifts(project: Path, styles=None) -> list[str]:
                 continue                                        # "`s.idx_6` does not exist"
             for m in _CITE_RE.finditer(line):
                 cited = m.group(1)
-                if line[m.end():m.end() + 1] == "*" or cited == "project" or cited.split(".")[0] in defined \
-                        or (cited.startswith("project.") and styles is None):
-                    continue                                    # s.text_* , the s.project namespace
+                if line[m.end():m.end() + 1] == "*" or cited.split(".")[0] in (*defined, "project", "xxx"):
+                    continue    # s.text_*, an example's own names, a placeholder, and s.project.*: the installed
+                    #             references are generic, their s.project examples name no real project's styles
                 if not resolves(cited, root):
                     problems.append(f"{f.relative_to(project)}:{n}: s.{cited} does not exist")
     return problems

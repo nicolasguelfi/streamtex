@@ -82,7 +82,7 @@ def test_check_finds_a_wrong_citation(project):
     r = CliRunner().invoke(cli, ["styles", "dump", str(project), "--check"])
     assert r.exit_code == 1
     assert "guide.md:1: s.idx_6 does not exist" in r.output
-    assert "s.project.colors.nope does not exist" in r.output     # the project's styles are known
+    assert "s.project" not in r.output          # generic examples, not judged against the project's styles
 
 
 def test_check_finds_a_fallback_that_differs(monkeypatch, project):

@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **`stx styles dump --check` no longer judges the generic `s.project.*`
+  examples** of the installed references against the project's own
+  styles (all-trainings, 2026-10-29: 37 false drifts with
+  `--styles shared.styles`); an `s.xxx` placeholder is left out too.
+  Measured on a copy of all-trainings with today's profiles: no drift.
+- **`stx release publish` and `limit` check that the target's containers
+  run before the export**: a publish sent to the wrong target (`local`,
+  no container) exported for 25 s and then failed at the first reload
+  ("No such container: stx-static"). It now stops at once and names the
+  containers, with `stx release local up` for a local target.
+
 ## [0.7.79] — 2026-10-29 — styles reference from the code, bibliography over slides, SSH retry (board vague4, wave 4a: #6, #23, #152, #154)
 
 ### Added

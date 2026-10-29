@@ -681,3 +681,32 @@ def test_rebuild_options_are_for_a_dockerfile_kept_in_coolify(tmp_path, monkeypa
     monkeypatch.chdir(cfg.root)
     r = CliRunner().invoke(rebuild_cmd, ["--dry-run"])
     assert r.exit_code == 1 and "built from the repository" in r.output
+
+
+def test_running_asks_docker_for_the_container(monkeypatch):
+    from streamtex.release import target
+    seen = []
+    monkeypatch.setattr(target.subprocess, "run", lambda argv, **kw: seen.append(argv[-1]) or
+                        subprocess.CompletedProcess(argv, 0, "abc123\n" if "stx-static" in argv[-1] else "", ""))
+    t = target.Target("local", {"type": "local", "root": "/tmp/x", "static": "stx-static", "live": "stx-live"})
+    assert t.running("static") and not t.running("live")
+    assert "name=^stx-static$" in seen[0]
+    t = target.Target("prod", {"type": "ssh", "root": "/srv", "host": "h", "live_uuid": "u42"})
+    assert not t.running("live") and "name=u42" in seen[-1]
+
+
+def test_publish_stops_before_the_export_when_a_container_does_not_run(monkeypatch):
+    """all-trainings, 2026-10-29: a publish to the wrong target exported 25 s, then failed at the reload."""
+    from streamtex.cli import release_cmd
+    from streamtex.release import target
+
+    class Cfg:
+        def select(self, sites, groups):
+            return [type("S", (), {"site": "a", "faces": ("live", "html")})()]
+    t = target.Target("local", {"type": "local", "root": "/tmp/x", "static": "stx-static", "live": "stx-live"})
+    monkeypatch.setattr(t, "running", lambda app: app == "live")
+    monkeypatch.setattr(release_cmd, "_ctx", lambda target: (Cfg(), {}, t))
+    monkeypatch.setattr(release_cmd.build, "require_committed", lambda root: pytest.fail("exported anyway"))
+    with pytest.raises(ReleaseError, match=r"target local: the static container\(s\) do not run — "
+                                           r"start them \(stx release local up\) or choose another --target"):
+        release_cmd.publish_cmd.callback(("a",), (), False, None, False, ())

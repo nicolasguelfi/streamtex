@@ -1,9 +1,10 @@
 """Real-Chromium e2e: the stage gives the document the projector's viewport (#105).
 
-A window of 1000×600 opens an export with ``?stage=1920x1080``: inside the
-frame the document measures 1920×1080, a 50vw×50vh box 960×540 px, the frame
-is scaled to 0.52 and centred, the deep link reaches the frame and the frame
-has the keyboard focus.
+A window of 1000×600 opens a page with ``?stage=1920x1080`` that runs the
+stage script (the live app injects the same one): inside the frame the
+document measures 1920×1080, a 50vw×50vh box 960×540 px, the frame is scaled
+to 0.52 and centred, the deep link reaches the frame and the frame has the
+keyboard focus. "Exit stage" brings the page back without the stage (0.7.81).
 
 Run:  uv run pytest -m e2e tests/e2e/test_stage.py -v
 Prerequisite (one-time): uv run playwright install chromium
@@ -14,20 +15,21 @@ import pytest
 
 playwright = pytest.importorskip("playwright.sync_api")
 
-from streamtex.export_enrich import enrich_export_html  # noqa: E402
+from streamtex.stage import stage_script  # noqa: E402
 
 pytestmark = pytest.mark.e2e
 
 RAW = ("<html><head><title>deck</title><style>body{margin:0}</style></head><body>"
        "<h1 id='a'>A</h1><div id='probe' style='width:50vw;height:50vh;background:#c33'></div>"
+       "<script>" + stage_script() +
+       "if (new URLSearchParams(location.search).get('stage')) stxStage(window, 1920, 1080);</script>"
        "</body></html>")
-TOC = [{"level": 1, "title": "A", "key_anchor": "a", "page_idx": 0}]
 
 
 @pytest.fixture
 def page(tmp_path):
     f = tmp_path / "deck.html"
-    f.write_text(enrich_export_html(RAW, toc=TOC, stage=(1920, 1080)), encoding="utf-8")
+    f.write_text(RAW, encoding="utf-8")
     with playwright.sync_playwright() as p:
         browser = p.chromium.launch()
         pg = browser.new_page(viewport={"width": 1000, "height": 600})
@@ -43,7 +45,7 @@ def test_the_frame_has_the_projector_viewport(page):
     assert inner.evaluate("[innerWidth, innerHeight]") == [1920, 1080]
     assert inner.evaluate("(() => { const r = document.getElementById('probe').getBoundingClientRect();"
                           " return [r.width, r.height]; })()") == [960, 540]
-    assert inner.url.endswith("deck.html#a")                          # stage removed, deep link kept
+    assert inner.url.endswith("deck.html?stage_frame=1#a")            # stage removed, deep link kept
     assert inner.evaluate("!document.getElementById('stx-stage')")   # no stage inside the stage
 
 
@@ -60,3 +62,11 @@ def test_resizing_the_window_fits_again(page):
     page.wait_for_timeout(100)
     box = page.locator("#stx-stage .stx-stage-box").bounding_box()
     assert box["width"] == pytest.approx(800, abs=1) and box["height"] == pytest.approx(450, abs=1)
+
+
+def test_exit_stage_brings_the_page_back(page):
+    page.get_by_role("button", name="Exit stage").click()
+    page.wait_for_load_state()
+    assert "stage=" not in page.url and page.url.endswith("deck.html#a")
+    assert page.locator("#stx-stage").count() == 0
+    assert page.evaluate("innerWidth") == 1000

@@ -263,8 +263,6 @@ def export_html(path, output, asset_mode, title, no_nav, theme_mode, theme_bg, t
         _cache_data = st.session_state.get(_book_mod._STX_CACHE_KEY) or {}
         from ..printing import get_print_state
         print_rules = get_print_state(st.session_state)       # notice, html_print (#107)
-        from ..stage import STAGE_KEY
-        stage_size = st.session_state.get(STAGE_KEY)            # the sidebar's stage link (#105)
 
     elapsed = time.time() - t0
 
@@ -345,7 +343,6 @@ def export_html(path, output, asset_mode, title, no_nav, theme_mode, theme_bg, t
             lib_version=_cache_data.get("lib_version", ""),
             page_nav=page_nav,
             notice=print_rules["notice"],
-            stage=stage_size,
         )
 
     if not no_nav and nav_data:

@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.81] — 2026-10-29 — stage mode for the live app only, a way out, [book.defaults] on published sites (#105)
+
+### Fixed
+
+- **The stage is for the live app only** (#105, NG via all-trainings,
+  2026-10-29): 0.7.80 also put a "Stage 1920×1080" link and the stage
+  script in every HTML export (238 of the 243 HTML files of gai4as-slides).
+  The HTML export now carries neither; the link stays under the zoom
+  controls of the live app.
+- **The stage can be left**: the stage tab had no way back and kept
+  `?stage=` in its address, so a reload brought it back, and the page
+  inside the stage showed its own Stage link, which opened more stage tabs.
+  The stage's bar now has **Exit stage**, which brings the tab back to the
+  page without the stage (a link of the page itself: from the sandboxed
+  component frame, a script may not navigate the tab). The frame loads the
+  page with `stage_frame=1` and shows no Stage link.
+- **`[book.defaults]` reaches published sites**: `stx release` snapshots the
+  site's paths, not the project's `stx.toml`, so `st_book` found no
+  `[book.defaults]` in the export nor in the live process — `stage = false`
+  (or any other key) never applied on a published site. The snapshot now
+  gets a `stx.toml` holding only the `[book.defaults]` of the project's
+  (at the published commit), never its packs, design system or release
+  settings; a `stx.toml` listed in `[release] snapshot` is kept as is.
+
+### Removed
+
+- `enrich_export_html(stage=...)` and `streamtex.stage.export_stage_js()`
+  (added in 0.7.80, used only by the export).
+
 ## [0.7.80] — 2026-10-29 — glossary, stage mode, two fixes from all-trainings (board vague4, wave 4b: #12, #105)
 
 ### Added

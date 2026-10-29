@@ -19,6 +19,7 @@ import os
 import re
 import shutil
 import subprocess
+import tomllib
 from pathlib import Path
 
 from . import ReleaseError
@@ -223,7 +224,32 @@ def snapshot(cfg: ReleaseConfig, site: Site, work: Path, rev: str = "HEAD") -> P
             target.unlink()
     if not (code / site.book).is_file():
         raise ReleaseError(f"{site.site}: {site.book} is not in the commit")
+    if not (code / "stx.toml").exists() and (defaults := book_defaults_toml(cfg.root, rev)):
+        (code / "stx.toml").write_text(defaults, encoding="utf-8")
     return code
+
+
+def book_defaults_toml(root: Path, rev: str = "HEAD") -> str | None:
+    """A ``stx.toml`` holding only the ``[book.defaults]`` of the project's, at *rev* (None: none).
+
+    The snapshot takes the site's paths, not the project's ``stx.toml``: without this file
+    ``st_book`` found no ``[book.defaults]`` in the export nor in the live process, so a
+    setting such as ``stage = false`` never reached a published site. The packs, the design
+    system and the rest of ``stx.toml`` stay out.
+    """
+    shown = subprocess.run(["git", "-C", str(root), "show", f"{rev}:stx.toml"], capture_output=True)
+    if shown.returncode:
+        return None
+    try:
+        section = tomllib.loads(shown.stdout.decode("utf-8")).get("book", {}).get("defaults")
+    except (tomllib.TOMLDecodeError, UnicodeDecodeError, AttributeError):
+        return None
+    if not isinstance(section, dict) or not section:
+        return None
+    # JSON writes the scalars and the lists of scalars of [book.defaults] as valid TOML
+    lines = [f"{key} = {json.dumps(value, ensure_ascii=False)}" for key, value in section.items()]
+    return ("# Written by stx release: the [book.defaults] of the project's stx.toml, nothing else.\n"
+            "[book.defaults]\n" + "\n".join(lines) + "\n")
 
 
 # -- the HTML export -----------------------------------------------------------------------

@@ -85,7 +85,6 @@ from .spacing import (
     resolve_block_spacing,
     set_active_profile,
 )
-from .stage import STAGE_KEY
 from .styles import Style
 from .toc import NumberingMode, TOCConfig, reset_toc_registry, toc_entries
 from .utils import inject_link_preview_scaffold
@@ -537,7 +536,6 @@ def _offer_export_downloads(html: str, base_name: str,
                             doc_version=_cache.get("doc_version", ""),
                             lib_version=_cache.get("lib_version", ""),
                             notice=rules["notice"],
-                            stage=st.session_state.get(STAGE_KEY),
                         )
                         # Apply custom title override
                         if enrich_title:
@@ -895,10 +893,9 @@ def _st_book_impl(module_list, toc_config: TOCConfig = None, marker_config: Mark
     _block_kwargs = dict(block_kwargs or {})
     # --- Usage notice and print rules (#107): read by the panel and every export ---
     st.session_state[PRINT_KEY] = print_state(printable, notice, _block_kwargs.get("lang"))
-    # --- Stage size (#105): the sidebar link, and the HTML export's ---
-    from .stage import parse_stage, render_stage, requested_stage
+    # --- Stage size (#105): the live sidebar link, never the HTML export ---
+    from .stage import FRAME_PARAM, parse_stage, render_stage, requested_stage
     _stage = parse_stage(stage)
-    st.session_state[STAGE_KEY] = _stage
     # --- Resolve PdfConfig from exports list if not provided directly ---
     if pdf_config is None and exports:
         for _ecfg in exports:
@@ -1095,7 +1092,7 @@ def _st_book_impl(module_list, toc_config: TOCConfig = None, marker_config: Mark
                 )
             add_zoom_options(default_page_width=page_width, default_zoom=zoom,
                              container=_stx_settings)
-            if _stage:
+            if _stage and FRAME_PARAM not in _query_params():    # not inside the stage's own frame
                 from .stage import stage_link
                 stage_link(_query_params(), _stage, container=_stx_settings)
             add_wrap_all_option(container=_stx_settings)

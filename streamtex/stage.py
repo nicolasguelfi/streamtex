@@ -7,11 +7,13 @@ of the chosen size — the one construct that gives a page a viewport of its
 own — scaled to fit the window, centred, with black bands, like the device
 mode of Chrome DevTools.
 
-The stage opens from the URL: ``?stage=1920x1080`` (``?stage=1`` takes the
-document's size). The tab then shows only the stage; its frame loads the same
-URL without ``stage``, so ``?marker=`` and ``#anchor`` deep links pass through.
-The same script serves the live app (sidebar link under the zoom controls) and
-the HTML export (sidebar link, same password cookie on a published site).
+The stage is for the live app only (a link under the zoom controls); the HTML
+export carries neither the link nor the script (0.7.81). It opens from the URL:
+``?stage=1920x1080`` (``?stage=1`` takes the document's size). The tab then
+shows only the stage; its frame loads the same URL without ``stage`` (plus
+``stage_frame=1``, which hides the link inside), so ``?marker=`` and
+``#anchor`` deep links pass through. "Exit stage" brings the tab back to the
+page without the stage.
 
     st_book([...], stage=(1920, 1080))     # default; stage=False: no link
 """
@@ -20,7 +22,8 @@ import json
 from urllib.parse import urlencode
 
 DEFAULT_STAGE = (1920, 1080)
-STAGE_KEY = "_stx_stage"
+#: In the URL of the stage's own frame: the page inside shows no stage link.
+FRAME_PARAM = "stage_frame"
 _MIN, _MAX = 100, 10000
 
 
@@ -65,7 +68,7 @@ def requested_stage(params: dict, default: tuple[int, int] | None) -> tuple[int,
 
 def stage_href(params: dict, size: tuple[int, int]) -> str:
     """The relative link that opens the current URL (*params*) on the stage."""
-    return "?" + urlencode({**{k: v for k, v in params.items() if k != "stage"},
+    return "?" + urlencode({**{k: v for k, v in params.items() if k not in ("stage", FRAME_PARAM)},
                             "stage": f"{size[0]}x{size[1]}"}, doseq=True)
 
 
@@ -77,6 +80,8 @@ function stxStage(win, w, h) {
   if (win.self !== win.top || doc.getElementById('stx-stage')) return;
   var url = new win.URL(win.location.href);
   url.searchParams.delete('stage');
+  var inside = new win.URL(url.href);
+  inside.searchParams.set('stage_frame', '1');
   var css = doc.createElement('style');
   css.textContent =
     'html.stx-staged, html.stx-staged body { overflow: hidden !important; }' +
@@ -88,7 +93,8 @@ function stxStage(win, w, h) {
     ' font: 12px/1.2 system-ui, sans-serif; color: #ddd; background: rgba(40,40,40,.85); padding: 4px 8px;' +
     ' border-radius: 6px; opacity: .35; transition: opacity .15s; }' +
     '#stx-stage .stx-stage-bar:hover, #stx-stage .stx-stage-bar:focus-within { opacity: 1; }' +
-    '#stx-stage .stx-stage-bar button { font: inherit; color: inherit; background: none; border: 1px solid #777;' +
+    '#stx-stage .stx-stage-bar button, #stx-stage .stx-stage-bar a { font: inherit; color: inherit; background: none;' +
+    ' border: 1px solid #777; text-decoration: none;' +
     ' border-radius: 4px; padding: 1px 6px; cursor: pointer; }';
   doc.head.appendChild(css);
   var root = doc.createElement('div');
@@ -99,7 +105,7 @@ function stxStage(win, w, h) {
   box.style.height = h + 'px';
   var frame = doc.createElement('iframe');
   frame.title = 'Stage ' + w + '×' + h;
-  frame.src = url.href;
+  frame.src = inside.href;
   box.appendChild(frame);
   var bar = doc.createElement('div');
   bar.className = 'stx-stage-bar';
@@ -107,8 +113,16 @@ function stxStage(win, w, h) {
   var full = doc.createElement('button');
   full.type = 'button';
   full.textContent = 'Full screen';
+  // A link of the page itself: in the live app this script runs in a sandboxed
+  // component frame, which may not navigate the tab (location.replace is refused).
+  var exit = doc.createElement('a');
+  exit.href = url.href;
+  exit.setAttribute('role', 'button');
+  exit.textContent = 'Exit stage';
+  exit.title = 'Back to the page without the stage';
   bar.appendChild(readout);
   bar.appendChild(full);
+  bar.appendChild(exit);
   root.appendChild(box);
   root.appendChild(bar);
   doc.body.appendChild(root);
@@ -142,25 +156,6 @@ function stxStage(win, w, h) {
 def stage_script() -> str:
     """The JavaScript of the stage: defines ``stxStage(win, w, h)``."""
     return _STAGE_JS
-
-
-def export_stage_js(size: tuple[int, int]) -> str:
-    """Script for an HTML export: the sidebar link keeps the current URL; ``?stage=`` opens the stage."""
-    w, h = size
-    return _STAGE_JS + (
-        "(function () {\n"
-        f"  var W = {w}, H = {h};\n"
-        "  var link = document.getElementById('stx-stage-link');\n"
-        "  if (link) link.addEventListener('click', function () {\n"
-        "    var u = new URL(location.href); u.searchParams.set('stage', W + 'x' + H); link.href = u.href;\n"
-        "  });\n"
-        "  var raw = new URLSearchParams(location.search).get('stage');\n"
-        "  if (raw === null) return;\n"
-        "  var m = /^(\\d{3,5})[x\\u00d7](\\d{3,5})$/i.exec(raw);\n"
-        "  if (m) { W = +m[1]; H = +m[2]; }\n"
-        "  var go = function () { stxStage(window, W, H); };\n"
-        "  if (document.body) go(); else document.addEventListener('DOMContentLoaded', go);\n"
-        "})();\n")
 
 
 def render_stage(size: tuple[int, int]) -> None:

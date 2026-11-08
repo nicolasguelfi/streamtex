@@ -181,7 +181,7 @@ def _publish(tmp_path, monkeypatch, cfg, faces=("live", "html")):
     """Publish up to the copy of the code; returns the files of its .stx-served and what was said."""
     code = _snapshot(tmp_path)
     html = _export(tmp_path, {"en/deck/data/video/a.mp4": b"A" * 40})
-    monkeypatch.setattr(build, "snapshot", lambda c, s, w: code)
+    monkeypatch.setattr(build, "snapshot", lambda c, s, w, **k: code)
     monkeypatch.setattr(build, "export", lambda c, s, code_, w, r, env: (html, r))
     seen = {}
 
@@ -235,7 +235,7 @@ def test_media_report(tmp_path, monkeypatch):
     cfg = _project(tmp_path, monkeypatch, 'media_keep = ["downloads/*"]')
     code = _snapshot(tmp_path)
     html = _export(tmp_path, {"en/deck/data/video/a.mp4": b"A" * 40})
-    monkeypatch.setattr(build, "snapshot", lambda c, s, w: code)
+    monkeypatch.setattr(build, "snapshot", lambda c, s, w, **k: code)
     monkeypatch.setattr(build, "export", lambda c, s, code_, w, r, env: (html, r))
     r = CliRunner().invoke(media_report_cmd, ["deck", "--list", "dropped"])
     assert r.exit_code == 0, r.output
@@ -317,7 +317,7 @@ def test_media_report_lists_the_links_to_other_sites(tmp_path, monkeypatch):
     cfg = _project(tmp_path, monkeypatch, site_extra=OTHER)
     code = _snapshot(tmp_path)
     html = _export(tmp_path, {"en/deck/deck.html": b"<a href='https://other.example.org/app/static/z.zip'>z</a>"})
-    monkeypatch.setattr(build, "snapshot", lambda c, s, w: code)
+    monkeypatch.setattr(build, "snapshot", lambda c, s, w, **k: code)
     monkeypatch.setattr(build, "export", lambda c, s, code_, w, r, env: (html, r))
     r = CliRunner().invoke(media_report_cmd, ["deck"])
     assert r.exit_code == 0, r.output

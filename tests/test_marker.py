@@ -1,5 +1,5 @@
 """Tests for the Marker Navigation system."""
-
+import sys
 from unittest.mock import patch
 
 import pytest
@@ -60,10 +60,14 @@ class TestMarkerRegistry:
 
     def test_register_single(self):
         reg = MarkerRegistry(MarkerConfig())
+        idx_line = sys._getframe().f_lineno + 1
         idx = reg.register("Intro", "anchor-1")
         assert idx == 0
         entries = reg.get_entries()
         assert len(entries) == 1
+        # where it was written (#157): this file, the line of the register() call
+        src = entries[0].pop("source")
+        assert src["file"].endswith("test_marker.py") and src["line"] == idx_line
         assert entries[0] == {"index": 0, "label": "Intro", "anchor": "anchor-1", "hidden": False,
                               "stop": True, "listed": True, "toc": False, "stop_index": 0,
                               "origin": "marker"}

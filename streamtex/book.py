@@ -78,6 +78,7 @@ from .printing import (
 )
 from .search import generate_search_input_html, generate_search_script, start_collector, stop_collector
 from .slide import add_slide_break_options
+from .source import set_entry as _source_set_entry
 from .space import st_br, st_space
 from .spacing import (
     mark_block_top_injected,
@@ -527,6 +528,7 @@ def _offer_export_downloads(html: str, base_name: str,
                 if enrich_nav:
                     try:
                         from .export_enrich import enrich_export_html
+                        from .source import page_payload
                         _cache = st.session_state.get(_STX_CACHE_KEY, {})
                         html_download = enrich_export_html(
                             html_download,
@@ -536,6 +538,7 @@ def _offer_export_downloads(html: str, base_name: str,
                             doc_version=_cache.get("doc_version", ""),
                             lib_version=_cache.get("lib_version", ""),
                             notice=rules["notice"],
+                            source=page_payload("html"),
                         )
                         # Apply custom title override
                         if enrich_title:
@@ -801,7 +804,7 @@ def _st_book_impl(module_list, toc_config: TOCConfig = None, marker_config: Mark
             notice=None,
             printable: bool | PrintConfig = True,
             glossary_sources=None, glossary_config=None,
-            stage=(1920, 1080)):
+            stage=(1920, 1080), source=None):
     """Generates a web page e-book from a list of block modules.
 
     :param separator: Optional module with a build() function, rendered between each block.
@@ -838,10 +841,19 @@ def _st_book_impl(module_list, toc_config: TOCConfig = None, marker_config: Mark
         or ``.bib`` (its ``@glossary`` entries). See ``streamtex.glossary``.
     :param glossary_config: Optional GlossaryConfig (``strict=True``: an unknown key raises).
     :param stage: Size of the stage (#105): ``(1920, 1080)`` (default),
-        ``[w, h]`` or ``"WxH"``. A link under the zoom controls, and in the
-        HTML export's sidebar, opens the document in a virtual screen of this
-        size scaled to the window, with black bands (``?stage=WxH`` in the
-        URL). ``False``: no stage.
+        ``[w, h]`` or ``"WxH"``. A link under the zoom controls of the live
+        app opens the document in a virtual screen of this size scaled to the
+        window, with black bands (``?stage=WxH`` in the URL); the HTML export
+        has no stage (0.7.81). ``False``: no stage.
+    :param source: Where each slide is written, copied in one gesture (#157):
+        a dict or a ``SourceConfig`` — ``{"live": "on"}`` turns it on in the
+        live app, ``{"html": "on"}`` in the HTML export (both ``"off"`` by
+        default: the pages are those of before). Option-click on the counter
+        of the marker bar, a click on the footer's counter or Ctrl+Option+Cmd+L
+        copies "document · n/N · file:line · key · « label » · release";
+        Cmd-click or Ctrl+Option+Cmd+O opens the file in the editor (live app
+        on this computer). Keys, clicks and editor are settings;
+        ``STX_SOURCE_LIVE``, ``STX_SOURCE_HTML``, … override the book.
     :param inspector: Optional InspectorConfig to enable the block inspector panel.
     :param page_width: Page width as % of browser width (default 90).
     :param zoom: Default zoom level as % (default 100).
@@ -896,6 +908,9 @@ def _st_book_impl(module_list, toc_config: TOCConfig = None, marker_config: Mark
     # --- Stage size (#105): the live sidebar link, never the HTML export ---
     from .stage import FRAME_PARAM, parse_stage, render_stage, requested_stage
     _stage = parse_stage(stage)
+    # --- Where each slide is written (#157): settings of this run, the book's root ---
+    from . import source as _source
+    _source.begin_book(source, _main_script_dir())
     # --- Resolve PdfConfig from exports list if not provided directly ---
     if pdf_config is None and exports:
         for _ecfg in exports:
@@ -1250,6 +1265,7 @@ def _st_book_impl(module_list, toc_config: TOCConfig = None, marker_config: Mark
         _inject_block_horizontal_css(_block_sp)
 
         marker_slide_boundary()     # each entry opens a slide (#116 §4.6)
+        _source_set_entry(module)   # the entry of the stops it writes (#157)
         try:
             st_include(module, *_block_args, _inspector_config=inspector, **_block_kwargs)
         finally:
@@ -2700,6 +2716,7 @@ def _build_page_cache(module_list, toc_config, marker_config, separator,
                     st_space("v", _block_sp.top)
                 mark_block_top_injected()
                 marker_slide_boundary()     # each entry opens a slide (#116)
+                _source_set_entry(module)   # the entry of the stops it writes (#157)
 
                 try:
                     if _warmup_mode:
@@ -3643,6 +3660,7 @@ def _paginated_book(module_list, toc_config, marker_config, separator,
     _inject_block_horizontal_css(_pg_block_sp)
 
     marker_slide_boundary()     # each entry opens a slide (#116)
+    _source_set_entry(module_list[_entry_idx])     # the entry of the stops it writes (#157)
     try:
         _render_page(module_list[_entry_idx], _page, pages, block_args, block_kwargs, inspector)
     finally:
@@ -3842,6 +3860,7 @@ BOOK_DEFAULT_KEYS = frozenset({
     "paginate", "paginate_by", "html_export_mode", "page_width", "zoom", "export", "export_title", "loading",
     "chrome_banner", "banner_color", "doc_version", "lang", "html_export_zoom",
     "stage",                                                     # stage = [1920, 1080] (#105)
+    "source",                                                    # [book.defaults.source] (#157)
 })
 
 
@@ -3914,7 +3933,8 @@ _DEFAULTS_DOC = """Generates a web page e-book from a list of block modules.
     taken from ``[book.defaults]`` of the project's ``stx.toml`` when it
     declares them (``paginate``, ``page_width``, ``zoom``, ``export``,
     ``export_title``, ``loading``, ``chrome_banner``, ``banner_color``,
-    ``doc_version``, ``lang``, ``stage``), then from the defaults below.
+    ``doc_version``, ``lang``, ``stage``, ``source`` — the table
+    ``[book.defaults.source]``), then from the defaults below.
     ``doc_version="auto"`` reads ``[project].version`` of ``pyproject.toml``.
     """
 

@@ -203,8 +203,14 @@ def verify_export(cfg: ReleaseConfig, site: Site, html: Path) -> None:
 
 # -- the code snapshot ---------------------------------------------------------------------
 
-def snapshot(cfg: ReleaseConfig, site: Site, work: Path, rev: str = "HEAD") -> Path:
-    """The site's code at *rev*: ``HEAD`` for a publication, the published commit for a limit (#146)."""
+def snapshot(cfg: ReleaseConfig, site: Site, work: Path, rev: str = "HEAD", release: str | None = None,
+             source: dict | None = None) -> Path:
+    """The site's code at *rev*: ``HEAD`` for a publication, the published commit for a limit (#146).
+
+    Writes ``stx-published.json`` at its root (#157): the release name (*release*, or the short commit of
+    *rev*) and the target's *source* settings — without them a published site carries no source data,
+    whatever the book says.
+    """
     code = work / "code"
     code.mkdir()
     paths = [p for p in (*cfg.snapshot, *site.paths) if (cfg.root / p).exists()]
@@ -226,6 +232,11 @@ def snapshot(cfg: ReleaseConfig, site: Site, work: Path, rev: str = "HEAD") -> P
         raise ReleaseError(f"{site.site}: {site.book} is not in the commit")
     if not (code / "stx.toml").exists() and (defaults := book_defaults_toml(cfg.root, rev)):
         (code / "stx.toml").write_text(defaults, encoding="utf-8")
+    from ..source import PUBLISHED_FILE, SIDES
+    name = release or git(cfg.root, "rev-parse", "--short=12", rev)
+    record = {"release": name, "site": site.site,
+              "source": {side: str((source or {}).get(side, "off")) for side in SIDES}}
+    (code / PUBLISHED_FILE).write_text(json.dumps(record, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     return code
 
 
@@ -246,8 +257,14 @@ def book_defaults_toml(root: Path, rev: str = "HEAD") -> str | None:
         return None
     if not isinstance(section, dict) or not section:
         return None
-    # JSON writes the scalars and the lists of scalars of [book.defaults] as valid TOML
-    lines = [f"{key} = {json.dumps(value, ensure_ascii=False)}" for key, value in section.items()]
+    # JSON writes the scalars and the lists of scalars of [book.defaults] as valid TOML; a table
+    # ([book.defaults.source], #157) gets its own header after them — JSON's {"k": v} is not TOML
+    lines = [f"{key} = {json.dumps(value, ensure_ascii=False)}" for key, value in section.items()
+             if not isinstance(value, dict)]
+    for key, value in section.items():
+        if isinstance(value, dict):
+            lines += ["", f"[book.defaults.{key}]"]
+            lines += [f"{k} = {json.dumps(v, ensure_ascii=False)}" for k, v in value.items()]
     return ("# Written by stx release: the [book.defaults] of the project's stx.toml, nothing else.\n"
             "[book.defaults]\n" + "\n".join(lines) + "\n")
 
@@ -281,8 +298,11 @@ def export(cfg: ReleaseConfig, site: Site, code: Path, work: Path, release: str,
         media.parent.mkdir(parents=True, exist_ok=True)
         media.symlink_to(cfg.root / cfg.media)       # the media of this machine (the commit is clean)
         linked_media = media
+    # STX_SOURCE_* of this shell is for local work (#157): the target decides (stx-published.json),
+    # --html-env can still set it for one publication
     env = {k: v for k, v in os.environ.items()
-           if k not in ("STX_PASSWORD", "STX_GATE") and not k.startswith(("STX_URL_", "STX_EXPORT_URL_"))}
+           if k not in ("STX_PASSWORD", "STX_GATE")
+           and not k.startswith(("STX_URL_", "STX_EXPORT_URL_", "STX_SOURCE_"))}
     last: int | None = None
     for lang in cfg.langs or ("",):
         out = html / lang if lang else html

@@ -92,7 +92,7 @@ class TestMarker:
         a = marker_entries()[0]
         st_marker("X", roles=MarkerRoles.HIDDEN)
         b = marker_entries()[1]
-        strip = ("index", "anchor", "stop_index")
+        strip = ("index", "anchor", "stop_index", "source")
         assert {k: v for k, v in a.items() if k not in strip} == {k: v for k, v in b.items() if k not in strip}
 
     def test_marker_false_with_key_is_refused(self, out):
@@ -216,4 +216,6 @@ def test_same_html_as_the_hand_written_form(out):
     with st_block(stx.get_slide_container()):
         pass
     by_hand = (list(out), [dict(e) for e in marker_entries()])
+    # the same entries, but each written on its own line (#157)
+    assert [s.pop("source")["line"] for s in by_slide[1]] != [s.pop("source")["line"] for s in by_hand[1]]
     assert by_slide == by_hand

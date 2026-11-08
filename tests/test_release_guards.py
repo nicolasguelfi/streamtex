@@ -272,7 +272,7 @@ def test_verify_must_name_a_function(tmp_path, monkeypatch):
 def test_a_refused_export_copies_nothing(tmp_path, monkeypatch):
     cfg = _verifying(tmp_path, monkeypatch, "project_checks:refuse")
     (tmp_path / "html").mkdir()
-    monkeypatch.setattr(build, "snapshot", lambda c, s, w: tmp_path)
+    monkeypatch.setattr(build, "snapshot", lambda c, s, w, **k: tmp_path)
     monkeypatch.setattr(build, "export", lambda c, s, code, w, r, env: (tmp_path / "html", r))
 
     class Target:

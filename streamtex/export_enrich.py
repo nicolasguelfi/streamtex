@@ -971,9 +971,17 @@ def _build_theme_vars_css() -> str:
     )
 
 
-def _marker_nav_script(markers: list[dict], page_nav: dict | None = None) -> str:
-    """The export marker bar script for *markers* (all entries, with roles)."""
-    return (_MARKER_NAV_JS
+def _marker_nav_script(markers: list[dict], page_nav: dict | None = None,
+                       source: dict | None = None) -> str:
+    """The export marker bar script for *markers* (all entries, with roles).
+
+    *source*: the payload of the source gesture (#157, ``source.page_payload("html")``), or None.
+    """
+    js = _MARKER_NAV_JS
+    if source is not None:
+        from .source import source_script
+        js = js.replace("  // --- Init ---\n", source_script(source, "document", "window") + "  // --- Init ---\n", 1)
+    return (js
             .replace("__ROLES_JS__", _MARKER_ROLES_JS)
             .replace("__PAGE_NAV__", json.dumps(page_nav, ensure_ascii=False))
             .replace("__MARKERS__", json.dumps(markers, ensure_ascii=False)))
@@ -988,8 +996,12 @@ def enrich_export_html(
     lib_version: str = "",
     page_nav: dict | None = None,
     notice: str = "",
+    source: dict | None = None,
 ) -> str:
     """Transform raw export HTML into a fully navigable static document.
+
+    *source* (#157): the payload of the source gesture (``source.page_payload("html")``);
+    None (the HTML side off) leaves no source in the page, as before.
 
     *page_nav* (#106): in a paginated export, ``{"mode": "paginated", "files":
     [file per page], "here": [pages of this file], "prefix": "",
@@ -1021,6 +1033,10 @@ def enrich_export_html(
         # entries that did not come through the page cache: give them their
         # roles and the numbers every surface shows (#116, #117)
         markers = annotate_marker_numbers(normalize_marker_entries([dict(m) for m in markers]))
+
+    if source is None and markers:
+        from .source import without_sources
+        markers = without_sources(markers)
 
     has_toc = bool(toc)
     has_markers = bool(markers)
@@ -1081,7 +1097,7 @@ def enrich_export_html(
 
     # --- Build JS block ---
     if has_markers:
-        marker_js = _marker_nav_script(markers, page_nav)
+        marker_js = _marker_nav_script(markers, page_nav, source)
         extra_js_parts.append(marker_js)
     if has_markers or has_toc:
         from .book import _toc_target_marker

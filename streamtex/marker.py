@@ -218,6 +218,10 @@ class MarkerRegistry:
             # label generated ("Marker N"), not given: the nav widget shows the
             # current section instead for an unlisted marker (#97)
             entry["auto"] = True
+        from .source import capture
+        src = capture()                                      # where the stop is written (#157)
+        if src is not None:
+            entry["source"] = src
         self._entries.append(entry)
         from . import pagewalk
         pagewalk.note("m", idx)                              # page of this marker (#121)
@@ -325,6 +329,8 @@ def annotate_marker_numbers(entries: list[dict] | None = None) -> list[dict]:
             end = n_stops
         e["row_end"] = end
         e["row_text"] = str(start) if end <= start else f"{start}–{end}"
+    from .source import annotate_sources
+    annotate_sources(entries)                                # rank and key of each source (#157)
     return entries
 
 
@@ -461,6 +467,8 @@ _registry: Optional[MarkerRegistry] = None
 def reset_marker_registry(config: MarkerConfig = None) -> None:
     """Initialise or reset the global marker registry."""
     global _registry
+    from .source import set_entry
+    set_entry(None)             # no entry of a previous book on the next stops (#157)
     if _registry is not None:
         _registry.reset()
         if config is not None:
@@ -1723,10 +1731,18 @@ __ROLES_JS__
 })();
 """
 
+    # #157: where each slide is written, only when the live side is on (off: the page of before)
+    from .source import page_payload, source_script, without_sources
+    source = page_payload("live")
+    if source is not None:
+        js_body = js_body.replace("    scheduleInit(INIT_MIN_MS);\n})();",
+                                  source_script(source, "hostDoc", "hostWin")
+                                  + "    scheduleInit(INIT_MIN_MS);\n})();")
+
     # Replace placeholders
     js_body = (js_body
         .replace('__ROLES_JS__', _MARKER_ROLES_JS)
-        .replace('__MARKERS__', json.dumps(entries))
+        .replace('__MARKERS__', json.dumps(entries if source is not None else without_sources(entries)))
         .replace('__NAV_TOC__', json.dumps(nav_toc) if nav_toc else 'null')
         .replace('__NEXT_KEYS__', json.dumps(config.next_keys))
         .replace('__PREV_KEYS__', json.dumps(config.prev_keys))

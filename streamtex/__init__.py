@@ -186,6 +186,9 @@ try:
         load_glossary, gloss, st_glossary,
     )
 
+    # Where each slide is written, copied in one gesture (#157)
+    from .source import SourceConfig, get_source_config
+
     # Link behavior configuration
     from .link_config import LinkConfig, set_link_config, get_link_config
 
@@ -304,6 +307,7 @@ __all__ = [
     "SLIDE_CONTAINER",
     "SLIDE_NOTE_STYLE",
     "SlideNote",
+    "SourceConfig",
     "ScaleConfig",
     "ScaleCurve",
     "SlideBreakConfig",
@@ -343,6 +347,7 @@ __all__ = [
     "get_bib_config",
     "get_glossary_config",
     "get_glossary_registry",
+    "get_source_config",
     "gloss",
     "get_bib_registry",
     "get_block_helper_config",

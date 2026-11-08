@@ -120,8 +120,11 @@ def resolve_export_lang(lang_option: str | None) -> str:
               help="Export slides 1 to N only (N on the slide counter): the export stops after "
                    "the block that holds slide N, which is kept whole; later blocks never run. "
                    "Writes stx-limit.json in the output folder.")
+@click.option("--source", "source_side", type=click.Choice(["on", "off"]), default=None,
+              help="Where each slide is written, copied from the marker bar (#157): on or off for this "
+                   "export, whatever the book says (as STX_SOURCE_HTML). Default: the book's setting.")
 def export_html(path, output, asset_mode, title, no_nav, theme_mode, theme_bg, theme_text,
-                lang, suffix, html_mode, keep_going, zoom, page_width, up_to_slide):
+                lang, suffix, html_mode, keep_going, zoom, page_width, up_to_slide, source_side):
     """Generate static HTML from a StreamTeX project without a Streamlit server.
 
     Exports a fully navigable HTML document with sidebar TOC, floating
@@ -236,6 +239,9 @@ def export_html(path, output, asset_mode, title, no_nav, theme_mode, theme_bg, t
         _book_mod._warmup_limit_result = None
 
         t0 = time.time()
+        _source_env = os.environ.get("STX_SOURCE_HTML")
+        if source_side is not None:
+            os.environ["STX_SOURCE_HTML"] = source_side      # read by st_book (#157)
         try:
             code = Path(book_py).read_text(encoding="utf-8")
             exec(compile(code, book_py, "exec"),  # noqa: S102
@@ -254,6 +260,11 @@ def export_html(path, output, asset_mode, title, no_nav, theme_mode, theme_bg, t
             _book_mod._warmup_export_config = None
             _book_mod._export_page_sentinels = False
             _book_mod._warmup_up_to_slide = None
+            if source_side is not None:
+                if _source_env is None:
+                    os.environ.pop("STX_SOURCE_HTML", None)
+                else:
+                    os.environ["STX_SOURCE_HTML"] = _source_env
             os.chdir(original_cwd)
 
         # Retrieve the captured HTML and nav data while session_state is the mock dict
@@ -334,6 +345,7 @@ def export_html(path, output, asset_mode, title, no_nav, theme_mode, theme_bg, t
         if no_nav or not nav_data:
             return html_in
         from ..export_enrich import enrich_export_html
+        from ..source import page_payload
         return enrich_export_html(
             html_in,
             toc=nav_toc,
@@ -343,6 +355,7 @@ def export_html(path, output, asset_mode, title, no_nav, theme_mode, theme_bg, t
             lib_version=_cache_data.get("lib_version", ""),
             page_nav=page_nav,
             notice=print_rules["notice"],
+            source=page_payload("html"),
         )
 
     if not no_nav and nav_data:

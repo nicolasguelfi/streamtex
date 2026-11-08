@@ -53,6 +53,12 @@ def _faces_dirs(site: Site) -> list[str]:
     return [{"html": "static", "live": "live"}[f] for f in site.faces]
 
 
+def _target_source(t: Target) -> dict | None:
+    """The target's ``source`` settings (#157): ``{"live": "on"}`` lets its sites carry where each slide
+    is written; without it a published site carries none."""
+    return (getattr(t, "cfg", None) or {}).get("source")
+
+
 def program_conf(cfg: ReleaseConfig, site: Site, port: int) -> str:
     cur = f"{LIVE_ROOT}/sites/{site.site}/current"
     env = ['HOME="/tmp"']
@@ -220,7 +226,7 @@ def ensure_cuts(t: Target, cfg: ReleaseConfig, site: Site, release: str, need: s
         return names
     with tempfile.TemporaryDirectory(prefix="stx-levels-") as w:
         if code is None:
-            code = build.snapshot(cfg, site, Path(w), rev=release)
+            code = build.snapshot(cfg, site, Path(w), rev=release, release=release, source=_target_source(t))
         made: dict[str, int] = {}
         for n in missing:
             out = Path(w) / f"cut-{n}"
@@ -296,7 +302,7 @@ def publish_site(t: Target, cfg: ReleaseConfig, state: dict, site: Site, release
     foreign: dict[str, list[str]] = {}
     with tempfile.TemporaryDirectory(prefix="stx-release-") as w:
         work = Path(w)
-        code = build.snapshot(cfg, site, work)
+        code = build.snapshot(cfg, site, work, release=release, source=_target_source(t))
         html = None
         if "html" in site.faces:
             html, _ = build.export(cfg, site, code, work, release, html_env)

@@ -7,6 +7,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Where each slide is written, copied in one gesture** (#157, board t157,
+  2026-11-08). Every stop records its **source** when it is registered —
+  `marker_entries()[i]["source"] = {"file", "line", "entry", "rank", "of",
+  "key"}`: the file and the line of the `with st_slide(...)` /
+  `st_marker(...)` / `st_slide_break()` call (the first frame outside the
+  library and `contextlib`; a call on several lines gives its first line; a
+  loop gives one line and several ranks), the book entry, the rank among
+  the stops of that file in that entry and the key `<file without bck_>#<rank>`
+  — the map and the keys of all-trainings' `slide_map.py` (measured on
+  GAI4AS21H: the 407 slides give the same file, line and rank). Nested block
+  lists (`st_sequence`) give the atom's file, not the list's.
+- In the floating marker bar, with the setting on: **Option-click on the
+  counter** `n / N`, a **click on the footer's** `Slide n / N` or
+  **Ctrl+Option+Cmd+L** copies the line of the slide shown —
+  `GAI4AS21H/slides · 5/407 · content/atoms/bck_trainer_ng_who.py:33 ·
+  trainer_ng_who#1 · « Qui ? » · release da8a1dde` (the document is the
+  book's folder; the release is the published release, or locally the short
+  commit with `+` when tracked files are modified); **Cmd-click on the
+  counter** or **Ctrl+Option+Cmd+O** opens the file at that line in the
+  editor (**Cursor** by default, `cursor://file/{abs}:{line}`), in the live
+  app run on this computer. A plain click on the counter keeps its role
+  (jump to a slide; the marker list in the export). Proven in Chromium from
+  the live app's sandboxed component frame (real clipboard, real
+  navigation) and in the export.
+- **Two independent settings, both off by default**:
+  `st_book(source={"live": "on", "html": "on"})`, `SourceConfig`, or the
+  table `[book.defaults.source]` of `stx.toml`; the keys, the clicks, the
+  editor address, the document name and the project helpers to skip are
+  settings too. `STX_SOURCE_LIVE`, `STX_SOURCE_HTML`, `STX_SOURCE_COPY_KEY`,
+  … override the book for one run or one export, and
+  `stx export html --source on|off` for one export. **Off, the pages are
+  those of before**: the GAI4AS21H export is byte-identical to 0.7.81's
+  (407 files).
+- **Published sites carry nothing unless their target says so**: the
+  snapshot of `stx release` gets `stx-published.json` (the release name and
+  the target's `source` settings, `"off"` unless the target in
+  `.stx-release.json` has `"source": {"live": "on"}` or `{"html": "on"}`);
+  it wins over the book, so a book left `"on"` for local work publishes no
+  file path. `STX_SOURCE_*` of the publishing shell no longer reaches the
+  export (as `STX_PASSWORD`); `--html-env STX_SOURCE_HTML=on` still can.
+- `stx.SourceConfig`, `stx.get_source_config()`.
+
+### Fixed
+
+- **A table in `[book.defaults]` broke every default of a published site**:
+  the snapshot's `stx.toml` (0.7.81) wrote each value as JSON, and a table
+  (`[book.defaults.source]`) became `source = {"live": "on"}` — not TOML,
+  so the whole file was unreadable and every `[book.defaults]` key
+  (`stage = false` included) was lost. A table now gets its own header.
+- The docstring of `st_book(stage=)` still announced a link in the HTML
+  export (removed in 0.7.81).
+
 ## [0.7.81] — 2026-10-29 — stage mode for the live app only, a way out, [book.defaults] on published sites (#105)
 
 ### Fixed

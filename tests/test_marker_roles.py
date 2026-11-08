@@ -166,7 +166,7 @@ class TestStopIndex:
 class TestShortcuts:
     @staticmethod
     def _strip(e):
-        return {k: v for k, v in e.items() if k not in ("index", "anchor", "stop_index")}
+        return {k: v for k, v in e.items() if k not in ("index", "anchor", "stop_index", "source")}
 
     def test_hidden_equals_roles_hidden(self):
         st_marker("X", hidden=True)
@@ -594,8 +594,14 @@ class TestBookSurfaces:
         assert not at2.exception
         continuous = mk.marker_entries()
         strip = ("page_idx", "block_idx", "page")
-        assert [{k: v for k, v in e.items() if k not in strip} for e in continuous] == \
-               [{k: v for k, v in e.items() if k not in strip} for e in paginated]
+
+        def same(e):     # the two scripts have their own file names (AppTest.from_string), same lines (#157)
+            out = {k: v for k, v in e.items() if k not in strip}
+            out["source"] = {k: v for k, v in e["source"].items() if k != "file"}
+            if "key" in out["source"]:                   # a stop: <file>#<rank>
+                out["source"]["key"] = out["source"]["key"].rsplit("#", 1)[-1]
+            return out
+        assert [same(e) for e in continuous] == [same(e) for e in paginated]
 
 
 class TestBookHelpers:

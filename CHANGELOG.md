@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.82] — 2026-11-08 — where each slide is written, copied in one gesture from the marker bar (#157)
+
 ### Added
 
 - **Where each slide is written, copied in one gesture** (#157, board t157,

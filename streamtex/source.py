@@ -34,9 +34,7 @@ from __future__ import annotations
 import json
 import logging
 import os
-import subprocess
 import sys
-import time
 from dataclasses import dataclass, field, fields, replace
 
 logger = logging.getLogger(__name__)
@@ -185,7 +183,6 @@ class _Book:
 
 
 _book = _Book()
-_release_cache: dict[str, tuple[float, str]] = {}
 
 
 def _find_root(start: str) -> tuple[str, dict | None]:
@@ -333,28 +330,62 @@ def without_sources(entries: list[dict] | None) -> list[dict]:
 
 # -- the page ----------------------------------------------------------------------------
 
+def _read(*parts: str) -> str:
+    try:
+        with open(os.path.join(*parts), encoding="utf-8") as f:
+            return f.read().strip()
+    except (OSError, UnicodeDecodeError):
+        return ""
+
+
+def _git_dir(start: str) -> str | None:
+    """The ``.git`` folder of *start* or of its nearest parent (a ``.git`` file points to a worktree's)."""
+    d = os.path.abspath(start)
+    while True:
+        git = os.path.join(d, ".git")
+        if os.path.isdir(git):
+            return git
+        if os.path.isfile(git):
+            line = _read(git)
+            if line.startswith("gitdir:"):
+                return os.path.normpath(os.path.join(d, line[len("gitdir:"):].strip()))
+        parent = os.path.dirname(d)
+        if parent == d:
+            return None
+        d = parent
+
+
+def head_commit(root: str) -> str:
+    """The commit checked out in *root*, read from ``.git`` without running git (``""`` when none).
+
+    Runs on every rerun of the live app: git itself (``rev-parse``, ``status``) took seconds on a
+    large repository synced by Dropbox, at each page turn (#157, board t157s).
+    """
+    git = _git_dir(root)
+    if not git:
+        return ""
+    head = _read(git, "HEAD")
+    if not head.startswith("ref:"):
+        return head
+    ref = head[len("ref:"):].strip()
+    common = os.path.normpath(os.path.join(git, _read(git, "commondir"))) if _read(git, "commondir") else git
+    for base in (git, common):
+        sha = _read(base, ref)
+        if sha:
+            return sha
+    for line in _read(common, "packed-refs").splitlines():
+        if line.endswith(" " + ref):
+            return line.split()[0]
+    return ""
+
+
 def release_name(root: str | None = None) -> str:
-    """The published release; locally the short commit, ``+`` when tracked files are modified."""
+    """The published release; locally the short commit checked out."""
     if _book.published and _book.published.get("release"):
         return str(_book.published["release"])
     root = root or _book.root
-    if not root:
-        return ""
-    hit = _release_cache.get(root)
-    if hit and time.monotonic() - hit[0] < 10:
-        return hit[1]
-    name = ""
-    try:
-        sha = subprocess.run(["git", "-C", root, "rev-parse", "--short=8", "HEAD"],
-                             capture_output=True, text=True, timeout=5)
-        if sha.returncode == 0:
-            dirty = subprocess.run(["git", "-C", root, "status", "--porcelain", "--untracked-files=no"],
-                                   capture_output=True, text=True, timeout=5)
-            name = sha.stdout.strip() + ("+" if dirty.stdout.strip() else "")
-    except (OSError, subprocess.SubprocessError):
-        name = ""
-    _release_cache[root] = (time.monotonic(), name)
-    return name
+    sha = head_commit(root) if root else ""
+    return sha[:8] if all(c in "0123456789abcdef" for c in sha) else ""
 
 
 def page_payload(side: str) -> dict | None:

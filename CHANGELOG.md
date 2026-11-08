@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A page turn no longer waits for git** (#157, board t157s, 2026-11-08).
+  With `[book.defaults.source] live = "on"`, every rerun of the live app
+  named the release by running `git rev-parse` and `git status` (kept 10 s
+  only); in a paginated profile each page turn is a rerun, and `git status`
+  over a large repository synced by Dropbox (7364 tracked files, 2780 media)
+  took seconds — the slide waited. The commit is now read from `.git`
+  itself (HEAD, the branch's ref or `packed-refs`, worktrees followed), in a
+  few milliseconds, without running anything; the `+` marking modified files
+  is gone (`release 1a2b3c4d`). Published sites are unchanged: their name
+  comes from `stx release`.
+
 ## [0.7.82] — 2026-11-08 — where each slide is written, copied in one gesture from the marker bar (#157)
 
 ### Added

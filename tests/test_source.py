@@ -156,16 +156,36 @@ def test_the_editor_is_cursor_and_only_live_on_this_computer(tmp_path):
     assert "editor" not in html["hint"]
 
 
-def test_the_release_is_the_commit_plus_a_mark_when_modified(tmp_path):
-    for cmd in (["init", "-q"], ["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", "x"]):
-        subprocess.run(["git", "-C", str(tmp_path), *cmd], check=True)
+def _git(path, *args):
+    return subprocess.run(["git", "-C", str(path), *args], check=True, capture_output=True, text=True).stdout.strip()
+
+
+def test_the_release_is_the_commit_read_without_running_git(tmp_path, monkeypatch):
+    _git(tmp_path, "init", "-q")
+    _git(tmp_path, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", "x")
     (tmp_path / "f.py").write_text("a")
-    subprocess.run(["git", "-C", str(tmp_path), "add", "f.py"], check=True)
-    begin_book(None, str(tmp_path), environ={})
-    src._release_cache.clear()
-    sha = subprocess.run(["git", "-C", str(tmp_path), "rev-parse", "--short=8", "HEAD"],
-                         capture_output=True, text=True).stdout.strip()
-    assert src.release_name() == sha + "+"                         # f.py staged, not committed
+    _git(tmp_path, "add", "f.py")                                  # modified: no "+" any more (t157s f2)
+    book = tmp_path / "docs" / "deck"
+    book.mkdir(parents=True)
+    sha = _git(tmp_path, "rev-parse", "--short=8", "HEAD")
+    begin_book(None, str(book), environ={})
+
+    def no_git(*a, **k):
+        raise AssertionError("git must not run while a page renders")
+    monkeypatch.setattr(subprocess, "run", no_git)
+    assert src.release_name() == sha
+    assert src.release_name(str(book)) == sha                       # a folder below the repository's root
+    monkeypatch.undo()
+
+    _git(tmp_path, "pack-refs", "--all")                            # the branch only in packed-refs
+    assert src.release_name() == sha
+    _git(tmp_path, "checkout", "-q", "--detach")                    # no branch
+    assert src.release_name() == sha
+    _git(tmp_path, "checkout", "-q", "-")
+    _git(tmp_path, "worktree", "add", "-q", "-b", "w", str(tmp_path / "wt"))
+    _git(tmp_path / "wt", "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", "y")
+    assert src.release_name(str(tmp_path / "wt")) == _git(tmp_path / "wt", "rev-parse", "--short=8", "HEAD") != sha
+    assert src.release_name(str(tmp_path.parent / "nowhere")) == ""
 
 
 # -- a real book ---------------------------------------------------------------------------

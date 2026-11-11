@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.83] — 2026-11-11 — a page turn no longer waits for git (#157)
+
 ### Fixed
 
 - **A page turn no longer waits for git** (#157, board t157s, 2026-11-08).

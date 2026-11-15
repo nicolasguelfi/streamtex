@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.84] — 2026-11-15 — the sidebar search box reads in every theme
+
 ### Fixed
 
 - **The sidebar search box reads in every theme** (board rch, 2026-11-15).

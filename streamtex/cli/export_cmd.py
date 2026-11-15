@@ -351,6 +351,7 @@ def export_html(path, output, asset_mode, title, no_nav, theme_mode, theme_bg, t
             toc=nav_toc,
             markers=nav_markers,
             search_index=nav_data.get("search_index"),
+            search_placeholder=nav_data.get("search_placeholder", "Search..."),
             doc_version=_cache_data.get("doc_version", ""),
             lib_version=_cache_data.get("lib_version", ""),
             page_nav=page_nav,

@@ -61,6 +61,16 @@ a {
     color: var(--stx-link-color);
 }
 
+/* Sidebar search box: drawn in the panel's own colours (search.py), so its
+   hint and its focus follow them too (board rch) */
+input[data-stx-search]::placeholder {
+    color: currentColor;
+    opacity: 0.6;
+}
+input[data-stx-search]:focus {
+    border-color: currentColor !important;
+}
+
 /* --- Responsive sizing variables --- */
 /* Desktop defaults (used as fallback values in var() too) */
 :root {

@@ -535,6 +535,7 @@ def _offer_export_downloads(html: str, base_name: str,
                             toc=_cache.get("toc"),
                             markers=_cache.get("markers"),
                             search_index=_cache.get("search_index"),
+                            search_placeholder=_cache.get("search_placeholder", "Search..."),
                             doc_version=_cache.get("doc_version", ""),
                             lib_version=_cache.get("lib_version", ""),
                             notice=rules["notice"],
@@ -1217,6 +1218,7 @@ def _st_book_impl(module_list, toc_config: TOCConfig = None, marker_config: Mark
         toc_sidebar, markers_sidebar, search_js_ph = build_ToC_sidebar_placeholder(
             has_markers=marker_config is not None,
             has_search=toc_config.search,
+            search_placeholder=toc_config.search_placeholder,
         )
         toc_block = None
         toc_content_style = None
@@ -1420,11 +1422,11 @@ def _waiting(placeholder: Delta, text: str) -> Delta:
     return placeholder
 
 
-def build_ToC_sidebar_placeholder(has_markers=False, has_search=False):
+def build_ToC_sidebar_placeholder(has_markers=False, has_search=False, search_placeholder="Search..."):
     with st.sidebar:
         # Search input above tabs (always visible regardless of active tab)
         if has_search:
-            st.markdown(generate_search_input_html(), unsafe_allow_html=True)
+            st.markdown(generate_search_input_html(search_placeholder), unsafe_allow_html=True)
             if st.button("Refresh search index", key="_stx_refresh_search_cont",
                          use_container_width=True, type="tertiary"):
                 st.rerun()
@@ -2815,6 +2817,7 @@ def _build_page_cache(module_list, toc_config, marker_config, separator,
             "toc": copy.deepcopy(toc_entries()) if toc_config else [],
             "markers": copy.deepcopy(marker_entries()) if marker_config else [],
             "search_index": search_index,
+            "search_placeholder": toc_config.search_placeholder if toc_config else "Search...",
         }
 
     # Persist cited bibliography keys so st_bibliography(only_cited=True) works
@@ -2833,6 +2836,7 @@ def _build_page_cache(module_list, toc_config, marker_config, separator,
         "paginate_by": _mode,
         "pages": pages,
         "search_index": search_index,
+        "search_placeholder": toc_config.search_placeholder if toc_config else "Search...",
         "cited_keys": _bib_cited,
         "glossary_used": _gloss_used,
         "doc_version": st.session_state.get("_stx_doc_version", ""),
@@ -2898,7 +2902,7 @@ def _build_paginated_sidebar(cache, current_page, total, toc_config, marker_conf
     with st.sidebar:
         # Search input above tabs (always visible regardless of active tab)
         if show_search:
-            st.markdown(generate_search_input_html(), unsafe_allow_html=True)
+            st.markdown(generate_search_input_html(toc_config.search_placeholder), unsafe_allow_html=True)
             if st.button("Refresh search index", key="_stx_refresh_search_pag",
                          use_container_width=True, type="tertiary"):
                 st.session_state[_STX_REFRESH_SEARCH_KEY] = True

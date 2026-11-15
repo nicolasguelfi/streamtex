@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import html
 import json
 from typing import Optional
 
@@ -65,11 +66,17 @@ def record_if_active(html: str) -> None:
 # ---------------------------------------------------------------------------
 
 def generate_search_input_html(placeholder: str = "Search...") -> str:
-    """Return HTML for the search input — rendered via st.markdown."""
+    """Return HTML for the search input — rendered via st.markdown.
+
+    The box takes the panel's own colours (transparent background, inherited
+    text), so it reads wherever the TOC reads: light or dark theme, Dark Reader
+    (board rch).  Its placeholder and focus rules live in ``default.css``.
+    """
     return (
         f'<div style="margin-bottom:8px;">'
-        f'<input data-stx-search="1" type="text" placeholder="{placeholder}"'
-        f' style="width:100%;padding:6px 10px;border:1px solid #ccc;'
+        f'<input data-stx-search="1" type="text" placeholder="{html.escape(placeholder)}"'
+        f' style="width:100%;padding:6px 10px;background:transparent;color:inherit;'
+        f'border:1px solid currentColor;border:1px solid color-mix(in srgb, currentColor 45%, transparent);'
         f'border-radius:6px;font-size:14px;box-sizing:border-box;outline:none;" />'
         f'</div>'
     )

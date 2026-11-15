@@ -6,6 +6,7 @@ with zero server-side dependencies.
 """
 
 import base64
+import html
 import json
 import re
 from pathlib import Path
@@ -170,14 +171,20 @@ body.stx-sidebar-resizing .streamtex-page { transition: none !important; }
   color: var(--stx-export-sidebar-fg, #555);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+/* The search box takes the panel's own colours, so it reads wherever the
+ * TOC reads (board rch): a white fallback background under the theme's
+ * light text made it white on white on every dark-themed site. */
 .stx-export-sidebar .stx-search-box {
   width: 100%; padding: 6px 10px;
-  border: 1px solid var(--stx-export-sidebar-input-border, #ccc);
+  border: 1px solid currentColor;
+  border: 1px solid color-mix(in srgb, currentColor 45%, transparent);
   border-radius: 6px; font-size: 13px; box-sizing: border-box;
   outline: none; margin-bottom: 10px;
-  background: var(--stx-export-sidebar-input-bg, #fff);
-  color: var(--stx-export-sidebar-fg, #333);
+  background: transparent;
+  color: inherit;
 }
+.stx-export-sidebar .stx-search-box::placeholder { color: currentColor; opacity: 0.6; }
+.stx-export-sidebar .stx-search-box:focus { border-color: currentColor; }
 /* Text-truncation lives on the inner <a>, not on the entry, so the active
  * indicator's ``::before`` (positioned at left:-8px) is not clipped by the
  * entry's own overflow box.  Keeping ``overflow: hidden`` on the entry
@@ -270,7 +277,8 @@ if _LOGO_TINY_PATH.exists():
 
 def _build_sidebar_html(toc: list[dict], has_search: bool = False,
                         doc_version: str = "", lib_version: str = "",
-                        page_nav: dict | None = None, notice: str = "") -> str:
+                        page_nav: dict | None = None, notice: str = "",
+                        search_placeholder: str = "Search...") -> str:
     """Build the sidebar TOC HTML from cache data.
 
     In a paginated export file (*page_nav*, #106) the table of contents is the
@@ -301,7 +309,7 @@ def _build_sidebar_html(toc: list[dict], has_search: bool = False,
     if has_search:
         parts.append(
             '<input id="stx-search" class="stx-search-box" '
-            'type="text" placeholder="Search..." autocomplete="off" />'
+            f'type="text" placeholder="{html.escape(search_placeholder)}" autocomplete="off" />'
         )
     for entry in toc:
         level = entry.get("level", 1)
@@ -997,11 +1005,14 @@ def enrich_export_html(
     page_nav: dict | None = None,
     notice: str = "",
     source: dict | None = None,
+    search_placeholder: str = "Search...",
 ) -> str:
     """Transform raw export HTML into a fully navigable static document.
 
     *source* (#157): the payload of the source gesture (``source.page_payload("html")``);
     None (the HTML side off) leaves no source in the page, as before.
+
+    *search_placeholder*: the hint of the search box (``TOCConfig.search_placeholder``).
 
     *page_nav* (#106): in a paginated export, ``{"mode": "paginated", "files":
     [file per page], "here": [pages of this file], "prefix": "",
@@ -1092,7 +1103,8 @@ def enrich_export_html(
     if has_toc:
         sidebar_html = _build_sidebar_html(toc, has_search=has_search,
                                            doc_version=doc_version, lib_version=lib_version,
-                                           page_nav=page_nav, notice=notice)
+                                           page_nav=page_nav, notice=notice,
+                                           search_placeholder=search_placeholder)
         raw_html = raw_html.replace("<body>", "<body>\n" + sidebar_html, 1)
 
     # --- Build JS block ---

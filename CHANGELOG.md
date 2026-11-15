@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **The sidebar search box reads in every theme** (board rch, 2026-11-15).
+  On published sites with a dark theme, the text typed in the search box
+  took the theme's light text colour on a white fallback background: white
+  on white (contrast 1.16), since 0.6.29, and Dark Reader left it so. In
+  the live app the box set no colour at all and relied on the browser's.
+  The box now takes the panel's own colours, live and in the export:
+  transparent background, inherited text, border, hint and focus drawn
+  from the text colour. Measured in Chromium, theme light, dark or none,
+  system light or dark, with and without Dark Reader: contrast 8.9 to 15.9.
+  Published sites change when they are published again.
+- **`TOCConfig(search_placeholder=…)` is used** (board rch). The hint of
+  the search box was always "Search...", live and in the export; it is
+  now the configured text (default unchanged).
+
 ## [0.7.83] — 2026-11-11 — a page turn no longer waits for git (#157)
 
 ### Fixed

@@ -293,6 +293,19 @@ class TestSidebarCssVars:
 
 
 # ---------------------------------------------------------------------------
+# Search box hint (TOCConfig.search_placeholder, board rch)
+# ---------------------------------------------------------------------------
+
+def test_the_search_box_shows_the_configured_hint_live_and_in_the_export():
+    from streamtex.search import generate_search_input_html
+    toc = [{"level": 1, "title": "Hello", "_reg_label": "Hello", "key_anchor": "h1"}]
+    assert 'placeholder="Search..."' in _build_sidebar_html(toc, has_search=True)
+    for html in (_build_sidebar_html(toc, has_search=True, search_placeholder='Rechercher "x"…'),
+                 generate_search_input_html('Rechercher "x"…')):
+        assert 'placeholder="Rechercher &quot;x&quot;…"' in html
+
+
+# ---------------------------------------------------------------------------
 # Sidebar drag-resize handle (P1 + P4 reset on double-click)
 # ---------------------------------------------------------------------------
 

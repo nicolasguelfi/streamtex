@@ -57,6 +57,30 @@ def _validate_align(param: str, value: str | None,
     return value
 
 
+_ITEM_GAP_FORBIDDEN = re.compile(r'[;{}<>"\\]')
+
+
+def _normalize_item_gap(value: str | float | None) -> str | None:
+    """Return the CSS length of ``st_list(item_gap=…)``, or ``None``.
+
+    A number is read as ``em`` — relative to the item's own font size, so the
+    spacing grows with the text.  A string is any CSS length (``"0.6em"``,
+    ``"12px"``, ``"1rem"``).  ``None`` and ``0`` add nothing.
+    """
+    if value is None:
+        return None
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        if value < 0:
+            raise ValueError(f"st_list(item_gap={value!r}): must not be negative")
+        return None if value == 0 else f"{value:g}em"
+    if isinstance(value, str):
+        css = value.strip()
+        if not css or _ITEM_GAP_FORBIDDEN.search(css):
+            raise ValueError(f"st_list(item_gap={value!r}): expected a CSS length such as '0.6em'")
+        return css
+    raise ValueError(f"st_list(item_gap={value!r}): expected a number or a CSS length")
+
+
 def _list_export_css(text_align: str | None, block_align: str | None) -> str:
     """Return the CSS declarations added to the exported ``<ul>``/``<ol>``.
 
@@ -160,8 +184,11 @@ def _export_marker_attr(bullet_content: str, is_ordered: bool) -> str:
 
 class ListController:
     def __init__(self, li_style: Style, bullet_content: str, is_ordered: bool,
-                 alt_li_styles: list[Style] | None = None):
+                 alt_li_styles: list[Style] | None = None,
+                 item_gap: str | None = None):
         self.li_style = li_style
+        self.item_gap = item_gap
+        self._items_opened = 0
         self.bullet_content = bullet_content
         self.is_ordered = is_ordered
         self.alt_li_styles = alt_li_styles
@@ -180,6 +207,19 @@ class ListController:
             self._item_index += 1
         if style:
             final_style = final_style + style
+        # item_gap: the same space above every item but the first, carried by
+        # the item itself so the live block and the exported <li> get the very
+        # same declaration (and nested lists keep their own spacing).
+        gap_before = bool(self.item_gap) and self._items_opened > 0
+        self._items_opened += 1
+        export_style = final_style
+        if gap_before:
+            final_style = final_style + Style(f"margin-top: {self.item_gap};", "stx_list_item_gap")
+            # An exported <li> keeps default.css's `margin-bottom: 0.3em`, and
+            # sibling margins collapse (the larger wins) where live flex items
+            # add up.  Adding those 0.3em back makes the export gap the same.
+            export_style = export_style + Style(
+                f"margin-top: calc({self.item_gap} + 0.3em);", "stx_list_item_gap")
 
         # We generate a unique ID for the Outer Container (the 'LI')
         item_id = generate_key("li")
@@ -195,7 +235,7 @@ class ListController:
         # Export wrapper: <li> (suppresses st_block's own <div>)
         if is_export_active():
             marker_attr = _export_marker_attr(self.bullet_content, self.is_ordered)
-            export_push_wrapper(f'<li style="{final_style}"{marker_attr}>')
+            export_push_wrapper(f'<li style="{export_style}"{marker_attr}>')
 
         with st_block(style=final_style, _export_wrapper=False):
             # Per-item bullet stylesheet + sentinel marker span go INSIDE the
@@ -223,6 +263,7 @@ def st_list(
     block_align: str | None = None,
     align: str | None = None,
     alt_li_styles: list[Style] | None = None,
+    item_gap: str | float | None = None,
 ):
     """
     A context manager representing a list (ordered or unordered) with optional styles and support for nested lists.
@@ -255,6 +296,12 @@ def st_list(
     :param alt_li_styles: Optional list of ``Style`` objects to cycle through for each item.
         Applied after ``li_style`` and before the per-item ``style`` argument.
         The style at index ``i % len(alt_li_styles)`` is merged for the i-th item.
+    :param item_gap: Extra space between consecutive items of THIS list
+        (nested lists keep their own).  A number is read as ``em`` (relative
+        to the item's font size, so it scales with the text): ``item_gap=0.6``;
+        a string is any CSS length: ``item_gap="12px"``.  Added as
+        ``margin-top`` on every item but the first, identically live and in
+        the HTML export.  ``None`` (default) keeps the current spacing.
 
     Notes:
     - Supports nested lists recursively, with the nesting level affecting the style if `l_style` is a `ListStyle`.
@@ -277,6 +324,7 @@ def st_list(
     text_align = _validate_align("text_align", text_align, _TEXT_ALIGN_VALUES)
     block_align = _validate_align("block_align", block_align, _BLOCK_ALIGN_VALUES)
     align = _validate_align("align", align, _BLOCK_ALIGN_VALUES)
+    gap_css = _normalize_item_gap(item_gap)
     if block_align is None:
         block_align = align
 
@@ -331,7 +379,8 @@ def st_list(
         # mode that `text_align=` switches on.
         with st_block(style=l_style, _export_wrapper=False):
             st.html(marker)
-            yield ListController(li_style=li_style, bullet_content=bullet_content, is_ordered=is_ordered, alt_li_styles=alt_li_styles)
+            yield ListController(li_style=li_style, bullet_content=bullet_content, is_ordered=is_ordered, alt_li_styles=alt_li_styles,
+                                 item_gap=gap_css)
 
         if is_export_active():
             export_pop_wrapper(f"</{tag}>")

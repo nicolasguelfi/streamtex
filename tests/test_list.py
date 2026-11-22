@@ -1104,3 +1104,79 @@ class TestExportMarkerAttr:
             ' data-stx-marker-counter="decimal"'
         assert _export_marker_attr("counter(streamtex-counter, lower-roman) '.'", True) == \
             ' data-stx-marker-counter="lower-roman"'
+
+
+class TestItemGap:
+    """st_list(item_gap=…): the same margin-top on every item but the first."""
+
+    def test_normalize(self):
+        from streamtex.list import _normalize_item_gap
+
+        assert _normalize_item_gap(None) is None
+        assert _normalize_item_gap(0) is None
+        assert _normalize_item_gap(0.6) == "0.6em"
+        assert _normalize_item_gap(1) == "1em"
+        assert _normalize_item_gap(" 12px ") == "12px"
+        for bad in (-1, True, "", "1em; color:red", "1em}", [1]):
+            with pytest.raises(ValueError):
+                _normalize_item_gap(bad)
+
+    @pytest.mark.parametrize("export", [False, True])
+    def test_margin_on_every_item_but_first(self, mock_streamlit, export):
+        styles, pushed = [], []
+
+        def fake_block(style=None, **kw):
+            styles.append(str(style))
+            return MagicMock(__enter__=MagicMock(), __exit__=MagicMock(return_value=False))
+
+        with patch("streamtex.list.st_block", side_effect=fake_block), \
+             patch("streamtex.list.st.container") as mock_container, \
+             patch("streamtex.list.st.html"), \
+             patch("streamtex.list.is_export_active", return_value=export), \
+             patch("streamtex.list.export_push_wrapper", side_effect=pushed.append), \
+             patch("streamtex.list.export_pop_wrapper"):
+            mock_container.return_value.__enter__ = MagicMock()
+            mock_container.return_value.__exit__ = MagicMock(return_value=False)
+            with st_list(item_gap=0.6) as lst:
+                for _ in range(3):
+                    with lst.item():
+                        pass
+
+        item_styles = styles[1:]  # styles[0] is the list root
+        assert "margin-top" not in item_styles[0]
+        assert all("margin-top: 0.6em;" in st for st in item_styles[1:])
+        if export:
+            lis = [p for p in pushed if p.startswith("<li")]
+            assert "margin-top" not in lis[0]
+            # default.css gives an exported <li> margin-bottom 0.3em, which
+            # collapses with margin-top: the export adds it back.
+            assert all("margin-top: calc(0.6em + 0.3em);" in li for li in lis[1:])
+
+    def test_default_adds_nothing(self, mock_streamlit):
+        controller = ListController(StxStyles.none, "'●'", is_ordered=False)
+        styles = []
+
+        def fake_block(style=None, **kw):
+            styles.append(str(style))
+            return MagicMock(__enter__=MagicMock(), __exit__=MagicMock(return_value=False))
+
+        with patch("streamtex.list.st_block", side_effect=fake_block), \
+             patch("streamtex.list.st.container") as mock_container, \
+             patch("streamtex.list.st.html"), \
+             patch("streamtex.list.is_export_active", return_value=False):
+            mock_container.return_value.__enter__ = MagicMock()
+            mock_container.return_value.__exit__ = MagicMock(return_value=False)
+            for _ in range(2):
+                with controller.item():
+                    pass
+        assert not any("margin-top" in st for st in styles)
+
+    def test_export_compensation_matches_default_css(self):
+        """The export adds back default.css's li margin-bottom; keep both in step."""
+        import re
+
+        import streamtex
+
+        css = (Path(streamtex.__file__).parent / "static" / "default.css").read_text()
+        li_rule = re.search(r"\nli \{([^}]*)\}", css).group(1)
+        assert "margin-bottom: 0.3em;" in li_rule

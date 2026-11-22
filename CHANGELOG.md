@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `tight` 1.1, `snug` 1.25, `normal` 1.4, `relaxed` 1.6, e.g.
   `s.Large + s.text.leading.snug`. New export `Leading` in
   `streamtex.styles`. Nothing changes for text that does not use them.
-- **Space between list items: `st_list(item_gap=…)`**. `st_list` had no
+- **Space between list items: `st_list(item_gap=…)`** (#159). `st_list` had no
   way to spread its items apart; projects added a `padding-bottom` to
   `li_style` by hand. `item_gap` adds the same space above every item but
   the first: a number is read as `em` of the item's font size

@@ -1,4 +1,4 @@
-"""Text-related style definitions: Colors, Sizes, Fonts, Decors, Weights, Alignments, Titles."""
+"""Text-related style definitions: Colors, Sizes, Fonts, Decors, Weights, Alignments, Wrap, Leading, Titles."""
 
 from typing import Optional, Union
 
@@ -348,6 +348,21 @@ class Wrap:
     """Enables automatic hyphenation at line breaks (requires lang attribute on parent)."""
 
 
+class Leading:
+    """Line-height (leading) presets, unitless so they scale with the font size.
+
+    Compose with a size: ``s.Large + s.text.leading.snug``.
+    """
+    tight   = Style("line-height: 1.1;",  "leading_tight")
+    """Line-height 1.1 — titles and one-line labels."""
+    snug    = Style("line-height: 1.25;", "leading_snug")
+    """Line-height 1.25 — large text on slides, short paragraphs."""
+    normal  = Style("line-height: 1.4;",  "leading_normal")
+    """Line-height 1.4 — body text."""
+    relaxed = Style("line-height: 1.6;",  "leading_relaxed")
+    """Line-height 1.6 — long reading passages."""
+
+
 class Titles:
     title = Style.create(
         Weights.bold_weight + Sizes.LARGE_size + Alignments.center_align,
@@ -369,3 +384,4 @@ class Text:
     fonts = Fonts
     titles = Titles
     wrap = Wrap
+    leading = Leading

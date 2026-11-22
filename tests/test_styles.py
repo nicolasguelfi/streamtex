@@ -278,3 +278,19 @@ def test_named_size_fallbacks_equal_desktop_css():
         g, h, hu = map(int, block)
         assert g > h > hu
     assert len(re.findall("--stx-HUGE-size", css)) == 3
+
+
+def test_text_leading_family():
+    """#158: s.text.leading offers unitless line-heights that compose with a size."""
+    from streamtex.styles import Leading
+    from streamtex.styles import StxStyles as s
+
+    assert s.text.leading is Leading
+    expected = {"tight": "1.1", "snug": "1.25", "normal": "1.4", "relaxed": "1.6"}
+    for name, value in expected.items():
+        style = getattr(s.text.leading, name)
+        assert str(style) == f"line-height: {value};"
+        assert style.style_id == f"leading_{name}"
+    combined = str(s.Large + s.text.leading.snug)
+    assert "font-size: var(--stx-Large-size" in combined
+    assert "line-height: 1.25;" in combined

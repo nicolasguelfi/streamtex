@@ -11,7 +11,7 @@ from .core import Style, ListStyle, StyleGrid, theme, add_css, remove_css
 # Text styles
 from .text import (
     Decors, Weights, Alignments, Colors, Sizes, Fonts, Wrap,
-    Titles, Text,
+    Leading, Titles, Text,
 )
 
 # Container styles

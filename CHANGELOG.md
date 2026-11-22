@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Line-height presets: `s.text.leading`** (#158). Text styles had no
+  line-height, so projects wrote `ns("line-height:…;")` by hand. Four
+  unitless presets now scale with the font size and compose with any size:
+  `tight` 1.1, `snug` 1.25, `normal` 1.4, `relaxed` 1.6, e.g.
+  `s.Large + s.text.leading.snug`. New export `Leading` in
+  `streamtex.styles`. Nothing changes for text that does not use them.
+
 ## [0.7.84] — 2026-11-15 — the sidebar search box reads in every theme
 
 ### Fixed

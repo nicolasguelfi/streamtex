@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.85] — 2026-11-22 — line-height presets and space between list items (#158, #159)
+
 ### Added
 
 - **Line-height presets: `s.text.leading`** (#158). Text styles had no
